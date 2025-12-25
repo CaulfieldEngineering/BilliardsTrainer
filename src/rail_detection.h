@@ -6,7 +6,8 @@
 // Structure to hold rail detection parameters
 struct RailParams {
     // Black rail HSV range
-    int blackVMax = 120;
+    // Default increased to better match typical "dark rail" brightness under indoor lighting.
+    int blackVMax = 217;
     // Brown rail HSV range
     int brownHMax = 40;
     int brownSMax = 120;

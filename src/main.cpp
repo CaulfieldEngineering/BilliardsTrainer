@@ -9,6 +9,7 @@
 #include <mutex>
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 
 #ifdef _WIN32
 #define NOMINMAX  // Prevent Windows.h from defining min/max macros
@@ -44,9 +45,10 @@ enum class SidebarPage {
 // Global variables for UI state
 struct UIControls {
     bool showOverlay = true;  // Master overlay toggle (on by default)
-    bool showDiamonds = false;
-    bool showFelt = false;
-    bool showRail = false;
+    // Default all overlays ON so masks are visible immediately.
+    bool showDiamonds = true;
+    bool showFelt = true;
+    bool showRail = true;
     bool showSidebar = true; // Debug sidebar toggle (on by default)
     bool sidebarCollapsed = false; // Sidebar collapsed state
     SidebarPage sidebarPage = SidebarPage::Debug; // Top-level sidebar page (default: Debug)
@@ -66,6 +68,169 @@ struct UIControls {
     FeltParams feltParams;
     RailParams railParams;
 } uiControls;
+
+// Last diamond debug buffers (captured from detectDiamonds when diamonds are enabled)
+static DiamondDebugImages g_lastDiamondDebug;
+static bool g_hasDiamondDebug = false;
+
+// Last rendered (overlaid) frame so menu-driven capture export can work.
+static cv::Mat g_lastProcessedFrame;
+
+// Choose a deterministic capture directory.
+// On Windows, we save next to the executable so "Export Captures" always goes somewhere predictable
+// even if the process current working directory is unexpected (e.g. launched from Explorer / shortcuts).
+static std::filesystem::path getCaptureDirectory() {
+#ifdef _WIN32
+    wchar_t modulePath[MAX_PATH] = {0};
+    const DWORD n = GetModuleFileNameW(NULL, modulePath, MAX_PATH);
+    if (n > 0 && n < MAX_PATH) {
+        std::filesystem::path exePath(modulePath);
+        return exePath.parent_path() / "captures";
+    }
+#endif
+    // Fallback: current working directory.
+    return std::filesystem::current_path() / "captures";
+}
+
+// Export the current overlay + diamond intermediate buffers to disk.
+// Saved under a timestamped prefix: ./captures/capture-<ms-since-epoch>-*.png
+static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem::path* outDir, std::string* outError) {
+    if (outDir) *outDir = std::filesystem::path();
+    if (outError) outError->clear();
+    if (processedImage.empty()) {
+        if (outError) *outError = "processedImage was empty (nothing to save).";
+        return false;
+    }
+
+    const std::filesystem::path dir = getCaptureDirectory();
+    if (outDir) *outDir = dir;
+    try {
+        std::filesystem::create_directories(dir);
+    } catch (const std::exception& e) {
+        if (outError) *outError = std::string("create_directories failed: ") + e.what();
+        return false;
+    } catch (...) {
+        if (outError) *outError = "create_directories failed (unknown error).";
+        return false;
+    }
+
+    const auto now = std::chrono::system_clock::now();
+    const auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    const std::string stem = "capture-" + std::to_string(ts);
+
+    struct WriteAttempt {
+        std::filesystem::path path;
+        bool ok = false;
+        std::string error;
+    };
+    std::vector<WriteAttempt> attempts;
+    attempts.reserve(8);
+
+    auto writeImageChecked = [&](const std::filesystem::path& p, const cv::Mat& img) {
+        WriteAttempt a;
+        a.path = p;
+        if (img.empty()) {
+            a.ok = false;
+            a.error = "image was empty";
+            attempts.push_back(std::move(a));
+            return;
+        }
+        try {
+            const bool wrote = cv::imwrite(p.string(), img);
+            if (!wrote) {
+                a.ok = false;
+                a.error = "cv::imwrite returned false";
+            } else {
+                // Verify the file actually exists and is non-empty.
+                std::error_code ec;
+                const bool exists = std::filesystem::exists(p, ec);
+                const auto sz = exists ? std::filesystem::file_size(p, ec) : 0;
+                a.ok = exists && sz > 0;
+                if (!a.ok) {
+                    a.error = "post-write verify failed (exists/size)";
+                }
+            }
+        } catch (const std::exception& e) {
+            a.ok = false;
+            a.error = std::string("exception: ") + e.what();
+        } catch (...) {
+            a.ok = false;
+            a.error = "exception: unknown";
+        }
+        attempts.push_back(std::move(a));
+    };
+
+    // Always attempt overlay first.
+    writeImageChecked(dir / (stem + "-overlay.png"), processedImage);
+
+    // Save debug masks for diamonds if available.
+    if (g_hasDiamondDebug) {
+        writeImageChecked(dir / (stem + "-railMaskDark.png"), g_lastDiamondDebug.railMaskDark);
+        writeImageChecked(dir / (stem + "-railSearchMask.png"), g_lastDiamondDebug.railSearchMask);
+        writeImageChecked(dir / (stem + "-railEnhanced.png"), g_lastDiamondDebug.railEnhanced);
+        writeImageChecked(dir / (stem + "-otsuBinary.png"), g_lastDiamondDebug.otsuBinary);
+        writeImageChecked(dir / (stem + "-diamondMask.png"), g_lastDiamondDebug.diamondMask);
+
+        // Emit a small info image with counts + ROI (easy to view without opening a text file).
+        cv::Mat info(80, 520, CV_8UC3, cv::Scalar(30, 30, 30));
+        const std::string line1 = "keypointsFound=" + std::to_string(g_lastDiamondDebug.keypointsFound) +
+                                  " centersKept=" + std::to_string(g_lastDiamondDebug.centersKept);
+        const std::string line2 = "roi=(" + std::to_string(g_lastDiamondDebug.roi.x) + "," +
+                                  std::to_string(g_lastDiamondDebug.roi.y) + " " +
+                                  std::to_string(g_lastDiamondDebug.roi.width) + "x" +
+                                  std::to_string(g_lastDiamondDebug.roi.height) + ")";
+        cv::putText(info, line1, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(240, 240, 240), 1, cv::LINE_AA);
+        cv::putText(info, line2, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(240, 240, 240), 1, cv::LINE_AA);
+        writeImageChecked(dir / (stem + "-diamondDebugInfo.png"), info);
+    }
+
+    // Always write a manifest so we can diagnose "it said exported but folder is empty".
+    // This also acts as a sanity check that we can write *something* to the directory.
+    {
+        const std::filesystem::path manifestPath = dir / (stem + "-manifest.txt");
+        try {
+            FILE* f = nullptr;
+#ifdef _WIN32
+            _wfopen_s(&f, manifestPath.wstring().c_str(), L"wb");
+#else
+            f = std::fopen(manifestPath.string().c_str(), "wb");
+#endif
+            if (f) {
+                std::string header = "BilliardsTrainer capture manifest\n";
+                header += "timestampMs=" + std::to_string(ts) + "\n";
+                header += "dir=" + dir.string() + "\n";
+                for (const auto& a : attempts) {
+                    header += (a.ok ? "OK " : "FAIL ");
+                    header += a.path.filename().string();
+                    if (!a.ok && !a.error.empty()) header += " (" + a.error + ")";
+                    header += "\n";
+                }
+                (void)std::fwrite(header.data(), 1, header.size(), f);
+                std::fclose(f);
+            }
+        } catch (...) {
+            // ignore
+        }
+    }
+
+    int okCount = 0;
+    for (const auto& a : attempts) if (a.ok) okCount++;
+
+    if (okCount <= 0) {
+        if (outError) {
+            std::string msg = "No files were verified on disk.\n";
+            for (const auto& a : attempts) {
+                msg += "- " + a.path.filename().string() + ": " + (a.ok ? "OK" : "FAIL");
+                if (!a.ok && !a.error.empty()) msg += " (" + a.error + ")";
+                msg += "\n";
+            }
+            *outError = msg;
+        }
+        return false;
+    }
+
+    return true;
+}
 std::vector<int> enumerateCameras();
 void createNativeMenu(HWND hwnd, const std::vector<int>& cameras);
 void handleMenuCommand(int menuId);
@@ -538,7 +703,10 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         }
 
         if (uiControls.showDiamonds) {
-            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams);
+            g_hasDiamondDebug = true;
+            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondDebug);
+        } else {
+            g_hasDiamondDebug = false;
         }
     }
 
@@ -608,6 +776,10 @@ static void onFrameTick(HWND mainHwnd) {
 
     cv::Mat display = buildDisplayFrame(frame);
     if (!display.empty()) {
+        // Keep a copy of the most recent rendered frame so "Export Captures" works in Win32 mode
+        // (this code path does not use the OpenCV `cv::imshow` loop).
+        g_lastProcessedFrame = display.clone();
+
         updateImageDibFromBgr(display);
         if (g_imageViewHwnd) {
             // Avoid erase flicker; ImageView fully repaints.
@@ -928,6 +1100,7 @@ static int runWin32HostedApp(int argc, char** argv) {
 // Menu command IDs
 #define IDM_NAV_DEBUG 900
 #define IDM_NAV_DISPLAY 901
+#define IDM_EXPORT_CAPTURES 902
 #define IDM_DEBUG_OVERLAY 1000
 #define IDM_DEBUG_OVERLAY_DIAMONDS 1001
 #define IDM_DEBUG_OVERLAY_FELT 1002
@@ -1255,9 +1428,15 @@ int legacyHighGuiMain(int argc, char** argv) {
             
             // Apply diamond detection if enabled
             if (uiControls.showDiamonds) {
-                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams);
+                g_hasDiamondDebug = true;
+                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondDebug);
+            } else {
+                g_hasDiamondDebug = false;
             }
         }
+        
+        // Keep a copy of the last overlaid frame for menu-driven capture export.
+        g_lastProcessedFrame = processedImage.clone();
         
         // Calculate scaled image size to fit window (maintain aspect ratio)
         // Reserve space for sidebar if enabled and not collapsed
@@ -1307,6 +1486,11 @@ int legacyHighGuiMain(int argc, char** argv) {
         if (key == 'q' || key == 27) { // 'q' or ESC
             running = false;
         }
+        else if (key == 's' || key == 'S') {
+            std::filesystem::path outDir;
+            std::string err;
+            (void)exportCapturesToDisk(processedImage, &outDir, &err);
+        }
     }
     
     // Cleanup: Release all resources
@@ -1347,6 +1531,7 @@ void createNativeMenu(HWND hwnd, const std::vector<int>& cameras) {
                 IDM_NAV_DEBUG, L"Debug");
     AppendMenuW(hMenuBar, MF_STRING | ((uiControls.sidebarPage == SidebarPage::Display) ? MF_CHECKED : MF_UNCHECKED),
                 IDM_NAV_DISPLAY, L"Display");
+    AppendMenuW(hMenuBar, MF_STRING, IDM_EXPORT_CAPTURES, L"Export Captures");
     
     // Set the menu bar
     SetMenu(hwnd, hMenuBar);
@@ -2179,6 +2364,22 @@ void handleMenuCommand(int menuId) {
         updateOverlayMenu();
         layoutChildren(g_hwnd);
         createSidebarControls(g_hwnd);
+    }
+    else if (menuId == IDM_EXPORT_CAPTURES) {
+        std::filesystem::path outDir;
+        std::string err;
+        const bool ok = exportCapturesToDisk(g_lastProcessedFrame, &outDir, &err);
+#ifdef _WIN32
+        std::wstring msg;
+        if (ok) {
+            msg = L"Captures exported to:\n" + outDir.wstring();
+            MessageBoxW(g_hwnd, msg.c_str(), L"Export Captures", MB_OK | MB_ICONINFORMATION);
+        } else {
+            msg = L"Export failed.\n\nTarget:\n" + outDir.wstring() +
+                  L"\n\nReason:\n" + std::wstring(err.begin(), err.end());
+            MessageBoxW(g_hwnd, msg.c_str(), L"Export Captures", MB_OK | MB_ICONERROR);
+        }
+#endif
     }
 }
 
