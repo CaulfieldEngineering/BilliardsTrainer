@@ -72,6 +72,11 @@ struct UIControls {
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
 
+// Last diamond detection processing image (the final image used for blob detection)
+static cv::Mat g_lastDiamondProcessingImage;
+// Additional debug images emitted by diamond detection (label, image).
+extern std::vector<std::pair<std::string, cv::Mat>> g_lastDiamondDebugImages;
+
 // Choose a deterministic capture directory.
 // On Windows, we save next to the executable so "Export Captures" always goes somewhere predictable
 // even if the process current working directory is unexpected (e.g. launched from Explorer / shortcuts).
@@ -158,6 +163,22 @@ static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem:
 
     // Always attempt overlay first.
     writeImageChecked(dir / (stem + "-overlay.png"), processedImage);
+
+    // Export diamond detection processing image if available
+    if (!g_lastDiamondProcessingImage.empty()) {
+        writeImageChecked(dir / (stem + "-diamond-processing.png"), g_lastDiamondProcessingImage);
+    }
+    // Export per-stage diamond debug images if available
+    if (!g_lastDiamondDebugImages.empty()) {
+        for (const auto& kv : g_lastDiamondDebugImages) {
+            std::string label = kv.first;
+            // sanitize label for filename
+            for (char& c : label) {
+                if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_')) c = '_';
+            }
+            writeImageChecked(dir / (stem + "-diamond-" + label + ".png"), kv.second);
+        }
+    }
 
     // Always write a manifest so we can diagnose "it said exported but folder is empty".
     // This also acts as a sanity check that we can write *something* to the directory.
@@ -678,7 +699,9 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         }
 
         if (uiControls.showDiamonds) {
-            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams);
+            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondProcessingImage);
+        } else {
+            g_lastDiamondProcessingImage.release();
         }
     }
 
@@ -1400,7 +1423,9 @@ int legacyHighGuiMain(int argc, char** argv) {
             
             // Apply diamond detection if enabled
             if (uiControls.showDiamonds) {
-                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams);
+                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondProcessingImage);
+            } else {
+                g_lastDiamondProcessingImage.release();
             }
         }
         
@@ -1915,23 +1940,23 @@ void createSidebarControls(HWND hwnd) {
                             yPos);
 
             yPos += 6;
-            createLabel(L"Threshold 1:", yPos, IDC_STATIC_BASE + 1);
-            createTrackbar(IDC_DIAMOND_THRESH1, yPos, 0, 255, uiControls.diamondParams.threshold1);
+            createLabel(L"Min Threshold:", yPos, IDC_STATIC_BASE + 1);
+            createTrackbar(IDC_DIAMOND_THRESH1, yPos, 0, 255, static_cast<int>(uiControls.diamondParams.minThreshold));
             createValueLabel(yPos, IDC_STATIC_BASE + 2);
             yPos += lineHeight;
 
-            createLabel(L"Threshold 2:", yPos, IDC_STATIC_BASE + 3);
-            createTrackbar(IDC_DIAMOND_THRESH2, yPos, 0, 255, uiControls.diamondParams.threshold2);
+            createLabel(L"Max Threshold:", yPos, IDC_STATIC_BASE + 3);
+            createTrackbar(IDC_DIAMOND_THRESH2, yPos, 0, 255, static_cast<int>(uiControls.diamondParams.maxThreshold));
             createValueLabel(yPos, IDC_STATIC_BASE + 4);
             yPos += lineHeight;
 
             createLabel(L"Min Area:", yPos, IDC_STATIC_BASE + 5);
-            createTrackbar(IDC_DIAMOND_MINAREA, yPos, 1, 100, uiControls.diamondParams.minArea);
+            createTrackbar(IDC_DIAMOND_MINAREA, yPos, 1, 1000, static_cast<int>(uiControls.diamondParams.minArea));
             createValueLabel(yPos, IDC_STATIC_BASE + 6);
             yPos += lineHeight;
 
             createLabel(L"Max Area:", yPos, IDC_STATIC_BASE + 7);
-            createTrackbar(IDC_DIAMOND_MAXAREA, yPos, 100, 5000, uiControls.diamondParams.maxArea);
+            createTrackbar(IDC_DIAMOND_MAXAREA, yPos, 100, 5000, static_cast<int>(uiControls.diamondParams.maxArea));
             createValueLabel(yPos, IDC_STATIC_BASE + 8);
             yPos += lineHeight;
 
@@ -2048,16 +2073,16 @@ void updateSidebarControls() {
     
     // Update trackbar positions
     HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH1);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold1);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.minThreshold));
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH2);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold2);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.maxThreshold));
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MINAREA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.minArea);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.minArea));
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MAXAREA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.maxArea);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.maxArea));
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BLACK_VMAX);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.blackVMax);
@@ -2111,22 +2136,22 @@ void updateSidebarControls() {
     wchar_t buffer[32];
     HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 2);
     if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.threshold1);
+        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.minThreshold);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 4);
     if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.threshold2);
+        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.maxThreshold);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 6);
     if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.minArea);
+        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.minArea);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 8);
     if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.maxArea);
+        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.maxArea);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 11);
@@ -2222,16 +2247,16 @@ void updateSidebarContext(SidebarContext context) {
 void handleTrackbarChange(int trackbarId, int value) {
     switch (trackbarId) {
         case IDC_DIAMOND_THRESH1:
-            uiControls.diamondParams.threshold1 = value;
+            uiControls.diamondParams.minThreshold = static_cast<float>(value);
             break;
         case IDC_DIAMOND_THRESH2:
-            uiControls.diamondParams.threshold2 = value;
+            uiControls.diamondParams.maxThreshold = static_cast<float>(value);
             break;
         case IDC_DIAMOND_MINAREA:
-            uiControls.diamondParams.minArea = value;
+            uiControls.diamondParams.minArea = static_cast<float>(value);
             break;
         case IDC_DIAMOND_MAXAREA:
-            uiControls.diamondParams.maxArea = value;
+            uiControls.diamondParams.maxArea = static_cast<float>(value);
             break;
         case IDC_RAIL_BLACK_VMAX:
             uiControls.railParams.blackVMax = value;

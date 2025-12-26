@@ -1,6 +1,8 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <string>
+#include <utility>
 #include <vector>
 
 // We accept these parameter structs so the sidebar tuning actually impacts diamond detection.
@@ -22,6 +24,9 @@ struct DiamondDetectionParams {
     int outlineThicknessPx = 2;
 };
 
+// Debug images emitted by the diamond detection pipeline (label, image)
+extern std::vector<std::pair<std::string, cv::Mat>> g_lastDiamondDebugImages;
+
 // Detect diamond markers on the pool table rails with context-aware constraints
 void detectDiamonds(
     const cv::Mat& src,
@@ -29,4 +34,5 @@ void detectDiamonds(
     bool showDiamonds,
     const DiamondDetectionParams& diamondParams,
     const FeltParams& feltParams,
-    const RailParams& railParams);
+    const RailParams& railParams,
+    cv::Mat* outProcessingImage = nullptr);
