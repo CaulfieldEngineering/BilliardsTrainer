@@ -1941,22 +1941,22 @@ void createSidebarControls(HWND hwnd) {
 
             yPos += 6;
             createLabel(L"Min Threshold:", yPos, IDC_STATIC_BASE + 1);
-            createTrackbar(IDC_DIAMOND_THRESH1, yPos, 0, 255, static_cast<int>(uiControls.diamondParams.minThreshold));
+            createTrackbar(IDC_DIAMOND_THRESH1, yPos, 0, 255, uiControls.diamondParams.threshold1);
             createValueLabel(yPos, IDC_STATIC_BASE + 2);
             yPos += lineHeight;
 
             createLabel(L"Max Threshold:", yPos, IDC_STATIC_BASE + 3);
-            createTrackbar(IDC_DIAMOND_THRESH2, yPos, 0, 255, static_cast<int>(uiControls.diamondParams.maxThreshold));
+            createTrackbar(IDC_DIAMOND_THRESH2, yPos, 0, 255, uiControls.diamondParams.threshold2);
             createValueLabel(yPos, IDC_STATIC_BASE + 4);
             yPos += lineHeight;
 
             createLabel(L"Min Area:", yPos, IDC_STATIC_BASE + 5);
-            createTrackbar(IDC_DIAMOND_MINAREA, yPos, 1, 1000, static_cast<int>(uiControls.diamondParams.minArea));
+            createTrackbar(IDC_DIAMOND_MINAREA, yPos, 1, 1000, uiControls.diamondParams.minArea);
             createValueLabel(yPos, IDC_STATIC_BASE + 6);
             yPos += lineHeight;
 
             createLabel(L"Max Area:", yPos, IDC_STATIC_BASE + 7);
-            createTrackbar(IDC_DIAMOND_MAXAREA, yPos, 100, 5000, static_cast<int>(uiControls.diamondParams.maxArea));
+            createTrackbar(IDC_DIAMOND_MAXAREA, yPos, 100, 5000, uiControls.diamondParams.maxArea);
             createValueLabel(yPos, IDC_STATIC_BASE + 8);
             yPos += lineHeight;
 
@@ -2073,16 +2073,16 @@ void updateSidebarControls() {
     
     // Update trackbar positions
     HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH1);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.minThreshold));
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold1);
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH2);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.maxThreshold));
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold2);
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MINAREA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.minArea));
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.minArea);
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MAXAREA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, static_cast<int>(uiControls.diamondParams.maxArea));
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.maxArea);
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BLACK_VMAX);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.blackVMax);
@@ -2136,22 +2136,22 @@ void updateSidebarControls() {
     wchar_t buffer[32];
     HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 2);
     if (hLabel) {
-        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.minThreshold);
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.threshold1);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 4);
     if (hLabel) {
-        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.maxThreshold);
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.threshold2);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 6);
     if (hLabel) {
-        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.minArea);
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.minArea);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 8);
     if (hLabel) {
-        swprintf_s(buffer, L"%.0f", uiControls.diamondParams.maxArea);
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.maxArea);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 11);
@@ -2247,16 +2247,16 @@ void updateSidebarContext(SidebarContext context) {
 void handleTrackbarChange(int trackbarId, int value) {
     switch (trackbarId) {
         case IDC_DIAMOND_THRESH1:
-            uiControls.diamondParams.minThreshold = static_cast<float>(value);
+            uiControls.diamondParams.threshold1 = value;
             break;
         case IDC_DIAMOND_THRESH2:
-            uiControls.diamondParams.maxThreshold = static_cast<float>(value);
+            uiControls.diamondParams.threshold2 = value;
             break;
         case IDC_DIAMOND_MINAREA:
-            uiControls.diamondParams.minArea = static_cast<float>(value);
+            uiControls.diamondParams.minArea = value;
             break;
         case IDC_DIAMOND_MAXAREA:
-            uiControls.diamondParams.maxArea = static_cast<float>(value);
+            uiControls.diamondParams.maxArea = value;
             break;
         case IDC_RAIL_BLACK_VMAX:
             uiControls.railParams.blackVMax = value;
