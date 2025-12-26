@@ -20,6 +20,7 @@ add_executable(table_detector
     src/diamond_detection.cpp
     src/felt_detection.cpp
     src/rail_detection.cpp
+    src/orientation_detector.cpp
 )
 
 # Set Windows subsystem to prevent console window
