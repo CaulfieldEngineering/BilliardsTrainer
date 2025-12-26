@@ -7,19 +7,6 @@
 #include "felt_detection.h"
 #include "rail_detection.h"
 
-// Debug outputs to help diagnose "no diamonds" / "garbage diamonds" quickly.
-// Filled by `detectDiamonds()` when a non-null debug pointer is supplied.
-struct DiamondDebugImages {
-    cv::Mat railMaskDark;    // output of detectRailMask(...)
-    cv::Mat railSearchMask;  // filled/dilated version used as ROI
-    cv::Mat railEnhanced;    // top-hat enhanced ROI (full-size for convenience)
-    cv::Mat otsuBinary;      // fallback binary (full-size for convenience)
-    cv::Mat diamondMask;     // final per-pixel mask for detected diamond/marker regions (full-size)
-    cv::Rect roi;            // bounding rect of railSearchMask
-    int keypointsFound = 0;  // SimpleBlobDetector keypoints count (pre-filter)
-    int centersKept = 0;     // centers kept after mask + pocket rejection (pre-layout)
-};
-
 // Structure to hold detection parameters
 struct DiamondDetectionParams {
     int threshold1 = 0;
@@ -42,5 +29,4 @@ void detectDiamonds(
     bool showDiamonds,
     const DiamondDetectionParams& diamondParams,
     const FeltParams& feltParams,
-    const RailParams& railParams,
-    DiamondDebugImages* debugOut = nullptr);
+    const RailParams& railParams);

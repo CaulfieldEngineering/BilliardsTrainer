@@ -69,10 +69,6 @@ struct UIControls {
     RailParams railParams;
 } uiControls;
 
-// Last diamond debug buffers (captured from detectDiamonds when diamonds are enabled)
-static DiamondDebugImages g_lastDiamondDebug;
-static bool g_hasDiamondDebug = false;
-
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
 
@@ -162,27 +158,6 @@ static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem:
 
     // Always attempt overlay first.
     writeImageChecked(dir / (stem + "-overlay.png"), processedImage);
-
-    // Save debug masks for diamonds if available.
-    if (g_hasDiamondDebug) {
-        writeImageChecked(dir / (stem + "-railMaskDark.png"), g_lastDiamondDebug.railMaskDark);
-        writeImageChecked(dir / (stem + "-railSearchMask.png"), g_lastDiamondDebug.railSearchMask);
-        writeImageChecked(dir / (stem + "-railEnhanced.png"), g_lastDiamondDebug.railEnhanced);
-        writeImageChecked(dir / (stem + "-otsuBinary.png"), g_lastDiamondDebug.otsuBinary);
-        writeImageChecked(dir / (stem + "-diamondMask.png"), g_lastDiamondDebug.diamondMask);
-
-        // Emit a small info image with counts + ROI (easy to view without opening a text file).
-        cv::Mat info(80, 520, CV_8UC3, cv::Scalar(30, 30, 30));
-        const std::string line1 = "keypointsFound=" + std::to_string(g_lastDiamondDebug.keypointsFound) +
-                                  " centersKept=" + std::to_string(g_lastDiamondDebug.centersKept);
-        const std::string line2 = "roi=(" + std::to_string(g_lastDiamondDebug.roi.x) + "," +
-                                  std::to_string(g_lastDiamondDebug.roi.y) + " " +
-                                  std::to_string(g_lastDiamondDebug.roi.width) + "x" +
-                                  std::to_string(g_lastDiamondDebug.roi.height) + ")";
-        cv::putText(info, line1, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(240, 240, 240), 1, cv::LINE_AA);
-        cv::putText(info, line2, cv::Point(10, 60), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(240, 240, 240), 1, cv::LINE_AA);
-        writeImageChecked(dir / (stem + "-diamondDebugInfo.png"), info);
-    }
 
     // Always write a manifest so we can diagnose "it said exported but folder is empty".
     // This also acts as a sanity check that we can write *something* to the directory.
@@ -703,10 +678,7 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         }
 
         if (uiControls.showDiamonds) {
-            g_hasDiamondDebug = true;
-            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondDebug);
-        } else {
-            g_hasDiamondDebug = false;
+            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams);
         }
     }
 
@@ -1428,10 +1400,7 @@ int legacyHighGuiMain(int argc, char** argv) {
             
             // Apply diamond detection if enabled
             if (uiControls.showDiamonds) {
-                g_hasDiamondDebug = true;
-                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondDebug);
-            } else {
-                g_hasDiamondDebug = false;
+                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams);
             }
         }
         
