@@ -28,6 +28,18 @@ struct DiamondDetectionParams {
     int colorSMin = 0, colorSMax = 255;   // Saturation range (0-255)
     // Default to a no-op filter (full V range) until a color is picked.
     int colorVMin = 0, colorVMax = 255;   // Value range (0-255)
+
+    // Color picker state (UI convenience):
+    // - `pickedHSV` is stored so changing the sensitivity slider can recompute the min/max ranges
+    //   without requiring the user to re-pick the color.
+    // - Hue wrapping is represented by allowing colorHMin > colorHMax (range spans 180->0).
+    bool hasPickedColor = false;
+    cv::Vec3b pickedHSV = cv::Vec3b(0, 0, 0);
+
+    // Sensitivity / tolerance (0..100):
+    // - 0  => very strict (only very close matches)
+    // - 100 => very loose (accepts more variation from the picked color)
+    int colorSensitivity = 50;
     cv::Vec3b pickedBGR = cv::Vec3b(0, 0, 0);  // Store the picked BGR color for UI display
     
     // Legacy parameters (kept for UI compatibility, threshold1 maps to min_threshold)

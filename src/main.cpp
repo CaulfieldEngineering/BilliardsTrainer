@@ -49,6 +49,8 @@ struct UIControls {
     bool showDiamonds = true;
     bool showFelt = true;
     bool showRail = true;
+    // Orientation overlay: draws an outer + inner rotated rectangle that bounds the rail mask (a "square donut").
+    bool showOrientation = false;
     bool showSidebar = true; // Debug sidebar toggle (on by default)
     bool sidebarCollapsed = false; // Sidebar collapsed state
     SidebarPage sidebarPage = SidebarPage::Debug; // Top-level sidebar page (default: Debug)
@@ -425,6 +427,7 @@ static const wchar_t* kSidebarPanelClass = L"BilliardsTrainerSidebarPanel";
 static void ensureSidebarAndImageChildren(HWND mainHwnd);
 static void layoutChildren(HWND mainHwnd);
 static void updateColorPickerLabels();
+static void applyColorSensitivityToRangesFromPickedHSV();
 static void updateImageDibFromBgr(const cv::Mat& bgr);
 
 // Update the global swatch brush used by WM_CTLCOLORSTATIC.
@@ -749,22 +752,11 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
         
         // Store the picked BGR color
         uiControls.diamondParams.pickedBGR = bgr;
+        uiControls.diamondParams.pickedHSV = hsv;
+        uiControls.diamondParams.hasPickedColor = true;
         
-        // Set HSV ranges around the sampled color with tighter tolerances
-        // Hue: ±15 degrees (wider for colors that wrap around)
-        int hTolerance = 15;
-        uiControls.diamondParams.colorHMin = std::max(0, (int)hsv[0] - hTolerance);
-        uiControls.diamondParams.colorHMax = std::min(180, (int)hsv[0] + hTolerance);
-        
-        // Saturation: ±30 (tighter range for better color matching)
-        int sTolerance = 30;
-        uiControls.diamondParams.colorSMin = std::max(0, (int)hsv[1] - sTolerance);
-        uiControls.diamondParams.colorSMax = std::min(255, (int)hsv[1] + sTolerance);
-        
-        // Value: ±40 (tighter range, but still allows for lighting variations)
-        int vTolerance = 40;
-        uiControls.diamondParams.colorVMin = std::max(0, (int)hsv[2] - vTolerance);
-        uiControls.diamondParams.colorVMax = std::min(255, (int)hsv[2] + vTolerance);
+        // Set HSV ranges around the sampled color based on the Sensitivity slider.
+        applyColorSensitivityToRangesFromPickedHSV();
         
         uiControls.diamondParams.use_color_filter = true;
 
@@ -917,22 +909,11 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                     
                     // Store the picked BGR color
                     uiControls.diamondParams.pickedBGR = bgr;
+                    uiControls.diamondParams.pickedHSV = hsv;
+                    uiControls.diamondParams.hasPickedColor = true;
                     
-                    // Set HSV ranges around the sampled color with tighter tolerances
-                    // Hue: ±15 degrees (wider for colors that wrap around)
-                    int hTolerance = 15;
-                    uiControls.diamondParams.colorHMin = std::max(0, (int)hsv[0] - hTolerance);
-                    uiControls.diamondParams.colorHMax = std::min(180, (int)hsv[0] + hTolerance);
-                    
-                    // Saturation: ±30 (tighter range for better color matching)
-                    int sTolerance = 30;
-                    uiControls.diamondParams.colorSMin = std::max(0, (int)hsv[1] - sTolerance);
-                    uiControls.diamondParams.colorSMax = std::min(255, (int)hsv[1] + sTolerance);
-                    
-                    // Value: ±40 (tighter range, but still allows for lighting variations)
-                    int vTolerance = 40;
-                    uiControls.diamondParams.colorVMin = std::max(0, (int)hsv[2] - vTolerance);
-                    uiControls.diamondParams.colorVMax = std::min(255, (int)hsv[2] + vTolerance);
+                    // Set HSV ranges around the sampled color based on the Sensitivity slider.
+                    applyColorSensitivityToRangesFromPickedHSV();
                     
                     uiControls.diamondParams.use_color_filter = true;
                     
@@ -1037,14 +1018,26 @@ static void updateColorPickerLabels() {
         cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
         swprintf_s(bgrText, L"BGR: (%d, %d, %d)",
                   (int)bgr[2], (int)bgr[1], (int)bgr[0]);
-        swprintf_s(hsvText, L"HSV: (%d, %d, %d)",
-                  (uiControls.diamondParams.colorHMin + uiControls.diamondParams.colorHMax) / 2,
-                  (uiControls.diamondParams.colorSMin + uiControls.diamondParams.colorSMax) / 2,
-                  (uiControls.diamondParams.colorVMin + uiControls.diamondParams.colorVMax) / 2);
-        swprintf_s(rangeText, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]",
-                  uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
-                  uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
-                  uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
+
+        if (uiControls.diamondParams.hasPickedColor) {
+            const cv::Vec3b hsv = uiControls.diamondParams.pickedHSV;
+            swprintf_s(hsvText, L"HSV: (%d, %d, %d)", (int)hsv[0], (int)hsv[1], (int)hsv[2]);
+        }
+
+        // If hue is wrapped, we intentionally store HMin > HMax to represent:
+        //   H in [0..HMax] U [HMin..180]
+        if (uiControls.diamondParams.colorHMin <= uiControls.diamondParams.colorHMax) {
+            swprintf_s(rangeText, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]",
+                      uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
+                      uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
+                      uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
+        } else {
+            swprintf_s(rangeText, L"Range: H[0-%d] U [%d-180] S[%d-%d] V[%d-%d]",
+                      uiControls.diamondParams.colorHMax,
+                      uiControls.diamondParams.colorHMin,
+                      uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
+                      uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
+        }
     }
     
     HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_BGR);
@@ -1072,6 +1065,46 @@ static void updateColorPickerLabels() {
         const wchar_t* btnText = g_colorPickerActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
         SetWindowTextW(hColorPicker, btnText);
     }
+}
+
+// Compute HSV tolerances based on the user-facing sensitivity (0..100).
+// - 0   => tight match (strict)
+// - 100 => loose match (more variation)
+static void applyColorSensitivityToRangesFromPickedHSV() {
+    if (!uiControls.diamondParams.hasPickedColor) return;
+
+    const int sens = std::clamp(uiControls.diamondParams.colorSensitivity, 0, 100);
+    const float t = static_cast<float>(sens) / 100.0f;
+
+    // Tuned to be usable for typical consumer cameras / mixed lighting.
+    // Hue is 0..180 in OpenCV. Saturation/Value are 0..255.
+    const int hTol = (int)std::lround(5.0f + t * 25.0f);    // 5..30
+    const int sTol = (int)std::lround(10.0f + t * 80.0f);   // 10..90
+    const int vTol = (int)std::lround(10.0f + t * 100.0f);  // 10..110
+
+    const cv::Vec3b hsv = uiControls.diamondParams.pickedHSV;
+    const int h = (int)hsv[0];
+    const int s = (int)hsv[1];
+    const int v = (int)hsv[2];
+
+    // Hue wrap: represent wrap by setting HMin > HMax (handled in diamond_detection.cpp).
+    const int hMinRaw = h - hTol;
+    const int hMaxRaw = h + hTol;
+    if (hMinRaw < 0 || hMaxRaw > 180) {
+        const int hMinWrap = (hMinRaw < 0) ? (180 + hMinRaw) : hMinRaw;
+        const int hMaxWrap = (hMaxRaw > 180) ? (hMaxRaw - 180) : hMaxRaw;
+        uiControls.diamondParams.colorHMin = std::clamp(hMinWrap, 0, 180);
+        uiControls.diamondParams.colorHMax = std::clamp(hMaxWrap, 0, 180);
+        // Note: HMin > HMax means wrapped.
+    } else {
+        uiControls.diamondParams.colorHMin = std::clamp(hMinRaw, 0, 180);
+        uiControls.diamondParams.colorHMax = std::clamp(hMaxRaw, 0, 180);
+    }
+
+    uiControls.diamondParams.colorSMin = std::clamp(s - sTol, 0, 255);
+    uiControls.diamondParams.colorSMax = std::clamp(s + sTol, 0, 255);
+    uiControls.diamondParams.colorVMin = std::clamp(v - vTol, 0, 255);
+    uiControls.diamondParams.colorVMax = std::clamp(v + vTol, 0, 255);
 }
 
 static void layoutChildren(HWND mainHwnd) {
@@ -1110,8 +1143,14 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     if (uiControls.showOverlay) {
         // Felt contour is needed for both felt and rail overlays (and rail detection).
         std::vector<cv::Point> feltContour;
-        if (uiControls.showFelt || uiControls.showRail) {
+        if (uiControls.showFelt || uiControls.showRail || uiControls.showOrientation) {
             feltContour = detectFeltContour(currentFrame, uiControls.feltParams);
+        }
+
+        // Rail mask is needed for both rail overlay AND the orientation overlay.
+        cv::Mat railMask;
+        if ((uiControls.showRail || uiControls.showOrientation) && !feltContour.empty()) {
+            railMask = detectRailMask(currentFrame, feltContour, uiControls.railParams);
         }
 
         if (uiControls.showFelt && !feltContour.empty()) {
@@ -1128,11 +1167,7 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
             }
         }
 
-        if (uiControls.showRail && !feltContour.empty()) {
-            // Compute rail mask once. We use the mask for filled overlay (pixel-accurate),
-            // and (optionally) an outline derived from the mask.
-            cv::Mat railMask = detectRailMask(currentFrame, feltContour, uiControls.railParams);
-            if (!railMask.empty() && cv::countNonZero(railMask) > 0) {
+        if (uiControls.showRail && !railMask.empty() && cv::countNonZero(railMask) > 0) {
                 if (uiControls.railParams.isFilled) {
                     cv::Mat overlay = processed.clone();
                     overlay.setTo(uiControls.railParams.color, railMask);
@@ -1144,6 +1179,365 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
                     cv::findContours(railMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
                     if (!contours.empty()) {
                         cv::drawContours(processed, contours, -1, uiControls.railParams.color, std::max(1, uiControls.railParams.outlineThicknessPx));
+                    }
+                }
+        }
+
+        // Orientation overlay: compute an outer + inner *perspective* quad around the rail mask (a "square donut").
+        //
+        // IMPORTANT:
+        // - A rotated rectangle cannot represent perspective (trapezoid) properly, so it will often
+        //   overlap the rails (or float away from them).
+        // - We instead compute a 4-corner convex quadrilateral (outer/inner) using convex hull +
+        //   polygon simplification.
+        if (uiControls.showOrientation && !railMask.empty() && cv::countNonZero(railMask) > 0) {
+            // Helper: derive a 4-corner quad from an arbitrary contour by:
+            // - convex hull (removes pocket indentations / noise)
+            // - approxPolyDP (reduce to 4 corners)
+            // - clockwise ordering (stable drawing)
+            //
+            // IMPORTANT:
+            // - approxPolyDP yields an *inscribed* quad when simplifying a hull with many vertices.
+            //   That can "cut corners" and fail to encompass the full perimeter.
+            // - For the OUTER quad, we post-process the 4-edge quad into an *enclosing* quad by
+            //   shifting each edge line outward until it contains all hull points.
+            auto quadFromContour = [&](const std::vector<cv::Point>& contour, cv::Point2f outPts[4], bool shouldEncloseHull) -> bool {
+                if (contour.size() < 4) return false;
+
+                std::vector<cv::Point> hull;
+                cv::convexHull(contour, hull);
+                if (hull.size() < 4) return false;
+
+                const double peri = std::max(1.0, cv::arcLength(hull, true));
+                std::vector<cv::Point> approx;
+
+                // Increase epsilon until we get <= 4 vertices; accept exactly 4.
+                bool found = false;
+                for (double k = 0.01; k <= 0.10; k += 0.01) {
+                    approx.clear();
+                    cv::approxPolyDP(hull, approx, k * peri, true);
+                    if (approx.size() == 4) { found = true; break; }
+                    if (approx.size() < 4) break;
+                }
+
+                if (!found) {
+                    // Fallback: rotated rectangle (not perspective), but better than nothing.
+                    cv::RotatedRect rr = cv::minAreaRect(hull);
+                    rr.points(outPts);
+                } else {
+                    // Convert and order clockwise.
+                    cv::Point2f c(0, 0);
+                    for (const auto& p : approx) c += cv::Point2f((float)p.x, (float)p.y);
+                    c *= (1.0f / 4.0f);
+
+                    std::sort(approx.begin(), approx.end(), [&](const cv::Point& a, const cv::Point& b) {
+                        const float aa = std::atan2((float)a.y - c.y, (float)a.x - c.x);
+                        const float bb = std::atan2((float)b.y - c.y, (float)b.x - c.x);
+                        return aa < bb;
+                    });
+
+                    for (int i = 0; i < 4; i++) {
+                        outPts[i] = cv::Point2f((float)approx[i].x, (float)approx[i].y);
+                    }
+
+                    if (shouldEncloseHull) {
+                        // Expand the quad to enclose ALL hull points by shifting each edge line outward.
+                        // We treat each edge as a half-plane and move it outward by the maximum violation.
+                        //
+                        // Line form: n·x + c = 0, where "inside" is n·x + c <= 0.
+                        // For each edge, choose n orientation so quad centroid is inside (<=0).
+                        // Then compute max(n·p + c) over all hull points; if positive, shift c by -max.
+                        struct Line { cv::Point2f n; float c; }; // normalized n
+                        Line lines[4]{};
+
+                        // Use centroid of current quad as an "inside" reference.
+                        cv::Point2f qc(0, 0);
+                        for (int i = 0; i < 4; i++) qc += outPts[i];
+                        qc *= 0.25f;
+
+                        for (int i = 0; i < 4; i++) {
+                            const cv::Point2f p0 = outPts[i];
+                            const cv::Point2f p1 = outPts[(i + 1) % 4];
+                            const cv::Point2f d = p1 - p0;
+                            float len = std::sqrt(d.dot(d));
+                            if (len < 1e-3f) len = 1.0f;
+
+                            // Candidate normal (perp to edge).
+                            cv::Point2f n(d.y / len, -d.x / len);
+                            float cc = -(n.dot(p0));
+
+                            // Ensure centroid is inside (<=0).
+                            if (n.dot(qc) + cc > 0.0f) {
+                                n *= -1.0f;
+                                cc *= -1.0f;
+                            }
+
+                            // Compute max violation.
+                            float maxV = 0.0f;
+                            for (const auto& hp : hull) {
+                                const cv::Point2f pf((float)hp.x, (float)hp.y);
+                                const float v = n.dot(pf) + cc;
+                                if (v > maxV) maxV = v;
+                            }
+
+                            // Shift outward to include all points.
+                            cc -= maxV;
+                            lines[i] = Line{n, cc};
+                        }
+
+                        // Intersect consecutive lines to get the expanded quad.
+                        auto intersect = [&](const Line& a, const Line& b, cv::Point2f& out) -> bool {
+                            // Solve:
+                            // a.n.x * x + a.n.y * y = -a.c
+                            // b.n.x * x + b.n.y * y = -b.c
+                            const float A00 = a.n.x;
+                            const float A01 = a.n.y;
+                            const float A10 = b.n.x;
+                            const float A11 = b.n.y;
+                            const float B0 = -a.c;
+                            const float B1 = -b.c;
+                            const float det = A00 * A11 - A01 * A10;
+                            if (std::abs(det) < 1e-6f) return false;
+                            out.x = (B0 * A11 - A01 * B1) / det;
+                            out.y = (A00 * B1 - B0 * A10) / det;
+                            return true;
+                        };
+
+                        cv::Point2f newPts[4];
+                        bool ok = true;
+                        for (int i = 0; i < 4; i++) {
+                            if (!intersect(lines[i], lines[(i + 1) % 4], newPts[(i + 1) % 4])) {
+                                ok = false;
+                                break;
+                            }
+                        }
+                        if (ok) {
+                            for (int i = 0; i < 4; i++) outPts[i] = newPts[i];
+                        }
+                    }
+                }
+                return true;
+            };
+
+            // Outer quad: from the external boundary of the rail mask (touches outside of rails).
+            std::vector<std::vector<cv::Point>> railContours;
+            cv::findContours(railMask, railContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            if (!railContours.empty() && !feltContour.empty()) {
+                size_t bestIdx = 0;
+                double bestArea = 0.0;
+                for (size_t i = 0; i < railContours.size(); i++) {
+                    const double area = cv::contourArea(railContours[i]);
+                    if (area > bestArea) { bestArea = area; bestIdx = i; }
+                }
+
+                cv::Point2f outerPts[4];
+                cv::Point2f innerPts[4];
+
+                // Outer perimeter: perspective quad that *encloses* the full rail-mask hull.
+                (void)quadFromContour(railContours[bestIdx], outerPts, /*shouldEncloseHull*/true);
+
+                // Inner perimeter: fit 4 edge lines directly to the felt contour (not derived from outer quad).
+                //
+                // Approach:
+                // - Use approxPolyDP on felt convex hull to get a 4-corner quad that follows perspective.
+                // - Bucket felt contour points by nearest felt-quad edge.
+                // - Fit a line to each side's points.
+                // - Intersect adjacent lines to get a tight inner quad that hugs the felt boundary.
+                //
+                // This ensures the inner quad follows the felt's own geometry under perspective,
+                // not the outer rail quad's orientation.
+                bool innerOk = false;
+                {
+                    struct Line {
+                        // Normal form: n·x + c = 0 (n is unit-length)
+                        cv::Point2f n;
+                        float c = 0.0f;
+                    };
+
+                    auto intersect = [&](const Line& a, const Line& b, cv::Point2f& out) -> bool {
+                        const float A00 = a.n.x;
+                        const float A01 = a.n.y;
+                        const float A10 = b.n.x;
+                        const float A11 = b.n.y;
+                        const float B0 = -a.c;
+                        const float B1 = -b.c;
+                        const float det = A00 * A11 - A01 * A10;
+                        if (std::abs(det) < 1e-6f) return false;
+                        out.x = (B0 * A11 - A01 * B1) / det;
+                        out.y = (A00 * B1 - B0 * A10) / det;
+                        return std::isfinite(out.x) && std::isfinite(out.y);
+                    };
+
+                    auto distPointToInfLine = [&](const cv::Point2f& p, const cv::Point2f& a, const cv::Point2f& b) -> float {
+                        const cv::Point2f ab = b - a;
+                        const float abLen = std::sqrt(ab.dot(ab));
+                        if (abLen <= 1e-6f) {
+                            const cv::Point2f d = p - a;
+                            return std::sqrt(d.dot(d));
+                        }
+                        const cv::Point2f ap = p - a;
+                        const float cross = std::abs(ab.x * ap.y - ab.y * ap.x);
+                        return cross / abLen;
+                    };
+
+                    // Get felt's perspective-following quad for bucketing guidance.
+                    // Use convex hull + approxPolyDP to get 4 corners that follow perspective.
+                    cv::Point2f feltQuadPts[4];
+                    {
+                        std::vector<cv::Point> feltHull;
+                        cv::convexHull(feltContour, feltHull);
+                        double peri = cv::arcLength(feltHull, true);
+                        std::vector<cv::Point> approx;
+                        for (double eps = 0.01; eps < 0.15; eps += 0.005) {
+                            cv::approxPolyDP(feltHull, approx, eps * peri, true);
+                            if (approx.size() <= 4) break;
+                        }
+                        if (approx.size() == 4) {
+                            // Order corners consistently (top-left first, clockwise).
+                            cv::Point2f ctr(0, 0);
+                            for (const auto& p : approx) ctr += cv::Point2f((float)p.x, (float)p.y);
+                            ctr *= 0.25f;
+                            std::vector<std::pair<float, int>> angles(4);
+                            for (int i = 0; i < 4; i++) {
+                                float dx = approx[i].x - ctr.x;
+                                float dy = approx[i].y - ctr.y;
+                                angles[i] = {std::atan2(dy, dx), i};
+                            }
+                            std::sort(angles.begin(), angles.end());
+                            for (int i = 0; i < 4; i++) {
+                                feltQuadPts[i] = cv::Point2f((float)approx[angles[i].second].x,
+                                                              (float)approx[angles[i].second].y);
+                            }
+                        } else {
+                            // Fallback to minAreaRect if approx fails.
+                            cv::RotatedRect rr = cv::minAreaRect(feltContour);
+                            rr.points(feltQuadPts);
+                        }
+                    }
+
+                    // Bucket felt contour points by nearest felt-quad edge.
+                    std::vector<cv::Point2f> sidePts[4];
+                    for (int i = 0; i < 4; i++) sidePts[i].reserve(feltContour.size() / 4);
+
+                    for (const auto& pI : feltContour) {
+                        const cv::Point2f p((float)pI.x, (float)pI.y);
+                        float bestD = std::numeric_limits<float>::infinity();
+                        int bestEdge = 0;
+                        for (int i = 0; i < 4; i++) {
+                            const cv::Point2f a = feltQuadPts[i];
+                            const cv::Point2f b = feltQuadPts[(i + 1) % 4];
+                            const float d = distPointToInfLine(p, a, b);
+                            if (d < bestD) { bestD = d; bestEdge = i; }
+                        }
+                        sidePts[bestEdge].push_back(p);
+                    }
+
+                    // Fit a line to each side.
+                    Line lines[4];
+                    bool ok = true;
+                    for (int i = 0; i < 4; i++) {
+                        if ((int)sidePts[i].size() < 20) { ok = false; break; }
+                        cv::Vec4f lf;
+                        cv::fitLine(sidePts[i], lf, cv::DIST_L2, 0, 0.01, 0.01);
+                        const float vx = lf[0], vy = lf[1], x0 = lf[2], y0 = lf[3];
+                        cv::Point2f n(vy, -vx);
+                        const float nLen = std::sqrt(n.dot(n));
+                        if (nLen <= 1e-6f) { ok = false; break; }
+                        n *= (1.0f / nLen);
+                        const float c = -(n.x * x0 + n.y * y0);
+                        lines[i] = Line{n, c};
+                    }
+
+                    if (ok) {
+                        // Intersect adjacent lines to get inner quad corners.
+                        cv::Point2f pts[4];
+                        for (int i = 0; i < 4; i++) {
+                            const Line& prev = lines[(i + 3) % 4];
+                            const Line& cur = lines[i];
+                            if (!intersect(prev, cur, pts[i])) { ok = false; break; }
+                        }
+                        if (ok) {
+                            for (int i = 0; i < 4; i++) innerPts[i] = pts[i];
+                            innerOk = true;
+                        }
+                    }
+
+                    if (!innerOk) {
+                        // Fallback: simpler quad (can be less tight).
+                        (void)quadFromContour(feltContour, innerPts, /*shouldEncloseHull*/true);
+                    }
+                }
+
+                // Shrink the inner quad inward by 5% (move each corner 5% toward centroid) for extra margin.
+                {
+                    cv::Point2f centroid(0, 0);
+                    for (int i = 0; i < 4; i++) centroid += innerPts[i];
+                    centroid *= 0.25f;
+                    const float shrink = 0.05f; // 5%
+                    for (int i = 0; i < 4; i++) {
+                        innerPts[i] = innerPts[i] + shrink * (centroid - innerPts[i]);
+                    }
+                }
+
+                auto drawQuad = [&](const cv::Point2f pts[4], const cv::Scalar& color, int thicknessPx) {
+                    for (int i = 0; i < 4; i++) {
+                        const cv::Point2f a = pts[i];
+                        const cv::Point2f b = pts[(i + 1) % 4];
+                        cv::line(
+                            processed,
+                            cv::Point((int)std::lround(a.x), (int)std::lround(a.y)),
+                            cv::Point((int)std::lround(b.x), (int)std::lround(b.y)),
+                            color,
+                            thicknessPx,
+                            cv::LINE_AA);
+                    }
+                };
+
+                // Outer: purple. Inner: purple. (Slightly bolder lines for readability.)
+                drawQuad(outerPts, cv::Scalar(255, 0, 255), 5);  // BGR purple
+                drawQuad(innerPts, cv::Scalar(255, 0, 255), 5);  // BGR purple
+
+                // Extend each inner edge to meet the outer quad, creating 4 rail regions + 4 corner regions.
+                // For each inner edge, find where its infinite line intersects the outer quad boundary.
+                auto lineSegmentIntersect = [](const cv::Point2f& p1, const cv::Point2f& p2,
+                                                const cv::Point2f& p3, const cv::Point2f& p4,
+                                                cv::Point2f& out) -> bool {
+                    // Line 1: p1 to p2, Line 2: p3 to p4
+                    const float d1x = p2.x - p1.x, d1y = p2.y - p1.y;
+                    const float d2x = p4.x - p3.x, d2y = p4.y - p3.y;
+                    const float cross = d1x * d2y - d1y * d2x;
+                    if (std::abs(cross) < 1e-6f) return false; // parallel
+                    const float t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / cross;
+                    const float u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / cross;
+                    // t can be any value (we're extending line 1), but u must be in [0,1] for segment intersection
+                    if (u < 0.0f || u > 1.0f) return false;
+                    out.x = p1.x + t * d1x;
+                    out.y = p1.y + t * d1y;
+                    return true;
+                };
+
+                // For each inner edge, find intersections with all outer edges, keep valid ones.
+                for (int i = 0; i < 4; i++) {
+                    const cv::Point2f iA = innerPts[i];
+                    const cv::Point2f iB = innerPts[(i + 1) % 4];
+
+                    std::vector<cv::Point2f> hits;
+                    for (int j = 0; j < 4; j++) {
+                        const cv::Point2f oA = outerPts[j];
+                        const cv::Point2f oB = outerPts[(j + 1) % 4];
+                        cv::Point2f hit;
+                        if (lineSegmentIntersect(iA, iB, oA, oB, hit)) {
+                            hits.push_back(hit);
+                        }
+                    }
+
+                    // We expect 2 hits (one on each "end" of the extended inner edge).
+                    if (hits.size() >= 2) {
+                        // Draw line from first hit to last hit (through the inner edge).
+                        cv::line(processed,
+                                 cv::Point((int)std::lround(hits[0].x), (int)std::lround(hits[0].y)),
+                                 cv::Point((int)std::lround(hits[1].x), (int)std::lround(hits[1].y)),
+                                 cv::Scalar(255, 0, 255), 5, cv::LINE_AA);
                     }
                 }
             }
@@ -1329,12 +1723,14 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             const int kIdOverlayDiamonds = 30201;
             const int kIdOverlayFelt = 30202;
             const int kIdOverlayRail = 30203;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRail)) {
+            const int kIdOverlayOrientation = 30204;
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRail || id == kIdOverlayOrientation)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
                 else if (id == kIdOverlayDiamonds) uiControls.showDiamonds = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
                 else if (id == kIdOverlayRail) uiControls.showRail = isChecked;
+                else if (id == kIdOverlayOrientation) uiControls.showOrientation = isChecked;
                 return 0;
             }
 
@@ -1652,6 +2048,8 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DIAMOND_MORPH_KERNEL (IDC_TRACKBAR_BASE + 6)  // Morphological kernel size (5-31, must be odd)
 #define IDC_DIAMOND_SKIP_MORPH 30250  // Skip morphological enhancement checkbox (matches kIdDiamondSkipMorph above)
 #define IDC_DIAMOND_ADAPTIVE_C (IDC_TRACKBAR_BASE + 7)  // Adaptive threshold C constant
+// Color picker sensitivity (tolerance) slider: 0..100 (0=strict, 100=loose)
+#define IDC_DIAMOND_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 8)
 #define IDC_RAIL_BLACK_VMAX (IDC_TRACKBAR_BASE + 10)
 #define IDC_RAIL_BROWN_HMAX (IDC_TRACKBAR_BASE + 11)
 #define IDC_RAIL_BROWN_SMAX (IDC_TRACKBAR_BASE + 12)
@@ -1667,6 +2065,7 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DEBUG_OVERLAY_DIAMONDS_CB (IDC_BUTTON_BASE + 201)
 #define IDC_DEBUG_OVERLAY_FELT_CB (IDC_BUTTON_BASE + 202)
 #define IDC_DEBUG_OVERLAY_RAIL_CB (IDC_BUTTON_BASE + 203)
+#define IDC_DEBUG_OVERLAY_ORIENTATION_CB (IDC_BUTTON_BASE + 204)
 
 // Overlay style controls
 #define IDC_DIAMONDS_STYLE_COLOR (IDC_BUTTON_BASE + 220)
@@ -2312,6 +2711,16 @@ void createSidebarControls(HWND hwnd) {
         }
         yPos += lineHeight;
 
+        // Orientation overlay toggle
+        {
+            HWND h = CreateWindowW(L"BUTTON", L"Orientation (rail donut)", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                   xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
+                                   (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
+            applyFont(h, false);
+            SendMessage(h, BM_SETCHECK, uiControls.showOrientation ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+        yPos += lineHeight;
+
         // Global smoothing
         createLabel(L"Smoothing:", yPos, IDC_STATIC_BASE + 400);
         createTrackbar(IDC_SMOOTHING, yPos, 0, 100, uiControls.smoothingPercent);
@@ -2517,6 +2926,15 @@ void createSidebarControls(HWND hwnd) {
             }
             yPos += 45;
 
+            // Sensitivity slider (tolerance for how far from the picked color we accept)
+            {
+                // IDs chosen in the IDC_STATIC_BASE + 200+ range to keep them local to the color picker UI.
+                createLabel(L"Sensitivity:", yPos, IDC_STATIC_BASE + 205);
+                createTrackbar(IDC_DIAMOND_COLOR_SENSITIVITY, yPos, 0, 100, uiControls.diamondParams.colorSensitivity);
+                createValueLabel(yPos, IDC_STATIC_BASE + 206);
+                yPos += lineHeight + 6;
+            }
+
             // Color info display (compact)
             {
                 wchar_t bgrText[64] = L"BGR: --";
@@ -2670,6 +3088,9 @@ void updateSidebarControls() {
 
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MORPH_KERNEL);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.morph_kernel_size);
+
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_SENSITIVITY);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.colorSensitivity);
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BLACK_VMAX);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.blackVMax);
@@ -2750,6 +3171,12 @@ void updateSidebarControls() {
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 23);
     if (hLabel) {
         swprintf_s(buffer, L"%d", uiControls.diamondParams.adaptive_thresh_C);
+        SetWindowTextW(hLabel, buffer);
+    }
+    // Color picker sensitivity value label (0..100)
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 206);
+    if (hLabel) {
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.colorSensitivity);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 11);
@@ -2868,6 +3295,12 @@ void handleTrackbarChange(int trackbarId, int value) {
             break;
         case IDC_DIAMOND_ADAPTIVE_C:
             uiControls.diamondParams.adaptive_thresh_C = value;
+            break;
+        case IDC_DIAMOND_COLOR_SENSITIVITY:
+            uiControls.diamondParams.colorSensitivity = std::clamp(value, 0, 100);
+            // If a color has already been picked, update the HSV range immediately so the filter reacts live.
+            applyColorSensitivityToRangesFromPickedHSV();
+            updateColorPickerLabels();
             break;
         case IDC_RAIL_BLACK_VMAX:
             uiControls.railParams.blackVMax = value;

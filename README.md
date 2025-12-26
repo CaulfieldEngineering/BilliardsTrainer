@@ -3,8 +3,14 @@ cd C:\Users\jpcfo\Documents\_GitHub\_CaulfieldEngineering\BilliardsTrainer\build
 
 
 # To-Do
+## Table Setup & Table Detection
+- Flow to "setting up table"
+  
 1) Felt Dection
+   - User picks color (sensitivity slider)
 2) Rail Detection
+   - User picks color (sensitivity slider)
+  
    - Rudimentary success
    - Uses Felt Detection to subtract felt
 3) Diamond Detection
