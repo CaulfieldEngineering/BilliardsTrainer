@@ -256,6 +256,69 @@ cv::Mat detectRailMask(const cv::Mat& src, const std::vector<cv::Point>& feltCon
 
     // Final hard guarantee: never include felt (even if cleanup bridged across the boundary).
     filtered.setTo(0, feltMaskExpanded);
+    
+    // Step 9: Fill holes (e.g., white diamond dots) so the rail mask is continuous (donut shape).
+    // The diamonds are physically part of the rail surface, so they should be included in the mask.
+    // We find internal contours (holes) and fill them.
+    {
+        cv::Mat maskWithHoles = filtered.clone();
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+        // RETR_CCOMP retrieves all contours and organizes them into a two-level hierarchy
+        cv::findContours(maskWithHoles, contours, hierarchy, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
+        
+        if (!contours.empty() && !hierarchy.empty()) {
+            // Fill all holes (internal contours). In RETR_CCOMP hierarchy:
+            // hierarchy[i][2] != -1 means contour i has children (holes inside it)
+            // hierarchy[i][3] != -1 means contour i is a hole (child of another contour)
+            for (size_t i = 0; i < contours.size(); ++i) {
+                // If this contour is a hole (has a parent), fill it
+                if (hierarchy[i][3] != -1) {
+                    cv::drawContours(filtered, contours, static_cast<int>(i), cv::Scalar(255), -1);
+                }
+            }
+        }
+        
+        // Ensure we still exclude felt after filling holes
+        filtered.setTo(0, feltMaskExpanded);
+    }
+    
+    // Step 10: Smooth edges by simplifying the contour with polygon approximation
+    // This removes jagged edges while maintaining the general direction/shape of each border segment
+    {
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(filtered, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        
+        if (!contours.empty()) {
+            // Find the largest contour (should be the rail donut shape)
+            size_t largestIdx = 0;
+            double largestArea = 0.0;
+            for (size_t i = 0; i < contours.size(); ++i) {
+                double area = cv::contourArea(contours[i]);
+                if (area > largestArea) {
+                    largestArea = area;
+                    largestIdx = i;
+                }
+            }
+            
+            // Simplify the contour using Douglas-Peucker algorithm
+            // Epsilon controls the smoothing: larger = more smoothing (fewer points, straighter lines)
+            // Using 2-3 pixels works well to smooth jagged edges while preserving shape
+            const double epsilon = 2.5;  // pixels - tune this for more/less smoothing
+            std::vector<cv::Point> smoothedContour;
+            cv::approxPolyDP(contours[largestIdx], smoothedContour, epsilon, false);
+            
+            // Recreate the mask from the smoothed contour
+            filtered = cv::Mat::zeros(filtered.size(), CV_8UC1);
+            std::vector<std::vector<cv::Point>> fillContours;
+            fillContours.push_back(smoothedContour);
+            cv::fillPoly(filtered, fillContours, cv::Scalar(255));
+            
+            // Final guarantee: exclude felt area
+            filtered.setTo(0, feltMaskExpanded);
+        }
+    }
+    
     return filtered;
 }
 

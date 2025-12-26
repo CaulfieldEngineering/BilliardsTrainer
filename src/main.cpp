@@ -71,6 +71,7 @@ struct UIControls {
 
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
+static cv::Mat g_lastSourceFrame;  // Original unscaled source frame for color picking
 
 // Last diamond detection processing image (the final image used for blob detection)
 static cv::Mat g_lastDiamondProcessingImage;
@@ -256,11 +257,30 @@ std::vector<int> g_availableCameras;
 // - OpenCV does NOT own the main window. OpenCV only produces cv::Mat frames.
 // ================================================================================================
 
+// Color picker button ID (defined early for use in mouse handlers)
+#define IDC_DIAMOND_COLOR_PICKER 30251
+
+// Color picker info labels (defined early for use in update function)
+#define IDC_COLOR_PICKER_BGR 10050
+#define IDC_COLOR_PICKER_HSV 10051
+#define IDC_COLOR_PICKER_RANGE_H 10052
+#define IDC_COLOR_PICKER_RANGE_S 10053
+#define IDC_COLOR_PICKER_RANGE_V 10054
+#define IDC_COLOR_PICKER_SWATCH 10055
+
 static HWND g_imageViewHwnd = NULL;
+static HWND g_zoomWindowHwnd = NULL;  // Zoom window for color picker
 static HBRUSH g_imageBgBrush = NULL;
 static HBRUSH g_sidebarBgBrush = NULL;
+// Color picker swatch brush:
+// - The swatch is a STATIC control. To paint it correctly and reliably, we provide a brush via
+//   WM_CTLCOLORSTATIC from the SidebarPanelProc.
+// - We own this brush and must delete it on replacement / shutdown to avoid leaking GDI objects.
+static HBRUSH g_colorPickerSwatchBrush = NULL;
 static HFONT g_sidebarFont = NULL;
 static HFONT g_sidebarFontBold = NULL;
+static bool g_colorPickerActive = false;  // Whether color picker mode is active
+static int g_scaledImageX = 0, g_scaledImageY = 0, g_scaledImageW = 0, g_scaledImageH = 0;  // Scaled image position/size for coordinate conversion
 
 static void applyFont(HWND hwnd, bool isBold = false) {
     HFONT font = isBold ? g_sidebarFontBold : g_sidebarFont;
@@ -404,7 +424,17 @@ static const wchar_t* kSidebarPanelClass = L"BilliardsTrainerSidebarPanel";
 
 static void ensureSidebarAndImageChildren(HWND mainHwnd);
 static void layoutChildren(HWND mainHwnd);
+static void updateColorPickerLabels();
 static void updateImageDibFromBgr(const cv::Mat& bgr);
+
+// Update the global swatch brush used by WM_CTLCOLORSTATIC.
+static void setColorPickerSwatchBrush(COLORREF swatchColor) {
+    if (g_colorPickerSwatchBrush) {
+        DeleteObject(g_colorPickerSwatchBrush);
+        g_colorPickerSwatchBrush = NULL;
+    }
+    g_colorPickerSwatchBrush = CreateSolidBrush(swatchColor);
+}
 
 // SidebarPanel WndProc:
 // Child controls (buttons/trackbars) send WM_COMMAND / WM_HSCROLL to their *parent* (the panel),
@@ -416,6 +446,19 @@ static LRESULT CALLBACK SidebarPanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             HWND parent = GetParent(hwnd);
             if (parent && IsWindow(parent)) {
                 return SendMessage(parent, msg, wParam, lParam);
+            }
+            break;
+        }
+        case WM_CTLCOLORSTATIC: {
+            // Provide a custom brush for the color picker swatch so the fill color is stable and
+            // does not rely on undefined SetClassLongPtr(GCLP_HBRBACKGROUND) behavior.
+            HDC hdc = (HDC)wParam;
+            HWND child = (HWND)lParam;
+            if (child && GetDlgCtrlID(child) == IDC_COLOR_PICKER_SWATCH && g_colorPickerSwatchBrush) {
+                // It's a solid color block: no text, so just set a matching background.
+                // (Text color doesn't matter because the swatch has an empty caption.)
+                SetBkMode(hdc, OPAQUE);
+                return (INT_PTR)g_colorPickerSwatchBrush;
             }
             break;
         }
@@ -501,6 +544,242 @@ static LRESULT CALLBACK SidebarPanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
+// Native Windows magnifier window
+static const wchar_t* kMagnifierClass = L"BilliardsTrainerMagnifier";
+static HWND g_magnifierHwnd = NULL;
+static HDC g_magnifierDC = NULL;
+static HBITMAP g_magnifierBitmap = NULL;
+static int g_magnifierSize = 200;
+
+// Magnifier window procedure
+static LRESULT CALLBACK MagnifierProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            
+            if (g_magnifierBitmap && g_magnifierDC) {
+                HDC memDC = CreateCompatibleDC(hdc);
+                HGDIOBJ oldBmp = SelectObject(memDC, g_magnifierBitmap);
+                BitBlt(hdc, 0, 0, rc.right, rc.bottom, memDC, 0, 0, SRCCOPY);
+                SelectObject(memDC, oldBmp);
+                DeleteDC(memDC);
+            } else {
+                FillRect(hdc, &rc, (HBRUSH)GetStockObject(BLACK_BRUSH));
+            }
+            
+            // Draw border
+            HPEN hPen = CreatePen(PS_SOLID, 2, RGB(0, 255, 255));
+            HGDIOBJ oldPen = SelectObject(hdc, hPen);
+            HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
+            Rectangle(hdc, 1, 1, rc.right - 1, rc.bottom - 1);
+            SelectObject(hdc, oldBrush);
+            SelectObject(hdc, oldPen);
+            DeleteObject(hPen);
+            
+            // Draw crosshairs
+            int centerX = rc.right / 2;
+            int centerY = rc.bottom / 2;
+            HPEN crossPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 255));
+            SelectObject(hdc, crossPen);
+            MoveToEx(hdc, centerX, 0, NULL);
+            LineTo(hdc, centerX, rc.bottom);
+            MoveToEx(hdc, 0, centerY, NULL);
+            LineTo(hdc, rc.right, centerY);
+            SelectObject(hdc, oldPen);
+            DeleteObject(crossPen);
+            
+            // Draw center dot
+            HBRUSH dotBrush = CreateSolidBrush(RGB(255, 0, 0));
+            HGDIOBJ oldDotBrush = SelectObject(hdc, dotBrush);
+            Ellipse(hdc, centerX - 3, centerY - 3, centerX + 3, centerY + 3);
+            SelectObject(hdc, oldDotBrush);
+            DeleteObject(dotBrush);
+            
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_ERASEBKGND:
+            return 1;
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+// Create magnifier window
+static void createMagnifierWindow() {
+    if (g_magnifierHwnd) return;
+    
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = MagnifierProc;
+    wc.hInstance = GetModuleHandleW(NULL);
+    wc.lpszClassName = kMagnifierClass;
+    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wc.hCursor = LoadCursor(NULL, IDC_CROSS);
+    RegisterClassW(&wc);
+    
+    g_magnifierHwnd = CreateWindowExW(
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        kMagnifierClass,
+        L"Color Picker Magnifier",
+        WS_POPUP | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        g_magnifierSize, g_magnifierSize,
+        NULL, NULL,
+        GetModuleHandleW(NULL),
+        NULL
+    );
+    
+    if (g_magnifierHwnd) {
+        SetLayeredWindowAttributes(g_magnifierHwnd, 0, 255, LWA_ALPHA);
+        ShowWindow(g_magnifierHwnd, SW_HIDE);
+    }
+}
+
+// Update magnifier window with zoomed image
+static void updateMagnifierWindow(int imgX, int imgY, int screenX, int screenY) {
+    if (!g_colorPickerActive || g_lastSourceFrame.empty()) {
+        if (g_magnifierHwnd) ShowWindow(g_magnifierHwnd, SW_HIDE);
+        return;
+    }
+    
+    if (!g_magnifierHwnd) {
+        createMagnifierWindow();
+    }
+    
+    if (!g_magnifierHwnd) return;
+    
+    const int sampleSize = 30;
+    int halfSample = sampleSize / 2;
+    int x1 = std::max(0, imgX - halfSample);
+    int y1 = std::max(0, imgY - halfSample);
+    int x2 = std::min(g_lastSourceFrame.cols, imgX + halfSample);
+    int y2 = std::min(g_lastSourceFrame.rows, imgY + halfSample);
+    
+    cv::Rect roi(x1, y1, x2 - x1, y2 - y1);
+    if (roi.width <= 0 || roi.height <= 0) return;
+    
+    cv::Mat zoomRegion = g_lastSourceFrame(roi);
+    cv::Mat zoomed;
+    cv::resize(zoomRegion, zoomed, cv::Size(g_magnifierSize, g_magnifierSize), 0, 0, cv::INTER_CUBIC);
+    
+    // Convert to BGRA for Windows
+    cv::Mat bgra;
+    cv::cvtColor(zoomed, bgra, cv::COLOR_BGR2BGRA);
+    
+    // Create or update bitmap
+    if (!g_magnifierDC) {
+        HDC screenDC = GetDC(NULL);
+        g_magnifierDC = CreateCompatibleDC(screenDC);
+        ReleaseDC(NULL, screenDC);
+    }
+    
+    if (g_magnifierBitmap) {
+        DeleteObject(g_magnifierBitmap);
+    }
+    
+    BITMAPINFO bmi = {};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = g_magnifierSize;
+    bmi.bmiHeader.biHeight = -g_magnifierSize; // Top-down
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+    
+    void* bits = NULL;
+    g_magnifierBitmap = CreateDIBSection(g_magnifierDC, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+    if (g_magnifierBitmap && bits) {
+        memcpy(bits, bgra.data, g_magnifierSize * g_magnifierSize * 4);
+    }
+    
+    // Position window
+    const int offsetX = 40;
+    const int offsetY = 40;
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+    
+    int posX = screenX + offsetX;
+    int posY = screenY + offsetY;
+    if (posX + g_magnifierSize > screenW) posX = screenX - g_magnifierSize - offsetX;
+    if (posY + g_magnifierSize > screenH) posY = screenY - g_magnifierSize - offsetY;
+    if (posX < 0) posX = 10;
+    if (posY < 0) posY = 10;
+    
+    SetWindowPos(g_magnifierHwnd, HWND_TOPMOST, posX, posY, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
+    InvalidateRect(g_magnifierHwnd, NULL, TRUE);
+    UpdateWindow(g_magnifierHwnd);
+}
+
+// OpenCV mouse callback for color picker (used when OpenCV window is active)
+static void onMouse(int event, int x, int y, int flags, void* userdata) {
+    if (!g_colorPickerActive || g_lastSourceFrame.empty()) return;
+    
+    // Convert display coordinates to source image coordinates
+    // The displayed image is scaled, so we need to account for that
+    int imgX, imgY;
+    if (g_scaledImageW > 0 && g_scaledImageH > 0) {
+        // Scale coordinates back to source image
+        imgX = (int)((double)x / g_scaledImageW * g_lastSourceFrame.cols);
+        imgY = (int)((double)y / g_scaledImageH * g_lastSourceFrame.rows);
+        imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+        imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+    } else {
+        imgX = x;
+        imgY = y;
+    }
+    
+    // Get screen coordinates for positioning zoom window
+    POINT pt;
+    GetCursorPos(&pt);  // Get current cursor position in screen coordinates
+    
+    if (event == cv::EVENT_MOUSEMOVE) {
+        updateMagnifierWindow(imgX, imgY, pt.x, pt.y);
+    } else if (event == cv::EVENT_LBUTTONDOWN) {
+        // Sample color at click position
+        cv::Vec3b bgr = g_lastSourceFrame.at<cv::Vec3b>(imgY, imgX);
+        
+        // Convert BGR to HSV
+        cv::Mat bgrMat(1, 1, CV_8UC3);
+        bgrMat.at<cv::Vec3b>(0, 0) = bgr;
+        cv::Mat hsvMat;
+        cv::cvtColor(bgrMat, hsvMat, cv::COLOR_BGR2HSV);
+        cv::Vec3b hsv = hsvMat.at<cv::Vec3b>(0, 0);
+        
+        // Store the picked BGR color
+        uiControls.diamondParams.pickedBGR = bgr;
+        
+        // Set HSV ranges around the sampled color with tighter tolerances
+        // Hue: ±15 degrees (wider for colors that wrap around)
+        int hTolerance = 15;
+        uiControls.diamondParams.colorHMin = std::max(0, (int)hsv[0] - hTolerance);
+        uiControls.diamondParams.colorHMax = std::min(180, (int)hsv[0] + hTolerance);
+        
+        // Saturation: ±30 (tighter range for better color matching)
+        int sTolerance = 30;
+        uiControls.diamondParams.colorSMin = std::max(0, (int)hsv[1] - sTolerance);
+        uiControls.diamondParams.colorSMax = std::min(255, (int)hsv[1] + sTolerance);
+        
+        // Value: ±40 (tighter range, but still allows for lighting variations)
+        int vTolerance = 40;
+        uiControls.diamondParams.colorVMin = std::max(0, (int)hsv[2] - vTolerance);
+        uiControls.diamondParams.colorVMax = std::min(255, (int)hsv[2] + vTolerance);
+        
+        uiControls.diamondParams.use_color_filter = true;
+
+        // Hide magnifier and deactivate picker FIRST, then refresh UI.
+        // `updateColorPickerLabels()` uses `g_colorPickerActive` to decide the button title.
+        if (g_magnifierHwnd) {
+            ShowWindow(g_magnifierHwnd, SW_HIDE);
+        }
+        g_colorPickerActive = false;
+
+        // Update UI labels (also updates button text)
+        updateColorPickerLabels();
+    }
+}
+
 // ImageView WndProc: draws the latest DIB scaled to fit.
 static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -547,6 +826,128 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 
             EndPaint(hwnd, &ps);
             return 0;
+        }
+        case WM_MOUSEMOVE: {
+            // Handle color picker mouse move in ImageView
+            if (g_colorPickerActive && !g_lastSourceFrame.empty()) {
+                int x = LOWORD(lParam);
+                int y = HIWORD(lParam);
+                
+                // Enable continuous mouse tracking
+                TRACKMOUSEEVENT tme = {};
+                tme.cbSize = sizeof(TRACKMOUSEEVENT);
+                tme.dwFlags = TME_HOVER | TME_LEAVE;
+                tme.hwndTrack = hwnd;
+                tme.dwHoverTime = 1;
+                TrackMouseEvent(&tme);
+                
+                // Convert client coordinates to source image coordinates
+                RECT rc{};
+                GetClientRect(hwnd, &rc);
+                const int dstW = std::max(0L, rc.right - rc.left);
+                const int dstH = std::max(0L, rc.bottom - rc.top);
+                
+                int imgX, imgY;
+                // Use g_imageDib dimensions for coordinate conversion (displayed image)
+                // Then clamp to g_lastSourceFrame dimensions (source image we're sampling from)
+                if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
+                    // Scale coordinates back to displayed image, then to source image
+                    imgX = (int)((double)x / dstW * g_imageDib.width);
+                    imgY = (int)((double)y / dstH * g_imageDib.height);
+                    // Clamp to source frame dimensions
+                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                } else {
+                    imgX = std::clamp(x, 0, g_lastSourceFrame.cols - 1);
+                    imgY = std::clamp(y, 0, g_lastSourceFrame.rows - 1);
+                }
+                
+                // Get screen coordinates for positioning zoom window
+                POINT pt = {x, y};
+                ClientToScreen(hwnd, &pt);
+                
+                updateMagnifierWindow(imgX, imgY, pt.x, pt.y);
+            }
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+        }
+        case WM_MOUSELEAVE: {
+            // Hide magnifier when mouse leaves the image view
+            if (g_magnifierHwnd) {
+                ShowWindow(g_magnifierHwnd, SW_HIDE);
+            }
+            break;
+        }
+        case WM_LBUTTONDOWN: {
+            // Handle color picker click in ImageView
+            if (g_colorPickerActive && !g_lastSourceFrame.empty()) {
+                int x = LOWORD(lParam);
+                int y = HIWORD(lParam);
+                
+                // Convert client coordinates to source image coordinates
+                RECT rc{};
+                GetClientRect(hwnd, &rc);
+                const int dstW = std::max(0L, rc.right - rc.left);
+                const int dstH = std::max(0L, rc.bottom - rc.top);
+                
+                int imgX, imgY;
+                // Use g_imageDib dimensions for coordinate conversion (displayed image)
+                // Then clamp to g_lastSourceFrame dimensions (source image we're sampling from)
+                if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
+                    // Scale coordinates back to displayed image, then to source image
+                    imgX = (int)((double)x / dstW * g_imageDib.width);
+                    imgY = (int)((double)y / dstH * g_imageDib.height);
+                    // Clamp to source frame dimensions
+                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                } else {
+                    imgX = std::clamp(x, 0, g_lastSourceFrame.cols - 1);
+                    imgY = std::clamp(y, 0, g_lastSourceFrame.rows - 1);
+                }
+                
+                // Sample color at click position
+                if (imgX >= 0 && imgX < g_lastSourceFrame.cols && imgY >= 0 && imgY < g_lastSourceFrame.rows) {
+                    cv::Vec3b bgr = g_lastSourceFrame.at<cv::Vec3b>(imgY, imgX);
+                    
+                    // Convert BGR to HSV
+                    cv::Mat bgrMat(1, 1, CV_8UC3);
+                    bgrMat.at<cv::Vec3b>(0, 0) = bgr;
+                    cv::Mat hsvMat;
+                    cv::cvtColor(bgrMat, hsvMat, cv::COLOR_BGR2HSV);
+                    cv::Vec3b hsv = hsvMat.at<cv::Vec3b>(0, 0);
+                    
+                    // Store the picked BGR color
+                    uiControls.diamondParams.pickedBGR = bgr;
+                    
+                    // Set HSV ranges around the sampled color with tighter tolerances
+                    // Hue: ±15 degrees (wider for colors that wrap around)
+                    int hTolerance = 15;
+                    uiControls.diamondParams.colorHMin = std::max(0, (int)hsv[0] - hTolerance);
+                    uiControls.diamondParams.colorHMax = std::min(180, (int)hsv[0] + hTolerance);
+                    
+                    // Saturation: ±30 (tighter range for better color matching)
+                    int sTolerance = 30;
+                    uiControls.diamondParams.colorSMin = std::max(0, (int)hsv[1] - sTolerance);
+                    uiControls.diamondParams.colorSMax = std::min(255, (int)hsv[1] + sTolerance);
+                    
+                    // Value: ±40 (tighter range, but still allows for lighting variations)
+                    int vTolerance = 40;
+                    uiControls.diamondParams.colorVMin = std::max(0, (int)hsv[2] - vTolerance);
+                    uiControls.diamondParams.colorVMax = std::min(255, (int)hsv[2] + vTolerance);
+                    
+                    uiControls.diamondParams.use_color_filter = true;
+                    
+                    // Hide magnifier and deactivate picker FIRST, then refresh UI.
+                    // `updateColorPickerLabels()` uses `g_colorPickerActive` to decide the button title.
+                    if (g_magnifierHwnd) {
+                        ShowWindow(g_magnifierHwnd, SW_HIDE);
+                    }
+                    g_colorPickerActive = false;
+
+                    // Update UI labels (also updates button text)
+                    updateColorPickerLabels();
+                }
+            }
+            break;
         }
     }
     return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -620,6 +1021,56 @@ static void ensureSidebarAndImageChildren(HWND mainHwnd) {
             GetModuleHandleW(NULL),
             NULL
         );
+    }
+}
+
+// Update color picker info labels and swatch in the UI
+static void updateColorPickerLabels() {
+    if (!g_sidebarPanel || !IsWindow(g_sidebarPanel)) return;
+    
+    wchar_t bgrText[64] = L"BGR: --";
+    wchar_t hsvText[64] = L"HSV: --";
+    wchar_t rangeText[128] = L"Range: --";
+    
+    // Color filtering is now always enabled; we always show the current picked color and ranges.
+    {
+        cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+        swprintf_s(bgrText, L"BGR: (%d, %d, %d)",
+                  (int)bgr[2], (int)bgr[1], (int)bgr[0]);
+        swprintf_s(hsvText, L"HSV: (%d, %d, %d)",
+                  (uiControls.diamondParams.colorHMin + uiControls.diamondParams.colorHMax) / 2,
+                  (uiControls.diamondParams.colorSMin + uiControls.diamondParams.colorSMax) / 2,
+                  (uiControls.diamondParams.colorVMin + uiControls.diamondParams.colorVMax) / 2);
+        swprintf_s(rangeText, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]",
+                  uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
+                  uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
+                  uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
+    }
+    
+    HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_BGR);
+    if (hBGR) SetWindowTextW(hBGR, bgrText);
+    
+    HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_HSV);
+    if (hHSV) SetWindowTextW(hHSV, hsvText);
+    
+    HWND hRange = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_RANGE_H);
+    if (hRange) SetWindowTextW(hRange, rangeText);
+    
+    // Update color swatch
+    HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_SWATCH);
+    if (hSwatch) {
+        cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+        COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
+        setColorPickerSwatchBrush(swatchColor);
+        InvalidateRect(hSwatch, NULL, TRUE);
+        UpdateWindow(hSwatch);
+    }
+    
+    // Update button text
+    HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER);
+    if (hColorPicker) {
+        const wchar_t* btnText = g_colorPickerActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
+        SetWindowTextW(hColorPicker, btnText);
     }
 }
 
@@ -769,6 +1220,11 @@ static void onFrameTick(HWND mainHwnd) {
         }
     }
 
+    // Keep source frame for color picking / magnifier.
+    // NOTE: In the Win32-hosted UI path, the picker reads pixels from `g_lastSourceFrame`.
+    // Without updating this each tick, the picker appears "dead" (no magnifier, no picked color updates).
+    g_lastSourceFrame = frame.clone();
+
     cv::Mat display = buildDisplayFrame(frame);
     if (!display.empty()) {
         // Keep a copy of the most recent rendered frame so "Export Captures" works in Win32 mode
@@ -889,6 +1345,7 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             const int kIdFeltFilled = 30231;
             const int kIdRailColor = 30240;
             const int kIdRailFilled = 30241;
+            const int kIdDiamondSkipMorph = 30250;  // IDC_DIAMOND_SKIP_MORPH
             if (code == BN_CLICKED) {
                 if (id == kIdDiamondsFilled) {
                     uiControls.diamondParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
@@ -900,6 +1357,57 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 }
                 if (id == kIdRailFilled) {
                     uiControls.railParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    return 0;
+                }
+                if (id == kIdDiamondSkipMorph) {
+                    uiControls.diamondParams.skip_morph_enhancement = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    return 0;
+                }
+                if (id == IDC_DIAMOND_COLOR_PICKER) {
+                    // Activate/deactivate color picker mode
+                    g_colorPickerActive = !g_colorPickerActive;
+                    if (!g_colorPickerActive) {
+                        // Hide magnifier when deactivating
+                        if (g_magnifierHwnd) {
+                            ShowWindow(g_magnifierHwnd, SW_HIDE);
+                        }
+                    } else {
+                        // Enable mouse tracking in ImageView to get mouse move events
+                        if (g_imageViewHwnd) {
+                            TRACKMOUSEEVENT tme = {};
+                            tme.cbSize = sizeof(TRACKMOUSEEVENT);
+                            tme.dwFlags = TME_HOVER | TME_LEAVE;
+                            tme.hwndTrack = g_imageViewHwnd;
+                            tme.dwHoverTime = 1;  // Immediate hover
+                            TrackMouseEvent(&tme);
+                            
+                            // Get current mouse position and show magnifier immediately
+                            POINT pt;
+                            GetCursorPos(&pt);
+                            ScreenToClient(g_imageViewHwnd, &pt);
+                            
+                            // Convert to image coordinates and show magnifier
+                            if (!g_lastSourceFrame.empty()) {
+                                RECT rc;
+                                GetClientRect(g_imageViewHwnd, &rc);
+                                const int dstW = std::max(0L, rc.right - rc.left);
+                                const int dstH = std::max(0L, rc.bottom - rc.top);
+                                
+                                int imgX, imgY;
+                                if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
+                                    imgX = (int)((double)pt.x / dstW * g_imageDib.width);
+                                    imgY = (int)((double)pt.y / dstH * g_imageDib.height);
+                                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                                    
+                                    POINT screenPt = {pt.x, pt.y};
+                                    ClientToScreen(g_imageViewHwnd, &screenPt);
+                                    updateMagnifierWindow(imgX, imgY, screenPt.x, screenPt.y);
+                                }
+                            }
+                        }
+                    }
+                    updateColorPickerLabels();  // Update button text and UI
                     return 0;
                 }
 
@@ -1007,6 +1515,23 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             return 0;
         }
         case WM_DESTROY: {
+            // Cleanup magnifier window
+            if (g_magnifierHwnd) {
+                DestroyWindow(g_magnifierHwnd);
+                g_magnifierHwnd = NULL;
+            }
+            if (g_magnifierBitmap) {
+                DeleteObject(g_magnifierBitmap);
+                g_magnifierBitmap = NULL;
+            }
+            if (g_magnifierDC) {
+                DeleteDC(g_magnifierDC);
+                g_magnifierDC = NULL;
+            }
+            if (g_colorPickerSwatchBrush) {
+                DeleteObject(g_colorPickerSwatchBrush);
+                g_colorPickerSwatchBrush = NULL;
+            }
             KillTimer(hwnd, 1);
             stopCaptureThread();
             PostQuitMessage(0);
@@ -1119,10 +1644,14 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_COMBO_BASE 40000
 
 // Trackbar IDs
-#define IDC_DIAMOND_THRESH1 (IDC_TRACKBAR_BASE + 1)
-#define IDC_DIAMOND_THRESH2 (IDC_TRACKBAR_BASE + 2)
+#define IDC_DIAMOND_THRESH1 (IDC_TRACKBAR_BASE + 1)  // Maps to min_threshold
+#define IDC_DIAMOND_THRESH2 (IDC_TRACKBAR_BASE + 2)  // Legacy, unused
 #define IDC_DIAMOND_MINAREA (IDC_TRACKBAR_BASE + 3)
 #define IDC_DIAMOND_MAXAREA (IDC_TRACKBAR_BASE + 4)
+#define IDC_DIAMOND_CIRCULARITY (IDC_TRACKBAR_BASE + 5)  // 0-100 (scaled from 0.0-1.0)
+#define IDC_DIAMOND_MORPH_KERNEL (IDC_TRACKBAR_BASE + 6)  // Morphological kernel size (5-31, must be odd)
+#define IDC_DIAMOND_SKIP_MORPH 30250  // Skip morphological enhancement checkbox (matches kIdDiamondSkipMorph above)
+#define IDC_DIAMOND_ADAPTIVE_C (IDC_TRACKBAR_BASE + 7)  // Adaptive threshold C constant
 #define IDC_RAIL_BLACK_VMAX (IDC_TRACKBAR_BASE + 10)
 #define IDC_RAIL_BROWN_HMAX (IDC_TRACKBAR_BASE + 11)
 #define IDC_RAIL_BROWN_SMAX (IDC_TRACKBAR_BASE + 12)
@@ -1207,6 +1736,7 @@ int legacyHighGuiMain(int argc, char** argv) {
     // Create window (resizable)
     const std::string windowName = "Billiards Trainer - Table Detection";
     cv::namedWindow(windowName, cv::WINDOW_NORMAL);
+    cv::setMouseCallback(windowName, onMouse, NULL);
     
     // Get the window handle and create native menu
 #ifdef _WIN32
@@ -1431,27 +1961,29 @@ int legacyHighGuiMain(int argc, char** argv) {
         
         // Keep a copy of the last overlaid frame for menu-driven capture export.
         g_lastProcessedFrame = processedImage.clone();
+        // Keep source frame for color picking
+        g_lastSourceFrame = currentFrame.clone();
         
-        // Calculate scaled image size to fit window (maintain aspect ratio)
-        // Reserve space for sidebar if enabled and not collapsed
+        // Store scaled image position for coordinate conversion
         int sidebarWidth = (uiControls.showSidebar && !uiControls.sidebarCollapsed) ? SIDEBAR_WIDTH : 
                           (uiControls.showSidebar && uiControls.sidebarCollapsed) ? SIDEBAR_COLLAPSED_WIDTH : 0;
         int availableWidth = windowWidth - sidebarWidth;
-        int availableHeight = windowHeight - 30; // Account for native menu bar
-        
+        int availableHeight = windowHeight - 30;
         double frameAspect = static_cast<double>(processedImage.cols) / processedImage.rows;
         double availableAspect = static_cast<double>(availableWidth) / availableHeight;
         
         int scaledWidth, scaledHeight;
         if (frameAspect > availableAspect) {
-            // Frame is wider - fit to width
             scaledWidth = availableWidth;
             scaledHeight = static_cast<int>(availableWidth / frameAspect);
         } else {
-            // Frame is taller - fit to height
             scaledHeight = availableHeight;
             scaledWidth = static_cast<int>(availableHeight * frameAspect);
         }
+        g_scaledImageX = (availableWidth - scaledWidth) / 2;
+        g_scaledImageY = 30 + (availableHeight - scaledHeight) / 2;
+        g_scaledImageW = scaledWidth;
+        g_scaledImageH = scaledHeight;
         
         // Scale the processed image
         cv::Mat scaledImage;
@@ -1930,7 +2462,7 @@ void createSidebarControls(HWND hwnd) {
             yPos += lineHeight + gap;
         }
 
-        // DIAMONDS group
+        // DIAMONDS group - Simplified Color Picker UI
         {
             addFeatureGroup(L"Diamonds",
                             IDC_DEBUG_OVERLAY_DIAMONDS_CB, uiControls.showDiamonds,
@@ -1939,36 +2471,79 @@ void createSidebarControls(HWND hwnd) {
                             IDC_DIAMONDS_STYLE_FILLED, uiControls.diamondParams.isFilled,
                             yPos);
 
-            yPos += 6;
-            createLabel(L"Min Threshold:", yPos, IDC_STATIC_BASE + 1);
-            createTrackbar(IDC_DIAMOND_THRESH1, yPos, 0, 255, uiControls.diamondParams.threshold1);
-            createValueLabel(yPos, IDC_STATIC_BASE + 2);
-            yPos += lineHeight;
+            yPos += 12;
+            
+            // Header
+            {
+                HWND hHeader = CreateWindowW(L"STATIC", L"Color Picker", WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                            xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel, NULL, NULL, NULL);
+                applyFont(hHeader, true);
+            }
+            yPos += lineHeight + 6;
 
-            createLabel(L"Max Threshold:", yPos, IDC_STATIC_BASE + 3);
-            createTrackbar(IDC_DIAMOND_THRESH2, yPos, 0, 255, uiControls.diamondParams.threshold2);
-            createValueLabel(yPos, IDC_STATIC_BASE + 4);
-            yPos += lineHeight;
+            // Color picker button
+            {
+                const wchar_t* btnText = g_colorPickerActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
+                HWND hColorPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                                 xPos, yPos - g_sidebarScrollPos, usableWidth, rowH + 5, g_sidebarPanel,
+                                                 (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER, NULL, NULL);
+                applyFont(hColorPicker, true);
+            }
+            yPos += lineHeight + 8;
 
-            createLabel(L"Min Area:", yPos, IDC_STATIC_BASE + 5);
-            createTrackbar(IDC_DIAMOND_MINAREA, yPos, 1, 1000, uiControls.diamondParams.minArea);
-            createValueLabel(yPos, IDC_STATIC_BASE + 6);
-            yPos += lineHeight;
+            // Color swatch (visual color display)
+            {
+                // Label
+                createLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 200);
+                yPos += lineHeight;
+                
+                // Color swatch rectangle
+                cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+                COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]); // BGR to RGB
+                
+                // IMPORTANT:
+                // - Do NOT use SS_WHITERECT / SS_BLACKRECT here: those styles cause the STATIC control
+                //   to paint a fixed-color rectangle (white/black) in its own WM_PAINT, which prevents
+                //   our WM_CTLCOLORSTATIC brush from showing up.
+                // - We rely on WM_CTLCOLORSTATIC (handled in SidebarPanelProc) to provide a solid brush.
+                HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
+                                            xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 40, 
+                                            g_sidebarPanel, (HMENU)(INT_PTR)IDC_COLOR_PICKER_SWATCH, NULL, NULL);
+                if (hSwatch) {
+                    // Keep the swatch brush in sync even when the sidebar is rebuilt.
+                    setColorPickerSwatchBrush(swatchColor);
+                    InvalidateRect(hSwatch, NULL, TRUE);
+                }
+            }
+            yPos += 45;
 
-            createLabel(L"Max Area:", yPos, IDC_STATIC_BASE + 7);
-            createTrackbar(IDC_DIAMOND_MAXAREA, yPos, 100, 5000, uiControls.diamondParams.maxArea);
-            createValueLabel(yPos, IDC_STATIC_BASE + 8);
-            yPos += lineHeight;
+            // Color info display (compact)
+            {
+                wchar_t bgrText[64] = L"BGR: --";
+                wchar_t hsvText[64] = L"HSV: --";
+                wchar_t rangeText[128] = L"Range: --";
+                
+                // Color filtering is always enabled; show current values unconditionally.
+                cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+                swprintf_s(bgrText, L"BGR: (%d, %d, %d)",
+                          (int)bgr[2], (int)bgr[1], (int)bgr[0]);
+                swprintf_s(hsvText, L"HSV: (%d, %d, %d)",
+                          (uiControls.diamondParams.colorHMin + uiControls.diamondParams.colorHMax) / 2,
+                          (uiControls.diamondParams.colorSMin + uiControls.diamondParams.colorSMax) / 2,
+                          (uiControls.diamondParams.colorVMin + uiControls.diamondParams.colorVMax) / 2);
+                swprintf_s(rangeText, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]",
+                          uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
+                          uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
+                          uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
+                
+                createLabel(bgrText, yPos, IDC_COLOR_PICKER_BGR);
+                yPos += lineHeight;
+                createLabel(hsvText, yPos, IDC_COLOR_PICKER_HSV);
+                yPos += lineHeight;
+                createLabel(rangeText, yPos, IDC_COLOR_PICKER_RANGE_H);
+                yPos += lineHeight;
+            }
 
-            yPos += 6;
-            createLabel(L"Radius:", yPos, IDC_STATIC_BASE + 90);
-            createTrackbar(IDC_DIAMONDS_RADIUS, yPos, 2, 25, uiControls.diamondParams.radiusPx);
-            createValueLabel(yPos, IDC_STATIC_BASE + 91);
-            yPos += lineHeight;
-
-            createLabel(L"Thickness:", yPos, IDC_STATIC_BASE + 92);
-            createTrackbar(IDC_DIAMONDS_THICKNESS, yPos, 1, 10, uiControls.diamondParams.outlineThicknessPx);
-            createValueLabel(yPos, IDC_STATIC_BASE + 93);
             yPos += lineHeight + gap;
         }
     }
@@ -2073,7 +2648,10 @@ void updateSidebarControls() {
     
     // Update trackbar positions
     HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH1);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold1);
+    if (hTrackbar) {
+        int thresholdVal = (uiControls.diamondParams.min_threshold > 0) ? uiControls.diamondParams.min_threshold : uiControls.diamondParams.threshold1;
+        SendMessage(hTrackbar, TBM_SETPOS, TRUE, thresholdVal);
+    }
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH2);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold2);
@@ -2083,6 +2661,15 @@ void updateSidebarControls() {
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MAXAREA);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.maxArea);
+
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_CIRCULARITY);
+    if (hTrackbar) {
+        int circularityVal = static_cast<int>(uiControls.diamondParams.min_circularity * 100.0f);
+        SendMessage(hTrackbar, TBM_SETPOS, TRUE, circularityVal);
+    }
+
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MORPH_KERNEL);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.morph_kernel_size);
     
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BLACK_VMAX);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.blackVMax);
@@ -2136,12 +2723,8 @@ void updateSidebarControls() {
     wchar_t buffer[32];
     HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 2);
     if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.threshold1);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 4);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.threshold2);
+        int thresholdVal = (uiControls.diamondParams.min_threshold > 0) ? uiControls.diamondParams.min_threshold : uiControls.diamondParams.threshold1;
+        swprintf_s(buffer, L"%d", thresholdVal);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 6);
@@ -2152,6 +2735,21 @@ void updateSidebarControls() {
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 8);
     if (hLabel) {
         swprintf_s(buffer, L"%d", uiControls.diamondParams.maxArea);
+        SetWindowTextW(hLabel, buffer);
+    }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 19);
+    if (hLabel) {
+        swprintf_s(buffer, L"%.2f", uiControls.diamondParams.min_circularity);
+        SetWindowTextW(hLabel, buffer);
+    }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 21);
+    if (hLabel) {
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.morph_kernel_size);
+        SetWindowTextW(hLabel, buffer);
+    }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 23);
+    if (hLabel) {
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.adaptive_thresh_C);
         SetWindowTextW(hLabel, buffer);
     }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 11);
@@ -2248,6 +2846,7 @@ void handleTrackbarChange(int trackbarId, int value) {
     switch (trackbarId) {
         case IDC_DIAMOND_THRESH1:
             uiControls.diamondParams.threshold1 = value;
+            uiControls.diamondParams.min_threshold = value;  // Keep in sync
             break;
         case IDC_DIAMOND_THRESH2:
             uiControls.diamondParams.threshold2 = value;
@@ -2257,6 +2856,18 @@ void handleTrackbarChange(int trackbarId, int value) {
             break;
         case IDC_DIAMOND_MAXAREA:
             uiControls.diamondParams.maxArea = value;
+            break;
+        case IDC_DIAMOND_CIRCULARITY:
+            // Scale from 0-100 to 0.0-1.0
+            uiControls.diamondParams.min_circularity = static_cast<float>(value) / 100.0f;
+            break;
+        case IDC_DIAMOND_MORPH_KERNEL:
+            // Ensure odd number for morphological kernel
+            uiControls.diamondParams.morph_kernel_size = (value % 2 == 0) ? (value + 1) : value;
+            uiControls.diamondParams.morph_kernel_size = std::clamp(uiControls.diamondParams.morph_kernel_size, 5, 31);
+            break;
+        case IDC_DIAMOND_ADAPTIVE_C:
+            uiControls.diamondParams.adaptive_thresh_C = value;
             break;
         case IDC_RAIL_BLACK_VMAX:
             uiControls.railParams.blackVMax = value;

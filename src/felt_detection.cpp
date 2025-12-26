@@ -70,6 +70,12 @@ std::vector<cv::Point> detectFeltContour(const cv::Mat& src, const FeltParams& p
         }
     }
     
-    return contours[largestIdx];
+    // Smooth edges by simplifying the contour with polygon approximation
+    // This removes jagged edges while maintaining the general direction/shape of each border segment
+    std::vector<cv::Point> smoothedContour;
+    const double epsilon = 2.5;  // pixels - tune this for more/less smoothing
+    cv::approxPolyDP(contours[largestIdx], smoothedContour, epsilon, false);
+    
+    return smoothedContour;
 }
 

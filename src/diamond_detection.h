@@ -11,17 +11,36 @@
 
 // Structure to hold detection parameters
 struct DiamondDetectionParams {
-    int threshold1 = 0;
-    int threshold2 = 255;
-    int minArea = 5;
-    int maxArea = 1000;
+    // Detection algorithm parameters
+    int min_threshold = 30;           // Threshold for enhanced image (0-255). Lower values = more sensitive, higher values = less sensitive.
+    int minArea = 20;                 // Minimum contour area in pixels
+    int maxArea = 300;                // Maximum contour area in pixels
+    float min_circularity = 0.4f;     // Minimum circularity (0.0-1.0), higher = more circular
+    int morph_kernel_size = 15;       // Morphological kernel size for top-hat/black-hat (should be larger than diamond size)
+    bool skip_morph_enhancement = false;  // If true, skip morphological enhancement and threshold grayscale directly
+    int adaptive_thresh_blocksize = 11;   // Block size for adaptive thresholding (must be odd: 3, 5, 7, 9, 11, etc.)
+    int adaptive_thresh_C = 2;            // Constant subtracted from mean for adaptive thresholding
+    
+    // Color filtering (HSV range) - if enabled, only detect diamonds matching this color
+    // Color filtering is now always ON (UI toggle removed). Keep the flag for backward compatibility.
+    bool use_color_filter = true;         // Always true; UI no longer exposes disabling this.
+    int colorHMin = 0, colorHMax = 180;   // Hue range (0-180 in OpenCV)
+    int colorSMin = 0, colorSMax = 255;   // Saturation range (0-255)
+    // Default to a no-op filter (full V range) until a color is picked.
+    int colorVMin = 0, colorVMax = 255;   // Value range (0-255)
+    cv::Vec3b pickedBGR = cv::Vec3b(0, 0, 0);  // Store the picked BGR color for UI display
+    
+    // Legacy parameters (kept for UI compatibility, threshold1 maps to min_threshold)
+    int threshold1 = 100;             // Maps to min_threshold for backward compatibility
+    int threshold2 = 255;             // Unused but kept for UI compatibility
+    
     // Overlay styling
-    cv::Scalar color = cv::Scalar(0, 255, 255); // BGR
+    cv::Scalar color = cv::Scalar(0, 0, 255); // BGR (red by default for diamonds)
     // Alpha (transparency) for rendering: 0..255 (0 = invisible, 255 = fully opaque)
     int alpha = 255;
     bool isFilled = true;
-    int radiusPx = 8;
-    int outlineThicknessPx = 2;
+    int radiusPx = 8;                 // Radius of drawn diamond markers
+    int outlineThicknessPx = 2;       // Outline thickness for markers
 };
 
 // Debug images emitted by the diamond detection pipeline (label, image)
