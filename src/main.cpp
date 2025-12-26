@@ -49,7 +49,7 @@ struct UIControls {
     bool showDiamonds = true;
     bool showFelt = true;
     bool showRail = true;
-    // Orientation overlay: draws an outer + inner rotated rectangle that bounds the rail mask (a "square donut").
+    // Orientation Mask: draws outer + inner quads bounding the rail mask, with labeled rail regions (L1, L2, S1, S2).
     bool showOrientation = false;
     bool showSidebar = true; // Debug sidebar toggle (on by default)
     bool sidebarCollapsed = false; // Sidebar collapsed state
@@ -74,6 +74,16 @@ struct UIControls {
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
 static cv::Mat g_lastSourceFrame;  // Original unscaled source frame for color picking
+
+// Table orientation output: two dominant directions from the rail mask.
+struct TableOrientation {
+    bool valid = false;
+    double thetaA = 0.0;  // First axis angle in [0, pi)
+    double thetaB = 0.0;  // Second axis angle in [0, pi)
+    cv::Point2f dirA;     // Unit direction vector for axis A
+    cv::Point2f dirB;     // Unit direction vector for axis B
+};
+static TableOrientation g_tableOrientation;
 
 // Last diamond detection processing image (the final image used for blob detection)
 static cv::Mat g_lastDiamondProcessingImage;
@@ -1133,6 +1143,127 @@ static void layoutChildren(HWND mainHwnd) {
     }
 }
 
+// Compute table orientation (two dominant axes) from the rail mask.
+// Uses Hough lines to find dominant edge directions, then clusters into two perpendicular families.
+static TableOrientation computeTableOrientation(const cv::Mat& railMask) {
+    TableOrientation result;
+    if (railMask.empty() || cv::countNonZero(railMask) < 100) return result;
+
+    // 1) Clean the mask: morphological close then open.
+    cv::Mat cleaned;
+    {
+        const int ksize = 5;
+        cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(ksize, ksize));
+        cv::morphologyEx(railMask, cleaned, cv::MORPH_CLOSE, kernel);
+        cv::morphologyEx(cleaned, cleaned, cv::MORPH_OPEN, kernel);
+    }
+
+    // Keep largest connected component.
+    {
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(cleaned.clone(), contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        if (contours.empty()) return result;
+        int bestIdx = 0;
+        double bestArea = 0;
+        for (int i = 0; i < (int)contours.size(); i++) {
+            double a = cv::contourArea(contours[i]);
+            if (a > bestArea) { bestArea = a; bestIdx = i; }
+        }
+        cleaned = cv::Mat::zeros(railMask.size(), CV_8UC1);
+        cv::drawContours(cleaned, contours, bestIdx, cv::Scalar(255), cv::FILLED);
+    }
+
+    // 2) Extract edges using Canny.
+    cv::Mat edges;
+    cv::Canny(cleaned, edges, 50, 150);
+
+    // 3) Hough lines to find dominant orientations.
+    std::vector<cv::Vec4i> lines;
+    cv::HoughLinesP(edges, lines, 1, CV_PI / 180, 50, 30, 10);
+    if (lines.size() < 4) return result;
+
+    // Collect angles (folded to [0, pi)).
+    std::vector<double> angles;
+    angles.reserve(lines.size());
+    for (const auto& l : lines) {
+        double dx = l[2] - l[0];
+        double dy = l[3] - l[1];
+        double len = std::sqrt(dx * dx + dy * dy);
+        if (len < 20) continue; // Skip short segments.
+        double theta = std::atan2(dy, dx);
+        // Fold to [0, pi).
+        theta = std::fmod(theta + CV_PI, CV_PI);
+        angles.push_back(theta);
+    }
+    if (angles.size() < 4) return result;
+
+    // 4) Cluster angles into two families using simple k-means on circular space.
+    // Initialize centers as the two most separated angles.
+    double centerA = angles[0];
+    double centerB = angles[0];
+    double maxSep = 0;
+    for (size_t i = 0; i < angles.size(); i++) {
+        for (size_t j = i + 1; j < angles.size(); j++) {
+            double diff = std::abs(angles[i] - angles[j]);
+            if (diff > CV_PI / 2) diff = CV_PI - diff; // Circular distance on [0, pi).
+            if (diff > maxSep) {
+                maxSep = diff;
+                centerA = angles[i];
+                centerB = angles[j];
+            }
+        }
+    }
+
+    // Iterate k-means (a few iterations is enough).
+    for (int iter = 0; iter < 10; iter++) {
+        std::vector<double> groupA, groupB;
+        for (double a : angles) {
+            double dA = std::abs(a - centerA);
+            if (dA > CV_PI / 2) dA = CV_PI - dA;
+            double dB = std::abs(a - centerB);
+            if (dB > CV_PI / 2) dB = CV_PI - dB;
+            if (dA < dB) groupA.push_back(a);
+            else groupB.push_back(a);
+        }
+        if (groupA.empty() || groupB.empty()) break;
+
+        // Update centers (circular mean).
+        auto circularMean = [](const std::vector<double>& vals) -> double {
+            double sx = 0, sy = 0;
+            for (double v : vals) {
+                sx += std::cos(2 * v); // Double angle for [0, pi) periodicity.
+                sy += std::sin(2 * v);
+            }
+            double mean2 = std::atan2(sy, sx);
+            double mean = mean2 / 2;
+            if (mean < 0) mean += CV_PI;
+            return mean;
+        };
+        centerA = circularMean(groupA);
+        centerB = circularMean(groupB);
+    }
+
+    // 5) Stabilize sign: ensure dirA · [1,0] >= 0.
+    // (Directions are bidirectional; this just picks a consistent sign.)
+    result.thetaA = centerA;
+    result.thetaB = centerB;
+    result.dirA = cv::Point2f((float)std::cos(centerA), (float)std::sin(centerA));
+    result.dirB = cv::Point2f((float)std::cos(centerB), (float)std::sin(centerB));
+
+    // Ensure dirA.x >= 0.
+    if (result.dirA.x < 0) {
+        result.dirA *= -1;
+        result.thetaA = std::fmod(result.thetaA + CV_PI, CV_PI);
+    }
+    if (result.dirB.x < 0) {
+        result.dirB *= -1;
+        result.thetaB = std::fmod(result.thetaB + CV_PI, CV_PI);
+    }
+
+    result.valid = true;
+    return result;
+}
+
 // Minimal per-frame render: apply overlays (using OpenCV), then push to ImageView.
 // We keep a small amount of global state to support temporal smoothing.
 static cv::Mat g_prevOverlayDeltaF; // CV_32FC3: (processed - rawFrame) from previous frame
@@ -1151,6 +1282,9 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         cv::Mat railMask;
         if ((uiControls.showRail || uiControls.showOrientation) && !feltContour.empty()) {
             railMask = detectRailMask(currentFrame, feltContour, uiControls.railParams);
+
+            // Compute table orientation (two dominant axes) from rail mask.
+            g_tableOrientation = computeTableOrientation(railMask);
         }
 
         if (uiControls.showFelt && !feltContour.empty()) {
@@ -1183,7 +1317,7 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
                 }
         }
 
-        // Orientation overlay: compute an outer + inner *perspective* quad around the rail mask (a "square donut").
+        // Orientation Mask: compute outer + inner perspective quads around the rail mask with labeled rail regions.
         //
         // IMPORTANT:
         // - A rotated rectangle cannot represent perspective (trapezoid) properly, so it will often
@@ -1479,6 +1613,53 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
                     }
                 }
 
+                // Normalize quad corner ordering to TL, TR, BR, BL and ensure inner/outer corners correspond.
+                // This makes downstream perspective transforms stable and avoids “rotated index” bugs.
+                auto orderQuadTLTRBRBL = [](cv::Point2f pts[4]) {
+                    // Using sum/diff heuristic:
+                    // - TL: min(x+y), BR: max(x+y)
+                    // - TR: min(x-y), BL: max(x-y)
+                    cv::Point2f ordered[4];
+                    int tl = 0, tr = 0, br = 0, bl = 0;
+                    float minSum = std::numeric_limits<float>::infinity();
+                    float maxSum = -std::numeric_limits<float>::infinity();
+                    float minDiff = std::numeric_limits<float>::infinity();
+                    float maxDiff = -std::numeric_limits<float>::infinity();
+                    for (int i = 0; i < 4; i++) {
+                        const float s = pts[i].x + pts[i].y;
+                        const float d = pts[i].x - pts[i].y;
+                        if (s < minSum) { minSum = s; tl = i; }
+                        if (s > maxSum) { maxSum = s; br = i; }
+                        if (d < minDiff) { minDiff = d; tr = i; }
+                        if (d > maxDiff) { maxDiff = d; bl = i; }
+                    }
+                    ordered[0] = pts[tl]; // TL
+                    ordered[1] = pts[tr]; // TR
+                    ordered[2] = pts[br]; // BR
+                    ordered[3] = pts[bl]; // BL
+                    for (int i = 0; i < 4; i++) pts[i] = ordered[i];
+                };
+
+                orderQuadTLTRBRBL(outerPts);
+                {
+                    // Reorder inner points to correspond to the now-ordered outer points.
+                    cv::Point2f orderedInner[4];
+                    bool used[4] = {false, false, false, false};
+                    for (int i = 0; i < 4; i++) {
+                        float bestD = std::numeric_limits<float>::infinity();
+                        int bestJ = 0;
+                        for (int j = 0; j < 4; j++) {
+                            if (used[j]) continue;
+                            const cv::Point2f d = innerPts[j] - outerPts[i];
+                            const float dd = d.dot(d);
+                            if (dd < bestD) { bestD = dd; bestJ = j; }
+                        }
+                        used[bestJ] = true;
+                        orderedInner[i] = innerPts[bestJ];
+                    }
+                    for (int i = 0; i < 4; i++) innerPts[i] = orderedInner[i];
+                }
+
                 auto drawQuad = [&](const cv::Point2f pts[4], const cv::Scalar& color, int thicknessPx) {
                     for (int i = 0; i < 4; i++) {
                         const cv::Point2f a = pts[i];
@@ -1497,48 +1678,192 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
                 drawQuad(outerPts, cv::Scalar(255, 0, 255), 5);  // BGR purple
                 drawQuad(innerPts, cv::Scalar(255, 0, 255), 5);  // BGR purple
 
-                // Extend each inner edge to meet the outer quad, creating 4 rail regions + 4 corner regions.
-                // For each inner edge, find where its infinite line intersects the outer quad boundary.
-                auto lineSegmentIntersect = [](const cv::Point2f& p1, const cv::Point2f& p2,
-                                                const cv::Point2f& p3, const cv::Point2f& p4,
-                                                cv::Point2f& out) -> bool {
-                    // Line 1: p1 to p2, Line 2: p3 to p4
-                    const float d1x = p2.x - p1.x, d1y = p2.y - p1.y;
-                    const float d2x = p4.x - p3.x, d2y = p4.y - p3.y;
-                    const float cross = d1x * d2y - d1y * d2x;
-                    if (std::abs(cross) < 1e-6f) return false; // parallel
-                    const float t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / cross;
-                    const float u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / cross;
-                    // t can be any value (we're extending line 1), but u must be in [0,1] for segment intersection
-                    if (u < 0.0f || u > 1.0f) return false;
-                    out.x = p1.x + t * d1x;
-                    out.y = p1.y + t * d1y;
-                    return true;
+                // Draw divider lines from each inner corner to corresponding outer corner.
+                // This creates 4 rail regions (trapezoids between inner and outer edges).
+                for (int i = 0; i < 4; i++) {
+                    cv::line(processed,
+                             cv::Point((int)std::lround(innerPts[i].x), (int)std::lround(innerPts[i].y)),
+                             cv::Point((int)std::lround(outerPts[i].x), (int)std::lround(outerPts[i].y)),
+                             cv::Scalar(255, 0, 255), 5, cv::LINE_AA);
+                }
+
+                // Build 4 rail region quads. Region i: innerPts[i] -> innerPts[i+1] -> outerPts[i+1] -> outerPts[i]
+                //
+                // Long vs short rule (no warp, no homography, no “+”):
+                // - If a region contains the MID-SIDE pocket gap/notch, it is a LONG rail region.
+                // - Otherwise it is a SHORT rail region.
+                //
+                // Implementation:
+                // - For each region, sample along its OUTER edge.
+                // - At each sample along the edge, sample inward (toward the felt) across the local rail thickness.
+                // - Build a 1D “rail coverage” profile along the edge.
+                // - A long-rail side pocket creates a clear DIP near the midpoint of that profile.
+                // - We score dip strength as: (centerMin / shoulderMean). Lower => more notch-like.
+                struct RailRegion {
+                    cv::Point2f innerA, innerB, outerA, outerB;
+                    cv::Point2f centroid;
+                    double notchScore = std::numeric_limits<double>::infinity();
+                    const char* label = "?";
+                };
+                std::vector<RailRegion> regions(4);
+                for (int i = 0; i < 4; i++) {
+                    const int next = (i + 1) % 4;
+                    regions[i].innerA = innerPts[i];
+                    regions[i].innerB = innerPts[next];
+                    regions[i].outerA = outerPts[i];
+                    regions[i].outerB = outerPts[next];
+                    regions[i].centroid = (regions[i].innerA + regions[i].innerB + regions[i].outerA + regions[i].outerB) * 0.25f;
+                }
+
+                auto smooth1D = [](std::vector<double>& v, int radius) {
+                    if (v.empty() || radius <= 0) return;
+                    std::vector<double> out(v.size(), 0.0);
+                    for (int i = 0; i < (int)v.size(); i++) {
+                        const int a = std::max(0, i - radius);
+                        const int b = std::min((int)v.size() - 1, i + radius);
+                        double s = 0.0;
+                        for (int j = a; j <= b; j++) s += v[j];
+                        out[i] = s / (double)(b - a + 1);
+                    }
+                    v.swap(out);
                 };
 
-                // For each inner edge, find intersections with all outer edges, keep valid ones.
-                for (int i = 0; i < 4; i++) {
-                    const cv::Point2f iA = innerPts[i];
-                    const cv::Point2f iB = innerPts[(i + 1) % 4];
+                auto scoreRegionForMiddlePocket = [&](const RailRegion& r) -> double {
+                    // Outer edge direction.
+                    const cv::Point2f e = r.outerB - r.outerA;
+                    const float eLen = std::sqrt(e.dot(e));
+                    if (eLen < 5.0f) return std::numeric_limits<double>::infinity();
+                    const cv::Point2f t = e * (1.0f / eLen);
 
-                    std::vector<cv::Point2f> hits;
-                    for (int j = 0; j < 4; j++) {
-                        const cv::Point2f oA = outerPts[j];
-                        const cv::Point2f oB = outerPts[(j + 1) % 4];
-                        cv::Point2f hit;
-                        if (lineSegmentIntersect(iA, iB, oA, oB, hit)) {
-                            hits.push_back(hit);
+                    // Inward normal (toward felt): choose sign so it points toward the region centroid.
+                    cv::Point2f n(t.y, -t.x);
+                    const cv::Point2f mid = (r.outerA + r.outerB) * 0.5f;
+                    if (n.dot(r.centroid - mid) < 0.0f) n *= -1.0f;
+
+                    // Profile along edge.
+                    const int N = 120; // samples along edge
+                    std::vector<double> prof(N, 0.0);
+
+                    for (int i = 0; i < N; i++) {
+                        const float a = (N == 1) ? 0.5f : (float)i / (float)(N - 1);
+                        const cv::Point2f pOuter = r.outerA + a * (r.outerB - r.outerA);
+                        const cv::Point2f pInner = r.innerA + a * (r.innerB - r.innerA);
+
+                        float depth = std::sqrt((pInner - pOuter).dot(pInner - pOuter));
+                        depth = std::clamp(depth, 8.0f, 200.0f);
+                        const int steps = std::clamp((int)std::lround(depth), 12, 80);
+
+                        int hits = 0;
+                        for (int s = 0; s < steps; s++) {
+                            const float u = ((float)s + 0.5f) / (float)steps;
+                            const cv::Point2f q = pOuter + n * (u * depth);
+                            const int x = (int)std::lround(q.x);
+                            const int y = (int)std::lround(q.y);
+                            if ((unsigned)x < (unsigned)railMask.cols && (unsigned)y < (unsigned)railMask.rows) {
+                                if (railMask.at<unsigned char>(y, x) != 0) hits++;
+                            }
                         }
+                        prof[i] = (double)hits / (double)steps; // [0..1] rail coverage
                     }
 
-                    // We expect 2 hits (one on each "end" of the extended inner edge).
-                    if (hits.size() >= 2) {
-                        // Draw line from first hit to last hit (through the inner edge).
-                        cv::line(processed,
-                                 cv::Point((int)std::lround(hits[0].x), (int)std::lround(hits[0].y)),
-                                 cv::Point((int)std::lround(hits[1].x), (int)std::lround(hits[1].y)),
-                                 cv::Scalar(255, 0, 255), 5, cv::LINE_AA);
+                    smooth1D(prof, 4);
+
+                    auto meanRange = [&](double a0, double a1) -> double {
+                        const int i0 = std::clamp((int)std::lround(a0 * (N - 1)), 0, N - 1);
+                        const int i1 = std::clamp((int)std::lround(a1 * (N - 1)), 0, N - 1);
+                        if (i1 <= i0) return 0.0;
+                        double acc = 0.0;
+                        for (int i = i0; i <= i1; i++) acc += prof[i];
+                        return acc / (double)(i1 - i0 + 1);
+                    };
+                    auto minRange = [&](double a0, double a1) -> double {
+                        const int i0 = std::clamp((int)std::lround(a0 * (N - 1)), 0, N - 1);
+                        const int i1 = std::clamp((int)std::lround(a1 * (N - 1)), 0, N - 1);
+                        if (i1 <= i0) return 1.0;
+                        double m = 1.0;
+                        for (int i = i0; i <= i1; i++) m = std::min(m, prof[i]);
+                        return m;
+                    };
+
+                    // Mid-pocket dip around midpoint.
+                    const double centerMin = minRange(0.44, 0.56);
+                    const double shoulderA = meanRange(0.22, 0.34);
+                    const double shoulderB = meanRange(0.66, 0.78);
+                    const double denom = std::max(1e-6, 0.5 * (shoulderA + shoulderB));
+                    return centerMin / denom; // smaller => stronger mid-pocket notch
+                };
+
+                for (auto& r : regions) r.notchScore = scoreRegionForMiddlePocket(r);
+
+                // Pick the two most notch-like regions as long rails.
+                std::vector<int> idx = {0, 1, 2, 3};
+                std::sort(idx.begin(), idx.end(), [&](int a, int b) { return regions[a].notchScore < regions[b].notchScore; });
+                const int Lidx0 = idx[0];
+                const int Lidx1 = idx[1];
+                const int Sidx0 = idx[2];
+                const int Sidx1 = idx[3];
+
+                auto assignPairLabels = [&](int a, int b, const char* labelA, const char* labelB) {
+                    const cv::Point2f ca = regions[a].centroid;
+                    const cv::Point2f cb = regions[b].centroid;
+                    const float dx = std::abs(ca.x - cb.x);
+                    const float dy = std::abs(ca.y - cb.y);
+                    const bool separateInX = (dx > dy);
+                    const bool aFirst = separateInX ? (ca.x < cb.x) : (ca.y < cb.y);
+                    if (aFirst) {
+                        regions[a].label = labelA;
+                        regions[b].label = labelB;
+                    } else {
+                        regions[a].label = labelB;
+                        regions[b].label = labelA;
                     }
+                };
+
+                assignPairLabels(Lidx0, Lidx1, "L1", "L2");
+                assignPairLabels(Sidx0, Sidx1, "S1", "S2");
+
+                // Draw shaded regions and labels.
+                cv::Mat overlay = processed.clone();
+                const cv::Scalar purpleFill(255, 0, 255); // BGR purple
+                for (int i = 0; i < 4; i++) {
+                    // Build polygon for this region.
+                    std::vector<cv::Point> poly = {
+                        cv::Point((int)std::lround(regions[i].innerA.x), (int)std::lround(regions[i].innerA.y)),
+                        cv::Point((int)std::lround(regions[i].innerB.x), (int)std::lround(regions[i].innerB.y)),
+                        cv::Point((int)std::lround(regions[i].outerB.x), (int)std::lround(regions[i].outerB.y)),
+                        cv::Point((int)std::lround(regions[i].outerA.x), (int)std::lround(regions[i].outerA.y))
+                    };
+                    cv::fillPoly(overlay, std::vector<std::vector<cv::Point>>{poly}, purpleFill);
+                }
+                // Blend overlay with processed (semi-transparent fill).
+                cv::addWeighted(overlay, 0.3, processed, 0.7, 0, processed);
+
+                // Redraw lines on top of shading.
+                drawQuad(outerPts, cv::Scalar(255, 0, 255), 5);
+                drawQuad(innerPts, cv::Scalar(255, 0, 255), 5);
+                for (int i = 0; i < 4; i++) {
+                    cv::line(processed,
+                             cv::Point((int)std::lround(innerPts[i].x), (int)std::lround(innerPts[i].y)),
+                             cv::Point((int)std::lround(outerPts[i].x), (int)std::lround(outerPts[i].y)),
+                             cv::Scalar(255, 0, 255), 5, cv::LINE_AA);
+                }
+
+                // Draw labels centered in each region.
+                for (int i = 0; i < 4; i++) {
+                    // Compute centroid of the trapezoid.
+                    cv::Point2f centroid = (regions[i].innerA + regions[i].innerB + 
+                                            regions[i].outerA + regions[i].outerB) * 0.25f;
+
+                    // Draw label.
+                    const int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+                    const double fontScale = 1.5;
+                    const int thickness = 3;
+                    int baseline = 0;
+                    cv::Size textSize = cv::getTextSize(regions[i].label, fontFace, fontScale, thickness, &baseline);
+                    cv::Point textOrg((int)(centroid.x - textSize.width / 2), (int)(centroid.y + textSize.height / 2));
+                    // White text with black outline for visibility.
+                    cv::putText(processed, regions[i].label, textOrg, fontFace, fontScale, cv::Scalar(0, 0, 0), thickness + 2, cv::LINE_AA);
+                    cv::putText(processed, regions[i].label, textOrg, fontFace, fontScale, cv::Scalar(255, 255, 255), thickness, cv::LINE_AA);
                 }
             }
         }
@@ -2713,7 +3038,7 @@ void createSidebarControls(HWND hwnd) {
 
         // Orientation overlay toggle
         {
-            HWND h = CreateWindowW(L"BUTTON", L"Orientation (rail donut)", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+            HWND h = CreateWindowW(L"BUTTON", L"Orientation Mask", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
                                    xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
                                    (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
             applyFont(h, false);
