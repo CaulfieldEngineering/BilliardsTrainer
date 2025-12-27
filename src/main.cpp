@@ -1,7 +1,259 @@
 #include "main.h"
 
+#include <fstream> // std::ifstream/std::ofstream
+#include <cctype>  // std::isspace
+#include <cstdio>  // std::sscanf
+
 // Define global UI state (declared as `extern` in `main.h`)
 UIControls uiControls{};
+
+// -------------------------------------------------------------------------------------------------
+// "Basic memory" (settings persistence)
+//
+// We intentionally keep this dead-simple:
+// - `settings.txt` in the same directory as the executable (or CWD fallback)
+// - key=value pairs, one per line
+// - unknown keys ignored (forward compatible)
+//
+// This is NOT meant to be a full config system; it just preserves the user's last-tuned parameters.
+// -------------------------------------------------------------------------------------------------
+
+static std::filesystem::path getSettingsFilePath() {
+    // Store settings in the same directory as testImage.jpg (project root)
+    // This ensures settings are not in the build folder (which is gitignored)
+    // and are preserved across builds and crashes.
+    // Use the same resolution logic as testImage.jpg: try current directory, then "../../"
+    std::filesystem::path basePath = std::filesystem::current_path();
+    
+    // Check if testImage.jpg exists in current directory
+    if (std::filesystem::exists(basePath / "testImage.jpg")) {
+        return basePath / "settings.txt";
+    }
+    
+    // Otherwise, use "../../" (assuming we're in build/Release or similar)
+    // Go up two directory levels to reach the project root
+    std::filesystem::path altPath = basePath.parent_path().parent_path() / "settings.txt";
+    return altPath;
+}
+
+static std::string trimCopy(const std::string& s) {
+    size_t a = 0;
+    while (a < s.size() && std::isspace((unsigned char)s[a])) a++;
+    size_t b = s.size();
+    while (b > a && std::isspace((unsigned char)s[b - 1])) b--;
+    return s.substr(a, b - a);
+}
+
+static bool parseBool(const std::string& v, bool& out) {
+    const std::string s = trimCopy(v);
+    if (s == "1" || s == "true" || s == "True" || s == "TRUE" || s == "yes" || s == "Yes") { out = true; return true; }
+    if (s == "0" || s == "false" || s == "False" || s == "FALSE" || s == "no" || s == "No") { out = false; return true; }
+    return false;
+}
+
+static bool parseInt(const std::string& v, int& out) {
+    try {
+        size_t idx = 0;
+        const int x = std::stoi(trimCopy(v), &idx);
+        out = x;
+        return true;
+    } catch (...) { return false; }
+}
+
+static bool parseFloat(const std::string& v, float& out) {
+    try {
+        size_t idx = 0;
+        const float x = std::stof(trimCopy(v), &idx);
+        out = x;
+        return true;
+    } catch (...) { return false; }
+}
+
+static std::string toStringBool(bool v) { return v ? "1" : "0"; }
+
+static std::string toStringVec3b(const cv::Vec3b& v) {
+    return std::to_string((int)v[0]) + "," + std::to_string((int)v[1]) + "," + std::to_string((int)v[2]);
+}
+
+static bool parseVec3b(const std::string& s, cv::Vec3b& out) {
+    int a = 0, b = 0, c = 0;
+    if (std::sscanf(s.c_str(), "%d,%d,%d", &a, &b, &c) == 3) {
+        out = cv::Vec3b((uchar)std::clamp(a, 0, 255), (uchar)std::clamp(b, 0, 255), (uchar)std::clamp(c, 0, 255));
+        return true;
+    }
+    return false;
+}
+
+static std::string toStringScalarBgr(const cv::Scalar& bgr) {
+    // BGR stored as integers for readability.
+    return std::to_string((int)std::lround(bgr[0])) + "," + std::to_string((int)std::lround(bgr[1])) + "," + std::to_string((int)std::lround(bgr[2]));
+}
+
+static bool parseScalarBgr(const std::string& s, cv::Scalar& out) {
+    int b = 0, g = 0, r = 0;
+    if (std::sscanf(s.c_str(), "%d,%d,%d", &b, &g, &r) == 3) {
+        out = cv::Scalar((double)std::clamp(b, 0, 255), (double)std::clamp(g, 0, 255), (double)std::clamp(r, 0, 255));
+        return true;
+    }
+    return false;
+}
+
+static void saveSettingsToDisk() {
+    const std::filesystem::path path = getSettingsFilePath();
+    try {
+        std::filesystem::create_directories(path.parent_path());
+    } catch (...) {
+        // Best effort
+    }
+
+    std::ofstream f(path, std::ios::binary);
+    if (!f) return;
+
+    f << "# BilliardsTrainer settings (auto-generated)\n";
+    f << "# Format: key=value\n\n";
+
+    // ---- UIControls ----
+    f << "ui.selectedSource=" << uiControls.selectedSource << "\n";
+    f << "ui.showOverlay=" << toStringBool(uiControls.showOverlay) << "\n";
+    f << "ui.showDiamonds=" << toStringBool(uiControls.showDiamonds) << "\n";
+    f << "ui.showFelt=" << toStringBool(uiControls.showFelt) << "\n";
+    f << "ui.showRail=" << toStringBool(uiControls.showRail) << "\n";
+    f << "ui.showOrientation=" << toStringBool(uiControls.showOrientation) << "\n";
+    f << "ui.smoothingPercent=" << uiControls.smoothingPercent << "\n";
+
+    // ---- Diamonds ----
+    const auto& d = uiControls.diamondParams;
+    f << "diamond.min_threshold=" << d.min_threshold << "\n";
+    f << "diamond.minArea=" << d.minArea << "\n";
+    f << "diamond.maxArea=" << d.maxArea << "\n";
+    f << "diamond.min_circularity=" << d.min_circularity << "\n";
+    f << "diamond.morph_kernel_size=" << d.morph_kernel_size << "\n";
+    f << "diamond.skip_morph_enhancement=" << toStringBool(d.skip_morph_enhancement) << "\n";
+    f << "diamond.adaptive_thresh_blocksize=" << d.adaptive_thresh_blocksize << "\n";
+    f << "diamond.adaptive_thresh_C=" << d.adaptive_thresh_C << "\n";
+    f << "diamond.hasPickedColor=" << toStringBool(d.hasPickedColor) << "\n";
+    f << "diamond.pickedHSV=" << toStringVec3b(d.pickedHSV) << "\n";
+    f << "diamond.pickedBGR=" << toStringVec3b(d.pickedBGR) << "\n";
+    f << "diamond.colorSensitivity=" << d.colorSensitivity << "\n";
+    f << "diamond.colorHMin=" << d.colorHMin << "\n";
+    f << "diamond.colorHMax=" << d.colorHMax << "\n";
+    f << "diamond.colorSMin=" << d.colorSMin << "\n";
+    f << "diamond.colorSMax=" << d.colorSMax << "\n";
+    f << "diamond.colorVMin=" << d.colorVMin << "\n";
+    f << "diamond.colorVMax=" << d.colorVMax << "\n";
+    f << "diamond.overlayColor=" << toStringScalarBgr(d.color) << "\n";
+    f << "diamond.alpha=" << d.alpha << "\n";
+    f << "diamond.isFilled=" << toStringBool(d.isFilled) << "\n";
+    f << "diamond.radiusPx=" << d.radiusPx << "\n";
+    f << "diamond.outlineThicknessPx=" << d.outlineThicknessPx << "\n";
+
+    // ---- Felt ----
+    const auto& fp = uiControls.feltParams;
+    f << "felt.hasPickedColor=" << toStringBool(fp.hasPickedColor) << "\n";
+    f << "felt.pickedHSV=" << toStringVec3b(fp.pickedHSV) << "\n";
+    f << "felt.pickedBGR=" << toStringVec3b(fp.pickedBGR) << "\n";
+    f << "felt.colorSensitivity=" << fp.colorSensitivity << "\n";
+    f << "felt.colorHMin=" << fp.colorHMin << "\n";
+    f << "felt.colorHMax=" << fp.colorHMax << "\n";
+    f << "felt.colorSMin=" << fp.colorSMin << "\n";
+    f << "felt.colorSMax=" << fp.colorSMax << "\n";
+    f << "felt.colorVMin=" << fp.colorVMin << "\n";
+    f << "felt.colorVMax=" << fp.colorVMax << "\n";
+    f << "felt.overlayColor=" << toStringScalarBgr(fp.color) << "\n";
+    f << "felt.isFilled=" << toStringBool(fp.isFilled) << "\n";
+    f << "felt.fillAlpha=" << fp.fillAlpha << "\n";
+    f << "felt.outlineThicknessPx=" << fp.outlineThicknessPx << "\n";
+
+    // ---- Rails ----
+    const auto& rp = uiControls.railParams;
+    f << "rail.blackVMax=" << rp.blackVMax << "\n";
+    f << "rail.brownHMax=" << rp.brownHMax << "\n";
+    f << "rail.brownSMax=" << rp.brownSMax << "\n";
+    f << "rail.brownVMax=" << rp.brownVMax << "\n";
+    f << "rail.overlayColor=" << toStringScalarBgr(rp.color) << "\n";
+    f << "rail.isFilled=" << toStringBool(rp.isFilled) << "\n";
+    f << "rail.fillAlpha=" << rp.fillAlpha << "\n";
+    f << "rail.outlineThicknessPx=" << rp.outlineThicknessPx << "\n";
+}
+
+static void loadSettingsFromDisk() {
+    const std::filesystem::path path = getSettingsFilePath();
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return;
+
+    std::string line;
+    while (std::getline(f, line)) {
+        line = trimCopy(line);
+        if (line.empty()) continue;
+        if (line[0] == '#') continue;
+
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+
+        const std::string key = trimCopy(line.substr(0, eq));
+        const std::string val = trimCopy(line.substr(eq + 1));
+
+        // ---- UIControls ----
+        if (key == "ui.selectedSource") { int v; if (parseInt(val, v)) uiControls.selectedSource = v; }
+        else if (key == "ui.showOverlay") { bool b; if (parseBool(val, b)) uiControls.showOverlay = b; }
+        else if (key == "ui.showDiamonds") { bool b; if (parseBool(val, b)) uiControls.showDiamonds = b; }
+        else if (key == "ui.showFelt") { bool b; if (parseBool(val, b)) uiControls.showFelt = b; }
+        else if (key == "ui.showRail") { bool b; if (parseBool(val, b)) uiControls.showRail = b; }
+        else if (key == "ui.showOrientation") { bool b; if (parseBool(val, b)) uiControls.showOrientation = b; }
+        else if (key == "ui.smoothingPercent") { int v; if (parseInt(val, v)) uiControls.smoothingPercent = std::clamp(v, 0, 100); }
+
+        // ---- Diamonds ----
+        else if (key == "diamond.min_threshold") { int v; if (parseInt(val, v)) uiControls.diamondParams.min_threshold = v; }
+        else if (key == "diamond.minArea") { int v; if (parseInt(val, v)) uiControls.diamondParams.minArea = v; }
+        else if (key == "diamond.maxArea") { int v; if (parseInt(val, v)) uiControls.diamondParams.maxArea = v; }
+        else if (key == "diamond.min_circularity") { float x; if (parseFloat(val, x)) uiControls.diamondParams.min_circularity = std::clamp(x, 0.0f, 1.0f); }
+        else if (key == "diamond.morph_kernel_size") { int v; if (parseInt(val, v)) uiControls.diamondParams.morph_kernel_size = v; }
+        else if (key == "diamond.skip_morph_enhancement") { bool b; if (parseBool(val, b)) uiControls.diamondParams.skip_morph_enhancement = b; }
+        else if (key == "diamond.adaptive_thresh_blocksize") { int v; if (parseInt(val, v)) uiControls.diamondParams.adaptive_thresh_blocksize = v; }
+        else if (key == "diamond.adaptive_thresh_C") { int v; if (parseInt(val, v)) uiControls.diamondParams.adaptive_thresh_C = v; }
+        else if (key == "diamond.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.diamondParams.hasPickedColor = b; }
+        else if (key == "diamond.pickedHSV") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.diamondParams.pickedHSV = vv; }
+        else if (key == "diamond.pickedBGR") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.diamondParams.pickedBGR = vv; }
+        else if (key == "diamond.colorSensitivity") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSensitivity = std::clamp(v, 0, 100); }
+        else if (key == "diamond.colorHMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorHMin = std::clamp(v, 0, 180); }
+        else if (key == "diamond.colorHMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorHMax = std::clamp(v, 0, 180); }
+        else if (key == "diamond.colorSMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSMin = std::clamp(v, 0, 255); }
+        else if (key == "diamond.colorSMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSMax = std::clamp(v, 0, 255); }
+        else if (key == "diamond.colorVMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorVMin = std::clamp(v, 0, 255); }
+        else if (key == "diamond.colorVMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorVMax = std::clamp(v, 0, 255); }
+        else if (key == "diamond.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.diamondParams.color = c; }
+        else if (key == "diamond.alpha") { int v; if (parseInt(val, v)) uiControls.diamondParams.alpha = std::clamp(v, 0, 255); }
+        else if (key == "diamond.isFilled") { bool b; if (parseBool(val, b)) uiControls.diamondParams.isFilled = b; }
+        else if (key == "diamond.radiusPx") { int v; if (parseInt(val, v)) uiControls.diamondParams.radiusPx = std::max(1, v); }
+        else if (key == "diamond.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.diamondParams.outlineThicknessPx = std::max(1, v); }
+
+        // ---- Felt ----
+        else if (key == "felt.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.feltParams.hasPickedColor = b; }
+        else if (key == "felt.pickedHSV") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.feltParams.pickedHSV = vv; }
+        else if (key == "felt.pickedBGR") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.feltParams.pickedBGR = vv; }
+        else if (key == "felt.colorSensitivity") { int v; if (parseInt(val, v)) uiControls.feltParams.colorSensitivity = std::clamp(v, 0, 100); }
+        else if (key == "felt.colorHMin") { int v; if (parseInt(val, v)) uiControls.feltParams.colorHMin = std::clamp(v, 0, 180); }
+        else if (key == "felt.colorHMax") { int v; if (parseInt(val, v)) uiControls.feltParams.colorHMax = std::clamp(v, 0, 180); }
+        else if (key == "felt.colorSMin") { int v; if (parseInt(val, v)) uiControls.feltParams.colorSMin = std::clamp(v, 0, 255); }
+        else if (key == "felt.colorSMax") { int v; if (parseInt(val, v)) uiControls.feltParams.colorSMax = std::clamp(v, 0, 255); }
+        else if (key == "felt.colorVMin") { int v; if (parseInt(val, v)) uiControls.feltParams.colorVMin = std::clamp(v, 0, 255); }
+        else if (key == "felt.colorVMax") { int v; if (parseInt(val, v)) uiControls.feltParams.colorVMax = std::clamp(v, 0, 255); }
+        else if (key == "felt.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.feltParams.color = c; }
+        else if (key == "felt.isFilled") { bool b; if (parseBool(val, b)) uiControls.feltParams.isFilled = b; }
+        else if (key == "felt.fillAlpha") { int v; if (parseInt(val, v)) uiControls.feltParams.fillAlpha = std::clamp(v, 0, 255); }
+        else if (key == "felt.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.feltParams.outlineThicknessPx = std::max(1, v); }
+
+        // ---- Rails ----
+        else if (key == "rail.blackVMax") { int v; if (parseInt(val, v)) uiControls.railParams.blackVMax = std::clamp(v, 0, 255); }
+        else if (key == "rail.brownHMax") { int v; if (parseInt(val, v)) uiControls.railParams.brownHMax = std::clamp(v, 0, 180); }
+        else if (key == "rail.brownSMax") { int v; if (parseInt(val, v)) uiControls.railParams.brownSMax = std::clamp(v, 0, 255); }
+        else if (key == "rail.brownVMax") { int v; if (parseInt(val, v)) uiControls.railParams.brownVMax = std::clamp(v, 0, 255); }
+        else if (key == "rail.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.railParams.color = c; }
+        else if (key == "rail.isFilled") { bool b; if (parseBool(val, b)) uiControls.railParams.isFilled = b; }
+        else if (key == "rail.fillAlpha") { int v; if (parseInt(val, v)) uiControls.railParams.fillAlpha = std::clamp(v, 0, 255); }
+        else if (key == "rail.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.railParams.outlineThicknessPx = std::max(1, v); }
+    }
+}
 
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
@@ -793,6 +1045,9 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
 
         // Update UI labels (also updates button text)
         updateColorPickerLabels();
+        
+        // Save settings immediately when color is picked
+        saveSettingsToDisk();
     }
 }
 
@@ -950,6 +1205,9 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                         ShowWindow(g_magnifierHwnd, SW_HIDE);
                     }
                     g_colorPickerTarget = ColorPickerTarget::None;
+                    
+                    // Save settings immediately when color is picked
+                    saveSettingsToDisk();
 
                     // Update UI labels (also updates button text)
                     updateColorPickerLabels();
@@ -1541,6 +1799,7 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
                 else if (id == kIdOverlayRail) uiControls.showRail = isChecked;
                 else if (id == kIdOverlayOrientation) uiControls.showOrientation = isChecked;
+                saveSettingsToDisk();  // Save settings immediately when overlay toggles change
                 return 0;
             }
 
@@ -1555,18 +1814,22 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             if (code == BN_CLICKED) {
                 if (id == kIdDiamondsFilled) {
                     uiControls.diamondParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
                     return 0;
                 }
                 if (id == kIdFeltFilled) {
                     uiControls.feltParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
                     return 0;
                 }
                 if (id == kIdRailFilled) {
                     uiControls.railParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
                     return 0;
                 }
                 if (id == kIdDiamondSkipMorph) {
                     uiControls.diamondParams.skip_morph_enhancement = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
                     return 0;
                 }
                 if (id == IDC_DIAMOND_COLOR_PICKER || id == IDC_FELT_COLOR_PICKER) {
@@ -1627,6 +1890,7 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     cv::Scalar newColor = uiControls.diamondParams.color;
                     if (chooseColor(hwnd, uiControls.diamondParams.color, newColor)) {
                         uiControls.diamondParams.color = newColor;
+                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
                     }
                     return 0;
                 }
@@ -1634,6 +1898,7 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     cv::Scalar newColor = uiControls.feltParams.color;
                     if (chooseColor(hwnd, uiControls.feltParams.color, newColor)) {
                         uiControls.feltParams.color = newColor;
+                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
                     }
                     return 0;
                 }
@@ -1641,6 +1906,7 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     cv::Scalar newColor = uiControls.railParams.color;
                     if (chooseColor(hwnd, uiControls.railParams.color, newColor)) {
                         uiControls.railParams.color = newColor;
+                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
                     }
                     return 0;
                 }
@@ -1680,6 +1946,9 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                         std::lock_guard<std::mutex> lock(g_latestFrameMutex);
                         g_latestCaptureFrame.release();
                     }
+                    
+                    // Save settings immediately when source selection changes
+                    saveSettingsToDisk();
                 }
                 return 0;
             }
@@ -1708,6 +1977,9 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     }
                 }
 
+                // Save settings immediately if source selection changed
+                saveSettingsToDisk();
+
                 // Rebuild sidebar (Display page shows the refreshed list)
                 createSidebarControls(hwnd);
                 return 0;
@@ -1732,6 +2004,9 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             return 0;
         }
         case WM_DESTROY: {
+            // Persist the current parameters before shutting down (best effort).
+            saveSettingsToDisk();
+
             // Cleanup magnifier window
             if (g_magnifierHwnd) {
                 DestroyWindow(g_magnifierHwnd);
@@ -1764,6 +2039,10 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
 static int runWin32HostedApp(int argc, char** argv) {
     g_availableCameras = enumerateCameras();
+
+    // Load previous session settings (best-effort).
+    // This must happen before we start the capture thread so the initial source selection is correct.
+    loadSettingsFromDisk();
 
     std::string imagePath = "testImage.jpg";
     if (argc > 1) imagePath = argv[1];
@@ -1936,6 +2215,9 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 int legacyHighGuiMain(int argc, char** argv) {
     // Enumerate available cameras
     g_availableCameras = enumerateCameras();
+
+    // Load previous session settings (best-effort).
+    loadSettingsFromDisk();
     
     // Load the test image
     std::string imagePath = "testImage.jpg";
@@ -3272,6 +3554,8 @@ void handleTrackbarChange(int trackbarId, int value) {
             break;
     }
     updateSidebarControls();
+    // Save settings immediately when any parameter changes
+    saveSettingsToDisk();
 }
 
 // Old drawSidebar function removed - replaced with native Windows controls
