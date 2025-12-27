@@ -299,7 +299,8 @@ static std::string g_testVideoPath = "testVideo.mp4";
 //   - test image directly when selected (never waits on capture thread)
 //   - else: latest capture frame (camera/video) if available, otherwise test image as fallback.
 // ------------------------------------------------------------------------------------------------
-static std::atomic<int> g_requestedCaptureSource{kSourceTestImage};
+// Start by requesting whatever the UI defaults to (currently Test Video).
+static std::atomic<int> g_requestedCaptureSource{uiControls.selectedSource};
 static std::atomic<bool> g_captureThreadRunning{false};
 static std::thread g_captureThread;
 static std::mutex g_latestFrameMutex;
@@ -320,6 +321,29 @@ static void startCaptureThread() {
     g_captureThread = std::thread([]() {
         cv::VideoCapture cap;
         int currentSource = -999; // sentinel; forces first open attempt
+
+        auto openTestVideo = [&](cv::VideoCapture& ioCap) -> bool {
+            if (ioCap.isOpened()) ioCap.release();
+            ioCap.open(g_testVideoPath);
+            if (!ioCap.isOpened()) ioCap.open("testVideo.mp4");
+            if (!ioCap.isOpened()) ioCap.open("../../testVideo.mp4");
+            return ioCap.isOpened();
+        };
+
+        auto rewindTestVideoOrReopen = [&](cv::VideoCapture& ioCap) -> bool {
+            if (!ioCap.isOpened()) return openTestVideo(ioCap);
+
+            // Strategy 1: frame seek (works on many demuxers/codecs)
+            const bool seekFramesOk = ioCap.set(cv::CAP_PROP_POS_FRAMES, 0);
+            if (seekFramesOk) return true;
+
+            // Strategy 2: ratio seek (sometimes works when frame seek is ignored)
+            const bool seekRatioOk = ioCap.set(cv::CAP_PROP_POS_AVI_RATIO, 0.0);
+            if (seekRatioOk) return true;
+
+            // Strategy 3: reopen the file (most reliable fallback)
+            return openTestVideo(ioCap);
+        };
 
         while (g_captureThreadRunning.load(std::memory_order_relaxed)) {
             const int requested = g_requestedCaptureSource.load(std::memory_order_relaxed);
@@ -348,9 +372,7 @@ static void startCaptureThread() {
                     // We keep this logic inside the capture thread so switching sources never blocks the UI thread.
                     // The path is resolved in `runWin32HostedApp()` (and in the non-hosted path we also try a
                     // relative fallback).
-                    cap.open(g_testVideoPath);
-                    if (!cap.isOpened()) cap.open("testVideo.mp4");
-                    if (!cap.isOpened()) cap.open("../../testVideo.mp4");
+                    openTestVideo(cap);
                 }
             }
 
@@ -363,12 +385,26 @@ static void startCaptureThread() {
             cv::Mat frame;
             // NOTE: Some backends block in read(). If that happens, UI still stays responsive because
             // this thread is the only one affected. UI can always switch back to Test Image.
+            if (currentSource == kSourceTestVideo) {
+                // Proactive EOF handling: if we're at/near the end, rewind before read.
+                const double frameCount = cap.get(cv::CAP_PROP_FRAME_COUNT);
+                const double posFrames = cap.get(cv::CAP_PROP_POS_FRAMES);
+                if (frameCount > 1.0 && posFrames >= frameCount - 1.0) {
+                    rewindTestVideoOrReopen(cap);
+                }
+            }
             if (!cap.read(frame) || frame.empty()) {
                 if (currentSource == kSourceTestVideo) {
-                    // End-of-file (or read hiccup): rewind and try again so the video loops.
-                    cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+                    // EOF / read hiccup: robust loop.
+                    // Some codecs/demuxers don't reliably honor frame seeking after long playback;
+                    // reopening is the fallback to prevent the UI from "freezing" on the last frame.
+                    if (!rewindTestVideoOrReopen(cap)) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        continue;
+                    }
+                    // Try to read again after rewind/reopen.
                     if (!cap.read(frame) || frame.empty()) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
                         continue;
                     }
                 } else {
@@ -1755,8 +1791,8 @@ static int runWin32HostedApp(int argc, char** argv) {
         }
     }
 
-    // Start capture thread with current selection (default is Test Image).
-    g_requestedCaptureSource.store(kSourceTestImage, std::memory_order_relaxed);
+    // Start capture thread with current selection (default is Test Video).
+    g_requestedCaptureSource.store(uiControls.selectedSource, std::memory_order_relaxed);
     startCaptureThread();
 
     HINSTANCE hInst = GetModuleHandleW(NULL);
@@ -2605,81 +2641,118 @@ void createSidebarControls(HWND hwnd) {
             ioYPos += lineHeight;
         };
 
-        // FELT group
+        // FELT section
+        //
+        // Split into:
+        // - Input params: felt color + sensitivity (what pixels are considered "felt")
+        // - Output params: overlay styling (how we render the detected felt contour)
         {
-            addFeatureGroup(L"Felt",
-                            IDC_DEBUG_OVERLAY_FELT_CB, uiControls.showFelt,
-                            IDC_FELT_STYLE_COLOR,
-                            IDC_FELT_ALPHA, uiControls.feltParams.fillAlpha, IDC_STATIC_BASE + 510,
-                            IDC_FELT_STYLE_FILLED, uiControls.feltParams.isFilled,
-                            yPos);
+            addHeader(L"Felt");
 
-            yPos += 12;
+            auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
+                HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                       xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                       (HMENU)(INT_PTR)id, NULL, NULL);
+                applyFont(h, false);
+                return h;
+            };
 
-            // Felt input color picker (picked color + sensitivity), matching the Diamonds UX.
-            {
-                HWND hHeader = CreateWindowW(L"STATIC", L"Color Picker", WS_VISIBLE | WS_CHILD | SS_LEFT,
-                                             xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel, NULL, NULL, NULL);
-                applyFont(hHeader, true);
-            }
-            yPos += lineHeight + 6;
+            // Separator (no "Input"/"Output" labels; keep a clean visual grouping)
+            addDivider(yPos - 2);
+            yPos += 6;
 
-            // Pick button
+            // Pick felt color (click-to-sample)
             {
                 const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Felt);
                 const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Felt Color";
                 HWND hPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                                             xPos, yPos - g_sidebarScrollPos, usableWidth, rowH + 5, g_sidebarPanel,
+                                             xPos, yPos - g_sidebarScrollPos, usableWidth, 28, g_sidebarPanel,
                                              (HMENU)(INT_PTR)IDC_FELT_COLOR_PICKER, NULL, NULL);
                 applyFont(hPicker, true);
+                yPos += 32;
             }
-            yPos += lineHeight + 8;
 
-            // Swatch
+            // Swatch (tightened height)
             {
-                createLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 600);
+                createFullWidthLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 600);
                 yPos += lineHeight;
 
                 const cv::Vec3b bgr = uiControls.feltParams.pickedBGR;
                 const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]); // BGR->RGB
 
                 HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
-                                             xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 40,
+                                             xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 28,
                                              g_sidebarPanel, (HMENU)(INT_PTR)IDC_FELT_COLOR_PICKER_SWATCH, NULL, NULL);
                 if (hSwatch) {
                     setSwatchBrush(g_feltColorPickerSwatchBrush, swatchColor);
                     InvalidateRect(hSwatch, NULL, TRUE);
                 }
+                yPos += 34;
             }
-            yPos += 45;
 
             // Sensitivity slider
             {
                 createLabel(L"Sensitivity:", yPos, IDC_STATIC_BASE + 601);
                 createTrackbar(IDC_FELT_COLOR_SENSITIVITY, yPos, 0, 100, uiControls.feltParams.colorSensitivity);
                 createValueLabel(yPos, IDC_STATIC_BASE + 602);
-                yPos += lineHeight + 6;
+                yPos += lineHeight + 2;
             }
 
-            // Color info display (compact)
+            // Readouts (full width so "Range" doesn't clip)
             {
-                wchar_t bgrText[64] = L"BGR: --";
-                wchar_t hsvText[64] = L"HSV: --";
-                wchar_t rangeText[128] = L"Range: --";
+                createFullWidthLabel(L"BGR: --", yPos, IDC_FELT_COLOR_PICKER_BGR);
+                yPos += lineHeight;
+                createFullWidthLabel(L"HSV: --", yPos, IDC_FELT_COLOR_PICKER_HSV);
+                yPos += lineHeight;
+                createFullWidthLabel(L"Range: --", yPos, IDC_FELT_COLOR_PICKER_RANGE);
+                yPos += lineHeight + gap;
+            }
 
-                createLabel(bgrText, yPos, IDC_FELT_COLOR_PICKER_BGR);
-                yPos += lineHeight;
-                createLabel(hsvText, yPos, IDC_FELT_COLOR_PICKER_HSV);
-                yPos += lineHeight;
-                createLabel(rangeText, yPos, IDC_FELT_COLOR_PICKER_RANGE);
+            // Separator between felt detection parameters and overlay styling
+            addDivider(yPos - 2);
+            yPos += 6;
+
+            // Enabled
+            {
+                HWND hEnabled = CreateWindowW(L"BUTTON", L"Enabled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                              xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
+                                              (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_FELT_CB, NULL, NULL);
+                applyFont(hEnabled, false);
+                SendMessage(hEnabled, BM_SETCHECK, uiControls.showFelt ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Style row: Color + Filled
+            {
+                HWND hColor = CreateWindowW(L"BUTTON", L"Color\u2026", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                            xPos, (yPos - 2) - g_sidebarScrollPos, colorW, colorH, g_sidebarPanel,
+                                            (HMENU)(INT_PTR)IDC_FELT_STYLE_COLOR, NULL, NULL);
+                applyFont(hColor, false);
+
+                const int filledX = xPos + usableWidth - filledW;
+                HWND hFill = CreateWindowW(L"BUTTON", L"Filled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                           filledX, yPos - g_sidebarScrollPos, filledW, rowH, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)IDC_FELT_STYLE_FILLED, NULL, NULL);
+                applyFont(hFill, false);
+                SendMessage(hFill, BM_SETCHECK, uiControls.feltParams.isFilled ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Alpha (value label ID must remain stable: IDC_STATIC_BASE + 510)
+            {
+                createLabel(L"Alpha:", yPos, IDC_STATIC_BASE + 450);
+                createTrackbar(IDC_FELT_ALPHA, yPos, 0, 255, uiControls.feltParams.fillAlpha);
+                createValueLabel(yPos, IDC_STATIC_BASE + 510);
                 yPos += lineHeight;
             }
 
-            yPos += 6;
-            createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 118);
-            createTrackbar(IDC_FELT_THICKNESS, yPos, 1, 10, uiControls.feltParams.outlineThicknessPx);
-            createValueLabel(yPos, IDC_STATIC_BASE + 119);
-            yPos += lineHeight + gap;
+            // Outline thickness
+            {
+                createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 118);
+                createTrackbar(IDC_FELT_THICKNESS, yPos, 1, 10, uiControls.feltParams.outlineThicknessPx);
+                createValueLabel(yPos, IDC_STATIC_BASE + 119);
+                yPos += lineHeight + gap;
+            }
         }
 
         // RAILS group

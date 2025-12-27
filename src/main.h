@@ -94,7 +94,8 @@ struct UIControls {
     // NOTE:
     // We intentionally use a single signed int here because it makes the Win32 combobox wiring
     // simple: we can store this value as CB_SETITEMDATA and treat all sources uniformly.
-    int selectedSource = kSourceTestImage;
+    // Default to Test Video so the app "does something" immediately without requiring a camera.
+    int selectedSource = kSourceTestVideo;
 
     // Track which capture device/source is currently open in the legacy OpenCV-window path.
     // (Win32-hosted UI uses a background thread and does not rely on this.)
