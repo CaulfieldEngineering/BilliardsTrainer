@@ -24,27 +24,35 @@ std::vector<cv::Point> detectFeltContour(const cv::Mat& src, const FeltParams& p
     cv::Mat hsv;
     cv::cvtColor(src, hsv, cv::COLOR_BGR2HSV);
     
-    // Detect blue felt (common pool table color)
-    cv::Mat blueMask;
-    cv::inRange(
-        hsv,
-        cv::Scalar(params.blueHMin, params.blueSMin, params.blueVMin),
-        cv::Scalar(params.blueHMax, params.blueSMax, params.blueVMax),
-        blueMask
-    );
-    
-    // Also detect green felt
-    cv::Mat greenMask;
-    cv::inRange(
-        hsv,
-        cv::Scalar(params.greenHMin, params.greenSMin, params.greenVMin),
-        cv::Scalar(params.greenHMax, params.greenSMax, params.greenVMax),
-        greenMask
-    );
-    
-    // Combine masks
+    // Detect felt using a single HSV range (picked-color + sensitivity UI).
+    //
+    // Hue wrap handling:
+    // - If colorHMin <= colorHMax => standard range [HMin..HMax]
+    // - Else => wrapped range [0..HMax] U [HMin..180]
     cv::Mat feltMask;
-    cv::bitwise_or(blueMask, greenMask, feltMask);
+    if (params.colorHMin <= params.colorHMax) {
+        cv::inRange(
+            hsv,
+            cv::Scalar(params.colorHMin, params.colorSMin, params.colorVMin),
+            cv::Scalar(params.colorHMax, params.colorSMax, params.colorVMax),
+            feltMask
+        );
+    } else {
+        cv::Mat a, b;
+        cv::inRange(
+            hsv,
+            cv::Scalar(0, params.colorSMin, params.colorVMin),
+            cv::Scalar(params.colorHMax, params.colorSMax, params.colorVMax),
+            a
+        );
+        cv::inRange(
+            hsv,
+            cv::Scalar(params.colorHMin, params.colorSMin, params.colorVMin),
+            cv::Scalar(180, params.colorSMax, params.colorVMax),
+            b
+        );
+        cv::bitwise_or(a, b, feltMask);
+    }
     
     // Apply morphological operations to clean up
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(15, 15));

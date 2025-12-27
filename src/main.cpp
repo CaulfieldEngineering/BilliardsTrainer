@@ -195,14 +195,20 @@ std::vector<int> g_availableCameras;
 
 // Color picker button ID (defined early for use in mouse handlers)
 #define IDC_DIAMOND_COLOR_PICKER 30251
+// Felt color picker button ID
+#define IDC_FELT_COLOR_PICKER 30252
 
-// Color picker info labels (defined early for use in update function)
-#define IDC_COLOR_PICKER_BGR 10050
-#define IDC_COLOR_PICKER_HSV 10051
-#define IDC_COLOR_PICKER_RANGE_H 10052
-#define IDC_COLOR_PICKER_RANGE_S 10053
-#define IDC_COLOR_PICKER_RANGE_V 10054
-#define IDC_COLOR_PICKER_SWATCH 10055
+// Diamond color picker info labels (defined early for use in update function)
+#define IDC_DIAMOND_COLOR_PICKER_BGR 10050
+#define IDC_DIAMOND_COLOR_PICKER_HSV 10051
+#define IDC_DIAMOND_COLOR_PICKER_RANGE 10052
+#define IDC_DIAMOND_COLOR_PICKER_SWATCH 10055
+
+// Felt color picker info labels (defined early for use in update function)
+#define IDC_FELT_COLOR_PICKER_BGR 10060
+#define IDC_FELT_COLOR_PICKER_HSV 10061
+#define IDC_FELT_COLOR_PICKER_RANGE 10062
+#define IDC_FELT_COLOR_PICKER_SWATCH 10065
 
 static HWND g_imageViewHwnd = NULL;
 static HWND g_zoomWindowHwnd = NULL;  // Zoom window for color picker
@@ -212,10 +218,18 @@ static HBRUSH g_sidebarBgBrush = NULL;
 // - The swatch is a STATIC control. To paint it correctly and reliably, we provide a brush via
 //   WM_CTLCOLORSTATIC from the SidebarPanelProc.
 // - We own this brush and must delete it on replacement / shutdown to avoid leaking GDI objects.
-static HBRUSH g_colorPickerSwatchBrush = NULL;
+static HBRUSH g_diamondColorPickerSwatchBrush = NULL;
+static HBRUSH g_feltColorPickerSwatchBrush = NULL;
 static HFONT g_sidebarFont = NULL;
 static HFONT g_sidebarFontBold = NULL;
-static bool g_colorPickerActive = false;  // Whether color picker mode is active
+
+// Which target (if any) the color picker is currently sampling for.
+enum class ColorPickerTarget {
+    None,
+    Diamonds,
+    Felt
+};
+static ColorPickerTarget g_colorPickerTarget = ColorPickerTarget::None;
 static int g_scaledImageX = 0, g_scaledImageY = 0, g_scaledImageW = 0, g_scaledImageH = 0;  // Scaled image position/size for coordinate conversion
 
 static void applyFont(HWND hwnd, bool isBold = false) {
@@ -390,16 +404,17 @@ static const wchar_t* kSidebarPanelClass = L"BilliardsTrainerSidebarPanel";
 static void ensureSidebarAndImageChildren(HWND mainHwnd);
 static void layoutChildren(HWND mainHwnd);
 static void updateColorPickerLabels();
-static void applyColorSensitivityToRangesFromPickedHSV();
+static void applyDiamondColorSensitivityToRangesFromPickedHSV();
+static void applyFeltColorSensitivityToRangesFromPickedHSV();
 static void updateImageDibFromBgr(const cv::Mat& bgr);
 
 // Update the global swatch brush used by WM_CTLCOLORSTATIC.
-static void setColorPickerSwatchBrush(COLORREF swatchColor) {
-    if (g_colorPickerSwatchBrush) {
-        DeleteObject(g_colorPickerSwatchBrush);
-        g_colorPickerSwatchBrush = NULL;
+static void setSwatchBrush(HBRUSH& ioBrush, COLORREF swatchColor) {
+    if (ioBrush) {
+        DeleteObject(ioBrush);
+        ioBrush = NULL;
     }
-    g_colorPickerSwatchBrush = CreateSolidBrush(swatchColor);
+    ioBrush = CreateSolidBrush(swatchColor);
 }
 
 // SidebarPanel WndProc:
@@ -420,11 +435,16 @@ static LRESULT CALLBACK SidebarPanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             // does not rely on undefined SetClassLongPtr(GCLP_HBRBACKGROUND) behavior.
             HDC hdc = (HDC)wParam;
             HWND child = (HWND)lParam;
-            if (child && GetDlgCtrlID(child) == IDC_COLOR_PICKER_SWATCH && g_colorPickerSwatchBrush) {
+            const int childId = child ? GetDlgCtrlID(child) : 0;
+            if (child && childId == IDC_DIAMOND_COLOR_PICKER_SWATCH && g_diamondColorPickerSwatchBrush) {
                 // It's a solid color block: no text, so just set a matching background.
                 // (Text color doesn't matter because the swatch has an empty caption.)
                 SetBkMode(hdc, OPAQUE);
-                return (INT_PTR)g_colorPickerSwatchBrush;
+                return (INT_PTR)g_diamondColorPickerSwatchBrush;
+            }
+            if (child && childId == IDC_FELT_COLOR_PICKER_SWATCH && g_feltColorPickerSwatchBrush) {
+                SetBkMode(hdc, OPAQUE);
+                return (INT_PTR)g_feltColorPickerSwatchBrush;
             }
             break;
         }
@@ -606,7 +626,7 @@ static void createMagnifierWindow() {
 
 // Update magnifier window with zoomed image
 static void updateMagnifierWindow(int imgX, int imgY, int screenX, int screenY) {
-    if (!g_colorPickerActive || g_lastSourceFrame.empty()) {
+    if (g_colorPickerTarget == ColorPickerTarget::None || g_lastSourceFrame.empty()) {
         if (g_magnifierHwnd) ShowWindow(g_magnifierHwnd, SW_HIDE);
         return;
     }
@@ -680,7 +700,7 @@ static void updateMagnifierWindow(int imgX, int imgY, int screenX, int screenY) 
 
 // OpenCV mouse callback for color picker (used when OpenCV window is active)
 static void onMouse(int event, int x, int y, int flags, void* userdata) {
-    if (!g_colorPickerActive || g_lastSourceFrame.empty()) return;
+    if (g_colorPickerTarget == ColorPickerTarget::None || g_lastSourceFrame.empty()) return;
     
     // Convert display coordinates to source image coordinates
     // The displayed image is scaled, so we need to account for that
@@ -713,22 +733,27 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
         cv::cvtColor(bgrMat, hsvMat, cv::COLOR_BGR2HSV);
         cv::Vec3b hsv = hsvMat.at<cv::Vec3b>(0, 0);
         
-        // Store the picked BGR color
-        uiControls.diamondParams.pickedBGR = bgr;
-        uiControls.diamondParams.pickedHSV = hsv;
-        uiControls.diamondParams.hasPickedColor = true;
-        
-        // Set HSV ranges around the sampled color based on the Sensitivity slider.
-        applyColorSensitivityToRangesFromPickedHSV();
-        
-        uiControls.diamondParams.use_color_filter = true;
+        // Store the picked color into the active target.
+        if (g_colorPickerTarget == ColorPickerTarget::Diamonds) {
+            uiControls.diamondParams.pickedBGR = bgr;
+            uiControls.diamondParams.pickedHSV = hsv;
+            uiControls.diamondParams.hasPickedColor = true;
+            // Set HSV ranges around the sampled color based on the Sensitivity slider.
+            applyDiamondColorSensitivityToRangesFromPickedHSV();
+            uiControls.diamondParams.use_color_filter = true;
+        } else if (g_colorPickerTarget == ColorPickerTarget::Felt) {
+            uiControls.feltParams.pickedBGR = bgr;
+            uiControls.feltParams.pickedHSV = hsv;
+            uiControls.feltParams.hasPickedColor = true;
+            applyFeltColorSensitivityToRangesFromPickedHSV();
+        }
 
         // Hide magnifier and deactivate picker FIRST, then refresh UI.
-        // `updateColorPickerLabels()` uses `g_colorPickerActive` to decide the button title.
+        // `updateColorPickerLabels()` uses `g_colorPickerTarget` to decide the button titles.
         if (g_magnifierHwnd) {
             ShowWindow(g_magnifierHwnd, SW_HIDE);
         }
-        g_colorPickerActive = false;
+        g_colorPickerTarget = ColorPickerTarget::None;
 
         // Update UI labels (also updates button text)
         updateColorPickerLabels();
@@ -784,7 +809,7 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         }
         case WM_MOUSEMOVE: {
             // Handle color picker mouse move in ImageView
-            if (g_colorPickerActive && !g_lastSourceFrame.empty()) {
+            if (g_colorPickerTarget != ColorPickerTarget::None && !g_lastSourceFrame.empty()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 
@@ -834,7 +859,7 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
         }
         case WM_LBUTTONDOWN: {
             // Handle color picker click in ImageView
-            if (g_colorPickerActive && !g_lastSourceFrame.empty()) {
+            if (g_colorPickerTarget != ColorPickerTarget::None && !g_lastSourceFrame.empty()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 
@@ -870,22 +895,25 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                     cv::cvtColor(bgrMat, hsvMat, cv::COLOR_BGR2HSV);
                     cv::Vec3b hsv = hsvMat.at<cv::Vec3b>(0, 0);
                     
-                    // Store the picked BGR color
-                    uiControls.diamondParams.pickedBGR = bgr;
-                    uiControls.diamondParams.pickedHSV = hsv;
-                    uiControls.diamondParams.hasPickedColor = true;
-                    
-                    // Set HSV ranges around the sampled color based on the Sensitivity slider.
-                    applyColorSensitivityToRangesFromPickedHSV();
-                    
-                    uiControls.diamondParams.use_color_filter = true;
+                    if (g_colorPickerTarget == ColorPickerTarget::Diamonds) {
+                        uiControls.diamondParams.pickedBGR = bgr;
+                        uiControls.diamondParams.pickedHSV = hsv;
+                        uiControls.diamondParams.hasPickedColor = true;
+                        applyDiamondColorSensitivityToRangesFromPickedHSV();
+                        uiControls.diamondParams.use_color_filter = true;
+                    } else if (g_colorPickerTarget == ColorPickerTarget::Felt) {
+                        uiControls.feltParams.pickedBGR = bgr;
+                        uiControls.feltParams.pickedHSV = hsv;
+                        uiControls.feltParams.hasPickedColor = true;
+                        applyFeltColorSensitivityToRangesFromPickedHSV();
+                    }
                     
                     // Hide magnifier and deactivate picker FIRST, then refresh UI.
-                    // `updateColorPickerLabels()` uses `g_colorPickerActive` to decide the button title.
+                    // `updateColorPickerLabels()` uses `g_colorPickerTarget` to decide the button titles.
                     if (g_magnifierHwnd) {
                         ShowWindow(g_magnifierHwnd, SW_HIDE);
                     }
-                    g_colorPickerActive = false;
+                    g_colorPickerTarget = ColorPickerTarget::None;
 
                     // Update UI labels (also updates button text)
                     updateColorPickerLabels();
@@ -971,72 +999,118 @@ static void ensureSidebarAndImageChildren(HWND mainHwnd) {
 // Update color picker info labels and swatch in the UI
 static void updateColorPickerLabels() {
     if (!g_sidebarPanel || !IsWindow(g_sidebarPanel)) return;
-    
-    wchar_t bgrText[64] = L"BGR: --";
-    wchar_t hsvText[64] = L"HSV: --";
-    wchar_t rangeText[128] = L"Range: --";
-    
-    // Color filtering is now always enabled; we always show the current picked color and ranges.
+
+    auto formatRange = [](int hMin, int hMax, int sMin, int sMax, int vMin, int vMax, wchar_t* out, size_t outCount) {
+        if (hMin <= hMax) {
+            swprintf_s(out, outCount, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]", hMin, hMax, sMin, sMax, vMin, vMax);
+        } else {
+            swprintf_s(out, outCount, L"Range: H[0-%d] U [%d-180] S[%d-%d] V[%d-%d]", hMax, hMin, sMin, sMax, vMin, vMax);
+        }
+    };
+
+    // -----------------------------
+    // Diamonds picker labels/swatch
+    // -----------------------------
     {
-        cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
-        swprintf_s(bgrText, L"BGR: (%d, %d, %d)",
-                  (int)bgr[2], (int)bgr[1], (int)bgr[0]);
+        wchar_t bgrText[64] = L"BGR: --";
+        wchar_t hsvText[64] = L"HSV: --";
+        wchar_t rangeText[128] = L"Range: --";
+
+        const cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+        swprintf_s(bgrText, L"BGR: (%d, %d, %d)", (int)bgr[2], (int)bgr[1], (int)bgr[0]);
 
         if (uiControls.diamondParams.hasPickedColor) {
             const cv::Vec3b hsv = uiControls.diamondParams.pickedHSV;
             swprintf_s(hsvText, L"HSV: (%d, %d, %d)", (int)hsv[0], (int)hsv[1], (int)hsv[2]);
         }
 
-        // If hue is wrapped, we intentionally store HMin > HMax to represent:
-        //   H in [0..HMax] U [HMin..180]
-        if (uiControls.diamondParams.colorHMin <= uiControls.diamondParams.colorHMax) {
-            swprintf_s(rangeText, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]",
-                      uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
-                      uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
-                      uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
-        } else {
-            swprintf_s(rangeText, L"Range: H[0-%d] U [%d-180] S[%d-%d] V[%d-%d]",
-                      uiControls.diamondParams.colorHMax,
-                      uiControls.diamondParams.colorHMin,
-                      uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
-                      uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
+        formatRange(uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
+                    uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
+                    uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax,
+                    rangeText, _countof(rangeText));
+
+        HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_BGR);
+        if (hBGR) SetWindowTextW(hBGR, bgrText);
+        HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_HSV);
+        if (hHSV) SetWindowTextW(hHSV, hsvText);
+        HWND hRange = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_RANGE);
+        if (hRange) SetWindowTextW(hRange, rangeText);
+
+        HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_SWATCH);
+        if (hSwatch) {
+            const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
+            setSwatchBrush(g_diamondColorPickerSwatchBrush, swatchColor);
+            InvalidateRect(hSwatch, NULL, TRUE);
+            UpdateWindow(hSwatch);
+        }
+
+        HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER);
+        if (hColorPicker) {
+            const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamonds);
+            const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
+            SetWindowTextW(hColorPicker, btnText);
         }
     }
-    
-    HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_BGR);
-    if (hBGR) SetWindowTextW(hBGR, bgrText);
-    
-    HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_HSV);
-    if (hHSV) SetWindowTextW(hHSV, hsvText);
-    
-    HWND hRange = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_RANGE_H);
-    if (hRange) SetWindowTextW(hRange, rangeText);
-    
-    // Update color swatch
-    HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_COLOR_PICKER_SWATCH);
-    if (hSwatch) {
-        cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
-        COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
-        setColorPickerSwatchBrush(swatchColor);
-        InvalidateRect(hSwatch, NULL, TRUE);
-        UpdateWindow(hSwatch);
-    }
-    
-    // Update button text
-    HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER);
-    if (hColorPicker) {
-        const wchar_t* btnText = g_colorPickerActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
-        SetWindowTextW(hColorPicker, btnText);
+
+    // --------------------------
+    // Felt picker labels/swatch
+    // --------------------------
+    {
+        wchar_t bgrText[64] = L"BGR: --";
+        wchar_t hsvText[64] = L"HSV: --";
+        wchar_t rangeText[128] = L"Range: --";
+
+        const cv::Vec3b bgr = uiControls.feltParams.pickedBGR;
+        swprintf_s(bgrText, L"BGR: (%d, %d, %d)", (int)bgr[2], (int)bgr[1], (int)bgr[0]);
+
+        if (uiControls.feltParams.hasPickedColor) {
+            const cv::Vec3b hsv = uiControls.feltParams.pickedHSV;
+            swprintf_s(hsvText, L"HSV: (%d, %d, %d)", (int)hsv[0], (int)hsv[1], (int)hsv[2]);
+        }
+
+        formatRange(uiControls.feltParams.colorHMin, uiControls.feltParams.colorHMax,
+                    uiControls.feltParams.colorSMin, uiControls.feltParams.colorSMax,
+                    uiControls.feltParams.colorVMin, uiControls.feltParams.colorVMax,
+                    rangeText, _countof(rangeText));
+
+        HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_PICKER_BGR);
+        if (hBGR) SetWindowTextW(hBGR, bgrText);
+        HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_PICKER_HSV);
+        if (hHSV) SetWindowTextW(hHSV, hsvText);
+        HWND hRange = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_PICKER_RANGE);
+        if (hRange) SetWindowTextW(hRange, rangeText);
+
+        HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_PICKER_SWATCH);
+        if (hSwatch) {
+            const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
+            setSwatchBrush(g_feltColorPickerSwatchBrush, swatchColor);
+            InvalidateRect(hSwatch, NULL, TRUE);
+            UpdateWindow(hSwatch);
+        }
+
+        HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_PICKER);
+        if (hColorPicker) {
+            const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Felt);
+            const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Felt Color";
+            SetWindowTextW(hColorPicker, btnText);
+        }
     }
 }
 
-// Compute HSV tolerances based on the user-facing sensitivity (0..100).
+// Shared HSV tolerance computation based on the user-facing sensitivity (0..100).
 // - 0   => tight match (strict)
 // - 100 => loose match (more variation)
-static void applyColorSensitivityToRangesFromPickedHSV() {
-    if (!uiControls.diamondParams.hasPickedColor) return;
-
-    const int sens = std::clamp(uiControls.diamondParams.colorSensitivity, 0, 100);
+static void computeHsvRangeFromPickedHsv(
+    const cv::Vec3b& pickedHSV,
+    int sensitivity,
+    int& outHMin,
+    int& outHMax,
+    int& outSMin,
+    int& outSMax,
+    int& outVMin,
+    int& outVMax
+) {
+    const int sens = std::clamp(sensitivity, 0, 100);
     const float t = static_cast<float>(sens) / 100.0f;
 
     // Tuned to be usable for typical consumer cameras / mixed lighting.
@@ -1045,29 +1119,107 @@ static void applyColorSensitivityToRangesFromPickedHSV() {
     const int sTol = (int)std::lround(10.0f + t * 80.0f);   // 10..90
     const int vTol = (int)std::lround(10.0f + t * 100.0f);  // 10..110
 
-    const cv::Vec3b hsv = uiControls.diamondParams.pickedHSV;
-    const int h = (int)hsv[0];
-    const int s = (int)hsv[1];
-    const int v = (int)hsv[2];
+    const int h = (int)pickedHSV[0];
+    const int s = (int)pickedHSV[1];
+    const int v = (int)pickedHSV[2];
 
-    // Hue wrap: represent wrap by setting HMin > HMax (handled in diamond_detection.cpp).
+    // Hue wrap: represent wrap by setting HMin > HMax (consumer of range must handle wrap).
     const int hMinRaw = h - hTol;
     const int hMaxRaw = h + hTol;
     if (hMinRaw < 0 || hMaxRaw > 180) {
         const int hMinWrap = (hMinRaw < 0) ? (180 + hMinRaw) : hMinRaw;
         const int hMaxWrap = (hMaxRaw > 180) ? (hMaxRaw - 180) : hMaxRaw;
-        uiControls.diamondParams.colorHMin = std::clamp(hMinWrap, 0, 180);
-        uiControls.diamondParams.colorHMax = std::clamp(hMaxWrap, 0, 180);
-        // Note: HMin > HMax means wrapped.
+        outHMin = std::clamp(hMinWrap, 0, 180);
+        outHMax = std::clamp(hMaxWrap, 0, 180);
     } else {
-        uiControls.diamondParams.colorHMin = std::clamp(hMinRaw, 0, 180);
-        uiControls.diamondParams.colorHMax = std::clamp(hMaxRaw, 0, 180);
+        outHMin = std::clamp(hMinRaw, 0, 180);
+        outHMax = std::clamp(hMaxRaw, 0, 180);
     }
 
-    uiControls.diamondParams.colorSMin = std::clamp(s - sTol, 0, 255);
-    uiControls.diamondParams.colorSMax = std::clamp(s + sTol, 0, 255);
-    uiControls.diamondParams.colorVMin = std::clamp(v - vTol, 0, 255);
-    uiControls.diamondParams.colorVMax = std::clamp(v + vTol, 0, 255);
+    outSMin = std::clamp(s - sTol, 0, 255);
+    outSMax = std::clamp(s + sTol, 0, 255);
+    outVMin = std::clamp(v - vTol, 0, 255);
+    outVMax = std::clamp(v + vTol, 0, 255);
+}
+
+// Felt-specific HSV tolerance:
+// Shadows are the dominant failure mode for felt segmentation (V drops substantially and S can soften),
+// so we intentionally allow a *much larger* tolerance toward darker values than toward brighter values.
+// This helps keep the felt mask connected up to the rails even under uneven lighting.
+static void computeFeltHsvRangeFromPickedHsv(
+    const cv::Vec3b& pickedHSV,
+    int sensitivity,
+    int& outHMin,
+    int& outHMax,
+    int& outSMin,
+    int& outSMax,
+    int& outVMin,
+    int& outVMax
+) {
+    const int sens = std::clamp(sensitivity, 0, 100);
+    const float t = static_cast<float>(sens) / 100.0f;
+
+    // Hue stays relatively stable under shadows; keep H tighter to avoid grabbing non-felt.
+    const int hTol = (int)std::lround(4.0f + t * 18.0f);     // 4..22
+
+    // Saturation can drift down under shadows / glare; allow more variation than diamonds.
+    const int sTol = (int)std::lround(20.0f + t * 120.0f);   // 20..140
+
+    // Value tolerance is intentionally asymmetric:
+    // - allow a lot darker (shadows)
+    // - allow a bit brighter (hotspots)
+    const int vTolDown = (int)std::lround(40.0f + t * 160.0f); // 40..200
+    const int vTolUp   = (int)std::lround(10.0f + t * 60.0f);  // 10..70
+
+    const int h = (int)pickedHSV[0];
+    const int s = (int)pickedHSV[1];
+    const int v = (int)pickedHSV[2];
+
+    // Hue wrap: represent wrap by setting HMin > HMax (consumer of range must handle wrap).
+    const int hMinRaw = h - hTol;
+    const int hMaxRaw = h + hTol;
+    if (hMinRaw < 0 || hMaxRaw > 180) {
+        const int hMinWrap = (hMinRaw < 0) ? (180 + hMinRaw) : hMinRaw;
+        const int hMaxWrap = (hMaxRaw > 180) ? (hMaxRaw - 180) : hMaxRaw;
+        outHMin = std::clamp(hMinWrap, 0, 180);
+        outHMax = std::clamp(hMaxWrap, 0, 180);
+    } else {
+        outHMin = std::clamp(hMinRaw, 0, 180);
+        outHMax = std::clamp(hMaxRaw, 0, 180);
+    }
+
+    outSMin = std::clamp(s - sTol, 0, 255);
+    outSMax = std::clamp(s + sTol, 0, 255);
+    outVMin = std::clamp(v - vTolDown, 0, 255);
+    outVMax = std::clamp(v + vTolUp, 0, 255);
+}
+
+static void applyDiamondColorSensitivityToRangesFromPickedHSV() {
+    if (!uiControls.diamondParams.hasPickedColor) return;
+    computeHsvRangeFromPickedHsv(
+        uiControls.diamondParams.pickedHSV,
+        uiControls.diamondParams.colorSensitivity,
+        uiControls.diamondParams.colorHMin,
+        uiControls.diamondParams.colorHMax,
+        uiControls.diamondParams.colorSMin,
+        uiControls.diamondParams.colorSMax,
+        uiControls.diamondParams.colorVMin,
+        uiControls.diamondParams.colorVMax
+    );
+}
+
+static void applyFeltColorSensitivityToRangesFromPickedHSV() {
+    if (!uiControls.feltParams.hasPickedColor) return;
+    computeFeltHsvRangeFromPickedHsv(
+        uiControls.feltParams.pickedHSV,
+        uiControls.feltParams.colorSensitivity,
+        uiControls.feltParams.colorHMin,
+        uiControls.feltParams.colorHMax,
+        uiControls.feltParams.colorSMin,
+        uiControls.feltParams.colorSMax,
+        uiControls.feltParams.colorVMin,
+        uiControls.feltParams.colorVMax
+    );
 }
 
 static void layoutChildren(HWND mainHwnd) {
@@ -1381,15 +1533,21 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     uiControls.diamondParams.skip_morph_enhancement = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     return 0;
                 }
-                if (id == IDC_DIAMOND_COLOR_PICKER) {
-                    // Activate/deactivate color picker mode
-                    g_colorPickerActive = !g_colorPickerActive;
-                    if (!g_colorPickerActive) {
-                        // Hide magnifier when deactivating
-                        if (g_magnifierHwnd) {
-                            ShowWindow(g_magnifierHwnd, SW_HIDE);
-                        }
+                if (id == IDC_DIAMOND_COLOR_PICKER || id == IDC_FELT_COLOR_PICKER) {
+                    // Activate/deactivate color picker mode.
+                    //
+                    // Only one picker can be active at a time; the active one is identified by `g_colorPickerTarget`.
+                    const ColorPickerTarget requested =
+                        (id == IDC_DIAMOND_COLOR_PICKER) ? ColorPickerTarget::Diamonds : ColorPickerTarget::Felt;
+
+                    if (g_colorPickerTarget == requested) {
+                        // Deactivate
+                        g_colorPickerTarget = ColorPickerTarget::None;
+                        if (g_magnifierHwnd) ShowWindow(g_magnifierHwnd, SW_HIDE);
                     } else {
+                        // Switch to requested picker
+                        g_colorPickerTarget = requested;
+
                         // Enable mouse tracking in ImageView to get mouse move events
                         if (g_imageViewHwnd) {
                             TRACKMOUSEEVENT tme = {};
@@ -1551,9 +1709,13 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 DeleteDC(g_magnifierDC);
                 g_magnifierDC = NULL;
             }
-            if (g_colorPickerSwatchBrush) {
-                DeleteObject(g_colorPickerSwatchBrush);
-                g_colorPickerSwatchBrush = NULL;
+            if (g_diamondColorPickerSwatchBrush) {
+                DeleteObject(g_diamondColorPickerSwatchBrush);
+                g_diamondColorPickerSwatchBrush = NULL;
+            }
+            if (g_feltColorPickerSwatchBrush) {
+                DeleteObject(g_feltColorPickerSwatchBrush);
+                g_feltColorPickerSwatchBrush = NULL;
             }
             KillTimer(hwnd, 1);
             stopCaptureThread();
@@ -1691,6 +1853,8 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DIAMOND_ADAPTIVE_C (IDC_TRACKBAR_BASE + 7)  // Adaptive threshold C constant
 // Color picker sensitivity (tolerance) slider: 0..100 (0=strict, 100=loose)
 #define IDC_DIAMOND_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 8)
+// Felt color picker sensitivity (tolerance) slider: 0..100 (0=strict, 100=loose)
+#define IDC_FELT_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 9)
 #define IDC_RAIL_BLACK_VMAX (IDC_TRACKBAR_BASE + 10)
 #define IDC_RAIL_BROWN_HMAX (IDC_TRACKBAR_BASE + 11)
 #define IDC_RAIL_BROWN_SMAX (IDC_TRACKBAR_BASE + 12)
@@ -1719,16 +1883,6 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 // Sidebar combobox IDs (Display page)
 #define IDC_DISPLAY_SOURCE_COMBO (IDC_COMBO_BASE + 1)
 #define IDC_DISPLAY_REFRESH_CAMERAS (IDC_BUTTON_BASE + 280)
-
-// Felt parameter trackbars
-#define IDC_FELT_BLUE_HMIN (IDC_TRACKBAR_BASE + 50)
-#define IDC_FELT_BLUE_HMAX (IDC_TRACKBAR_BASE + 51)
-#define IDC_FELT_BLUE_SMIN (IDC_TRACKBAR_BASE + 52)
-#define IDC_FELT_BLUE_VMIN (IDC_TRACKBAR_BASE + 53)
-#define IDC_FELT_GREEN_HMIN (IDC_TRACKBAR_BASE + 54)
-#define IDC_FELT_GREEN_HMAX (IDC_TRACKBAR_BASE + 55)
-#define IDC_FELT_GREEN_SMIN (IDC_TRACKBAR_BASE + 56)
-#define IDC_FELT_GREEN_VMIN (IDC_TRACKBAR_BASE + 57)
 
 // Overlay style trackbars
 #define IDC_DIAMONDS_RADIUS (IDC_TRACKBAR_BASE + 60)
@@ -2369,36 +2523,30 @@ void createSidebarControls(HWND hwnd) {
     yPos += dividerPadY;
 
     if (uiControls.sidebarPage == SidebarPage::Debug) {
-        // ===== Debug page: Global + 3 feature groups =====
-        addHeader(L"Global");
+        // ===== Debug page sections (ordered): Global, Felt, Rails, Orientation, Diamonds =====
 
-        // Master overlay toggle
-        {
-            HWND h = CreateWindowW(L"BUTTON", L"Overlay (master)", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
-                                   xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
-                                   (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_MASTER, NULL, NULL);
-            applyFont(h, false);
-            SendMessage(h, BM_SETCHECK, uiControls.showOverlay ? BST_CHECKED : BST_UNCHECKED, 0);
-        }
-        yPos += lineHeight;
-
-        // Global smoothing
-        createLabel(L"Smoothing:", yPos, IDC_STATIC_BASE + 400);
-        createTrackbar(IDC_SMOOTHING, yPos, 0, 100, uiControls.smoothingPercent);
-        createValueLabel(yPos, IDC_STATIC_BASE + 401);
-        yPos += lineHeight + gap;
-
-        // ORIENTATION group
+        // GLOBAL section
         //
-        // This was previously a single checkbox under "Global". Keep the same behavior, but present it
-        // as its own detector-style section for consistency with Felt/Rails/Diamonds.
+        // Cross-cutting overlay controls:
+        // - master overlay gate
+        // - overlay smoothing strength
         {
-            addHeader(L"Orientation");
-            HWND h = CreateWindowW(L"BUTTON", L"Enabled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
-                                   xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
-                                   (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
-            applyFont(h, false);
-            SendMessage(h, BM_SETCHECK, uiControls.showOrientation ? BST_CHECKED : BST_UNCHECKED, 0);
+            addHeader(L"Global");
+
+            // Master overlay toggle
+            {
+                HWND h = CreateWindowW(L"BUTTON", L"Overlay (master)", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                       xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
+                                       (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_MASTER, NULL, NULL);
+                applyFont(h, false);
+                SendMessage(h, BM_SETCHECK, uiControls.showOverlay ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Global smoothing
+            createLabel(L"Smoothing:", yPos, IDC_STATIC_BASE + 400);
+            createTrackbar(IDC_SMOOTHING, yPos, 0, 100, uiControls.smoothingPercent);
+            createValueLabel(yPos, IDC_STATIC_BASE + 401);
             yPos += lineHeight + gap;
         }
 
@@ -2466,41 +2614,66 @@ void createSidebarControls(HWND hwnd) {
                             IDC_FELT_STYLE_FILLED, uiControls.feltParams.isFilled,
                             yPos);
 
-            yPos += 6;
-            createLabel(L"Blue H min:", yPos, IDC_STATIC_BASE + 100);
-            createTrackbar(IDC_FELT_BLUE_HMIN, yPos, 0, 180, uiControls.feltParams.blueHMin);
-            createValueLabel(yPos, IDC_STATIC_BASE + 101);
-            yPos += lineHeight;
-            createLabel(L"Blue H max:", yPos, IDC_STATIC_BASE + 102);
-            createTrackbar(IDC_FELT_BLUE_HMAX, yPos, 0, 180, uiControls.feltParams.blueHMax);
-            createValueLabel(yPos, IDC_STATIC_BASE + 103);
-            yPos += lineHeight;
-            createLabel(L"Blue S min:", yPos, IDC_STATIC_BASE + 104);
-            createTrackbar(IDC_FELT_BLUE_SMIN, yPos, 0, 255, uiControls.feltParams.blueSMin);
-            createValueLabel(yPos, IDC_STATIC_BASE + 105);
-            yPos += lineHeight;
-            createLabel(L"Blue V min:", yPos, IDC_STATIC_BASE + 106);
-            createTrackbar(IDC_FELT_BLUE_VMIN, yPos, 0, 255, uiControls.feltParams.blueVMin);
-            createValueLabel(yPos, IDC_STATIC_BASE + 107);
-            yPos += lineHeight;
+            yPos += 12;
 
-            yPos += 6;
-            createLabel(L"Green H min:", yPos, IDC_STATIC_BASE + 108);
-            createTrackbar(IDC_FELT_GREEN_HMIN, yPos, 0, 180, uiControls.feltParams.greenHMin);
-            createValueLabel(yPos, IDC_STATIC_BASE + 109);
-            yPos += lineHeight;
-            createLabel(L"Green H max:", yPos, IDC_STATIC_BASE + 110);
-            createTrackbar(IDC_FELT_GREEN_HMAX, yPos, 0, 180, uiControls.feltParams.greenHMax);
-            createValueLabel(yPos, IDC_STATIC_BASE + 111);
-            yPos += lineHeight;
-            createLabel(L"Green S min:", yPos, IDC_STATIC_BASE + 112);
-            createTrackbar(IDC_FELT_GREEN_SMIN, yPos, 0, 255, uiControls.feltParams.greenSMin);
-            createValueLabel(yPos, IDC_STATIC_BASE + 113);
-            yPos += lineHeight;
-            createLabel(L"Green V min:", yPos, IDC_STATIC_BASE + 114);
-            createTrackbar(IDC_FELT_GREEN_VMIN, yPos, 0, 255, uiControls.feltParams.greenVMin);
-            createValueLabel(yPos, IDC_STATIC_BASE + 115);
-            yPos += lineHeight;
+            // Felt input color picker (picked color + sensitivity), matching the Diamonds UX.
+            {
+                HWND hHeader = CreateWindowW(L"STATIC", L"Color Picker", WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                             xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel, NULL, NULL, NULL);
+                applyFont(hHeader, true);
+            }
+            yPos += lineHeight + 6;
+
+            // Pick button
+            {
+                const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Felt);
+                const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Felt Color";
+                HWND hPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                             xPos, yPos - g_sidebarScrollPos, usableWidth, rowH + 5, g_sidebarPanel,
+                                             (HMENU)(INT_PTR)IDC_FELT_COLOR_PICKER, NULL, NULL);
+                applyFont(hPicker, true);
+            }
+            yPos += lineHeight + 8;
+
+            // Swatch
+            {
+                createLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 600);
+                yPos += lineHeight;
+
+                const cv::Vec3b bgr = uiControls.feltParams.pickedBGR;
+                const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]); // BGR->RGB
+
+                HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
+                                             xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 40,
+                                             g_sidebarPanel, (HMENU)(INT_PTR)IDC_FELT_COLOR_PICKER_SWATCH, NULL, NULL);
+                if (hSwatch) {
+                    setSwatchBrush(g_feltColorPickerSwatchBrush, swatchColor);
+                    InvalidateRect(hSwatch, NULL, TRUE);
+                }
+            }
+            yPos += 45;
+
+            // Sensitivity slider
+            {
+                createLabel(L"Sensitivity:", yPos, IDC_STATIC_BASE + 601);
+                createTrackbar(IDC_FELT_COLOR_SENSITIVITY, yPos, 0, 100, uiControls.feltParams.colorSensitivity);
+                createValueLabel(yPos, IDC_STATIC_BASE + 602);
+                yPos += lineHeight + 6;
+            }
+
+            // Color info display (compact)
+            {
+                wchar_t bgrText[64] = L"BGR: --";
+                wchar_t hsvText[64] = L"HSV: --";
+                wchar_t rangeText[128] = L"Range: --";
+
+                createLabel(bgrText, yPos, IDC_FELT_COLOR_PICKER_BGR);
+                yPos += lineHeight;
+                createLabel(hsvText, yPos, IDC_FELT_COLOR_PICKER_HSV);
+                yPos += lineHeight;
+                createLabel(rangeText, yPos, IDC_FELT_COLOR_PICKER_RANGE);
+                yPos += lineHeight;
+            }
 
             yPos += 6;
             createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 118);
@@ -2546,6 +2719,21 @@ void createSidebarControls(HWND hwnd) {
             yPos += lineHeight + gap;
         }
 
+        // ORIENTATION section
+        {
+            addHeader(L"Orientation");
+
+            // Orientation Mask overlay toggle
+            {
+                HWND h = CreateWindowW(L"BUTTON", L"Orientation Mask", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                       xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
+                                       (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
+                applyFont(h, false);
+                SendMessage(h, BM_SETCHECK, uiControls.showOrientation ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight + gap;
+        }
+
         // DIAMONDS group - Simplified Color Picker UI
         {
             addFeatureGroup(L"Diamonds",
@@ -2567,7 +2755,8 @@ void createSidebarControls(HWND hwnd) {
 
             // Color picker button
             {
-                const wchar_t* btnText = g_colorPickerActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
+                const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamonds);
+                const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
                 HWND hColorPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                                                  xPos, yPos - g_sidebarScrollPos, usableWidth, rowH + 5, g_sidebarPanel,
                                                  (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER, NULL, NULL);
@@ -2592,10 +2781,10 @@ void createSidebarControls(HWND hwnd) {
                 // - We rely on WM_CTLCOLORSTATIC (handled in SidebarPanelProc) to provide a solid brush.
                 HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
                                             xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 40, 
-                                            g_sidebarPanel, (HMENU)(INT_PTR)IDC_COLOR_PICKER_SWATCH, NULL, NULL);
+                                            g_sidebarPanel, (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER_SWATCH, NULL, NULL);
                 if (hSwatch) {
                     // Keep the swatch brush in sync even when the sidebar is rebuilt.
-                    setColorPickerSwatchBrush(swatchColor);
+                    setSwatchBrush(g_diamondColorPickerSwatchBrush, swatchColor);
                     InvalidateRect(hSwatch, NULL, TRUE);
                 }
             }
@@ -2629,11 +2818,11 @@ void createSidebarControls(HWND hwnd) {
                           uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
                           uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
                 
-                createLabel(bgrText, yPos, IDC_COLOR_PICKER_BGR);
+                createLabel(bgrText, yPos, IDC_DIAMOND_COLOR_PICKER_BGR);
                 yPos += lineHeight;
-                createLabel(hsvText, yPos, IDC_COLOR_PICKER_HSV);
+                createLabel(hsvText, yPos, IDC_DIAMOND_COLOR_PICKER_HSV);
                 yPos += lineHeight;
-                createLabel(rangeText, yPos, IDC_COLOR_PICKER_RANGE_H);
+                createLabel(rangeText, yPos, IDC_DIAMOND_COLOR_PICKER_RANGE);
                 yPos += lineHeight;
             }
 
@@ -2791,22 +2980,8 @@ void updateSidebarControls() {
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMONDS_ALPHA);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.alpha);
 
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_BLUE_HMIN);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.blueHMin);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_BLUE_HMAX);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.blueHMax);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_BLUE_SMIN);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.blueSMin);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_BLUE_VMIN);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.blueVMin);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_GREEN_HMIN);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.greenHMin);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_GREEN_HMAX);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.greenHMax);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_GREEN_SMIN);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.greenSMin);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_GREEN_VMIN);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.greenVMin);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_SENSITIVITY);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.colorSensitivity);
 
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_ALPHA);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.fillAlpha);
@@ -2859,6 +3034,13 @@ void updateSidebarControls() {
         swprintf_s(buffer, L"%d", uiControls.diamondParams.colorSensitivity);
         SetWindowTextW(hLabel, buffer);
     }
+
+    // Felt color picker sensitivity value label (0..100)
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 602);
+    if (hLabel) {
+        swprintf_s(buffer, L"%d", uiControls.feltParams.colorSensitivity);
+        SetWindowTextW(hLabel, buffer);
+    }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 11);
     if (hLabel) {
         swprintf_s(buffer, L"%d", uiControls.railParams.blackVMax);
@@ -2886,23 +3068,8 @@ void updateSidebarControls() {
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 93);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
 
-    // Felt param values
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 101);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.blueHMin); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 103);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.blueHMax); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 105);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.blueSMin); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 107);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.blueVMin); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 109);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.greenHMin); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 111);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.greenHMax); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 113);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.greenSMin); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 115);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.greenVMin); SetWindowTextW(hLabel, buffer); }
+    // Felt color filtering values are presented via the Felt color picker labels (BGR/HSV/Range),
+    // not via individual HSV sliders.
 
     // Alpha/thickness values
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 401);
@@ -2924,6 +3091,11 @@ void updateSidebarControls() {
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 530);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.alpha); SetWindowTextW(hLabel, buffer); }
+
+    // The color picker info labels (BGR/HSV/Range) are STATIC controls; keep them in sync here so
+    // rebuilding the sidebar immediately reflects the current picked colors/ranges for both
+    // Diamonds and Felt.
+    updateColorPickerLabels();
 }
 
 // Handle sidebar button clicks
@@ -2979,7 +3151,12 @@ void handleTrackbarChange(int trackbarId, int value) {
         case IDC_DIAMOND_COLOR_SENSITIVITY:
             uiControls.diamondParams.colorSensitivity = std::clamp(value, 0, 100);
             // If a color has already been picked, update the HSV range immediately so the filter reacts live.
-            applyColorSensitivityToRangesFromPickedHSV();
+            applyDiamondColorSensitivityToRangesFromPickedHSV();
+            updateColorPickerLabels();
+            break;
+        case IDC_FELT_COLOR_SENSITIVITY:
+            uiControls.feltParams.colorSensitivity = std::clamp(value, 0, 100);
+            applyFeltColorSensitivityToRangesFromPickedHSV();
             updateColorPickerLabels();
             break;
         case IDC_RAIL_BLACK_VMAX:
@@ -3003,30 +3180,6 @@ void handleTrackbarChange(int trackbarId, int value) {
         case IDC_DIAMONDS_ALPHA:
             uiControls.diamondParams.alpha = value;
             break;
-        case IDC_FELT_BLUE_HMIN:
-            uiControls.feltParams.blueHMin = value;
-            break;
-        case IDC_FELT_BLUE_HMAX:
-            uiControls.feltParams.blueHMax = value;
-            break;
-        case IDC_FELT_BLUE_SMIN:
-            uiControls.feltParams.blueSMin = value;
-            break;
-        case IDC_FELT_BLUE_VMIN:
-            uiControls.feltParams.blueVMin = value;
-            break;
-        case IDC_FELT_GREEN_HMIN:
-            uiControls.feltParams.greenHMin = value;
-            break;
-        case IDC_FELT_GREEN_HMAX:
-            uiControls.feltParams.greenHMax = value;
-            break;
-        case IDC_FELT_GREEN_SMIN:
-            uiControls.feltParams.greenSMin = value;
-            break;
-        case IDC_FELT_GREEN_VMIN:
-            uiControls.feltParams.greenVMin = value;
-            break;
         case IDC_FELT_ALPHA:
             uiControls.feltParams.fillAlpha = value;
             break;
@@ -3043,11 +3196,6 @@ void handleTrackbarChange(int trackbarId, int value) {
             uiControls.smoothingPercent = value;
             break;
         default:
-            // Handle felt parameters (dynamic IDs)
-            if (trackbarId == IDC_STATIC_BASE + 21) uiControls.feltParams.blueHMin = value;
-            else if (trackbarId == IDC_STATIC_BASE + 24) uiControls.feltParams.blueHMax = value;
-            else if (trackbarId == IDC_STATIC_BASE + 27) uiControls.feltParams.greenHMin = value;
-            else if (trackbarId == IDC_STATIC_BASE + 30) uiControls.feltParams.greenHMax = value;
             break;
     }
     updateSidebarControls();
