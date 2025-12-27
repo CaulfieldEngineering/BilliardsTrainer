@@ -43,10 +43,10 @@
     #pragma comment(lib, "uxtheme.lib")
 #endif
 
-#include "diamond_detection.h"
-#include "felt_detection.h"
-#include "rail_detection.h"
-#include "orientation_detector.h"
+#include "DiamondDetection/diamond_detection.h"
+#include "FeltDetection/felt_detection.h"
+#include "RailDetection/rail_detection.h"
+#include "OrientationDetection/orientation_detector.h"
 
 // Sidebar context types
 enum class SidebarContext {

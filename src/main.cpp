@@ -2382,21 +2382,25 @@ void createSidebarControls(HWND hwnd) {
         }
         yPos += lineHeight;
 
-        // Orientation overlay toggle
-        {
-            HWND h = CreateWindowW(L"BUTTON", L"Orientation Mask", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
-                                   xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
-                                   (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
-            applyFont(h, false);
-            SendMessage(h, BM_SETCHECK, uiControls.showOrientation ? BST_CHECKED : BST_UNCHECKED, 0);
-        }
-        yPos += lineHeight;
-
         // Global smoothing
         createLabel(L"Smoothing:", yPos, IDC_STATIC_BASE + 400);
         createTrackbar(IDC_SMOOTHING, yPos, 0, 100, uiControls.smoothingPercent);
         createValueLabel(yPos, IDC_STATIC_BASE + 401);
         yPos += lineHeight + gap;
+
+        // ORIENTATION group
+        //
+        // This was previously a single checkbox under "Global". Keep the same behavior, but present it
+        // as its own detector-style section for consistency with Felt/Rails/Diamonds.
+        {
+            addHeader(L"Orientation");
+            HWND h = CreateWindowW(L"BUTTON", L"Enabled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                   xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
+                                   (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
+            applyFont(h, false);
+            SendMessage(h, BM_SETCHECK, uiControls.showOrientation ? BST_CHECKED : BST_UNCHECKED, 0);
+            yPos += lineHeight + gap;
+        }
 
         // Shared layout constants for feature groups
         const int rowH = 24;

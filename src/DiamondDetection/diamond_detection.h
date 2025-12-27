@@ -6,8 +6,8 @@
 #include <vector>
 
 // We accept these parameter structs so the sidebar tuning actually impacts diamond detection.
-#include "felt_detection.h"
-#include "rail_detection.h"
+#include "../FeltDetection/felt_detection.h"
+#include "../RailDetection/rail_detection.h"
 
 // Structure to hold detection parameters
 struct DiamondDetectionParams {

@@ -17,10 +17,10 @@ endif()
 # Main executable
 add_executable(table_detector
     src/main.cpp
-    src/diamond_detection.cpp
-    src/felt_detection.cpp
-    src/rail_detection.cpp
-    src/orientation_detector.cpp
+    src/DiamondDetection/diamond_detection.cpp
+    src/FeltDetection/felt_detection.cpp
+    src/RailDetection/rail_detection.cpp
+    src/OrientationDetection/orientation_detector.cpp
 )
 
 # Set Windows subsystem to prevent console window

@@ -1,6 +1,6 @@
 #include "diamond_detection.h"
-#include "felt_detection.h"
-#include "rail_detection.h"
+#include "../FeltDetection/felt_detection.h"
+#include "../RailDetection/rail_detection.h"
 #include <algorithm>
 #include <numeric>
 #include <functional>
