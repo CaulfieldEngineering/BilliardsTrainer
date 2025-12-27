@@ -10,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <cmath>  // std::lround
 
 #ifdef _WIN32
 #define NOMINMAX  // Prevent Windows.h from defining min/max macros
@@ -56,8 +57,19 @@ struct UIControls {
     bool sidebarCollapsed = false; // Sidebar collapsed state
     SidebarPage sidebarPage = SidebarPage::Debug; // Top-level sidebar page (default: Debug)
     SidebarContext sidebarContext = SidebarContext::Diamonds; // Current sidebar context (default to Diamonds)
-    bool useTestImage = true;
-    int selectedCamera = -1;
+
+    // Selected input source.
+    //
+    // Values:
+    // - -1: Test Image (static `testImage.jpg`)
+    // - -2: Test Video (looping `testVideo.mp4`)
+    // - >= 0: camera index
+    //
+    // NOTE:
+    // We intentionally use a single signed int here because it makes the Win32 combobox wiring
+    // simple: we can store this value as CB_SETITEMDATA and treat all sources uniformly.
+    int selectedSource = -1;
+
     int currentOpenedCamera = -1; // Track which camera is currently opened
 
     // Global rendering/UX tuning.
@@ -71,6 +83,10 @@ struct UIControls {
     FeltParams feltParams;
     RailParams railParams;
 } uiControls;
+
+// Source sentinel values (match UIControls::selectedSource contract above)
+static constexpr int kSourceTestImage = -1;
+static constexpr int kSourceTestVideo = -2;
 
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
@@ -333,6 +349,7 @@ static ImageDibBuffer g_imageDib;
 // App data sources
 static cv::Mat g_testImage;
 static cv::VideoCapture g_camera;
+static std::string g_testVideoPath = "testVideo.mp4";
 
 // ------------------------------------------------------------------------------------------------
 // Camera capture runs on a background thread.
@@ -344,17 +361,20 @@ static cv::VideoCapture g_camera;
 // - The UI thread should always be able to render the test image immediately.
 //
 // Design:
-// - `g_requestedCameraIndex`: -1 means "Test Image", >= 0 means "open that camera index"
-// - The capture thread updates `g_latestCameraFrame` whenever it successfully reads a frame.
+// - `g_requestedCaptureSource`:
+//     - -1 means "Test Image"
+//     - -2 means "Test Video" (looping file)
+//     - >= 0 means "open that camera index"
+// - The capture thread updates `g_latestCaptureFrame` whenever it successfully reads a frame.
 // - The UI thread renders:
-//   - test image directly when `useTestImage == true` (never waits on camera thread)
-//   - else: latest camera frame if available, otherwise test image as fallback.
+//   - test image directly when selected (never waits on capture thread)
+//   - else: latest capture frame (camera/video) if available, otherwise test image as fallback.
 // ------------------------------------------------------------------------------------------------
-static std::atomic<int> g_requestedCameraIndex{-1};
+static std::atomic<int> g_requestedCaptureSource{kSourceTestImage};
 static std::atomic<bool> g_captureThreadRunning{false};
 static std::thread g_captureThread;
 static std::mutex g_latestFrameMutex;
-static cv::Mat g_latestCameraFrame;
+static cv::Mat g_latestCaptureFrame;
 
 static void stopCaptureThread() {
     g_captureThreadRunning.store(false, std::memory_order_relaxed);
@@ -370,34 +390,43 @@ static void startCaptureThread() {
 
     g_captureThread = std::thread([]() {
         cv::VideoCapture cap;
-        int currentCam = -2; // sentinel; forces first open attempt if requested >= 0
+        int currentSource = -999; // sentinel; forces first open attempt
 
         while (g_captureThreadRunning.load(std::memory_order_relaxed)) {
-            const int requested = g_requestedCameraIndex.load(std::memory_order_relaxed);
+            const int requested = g_requestedCaptureSource.load(std::memory_order_relaxed);
 
             // Switch camera / release camera as needed.
-            if (requested != currentCam) {
+            if (requested != currentSource) {
                 if (cap.isOpened()) {
                     cap.release();
                 }
 
-                currentCam = requested;
+                currentSource = requested;
 
-                if (currentCam >= 0) {
+                if (currentSource >= 0) {
                     // Prefer a backend that tends to behave well on Windows.
                     // If this fails, OpenCV will fall back internally on some installs;
                     // but using an explicit backend often reduces open latency/hangs.
-                    cap.open(currentCam, cv::CAP_DSHOW);
+                    cap.open(currentSource, cv::CAP_DSHOW);
                     if (cap.isOpened()) {
                         cap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
                         cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
                         cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
                     }
+                } else if (currentSource == kSourceTestVideo) {
+                    // Test video: open file source (looped).
+                    //
+                    // We keep this logic inside the capture thread so switching sources never blocks the UI thread.
+                    // The path is resolved in `runWin32HostedApp()` (and in the non-hosted path we also try a
+                    // relative fallback).
+                    cap.open(g_testVideoPath);
+                    if (!cap.isOpened()) cap.open("testVideo.mp4");
+                    if (!cap.isOpened()) cap.open("../../testVideo.mp4");
                 }
             }
 
-            // If no camera requested, just idle.
-            if (currentCam < 0 || !cap.isOpened()) {
+            // If test image (or anything unopened), just idle.
+            if (currentSource == kSourceTestImage || !cap.isOpened()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 continue;
             }
@@ -406,14 +435,30 @@ static void startCaptureThread() {
             // NOTE: Some backends block in read(). If that happens, UI still stays responsive because
             // this thread is the only one affected. UI can always switch back to Test Image.
             if (!cap.read(frame) || frame.empty()) {
-                // Backoff a bit on read failure.
-                std::this_thread::sleep_for(std::chrono::milliseconds(30));
-                continue;
+                if (currentSource == kSourceTestVideo) {
+                    // End-of-file (or read hiccup): rewind and try again so the video loops.
+                    cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+                    if (!cap.read(frame) || frame.empty()) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                        continue;
+                    }
+                } else {
+                    // Backoff a bit on camera read failure.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                    continue;
+                }
             }
 
             {
                 std::lock_guard<std::mutex> lock(g_latestFrameMutex);
-                g_latestCameraFrame = frame;
+                g_latestCaptureFrame = frame;
+            }
+
+            // For video files, respect the file's FPS to avoid burning CPU / skipping too fast.
+            if (currentSource == kSourceTestVideo) {
+                const double fps = cap.get(cv::CAP_PROP_FPS);
+                const int delayMs = (fps > 1.0 && fps < 240.0) ? (int)std::lround(1000.0 / fps) : 33;
+                std::this_thread::sleep_for(std::chrono::milliseconds(std::max(1, delayMs)));
             }
         }
 
@@ -1261,15 +1306,15 @@ static void openSelectedCameraIfNeeded() {
 static void onFrameTick(HWND mainHwnd) {
     cv::Mat frame;
 
-    // Always render test image immediately when selected (never wait for camera I/O).
-    if (uiControls.useTestImage) {
+    // Always render test image immediately when selected (never wait for capture I/O).
+    if (uiControls.selectedSource == kSourceTestImage) {
         frame = g_testImage;
-        g_requestedCameraIndex.store(-1, std::memory_order_relaxed);
+        g_requestedCaptureSource.store(kSourceTestImage, std::memory_order_relaxed);
     } else {
-        g_requestedCameraIndex.store(uiControls.selectedCamera, std::memory_order_relaxed);
+        g_requestedCaptureSource.store(uiControls.selectedSource, std::memory_order_relaxed);
         {
             std::lock_guard<std::mutex> lock(g_latestFrameMutex);
-            frame = g_latestCameraFrame;
+            frame = g_latestCaptureFrame;
         }
         if (frame.empty()) {
             frame = g_testImage;
@@ -1506,22 +1551,25 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     // - Index 0 is always "Test Image" (even if item-data is missing/incorrect).
                     // This avoids ambiguous cases like camera 0 vs "Test Image" if CB_SETITEMDATA fails.
                     if (sel == 0) {
-                        uiControls.useTestImage = true;
-                        uiControls.selectedCamera = -1;
-                        g_requestedCameraIndex.store(-1, std::memory_order_relaxed);
+                        uiControls.selectedSource = kSourceTestImage;
+                        g_requestedCaptureSource.store(kSourceTestImage, std::memory_order_relaxed);
                     } else {
                         const LRESULT camData = SendMessage(hwndCtl, CB_GETITEMDATA, sel, 0);
                         if (camData == CB_ERR) {
                             // Fallback to Test Image if item-data is unavailable.
-                            uiControls.useTestImage = true;
-                            uiControls.selectedCamera = -1;
-                            g_requestedCameraIndex.store(-1, std::memory_order_relaxed);
+                            uiControls.selectedSource = kSourceTestImage;
+                            g_requestedCaptureSource.store(kSourceTestImage, std::memory_order_relaxed);
                             return 0;
                         }
-                        const int cam = (int)camData;
-                        uiControls.useTestImage = false;
-                        uiControls.selectedCamera = cam;
-                        g_requestedCameraIndex.store(cam, std::memory_order_relaxed);
+                        const int source = (int)camData; // -2 = test video, >=0 = camera index
+                        uiControls.selectedSource = source;
+                        g_requestedCaptureSource.store(source, std::memory_order_relaxed);
+                    }
+
+                    // Avoid briefly showing a stale frame from the previous source after switching.
+                    {
+                        std::lock_guard<std::mutex> lock(g_latestFrameMutex);
+                        g_latestCaptureFrame.release();
                     }
                 }
                 return 0;
@@ -1530,22 +1578,24 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             // Refresh camera list button (IDC_BUTTON_BASE + 280 = 30280)
             if (code == BN_CLICKED && id == 30280) {
                 // Hint to capture thread to release camera before probing devices.
-                g_requestedCameraIndex.store(-1, std::memory_order_relaxed);
-                uiControls.useTestImage = true;
-                uiControls.selectedCamera = -1;
+                g_requestedCaptureSource.store(kSourceTestImage, std::memory_order_relaxed);
+                uiControls.selectedSource = kSourceTestImage;
                 uiControls.currentOpenedCamera = -1;
+                {
+                    std::lock_guard<std::mutex> lock(g_latestFrameMutex);
+                    g_latestCaptureFrame.release();
+                }
 
                 g_availableCameras = enumerateCameras();
 
                 // If current selection no longer exists, fall back to Test Image.
-                if (!uiControls.useTestImage) {
+                if (uiControls.selectedSource >= 0) {
                     bool found = false;
                     for (int cam : g_availableCameras) {
-                        if (cam == uiControls.selectedCamera) { found = true; break; }
+                        if (cam == uiControls.selectedSource) { found = true; break; }
                     }
                     if (!found) {
-                        uiControls.useTestImage = true;
-                        uiControls.selectedCamera = -1;
+                        uiControls.selectedSource = kSourceTestImage;
                     }
                 }
 
@@ -1614,8 +1664,22 @@ static int runWin32HostedApp(int argc, char** argv) {
         return -1;
     }
 
+    // Resolve test video path similarly to the test image (common when running from `build/`).
+    // NOTE: We don't *open* the video here; the capture thread opens it on demand when selected.
+    {
+        const std::string videoPath = "testVideo.mp4";
+        if (std::filesystem::exists(videoPath)) {
+            g_testVideoPath = videoPath;
+        } else if (std::filesystem::exists("../../" + videoPath)) {
+            g_testVideoPath = "../../" + videoPath;
+        } else {
+            // Keep default "testVideo.mp4"; if it doesn't exist, selection will simply fall back to Test Image.
+            g_testVideoPath = videoPath;
+        }
+    }
+
     // Start capture thread with current selection (default is Test Image).
-    g_requestedCameraIndex.store(-1, std::memory_order_relaxed);
+    g_requestedCaptureSource.store(kSourceTestImage, std::memory_order_relaxed);
     startCaptureThread();
 
     HINSTANCE hInst = GetModuleHandleW(NULL);
@@ -1917,47 +1981,77 @@ int legacyHighGuiMain(int argc, char** argv) {
         if (windowWidth < 400) windowWidth = 400;
         if (windowHeight < 330) windowHeight = 330;
         
-        // Get current frame (test image or camera)
+        // Get current frame (test image, test video, or camera)
         cv::Mat currentFrame;
-        if (uiControls.useTestImage) {
-            // Close camera if we're switching to test image
+        if (uiControls.selectedSource == kSourceTestImage) {
+            // Close capture if we're switching to test image.
             if (camera.isOpened()) {
                 camera.release();
                 uiControls.currentOpenedCamera = -1;
             }
             testImage.copyTo(currentFrame);
-        } else {
-            // Check if we need to switch cameras
-            if (uiControls.selectedCamera >= 0) {
-                // If camera is open but different camera selected, close and reopen
-                if (camera.isOpened() && uiControls.currentOpenedCamera != uiControls.selectedCamera) {
-                    camera.release();
-                    uiControls.currentOpenedCamera = -1;
-                }
-                
-                // Open camera if not already open
-                if (!camera.isOpened()) {
-                    camera.open(uiControls.selectedCamera);
-                    if (camera.isOpened()) {
-                        uiControls.currentOpenedCamera = uiControls.selectedCamera;
-                        // Set some camera properties for better performance
-                        camera.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
-                        camera.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
-                    } else {
-                        std::cerr << "Warning: Could not open camera " << uiControls.selectedCamera << std::endl;
-                        uiControls.useTestImage = true; // Fall back to test image
-                        uiControls.selectedCamera = -1;
-                    }
+        } else if (uiControls.selectedSource == kSourceTestVideo) {
+            // Test video (looping).
+            //
+            // NOTE: This legacy (OpenCV window) code path keeps its own capture object (not the background thread
+            // used by the Win32-hosted UI path). We still implement looping for consistent behavior.
+            if (!camera.isOpened() || uiControls.currentOpenedCamera != kSourceTestVideo) {
+                if (camera.isOpened()) camera.release();
+                uiControls.currentOpenedCamera = -1;
+
+                camera.open(g_testVideoPath);
+                if (!camera.isOpened()) camera.open("testVideo.mp4");
+                if (!camera.isOpened()) camera.open("../../testVideo.mp4");
+                if (camera.isOpened()) {
+                    uiControls.currentOpenedCamera = kSourceTestVideo;
+                } else {
+                    // Fall back to test image if we can't open the video.
+                    uiControls.selectedSource = kSourceTestImage;
+                    testImage.copyTo(currentFrame);
                 }
             }
-            
+
             if (camera.isOpened()) {
                 camera >> currentFrame;
                 if (currentFrame.empty()) {
-                    testImage.copyTo(currentFrame); // Fallback if camera fails
+                    // EOF -> rewind and continue.
+                    camera.set(cv::CAP_PROP_POS_FRAMES, 0);
+                    camera >> currentFrame;
                 }
-            } else {
+            }
+            if (currentFrame.empty()) {
                 testImage.copyTo(currentFrame);
+            }
+        } else {
+            // Camera index (>= 0)
+            const int requestedCamera = uiControls.selectedSource;
+
+            // If camera is open but different camera selected, close and reopen.
+            if (camera.isOpened() && uiControls.currentOpenedCamera != requestedCamera) {
+                camera.release();
+                uiControls.currentOpenedCamera = -1;
+            }
+
+            // Open camera if not already open.
+            if (!camera.isOpened()) {
+                camera.open(requestedCamera);
+                if (camera.isOpened()) {
+                    uiControls.currentOpenedCamera = requestedCamera;
+                    // Set some camera properties for better performance
+                    camera.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+                    camera.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
+                } else {
+                    std::cerr << "Warning: Could not open camera " << requestedCamera << std::endl;
+                    uiControls.selectedSource = kSourceTestImage; // Fall back to test image
+                    testImage.copyTo(currentFrame);
+                }
+            }
+
+            if (camera.isOpened()) {
+                camera >> currentFrame;
+            }
+            if (currentFrame.empty()) {
+                testImage.copyTo(currentFrame); // Fallback if camera fails
             }
         }
         
@@ -2649,14 +2743,19 @@ void createSidebarControls(HWND hwnd) {
             // Use SendMessageW explicitly: some toolchains/projects may not have UNICODE enabled,
             // and SendMessageA would interpret UTF-16 strings as ANSI and truncate at the first NUL.
             SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Test Image");
-            SendMessageW(hCombo, CB_SETITEMDATA, 0, (LPARAM)-1);
+            SendMessageW(hCombo, CB_SETITEMDATA, 0, (LPARAM)kSourceTestImage);
+
+            SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Test Video");
+            SendMessageW(hCombo, CB_SETITEMDATA, 1, (LPARAM)kSourceTestVideo);
+
             int selectedIndex = 0;
-            int idx = 1;
+            if (uiControls.selectedSource == kSourceTestVideo) selectedIndex = 1;
+            int idx = 2;
             for (int cam : g_availableCameras) {
                 std::wstring label = L"Camera " + std::to_wstring(cam);
                 SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)label.c_str());
                 SendMessageW(hCombo, CB_SETITEMDATA, idx, (LPARAM)cam);
-                if (!uiControls.useTestImage && uiControls.selectedCamera == cam) {
+                if (uiControls.selectedSource >= 0 && uiControls.selectedSource == cam) {
                     selectedIndex = idx;
                 }
                 idx++;
