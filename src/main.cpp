@@ -118,7 +118,6 @@ static void saveSettingsToDisk() {
     f << "ui.showDiamonds=" << toStringBool(uiControls.showDiamonds) << "\n";
     f << "ui.showFelt=" << toStringBool(uiControls.showFelt) << "\n";
     f << "ui.showRail=" << toStringBool(uiControls.showRail) << "\n";
-    f << "ui.showOrientation=" << toStringBool(uiControls.showOrientation) << "\n";
     f << "ui.smoothingPercent=" << uiControls.smoothingPercent << "\n";
 
     // ---- Diamonds ----
@@ -199,7 +198,6 @@ static void loadSettingsFromDisk() {
         else if (key == "ui.showDiamonds") { bool b; if (parseBool(val, b)) uiControls.showDiamonds = b; }
         else if (key == "ui.showFelt") { bool b; if (parseBool(val, b)) uiControls.showFelt = b; }
         else if (key == "ui.showRail") { bool b; if (parseBool(val, b)) uiControls.showRail = b; }
-        else if (key == "ui.showOrientation") { bool b; if (parseBool(val, b)) uiControls.showOrientation = b; }
         else if (key == "ui.smoothingPercent") { int v; if (parseInt(val, v)) uiControls.smoothingPercent = std::clamp(v, 0, 100); }
 
         // ---- Diamonds ----
@@ -258,8 +256,6 @@ static void loadSettingsFromDisk() {
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
 static cv::Mat g_lastSourceFrame;  // Original unscaled source frame for color picking
-
-static TableOrientation g_tableOrientation;
 
 // Last diamond detection processing image (the final image used for blob detection)
 static cv::Mat g_lastDiamondProcessingImage;
@@ -1542,9 +1538,6 @@ static void layoutChildren(HWND mainHwnd) {
     }
 }
 
-// NOTE: Orientation logic (table-axis estimation + Orientation Mask overlay) lives in
-// `src/orientation_detector.{h,cpp}`. main.cpp should only own UI wiring and high-level calls.
-
 // Minimal per-frame render: apply overlays (using OpenCV), then push to ImageView.
 // We keep a small amount of global state to support temporal smoothing.
 static cv::Mat g_prevOverlayDeltaF; // CV_32FC3: (processed - rawFrame) from previous frame
@@ -1555,17 +1548,14 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     if (uiControls.showOverlay) {
         // Felt contour is needed for both felt and rail overlays (and rail detection).
         std::vector<cv::Point> feltContour;
-        if (uiControls.showFelt || uiControls.showRail || uiControls.showOrientation) {
+        if (uiControls.showFelt || uiControls.showRail) {
             feltContour = detectFeltContour(currentFrame, uiControls.feltParams);
         }
 
-        // Rail mask is needed for both rail overlay AND the orientation overlay.
+        // Rail mask is needed for rail overlay.
         cv::Mat railMask;
-        if ((uiControls.showRail || uiControls.showOrientation) && !feltContour.empty()) {
+        if (uiControls.showRail && !feltContour.empty()) {
             railMask = detectRailMask(currentFrame, feltContour, uiControls.railParams);
-
-            // Compute table orientation (two dominant axes) from rail mask.
-            g_tableOrientation = computeTableOrientationFromRailMask(railMask);
         }
 
         if (uiControls.showFelt && !feltContour.empty()) {
@@ -1596,19 +1586,24 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
                         cv::drawContours(processed, contours, -1, uiControls.railParams.color, std::max(1, uiControls.railParams.outlineThicknessPx));
                     }
                 }
-        }
-
-        // Orientation Mask overlay (geometry + labeling) lives in `orientation_detector`.
-        if (uiControls.showOrientation && !railMask.empty() && cv::countNonZero(railMask) > 0) {
-            OrientationMaskRenderParams p;
-            p.lineColorBGR = cv::Scalar(255, 0, 255);
-            p.fillColorBGR = cv::Scalar(255, 0, 255);
-            p.lineThicknessPx = 5;
-            p.fillAlpha = 0.30;
-            p.innerShrinkFraction = 0.05f;
-            p.labelFontScale = 1.5;
-            p.labelThicknessPx = 3;
-            drawOrientationMaskOverlay(processed, railMask, feltContour, p);
+                
+                // Draw the four edge lines (top, bottom, left, right) that best fit the rail mask edges
+                RailEdgeLines edgeLines;
+                if (detectRailEdgeLines(railMask, processed.size(), edgeLines)) {
+                    // Use a slightly different color or style for the edge lines to distinguish them
+                    // Using a brighter version of the rail color
+                    cv::Scalar edgeLineColor = uiControls.railParams.color;
+                    const int edgeLineThickness = std::max(2, uiControls.railParams.outlineThicknessPx);
+                    
+                    // Draw top edge line
+                    cv::line(processed, edgeLines.topLinePt1, edgeLines.topLinePt2, edgeLineColor, edgeLineThickness);
+                    // Draw bottom edge line
+                    cv::line(processed, edgeLines.bottomLinePt1, edgeLines.bottomLinePt2, edgeLineColor, edgeLineThickness);
+                    // Draw left edge line
+                    cv::line(processed, edgeLines.leftLinePt1, edgeLines.leftLinePt2, edgeLineColor, edgeLineThickness);
+                    // Draw right edge line
+                    cv::line(processed, edgeLines.rightLinePt1, edgeLines.rightLinePt2, edgeLineColor, edgeLineThickness);
+                }
         }
 
         if (uiControls.showDiamonds) {
@@ -1791,14 +1786,12 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             const int kIdOverlayDiamonds = 30201;
             const int kIdOverlayFelt = 30202;
             const int kIdOverlayRail = 30203;
-            const int kIdOverlayOrientation = 30204;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRail || id == kIdOverlayOrientation)) {
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRail)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
                 else if (id == kIdOverlayDiamonds) uiControls.showDiamonds = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
                 else if (id == kIdOverlayRail) uiControls.showRail = isChecked;
-                else if (id == kIdOverlayOrientation) uiControls.showOrientation = isChecked;
                 saveSettingsToDisk();  // Save settings immediately when overlay toggles change
                 return 0;
             }
@@ -2185,7 +2178,6 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DEBUG_OVERLAY_DIAMONDS_CB (IDC_BUTTON_BASE + 201)
 #define IDC_DEBUG_OVERLAY_FELT_CB (IDC_BUTTON_BASE + 202)
 #define IDC_DEBUG_OVERLAY_RAIL_CB (IDC_BUTTON_BASE + 203)
-#define IDC_DEBUG_OVERLAY_ORIENTATION_CB (IDC_BUTTON_BASE + 204)
 
 // Overlay style controls
 #define IDC_DIAMONDS_STYLE_COLOR (IDC_BUTTON_BASE + 220)
@@ -2841,7 +2833,7 @@ void createSidebarControls(HWND hwnd) {
     yPos += dividerPadY;
 
     if (uiControls.sidebarPage == SidebarPage::Debug) {
-        // ===== Debug page sections (ordered): Global, Felt, Rails, Orientation, Diamonds =====
+        // ===== Debug page sections (ordered): Global, Felt, Rails, Diamonds =====
 
         // GLOBAL section
         //
@@ -3071,21 +3063,6 @@ void createSidebarControls(HWND hwnd) {
             createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 122);
             createTrackbar(IDC_RAIL_THICKNESS, yPos, 1, 10, uiControls.railParams.outlineThicknessPx);
             createValueLabel(yPos, IDC_STATIC_BASE + 123);
-            yPos += lineHeight + gap;
-        }
-
-        // ORIENTATION section
-        {
-            addHeader(L"Orientation");
-
-            // Orientation Mask overlay toggle
-            {
-                HWND h = CreateWindowW(L"BUTTON", L"Orientation Mask", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
-                                       xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
-                                       (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_ORIENTATION_CB, NULL, NULL);
-                applyFont(h, false);
-                SendMessage(h, BM_SETCHECK, uiControls.showOrientation ? BST_CHECKED : BST_UNCHECKED, 0);
-            }
             yPos += lineHeight + gap;
         }
 

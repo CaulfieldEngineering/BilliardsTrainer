@@ -46,7 +46,6 @@
 #include "DiamondDetection/diamond_detection.h"
 #include "FeltDetection/felt_detection.h"
 #include "RailDetection/rail_detection.h"
-#include "OrientationDetection/orientation_detector.h"
 
 // Sidebar context types
 enum class SidebarContext {
@@ -75,9 +74,6 @@ struct UIControls {
     bool showDiamonds = true;
     bool showFelt = true;
     bool showRail = true;
-
-    // Orientation Mask: draws outer + inner quads bounding the rail mask, with labeled rail regions (L1, L2, S1, S2).
-    bool showOrientation = false;
 
     bool showSidebar = true; // Debug sidebar toggle (on by default)
     bool sidebarCollapsed = false; // Sidebar collapsed state

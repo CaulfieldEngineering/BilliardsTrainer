@@ -35,3 +35,21 @@ std::vector<std::vector<cv::Point>> detectRailContours(const cv::Mat& src, const
 // Returns an empty vector if a boundary could not be estimated.
 std::vector<cv::Point> detectRailOuterBoundary(const cv::Mat& railMask);
 
+// Structure to hold the four edge lines of the rail mask
+// Each line is represented by two points (pt1, pt2) that extend to the image boundaries
+struct RailEdgeLines {
+    cv::Point topLinePt1;      // Left endpoint of top edge line
+    cv::Point topLinePt2;      // Right endpoint of top edge line
+    cv::Point bottomLinePt1;   // Left endpoint of bottom edge line
+    cv::Point bottomLinePt2;   // Right endpoint of bottom edge line
+    cv::Point leftLinePt1;     // Top endpoint of left edge line
+    cv::Point leftLinePt2;     // Bottom endpoint of left edge line
+    cv::Point rightLinePt1;    // Top endpoint of right edge line
+    cv::Point rightLinePt2;    // Bottom endpoint of right edge line
+};
+
+// Fit four lines to the edges of the rail mask (top, bottom, left, right)
+// Each line extends to infinity (image boundaries) and represents a best fit to the corresponding edge
+// Returns true if all four lines were successfully fitted, false otherwise
+bool detectRailEdgeLines(const cv::Mat& railMask, const cv::Size& imageSize, RailEdgeLines& edgeLines);
+

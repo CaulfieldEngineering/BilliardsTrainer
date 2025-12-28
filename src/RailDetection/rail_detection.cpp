@@ -356,3 +356,247 @@ std::vector<std::vector<cv::Point>> detectRailContours(const cv::Mat& src, const
     return filteredContours;
 }
 
+// Helper function to fit a line to a set of points using least squares
+// Returns the line equation in form: ax + by + c = 0 (normalized so a^2 + b^2 = 1)
+static bool fitLineToPoints(const std::vector<cv::Point>& points, double& a, double& b, double& c) {
+    if (points.size() < 2) return false;
+    
+    // Use OpenCV's fitLine which uses least squares (or RANSAC if distanceType allows)
+    cv::Vec4f lineParams;
+    cv::fitLine(points, lineParams, cv::DIST_L2, 0, 0.01, 0.01);
+    
+    // lineParams format: [vx, vy, x0, y0] where (vx, vy) is the unit direction vector
+    // and (x0, y0) is a point on the line
+    double vx = lineParams[0];
+    double vy = lineParams[1];
+    double x0 = lineParams[2];
+    double y0 = lineParams[3];
+    
+    // Convert to ax + by + c = 0 form
+    // The line normal is (-vy, vx) (perpendicular to direction vector)
+    // Equation: -vy * (x - x0) + vx * (y - y0) = 0
+    //           -vy * x + vy * x0 + vx * y - vx * y0 = 0
+    //           -vy * x + vx * y + (vy * x0 - vx * y0) = 0
+    a = -vy;
+    b = vx;
+    c = vy * x0 - vx * y0;
+    
+    // Normalize so a^2 + b^2 = 1
+    double norm = std::sqrt(a * a + b * b);
+    if (norm < 1e-10) return false;
+    a /= norm;
+    b /= norm;
+    c /= norm;
+    
+    return true;
+}
+
+// Helper function to extend a line to image boundaries
+// Given line equation ax + by + c = 0 and image size, returns two points at image boundaries
+static bool extendLineToBoundaries(double a, double b, double c, const cv::Size& imageSize, cv::Point& pt1, cv::Point& pt2) {
+    const int w = imageSize.width;
+    const int h = imageSize.height;
+    
+    // Check for vertical line (b is very small)
+    if (std::abs(b) < 1e-6) {
+        // Vertical line: ax + c = 0, so x = -c/a
+        double x = -c / a;
+        if (x < 0 || x >= w) return false;
+        pt1 = cv::Point((int)std::lround(x), 0);
+        pt2 = cv::Point((int)std::lround(x), h - 1);
+        return true;
+    }
+    
+    // Check for horizontal line (a is very small)
+    if (std::abs(a) < 1e-6) {
+        // Horizontal line: by + c = 0, so y = -c/b
+        double y = -c / b;
+        if (y < 0 || y >= h) return false;
+        pt1 = cv::Point(0, (int)std::lround(y));
+        pt2 = cv::Point(w - 1, (int)std::lround(y));
+        return true;
+    }
+    
+    // General line: find intersections with image boundaries
+    std::vector<cv::Point> intersections;
+    
+    // Left edge: x = 0
+    double y_left = -(a * 0 + c) / b;
+    if (y_left >= 0 && y_left < h) {
+        intersections.emplace_back(0, (int)std::lround(y_left));
+    }
+    
+    // Right edge: x = w - 1
+    double y_right = -(a * (w - 1) + c) / b;
+    if (y_right >= 0 && y_right < h) {
+        intersections.emplace_back(w - 1, (int)std::lround(y_right));
+    }
+    
+    // Top edge: y = 0
+    double x_top = -(b * 0 + c) / a;
+    if (x_top >= 0 && x_top < w) {
+        intersections.emplace_back((int)std::lround(x_top), 0);
+    }
+    
+    // Bottom edge: y = h - 1
+    double x_bottom = -(b * (h - 1) + c) / a;
+    if (x_bottom >= 0 && x_bottom < w) {
+        intersections.emplace_back((int)std::lround(x_bottom), h - 1);
+    }
+    
+    // We should have exactly 2 intersections (the line crosses two boundaries)
+    if (intersections.size() < 2) return false;
+    
+    // Use the two points that are furthest apart (should be the corner intersections)
+    pt1 = intersections[0];
+    pt2 = intersections[1];
+    
+    // If we have more than 2, find the two that are furthest apart
+    if (intersections.size() > 2) {
+        double maxDist = 0;
+        for (size_t i = 0; i < intersections.size(); ++i) {
+            for (size_t j = i + 1; j < intersections.size(); ++j) {
+                double dist = cv::norm(intersections[i] - intersections[j]);
+                if (dist > maxDist) {
+                    maxDist = dist;
+                    pt1 = intersections[i];
+                    pt2 = intersections[j];
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool detectRailEdgeLines(const cv::Mat& railMask, const cv::Size& imageSize, RailEdgeLines& edgeLines) {
+    if (railMask.empty() || railMask.size() != imageSize) {
+        return false;
+    }
+    
+    // Find the outer contour of the rail mask
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(railMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    
+    if (contours.empty()) {
+        return false;
+    }
+    
+    // Find the largest contour (should be the rail region)
+    size_t largestIdx = 0;
+    double largestArea = 0.0;
+    for (size_t i = 0; i < contours.size(); ++i) {
+        double area = cv::contourArea(contours[i]);
+        if (area > largestArea) {
+            largestArea = area;
+            largestIdx = i;
+        }
+    }
+    
+    const auto& contour = contours[largestIdx];
+    if (contour.size() < 4) {
+        return false;
+    }
+    
+    // Find the OUTERMOST edge points along each of the 4 edges
+    // The rail mask is donut-shaped, so we want the outer perimeter edge points
+    
+    // Get bounding rectangle to help define edge regions
+    cv::Rect boundingRect = cv::boundingRect(contour);
+    
+    // Find extreme values (outermost points)
+    int minY = imageSize.height, maxY = 0;
+    int minX = imageSize.width, maxX = 0;
+    
+    for (const auto& pt : contour) {
+        if (pt.y < minY) minY = pt.y;
+        if (pt.y > maxY) maxY = pt.y;
+        if (pt.x < minX) minX = pt.x;
+        if (pt.x > maxX) maxX = pt.x;
+    }
+    
+    // Define edge regions: use a band near each extreme value
+    // The band width should be adaptive but capture the full edge segment
+    const int edgeBandWidth = std::max(5, std::min(std::min(boundingRect.width, boundingRect.height) / 15, 25));
+    
+    // Define regions for each edge to identify which points belong to each edge segment
+    // We'll use the bounding box to help partition, but prioritize the extreme values
+    const int topBandTop = minY;
+    const int topBandBottom = minY + edgeBandWidth;
+    const int bottomBandTop = maxY - edgeBandWidth;
+    const int bottomBandBottom = maxY;
+    const int leftBandLeft = minX;
+    const int leftBandRight = minX + edgeBandWidth;
+    const int rightBandLeft = maxX - edgeBandWidth;
+    const int rightBandRight = maxX;
+    
+    std::vector<cv::Point> topEdgePoints, bottomEdgePoints, leftEdgePoints, rightEdgePoints;
+    
+    for (const auto& pt : contour) {
+        // Top edge: points in the top band
+        if (pt.y >= topBandTop && pt.y <= topBandBottom) {
+            topEdgePoints.push_back(pt);
+        }
+        
+        // Bottom edge: points in the bottom band
+        if (pt.y >= bottomBandTop && pt.y <= bottomBandBottom) {
+            bottomEdgePoints.push_back(pt);
+        }
+        
+        // Left edge: points in the left band
+        if (pt.x >= leftBandLeft && pt.x <= leftBandRight) {
+            leftEdgePoints.push_back(pt);
+        }
+        
+        // Right edge: points in the right band
+        if (pt.x >= rightBandLeft && pt.x <= rightBandRight) {
+            rightEdgePoints.push_back(pt);
+        }
+    }
+    
+    // Fit lines to each edge
+    bool success = true;
+    
+    // Fit top edge line
+    double a_top, b_top, c_top;
+    if (topEdgePoints.size() >= 2 && fitLineToPoints(topEdgePoints, a_top, b_top, c_top)) {
+        if (!extendLineToBoundaries(a_top, b_top, c_top, imageSize, edgeLines.topLinePt1, edgeLines.topLinePt2)) {
+            success = false;
+        }
+    } else {
+        success = false;
+    }
+    
+    // Fit bottom edge line
+    double a_bottom, b_bottom, c_bottom;
+    if (bottomEdgePoints.size() >= 2 && fitLineToPoints(bottomEdgePoints, a_bottom, b_bottom, c_bottom)) {
+        if (!extendLineToBoundaries(a_bottom, b_bottom, c_bottom, imageSize, edgeLines.bottomLinePt1, edgeLines.bottomLinePt2)) {
+            success = false;
+        }
+    } else {
+        success = false;
+    }
+    
+    // Fit left edge line
+    double a_left, b_left, c_left;
+    if (leftEdgePoints.size() >= 2 && fitLineToPoints(leftEdgePoints, a_left, b_left, c_left)) {
+        if (!extendLineToBoundaries(a_left, b_left, c_left, imageSize, edgeLines.leftLinePt1, edgeLines.leftLinePt2)) {
+            success = false;
+        }
+    } else {
+        success = false;
+    }
+    
+    // Fit right edge line
+    double a_right, b_right, c_right;
+    if (rightEdgePoints.size() >= 2 && fitLineToPoints(rightEdgePoints, a_right, b_right, c_right)) {
+        if (!extendLineToBoundaries(a_right, b_right, c_right, imageSize, edgeLines.rightLinePt1, edgeLines.rightLinePt2)) {
+            success = false;
+        }
+    } else {
+        success = false;
+    }
+    
+    return success;
+}
+
