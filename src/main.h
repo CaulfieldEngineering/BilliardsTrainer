@@ -43,16 +43,12 @@
     #pragma comment(lib, "uxtheme.lib")
 #endif
 
-#include "DiamondDetection/diamond_detection.h"
 #include "FeltDetection/felt_detection.h"
-#include "RailDetection/rail_detection.h"
 
 // Sidebar context types
 enum class SidebarContext {
     None,
-    Diamonds,
-    Felt,
-    Rail
+    Felt
 };
 
 // Which *top-level* sidebar page is currently shown.
@@ -70,15 +66,13 @@ inline constexpr int kSourceTestVideo = -2;
 struct UIControls {
     bool showOverlay = true;  // Master overlay toggle (on by default)
 
-    // Default all overlays ON so masks are visible immediately.
-    bool showDiamonds = true;
+    // Default overlay ON so mask is visible immediately.
     bool showFelt = true;
-    bool showRail = true;
 
     bool showSidebar = true; // Debug sidebar toggle (on by default)
     bool sidebarCollapsed = false; // Sidebar collapsed state
     SidebarPage sidebarPage = SidebarPage::Debug; // Top-level sidebar page (default: Debug)
-    SidebarContext sidebarContext = SidebarContext::Diamonds; // Current sidebar context (default to Diamonds)
+    SidebarContext sidebarContext = SidebarContext::Felt; // Current sidebar context (default to Felt)
 
     // Selected input source.
     //
@@ -104,9 +98,7 @@ struct UIControls {
     int smoothingPercent = 0;
 
     // Overlay parameters (defined in respective detection headers)
-    DiamondDetectionParams diamondParams;
     FeltParams feltParams;
-    RailParams railParams;
 };
 
 // Defined in `main.cpp`

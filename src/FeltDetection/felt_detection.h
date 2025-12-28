@@ -2,6 +2,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <vector>
+#include <array>
 
 // Structure to hold felt detection parameters
 struct FeltParams {
@@ -32,6 +33,30 @@ struct FeltParams {
     int fillAlpha = 80;          // 0..255 (only used if isFilled)
     int outlineThicknessPx = 2;  // used if !isFilled (or for outline)
 };
+
+// Result structure for robust felt detection
+// Provides clean mask, stable contour, and ordered 4-corner quad suitable for rail extraction
+struct FeltDetectionResult {
+    cv::Mat feltMask;                              // CV_8U, 0/255 - cleaned mask with holes filled
+    std::vector<cv::Point> contour;                // External contour of felt (raw, before simplification)
+    std::array<cv::Point2f, 4> corners;            // Ordered corners: TL, TR, BR, BL
+    cv::Rect bbox;                                 // Bounding rectangle of convex hull envelope
+    bool ok;                                       // True if detection passed validation checks
+    bool hasCorners;                               // True if 4 corners were successfully computed
+    std::vector<cv::Point> polyDebug;              // Temporary: raw polygon for debug visualization
+    
+    // Telemetry fields for export
+    double envArea = 0.0;                          // Area of convex hull envelope
+    double areaRatio = 0.0;                        // envArea / imageArea
+    int polySize = 0;                              // Size of poly used to form corners
+    bool found4Points = false;                     // True if approxPolyDP produced exactly 4 points
+};
+
+// Main felt detection function - returns complete result structure
+FeltDetectionResult detectFelt(const cv::Mat& bgr, const FeltParams& params);
+
+// Debug visualization function - draws mask overlay, contour, corners, and bbox
+cv::Mat drawFeltDebug(const cv::Mat& bgr, const FeltDetectionResult& result);
 
 // Detect the felt/table surface (blue or green)
 // Returns the bounding rectangle

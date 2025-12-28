@@ -256,11 +256,9 @@ static void loadSettingsFromDisk() {
 // Last rendered (overlaid) frame so menu-driven capture export can work.
 static cv::Mat g_lastProcessedFrame;
 static cv::Mat g_lastSourceFrame;  // Original unscaled source frame for color picking
+static FeltDetectionResult g_lastFeltResult;  // Last felt detection result for export
+static int g_lastFrameIndex = -1;  // Last processed frame index (for video)
 
-// Last diamond detection processing image (the final image used for blob detection)
-static cv::Mat g_lastDiamondProcessingImage;
-// Additional debug images emitted by diamond detection (label, image).
-extern std::vector<std::pair<std::string, cv::Mat>> g_lastDiamondDebugImages;
 
 // Choose a deterministic capture directory.
 // On Windows, we save next to the executable so "Export Captures" always goes somewhere predictable
@@ -349,22 +347,58 @@ static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem:
     // Always attempt overlay first.
     writeImageChecked(dir / (stem + "-overlay.png"), processedImage);
 
-    // Export diamond detection processing image if available
-    if (!g_lastDiamondProcessingImage.empty()) {
-        writeImageChecked(dir / (stem + "-diamond-processing.png"), g_lastDiamondProcessingImage);
-    }
-    // Export per-stage diamond debug images if available
-    if (!g_lastDiamondDebugImages.empty()) {
-        for (const auto& kv : g_lastDiamondDebugImages) {
-            std::string label = kv.first;
-            // sanitize label for filename
-            for (char& c : label) {
-                if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_')) c = '_';
+    // Write felt detection telemetry JSON sidecar
+    {
+        const std::filesystem::path jsonPath = dir / (stem + ".json");
+        try {
+            std::ofstream jsonFile(jsonPath);
+            if (jsonFile.is_open()) {
+                jsonFile << "{\n";
+                jsonFile << "  \"frame_index\": " << (g_lastFrameIndex >= 0 ? std::to_string(g_lastFrameIndex) : "null") << ",\n";
+                jsonFile << "  \"image\": {\"w\":" << processedImage.cols << ",\"h\":" << processedImage.rows << "},\n";
+                jsonFile << "  \"felt\": {\n";
+                jsonFile << "    \"ok\": " << (g_lastFeltResult.ok ? "true" : "false") << ",\n";
+                jsonFile << "    \"hasCorners\": " << (g_lastFeltResult.hasCorners ? "true" : "false") << ",\n";
+                jsonFile << "    \"poly_size\": " << g_lastFeltResult.polySize << ",\n";
+                jsonFile << "    \"found4Points\": " << (g_lastFeltResult.found4Points ? "true" : "false") << ",\n";
+                jsonFile << "    \"areaRatio\": " << g_lastFeltResult.areaRatio << ",\n";
+                jsonFile << "    \"envBox\": {\"x\":" << g_lastFeltResult.bbox.x << ",\"y\":" << g_lastFeltResult.bbox.y
+                         << ",\"w\":" << g_lastFeltResult.bbox.width << ",\"h\":" << g_lastFeltResult.bbox.height << "},\n";
+                jsonFile << "    \"hull_area\": " << g_lastFeltResult.envArea << ",\n";
+                double contourArea = g_lastFeltResult.contour.empty() ? 0.0 : cv::contourArea(g_lastFeltResult.contour);
+                jsonFile << "    \"contour_area\": " << contourArea << ",\n";
+                
+                // Corners
+                jsonFile << "    \"corners_px\": ";
+                if (g_lastFeltResult.hasCorners) {
+                    jsonFile << "{\n";
+                    jsonFile << "      \"TL\":{\"x\":" << g_lastFeltResult.corners[0].x << ",\"y\":" << g_lastFeltResult.corners[0].y << "},\n";
+                    jsonFile << "      \"TR\":{\"x\":" << g_lastFeltResult.corners[1].x << ",\"y\":" << g_lastFeltResult.corners[1].y << "},\n";
+                    jsonFile << "      \"BR\":{\"x\":" << g_lastFeltResult.corners[2].x << ",\"y\":" << g_lastFeltResult.corners[2].y << "},\n";
+                    jsonFile << "      \"BL\":{\"x\":" << g_lastFeltResult.corners[3].x << ",\"y\":" << g_lastFeltResult.corners[3].y << "}\n";
+                    jsonFile << "    },\n";
+                } else {
+                    jsonFile << "null,\n";
+                }
+                
+                // HSV params
+                jsonFile << "    \"hsv_params\": {\n";
+                jsonFile << "      \"HMin\":" << uiControls.feltParams.colorHMin << ",\n";
+                jsonFile << "      \"HMax\":" << uiControls.feltParams.colorHMax << ",\n";
+                jsonFile << "      \"SMin\":" << uiControls.feltParams.colorSMin << ",\n";
+                jsonFile << "      \"SMax\":" << uiControls.feltParams.colorSMax << ",\n";
+                jsonFile << "      \"VMin\":" << uiControls.feltParams.colorVMin << ",\n";
+                jsonFile << "      \"VMax\":" << uiControls.feltParams.colorVMax << "\n";
+                jsonFile << "    }\n";
+                jsonFile << "  }\n";
+                jsonFile << "}\n";
+                jsonFile.close();
             }
-            writeImageChecked(dir / (stem + "-diamond-" + label + ".png"), kv.second);
+        } catch (...) {
+            // ignore JSON write errors
         }
     }
-
+    
     // Always write a manifest so we can diagnose "it said exported but folder is empty".
     // This also acts as a sanity check that we can write *something* to the directory.
     {
@@ -474,7 +508,6 @@ static HFONT g_sidebarFontBold = NULL;
 // Which target (if any) the color picker is currently sampling for.
 enum class ColorPickerTarget {
     None,
-    Diamonds,
     Felt
 };
 static ColorPickerTarget g_colorPickerTarget = ColorPickerTarget::None;
@@ -666,6 +699,13 @@ static void startCaptureThread() {
                 std::lock_guard<std::mutex> lock(g_latestFrameMutex);
                 g_latestCaptureFrame = frame;
             }
+            
+            // Track frame index for export (after successful read)
+            if (currentSource == kSourceTestVideo && cap.isOpened()) {
+                g_lastFrameIndex = static_cast<int>(cap.get(cv::CAP_PROP_POS_FRAMES)) - 1; // -1 because read advances
+            } else {
+                g_lastFrameIndex = -1; // Camera or image input, no frame index
+            }
 
             // For video files, respect the file's FPS to avoid burning CPU / skipping too fast.
             if (currentSource == kSourceTestVideo) {
@@ -688,7 +728,6 @@ static const wchar_t* kSidebarPanelClass = L"BilliardsTrainerSidebarPanel";
 static void ensureSidebarAndImageChildren(HWND mainHwnd);
 static void layoutChildren(HWND mainHwnd);
 static void updateColorPickerLabels();
-static void applyDiamondColorSensitivityToRangesFromPickedHSV();
 static void applyFeltColorSensitivityToRangesFromPickedHSV();
 static void updateImageDibFromBgr(const cv::Mat& bgr);
 
@@ -1018,14 +1057,7 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
         cv::Vec3b hsv = hsvMat.at<cv::Vec3b>(0, 0);
         
         // Store the picked color into the active target.
-        if (g_colorPickerTarget == ColorPickerTarget::Diamonds) {
-            uiControls.diamondParams.pickedBGR = bgr;
-            uiControls.diamondParams.pickedHSV = hsv;
-            uiControls.diamondParams.hasPickedColor = true;
-            // Set HSV ranges around the sampled color based on the Sensitivity slider.
-            applyDiamondColorSensitivityToRangesFromPickedHSV();
-            uiControls.diamondParams.use_color_filter = true;
-        } else if (g_colorPickerTarget == ColorPickerTarget::Felt) {
+        if (g_colorPickerTarget == ColorPickerTarget::Felt) {
             uiControls.feltParams.pickedBGR = bgr;
             uiControls.feltParams.pickedHSV = hsv;
             uiControls.feltParams.hasPickedColor = true;
@@ -1182,13 +1214,7 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                     cv::cvtColor(bgrMat, hsvMat, cv::COLOR_BGR2HSV);
                     cv::Vec3b hsv = hsvMat.at<cv::Vec3b>(0, 0);
                     
-                    if (g_colorPickerTarget == ColorPickerTarget::Diamonds) {
-                        uiControls.diamondParams.pickedBGR = bgr;
-                        uiControls.diamondParams.pickedHSV = hsv;
-                        uiControls.diamondParams.hasPickedColor = true;
-                        applyDiamondColorSensitivityToRangesFromPickedHSV();
-                        uiControls.diamondParams.use_color_filter = true;
-                    } else if (g_colorPickerTarget == ColorPickerTarget::Felt) {
+                    if (g_colorPickerTarget == ColorPickerTarget::Felt) {
                         uiControls.feltParams.pickedBGR = bgr;
                         uiControls.feltParams.pickedHSV = hsv;
                         uiControls.feltParams.hasPickedColor = true;
@@ -1484,20 +1510,6 @@ static void computeFeltHsvRangeFromPickedHsv(
     outVMax = std::clamp(v + vTolUp, 0, 255);
 }
 
-static void applyDiamondColorSensitivityToRangesFromPickedHSV() {
-    if (!uiControls.diamondParams.hasPickedColor) return;
-    computeHsvRangeFromPickedHsv(
-        uiControls.diamondParams.pickedHSV,
-        uiControls.diamondParams.colorSensitivity,
-        uiControls.diamondParams.colorHMin,
-        uiControls.diamondParams.colorHMax,
-        uiControls.diamondParams.colorSMin,
-        uiControls.diamondParams.colorSMax,
-        uiControls.diamondParams.colorVMin,
-        uiControls.diamondParams.colorVMax
-    );
-}
-
 static void applyFeltColorSensitivityToRangesFromPickedHSV() {
     if (!uiControls.feltParams.hasPickedColor) return;
     computeFeltHsvRangeFromPickedHsv(
@@ -1546,10 +1558,14 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     cv::Mat processed = currentFrame.clone();
 
     if (uiControls.showOverlay) {
-        // Felt contour is needed for both felt and rail overlays (and rail detection).
+        // Felt detection - use full detectFelt to get complete result for export
         std::vector<cv::Point> feltContour;
         if (uiControls.showFelt || uiControls.showRail) {
-            feltContour = detectFeltContour(currentFrame, uiControls.feltParams);
+            g_lastFeltResult = detectFelt(currentFrame, uiControls.feltParams);
+            feltContour = g_lastFeltResult.contour;
+        } else {
+            // Reset result if felt detection is not being run
+            g_lastFeltResult = FeltDetectionResult();
         }
 
         // Rail mask is needed for rail overlay.
@@ -2397,9 +2413,12 @@ int legacyHighGuiMain(int argc, char** argv) {
                     camera.set(cv::CAP_PROP_POS_FRAMES, 0);
                     camera >> currentFrame;
                 }
+                // For camera input, no frame index
+                g_lastFrameIndex = -1;
             }
             if (currentFrame.empty()) {
                 testImage.copyTo(currentFrame);
+                g_lastFrameIndex = -1; // Image input, no frame index
             }
         } else {
             // Camera index (>= 0)
