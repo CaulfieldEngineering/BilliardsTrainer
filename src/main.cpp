@@ -1971,6 +1971,9 @@ static void layoutChildren(HWND mainHwnd) {
 // Minimal per-frame render: apply overlays (using OpenCV), then push to ImageView.
 // We keep a small amount of global state to support temporal smoothing.
 static cv::Mat g_prevOverlayDeltaF; // CV_32FC3: (processed - rawFrame) from previous frame
+static std::array<cv::Point2f, 4> g_smoothedCorners; // Temporally smoothed corners for stable rectification
+static bool g_cornersInitialized = false;
+
 static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     if (currentFrame.empty()) return {};
     cv::Mat processed = currentFrame.clone();
@@ -2023,17 +2026,40 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
 
     // Perform rectification if felt detection succeeded and has corners
     if (latestAnalysis.felt.ok && latestAnalysis.felt.hasCorners) {
+        // Apply temporal smoothing to corners for stable rectification
+        // This uses the smoothingPercent slider to control corner jitter in the rectified view
+        const int sPct = std::clamp(uiControls.smoothingPercent, 0, 100);
+        std::array<cv::Point2f, 4> cornersToUse = latestAnalysis.felt.corners;
+
+        if (sPct > 0) {
+            const float alpha = static_cast<float>(sPct) / 100.0f;
+            if (!g_cornersInitialized) {
+                g_smoothedCorners = latestAnalysis.felt.corners;
+                g_cornersInitialized = true;
+            } else {
+                // Exponential moving average smoothing
+                for (size_t i = 0; i < 4; ++i) {
+                    g_smoothedCorners[i].x = alpha * g_smoothedCorners[i].x + (1.0f - alpha) * latestAnalysis.felt.corners[i].x;
+                    g_smoothedCorners[i].y = alpha * g_smoothedCorners[i].y + (1.0f - alpha) * latestAnalysis.felt.corners[i].y;
+                }
+            }
+            cornersToUse = g_smoothedCorners;
+        }
+
+        // Call rectification with smoothed corners
+        // rectifyTabletop is now configured to output 2:1 portrait aspect ratio
         latestAnalysis.rect = rectifyTabletop(
             currentFrame,
             latestAnalysis.felt.feltMask,
-            latestAnalysis.felt.corners,
+            cornersToUse,
             uiControls.rectifyMarginScale,
             uiControls.rectifyPadPx
         );
-        
+
     } else {
         // Reset rectification results if felt detection failed
         latestAnalysis.rect = RectificationResult();
+        g_cornersInitialized = false;  // Reset smoothing when corners are lost
     }
 
     // --------------------------------------------------------------------------------------------

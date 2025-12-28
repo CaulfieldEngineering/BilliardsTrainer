@@ -98,13 +98,31 @@ RectificationResult rectifyTabletop(
     const float wBot = cv::norm(BR - BL);
     const float hLeft = cv::norm(BL - TL);
     const float hRight = cv::norm(BR - TR);
-    
-    // Destination dimensions are max of corresponding edges
-    float dstW = std::max(wTop, wBot);
-    float dstH = std::max(hLeft, hRight);
-    
-    // Optionally normalize scale AFTER this (preserve aspect ratio)
-    // For now, use dimensions as computed
+
+    // Determine natural dimensions (max of corresponding edges)
+    float naturalW = std::max(wTop, wBot);
+    float naturalH = std::max(hLeft, hRight);
+
+    // Analyze pool table orientation and force 2:1 portrait aspect ratio
+    // Pool tables are 2:1 ratio (length:width). We want to display in portrait mode.
+    // Portrait means height > width, so we want height = 2 * width
+
+    // Determine which dimension represents the "long" side of the table
+    // If naturalW > naturalH, the table is oriented horizontally in the source
+    // If naturalH > naturalW, the table is oriented vertically in the source
+
+    float dstW, dstH;
+    if (naturalW > naturalH) {
+        // Table is horizontal in source -> we need to rotate to portrait
+        // The long dimension (naturalW) becomes our height in portrait mode
+        dstH = naturalW;  // Long dimension becomes height
+        dstW = dstH / 2.0f;  // Width is half of height for 2:1 portrait
+    } else {
+        // Table is vertical in source -> already portrait-ish
+        // The long dimension (naturalH) is our height
+        dstH = naturalH;  // Long dimension is already height
+        dstW = dstH / 2.0f;  // Width is half of height for 2:1 portrait
+    }
     
     // Calculate destination size with padding
     const int baseDstW = static_cast<int>(std::round(dstW)) + 2 * rectifyPadPx;
