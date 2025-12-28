@@ -108,7 +108,6 @@ struct UIControls {
     // Rectification parameters
     float rectifyMarginScale = 1.18f; // Expand source quad by this factor (default 1.18)
     int rectifyPadPx = 40; // Padding in destination space (default 40)
-    bool showRectifyDebug = false; // Show debug overlay for rectification quads
 };
 
 // Defined in `main.cpp`

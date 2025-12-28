@@ -121,7 +121,6 @@ static void saveSettingsToDisk() {
     f << "ui.rectifyExpanded=" << toStringBool(uiControls.rectifyExpanded) << "\n";
     f << "ui.rectifyMarginScale=" << uiControls.rectifyMarginScale << "\n";
     f << "ui.rectifyPadPx=" << uiControls.rectifyPadPx << "\n";
-    f << "ui.showRectifyDebug=" << toStringBool(uiControls.showRectifyDebug) << "\n";
     f << "ui.smoothingPercent=" << uiControls.smoothingPercent << "\n";
 
     // ---- Felt ----
@@ -168,7 +167,6 @@ static void loadSettingsFromDisk() {
         else if (key == "ui.rectifyExpanded") { bool b; if (parseBool(val, b)) uiControls.rectifyExpanded = b; }
         else if (key == "ui.rectifyMarginScale") { float v; if (std::sscanf(val.c_str(), "%f", &v) == 1) uiControls.rectifyMarginScale = std::clamp(v, 1.0f, 1.4f); }
         else if (key == "ui.rectifyPadPx") { int v; if (parseInt(val, v)) uiControls.rectifyPadPx = std::clamp(v, 0, 200); }
-        else if (key == "ui.showRectifyDebug") { bool b; if (parseBool(val, b)) uiControls.showRectifyDebug = b; }
 
         // ---- Felt ----
         else if (key == "felt.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.feltParams.hasPickedColor = b; }
@@ -394,43 +392,14 @@ static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem:
     if (latestAnalysis.rect.ok) {
         // Export live_with_quads.png (live view with debug quads)
         cv::Mat liveWithQuads = processedImage.clone();
-        if (uiControls.showRectifyDebug) {
-            // Draw original felt quad (green)
-            std::vector<cv::Point> feltQuad;
-            for (const auto& pt : latestAnalysis.rect.srcQuad) {
-                feltQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
-            }
-            if (feltQuad.size() == 4) {
-                cv::polylines(liveWithQuads, std::vector<std::vector<cv::Point>>{feltQuad}, true, cv::Scalar(0, 255, 0), 2);
-            }
-            
-            // Draw expanded source quad (yellow)
-            std::vector<cv::Point> expandedQuad;
-            for (const auto& pt : latestAnalysis.rect.expandedSrcQuad) {
-                expandedQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
-            }
-            if (expandedQuad.size() == 4) {
-                cv::polylines(liveWithQuads, std::vector<std::vector<cv::Point>>{expandedQuad}, true, cv::Scalar(0, 255, 255), 2);
-            }
+        // Draw felt corners quad (from felt_detection module) - tied to felt overlay toggle
+        if (uiControls.showFelt) {
+            drawFeltCornersQuad(liveWithQuads, g_lastFeltResult, uiControls.feltParams);
         }
         writeImageChecked(dir / (stem + "-live_with_quads.png"), liveWithQuads);
         
-        // Export rect_with_guides.png (rectified view with debug guides)
+        // Export rect_with_guides.png (rectified view)
         cv::Mat rectWithGuides = latestAnalysis.rect.rectifiedBgr.clone();
-        if (uiControls.showRectifyDebug) {
-            // Draw border rectangle (cyan)
-            cv::Rect borderRect(0, 0, rectWithGuides.cols, rectWithGuides.rows);
-            cv::rectangle(rectWithGuides, borderRect, cv::Scalar(255, 255, 0), 2);
-            
-            // Draw mapped felt quad region (green)
-            std::vector<cv::Point> dstQuadPts;
-            for (const auto& pt : latestAnalysis.rect.dstQuad) {
-                dstQuadPts.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
-            }
-            if (dstQuadPts.size() == 4) {
-                cv::polylines(rectWithGuides, std::vector<std::vector<cv::Point>>{dstQuadPts}, true, cv::Scalar(0, 255, 0), 2);
-            }
-        }
         writeImageChecked(dir / (stem + "-rect_with_guides.png"), rectWithGuides);
     }
 
@@ -1584,131 +1553,38 @@ static cv::Mat buildRectifiedDisplayFrame() {
 
     cv::Mat processed = latestAnalysis.rect.rectifiedBgr.clone();
 
-    // Apply felt mask overlay if enabled
+    // Apply felt mask overlay if enabled (using felt_detection module)
     if (uiControls.showOverlay && uiControls.showFelt && !latestAnalysis.rect.rectifiedFeltMask.empty()) {
-        cv::Mat mask = latestAnalysis.rect.rectifiedFeltMask;
-        if (uiControls.feltParams.isFilled) {
-            cv::Mat overlay = processed.clone();
-            // Create a 3-channel mask for blending
-            std::vector<cv::Mat> maskChannels;
-            cv::split(mask, maskChannels);
-            cv::Mat mask3ch;
-            cv::merge(std::vector<cv::Mat>{maskChannels[0], maskChannels[0], maskChannels[0]}, mask3ch);
-            
-            // Apply color overlay where mask is non-zero
-            overlay.setTo(uiControls.feltParams.color, mask3ch);
-            const double a = std::clamp(uiControls.feltParams.fillAlpha, 0, 255) / 255.0;
-            cv::addWeighted(processed, 1.0 - a, overlay, a, 0, processed);
-            
-            // Draw outline for definition
-            std::vector<std::vector<cv::Point>> contours;
-            cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-            if (!contours.empty()) {
-                cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
-            }
-        } else {
-            // Draw outline only
-            std::vector<std::vector<cv::Point>> contours;
-            cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-            if (!contours.empty()) {
-                cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
-            }
-        }
+        drawFeltOverlayFromMask(processed, latestAnalysis.rect.rectifiedFeltMask, uiControls.feltParams);
     }
 
-    // Draw rectification debug overlay on rectified view
-    if (uiControls.showRectifyDebug && latestAnalysis.rect.ok) {
-        // Transform source quad to rectified space using homography
-        std::vector<cv::Point2f> srcQuadF;
-        for (const auto& pt : latestAnalysis.rect.srcQuad) {
-            srcQuadF.push_back(pt);
+    // Draw felt corners quad on rectified view (transform corners from source to rectified space)
+    if (uiControls.showOverlay && uiControls.showFelt && latestAnalysis.felt.hasCorners && !latestAnalysis.rect.H.empty()) {
+        // Transform felt corners from source space to rectified space using homography
+        std::vector<cv::Point2f> srcCornersF;
+        for (const auto& corner : latestAnalysis.felt.corners) {
+            srcCornersF.push_back(corner);
         }
-        std::vector<cv::Point2f> transformedSrcQuad;
-        if (!srcQuadF.empty() && !latestAnalysis.rect.H.empty()) {
-            cv::perspectiveTransform(srcQuadF, transformedSrcQuad, latestAnalysis.rect.H);
-        }
+        std::vector<cv::Point2f> transformedCorners;
+        cv::perspectiveTransform(srcCornersF, transformedCorners, latestAnalysis.rect.H);
         
-        // Draw source quad in rectified space (cyan)
-        if (transformedSrcQuad.size() == 4) {
-            std::vector<cv::Point> srcQuadPts;
-            for (const auto& pt : transformedSrcQuad) {
-                srcQuadPts.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+        // Draw the quad with darker felt color
+        if (transformedCorners.size() == 4) {
+            std::vector<cv::Point> quadPts;
+            for (const auto& corner : transformedCorners) {
+                quadPts.push_back(cv::Point(static_cast<int>(corner.x), static_cast<int>(corner.y)));
             }
-            cv::polylines(processed, std::vector<std::vector<cv::Point>>{srcQuadPts}, true, cv::Scalar(255, 255, 0), 2); // Cyan
             
-            // Label corner indices (0-3)
-            const char* labels[] = {"0", "1", "2", "3"};
-            for (size_t i = 0; i < 4; ++i) {
-                cv::Point labelPos(static_cast<int>(transformedSrcQuad[i].x) + 10, 
-                                   static_cast<int>(transformedSrcQuad[i].y) - 10);
-                cv::putText(processed, labels[i], labelPos, cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 0), 2);
-            }
-        }
-        
-        // Draw rectified felt edges and check alignment
-        if (!latestAnalysis.rect.rectifiedFeltMask.empty()) {
-            // Find felt contour edges
-            std::vector<std::vector<cv::Point>> contours;
-            cv::findContours(latestAnalysis.rect.rectifiedFeltMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            // Use a darker version of the felt overlay color (multiply each channel by 0.7)
+            cv::Scalar darkerColor(
+                uiControls.feltParams.color[0] * 0.7,
+                uiControls.feltParams.color[1] * 0.7,
+                uiControls.feltParams.color[2] * 0.7
+            );
             
-            if (!contours.empty()) {
-                // Find bounding rect of largest contour
-                auto largestContour = std::max_element(contours.begin(), contours.end(),
-                    [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) {
-                        return cv::contourArea(a) < cv::contourArea(b);
-                    });
-                
-                if (largestContour != contours.end() && !largestContour->empty()) {
-                    cv::Rect bbox = cv::boundingRect(*largestContour);
-                    
-                    // Extract edge points
-                    cv::Point topLeft(bbox.x, bbox.y);
-                    cv::Point topRight(bbox.x + bbox.width, bbox.y);
-                    cv::Point bottomLeft(bbox.x, bbox.y + bbox.height);
-                    cv::Point bottomRight(bbox.x + bbox.width, bbox.y + bbox.height);
-                    
-                    // Draw edges
-                    cv::line(processed, topLeft, topRight, cv::Scalar(0, 255, 0), 2); // Top edge (green)
-                    cv::line(processed, bottomLeft, bottomRight, cv::Scalar(0, 255, 0), 2); // Bottom edge (green)
-                    cv::line(processed, topLeft, bottomLeft, cv::Scalar(255, 0, 255), 2); // Left edge (magenta)
-                    cv::line(processed, topRight, bottomRight, cv::Scalar(255, 0, 255), 2); // Right edge (magenta)
-                    
-                    // Check if edges are near horizontal/vertical
-                    // Top edge: check if near horizontal (dy should be small relative to dx)
-                    float topDx = static_cast<float>(topRight.x - topLeft.x);
-                    float topDy = static_cast<float>(topRight.y - topLeft.y);
-                    float topAngle = std::atan2(std::abs(topDy), std::abs(topDx)) * 180.0f / 3.14159f;
-                    bool topHorizontal = topAngle < 5.0f; // Within 5 degrees of horizontal
-                    
-                    // Bottom edge: check if near horizontal
-                    float botDx = static_cast<float>(bottomRight.x - bottomLeft.x);
-                    float botDy = static_cast<float>(bottomRight.y - bottomLeft.y);
-                    float botAngle = std::atan2(std::abs(botDy), std::abs(botDx)) * 180.0f / 3.14159f;
-                    bool botHorizontal = botAngle < 5.0f;
-                    
-                    // Left edge: check if near vertical (dx should be small relative to dy)
-                    float leftDx = static_cast<float>(bottomLeft.x - topLeft.x);
-                    float leftDy = static_cast<float>(bottomLeft.y - topLeft.y);
-                    float leftAngle = std::atan2(std::abs(leftDx), std::abs(leftDy)) * 180.0f / 3.14159f;
-                    bool leftVertical = leftAngle < 5.0f;
-                    
-                    // Right edge: check if near vertical
-                    float rightDx = static_cast<float>(bottomRight.x - topRight.x);
-                    float rightDy = static_cast<float>(bottomRight.y - topRight.y);
-                    float rightAngle = std::atan2(std::abs(rightDx), std::abs(rightDy)) * 180.0f / 3.14159f;
-                    bool rightVertical = rightAngle < 5.0f;
-                    
-                    // Draw status text
-                    std::string status = "T:" + std::string(topHorizontal ? "H" : "~") + 
-                                        " B:" + std::string(botHorizontal ? "H" : "~") +
-                                        " L:" + std::string(leftVertical ? "V" : "~") +
-                                        " R:" + std::string(rightVertical ? "V" : "~");
-                    cv::putText(processed, status, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
-                }
-            }
+            cv::polylines(processed, std::vector<std::vector<cv::Point>>{quadPts}, true, darkerColor, 2);
         }
     }
-
 
     return processed;
 }
@@ -1981,43 +1857,14 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     // Felt detection - always run for rectification, regardless of showFelt toggle
     // showFelt only controls whether the overlay is displayed
     g_lastFeltResult = detectFelt(currentFrame, uiControls.feltParams);
-    std::vector<cv::Point> feltContour = g_lastFeltResult.contour;
 
-    // Draw rectification debug overlay on live view
-    if (uiControls.showRectifyDebug && latestAnalysis.rect.ok) {
-        // Draw original felt quad (green)
-        std::vector<cv::Point> feltQuad;
-        for (const auto& pt : latestAnalysis.rect.srcQuad) {
-            feltQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
-        }
-        if (feltQuad.size() == 4) {
-            cv::polylines(processed, std::vector<std::vector<cv::Point>>{feltQuad}, true, cv::Scalar(0, 255, 0), 2); // Green
-        }
-        
-        // Draw expanded source quad (yellow)
-        std::vector<cv::Point> expandedQuad;
-        for (const auto& pt : latestAnalysis.rect.expandedSrcQuad) {
-            expandedQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
-        }
-        if (expandedQuad.size() == 4) {
-            cv::polylines(processed, std::vector<std::vector<cv::Point>>{expandedQuad}, true, cv::Scalar(0, 255, 255), 2); // Yellow
-        }
-    }
 
     if (uiControls.showOverlay) {
-        // Apply felt overlay only if showFelt is enabled
-        if (uiControls.showFelt && !feltContour.empty()) {
-            std::vector<std::vector<cv::Point>> contours{feltContour};
-            if (uiControls.feltParams.isFilled) {
-                cv::Mat overlay = processed.clone();
-                cv::fillPoly(overlay, contours, uiControls.feltParams.color);
-                const double a = std::clamp(uiControls.feltParams.fillAlpha, 0, 255) / 255.0;
-                cv::addWeighted(processed, 1.0 - a, overlay, a, 0, processed);
-                // Outline for definition
-                cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
-            } else {
-                cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
-            }
+        // Apply felt overlay only if showFelt is enabled (using felt_detection module)
+        if (uiControls.showFelt) {
+            drawFeltOverlay(processed, g_lastFeltResult, uiControls.feltParams);
+            // Draw felt corners quad (from felt_detection module) - darker version of felt color
+            drawFeltCornersQuad(processed, g_lastFeltResult, uiControls.feltParams);
         }
     }
 
@@ -2249,12 +2096,10 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             // Debug sidebar checkboxes (IDs match defines below: 30200..30203)
             const int kIdOverlayMaster = 30200;
             const int kIdOverlayFelt = 30202;
-            const int kIdRectifyDebug = 30250;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayFelt || id == kIdRectifyDebug)) {
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayFelt)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
-                else if (id == kIdRectifyDebug) uiControls.showRectifyDebug = isChecked;
                 saveSettingsToDisk();  // Save settings immediately when overlay toggles change
                 return 0;
             }
@@ -2615,7 +2460,6 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_FELT_THICKNESS (IDC_TRACKBAR_BASE + 71)
 #define IDC_RECTIFY_MARGIN_SCALE (IDC_TRACKBAR_BASE + 90)
 #define IDC_RECTIFY_PAD_PX (IDC_TRACKBAR_BASE + 91)
-#define IDC_RECTIFY_DEBUG_CB (IDC_BUTTON_BASE + 250)
 
 // Global tuning trackbars
 #define IDC_SMOOTHING (IDC_TRACKBAR_BASE + 95)
@@ -2861,21 +2705,10 @@ int legacyHighGuiMain(int argc, char** argv) {
         // Apply overlays only if master overlay toggle is enabled
         // Master toggle acts as a gate - individual toggles control what's shown
         if (uiControls.showOverlay) {
-            // Apply felt detection overlay if enabled
+            // Apply felt detection overlay if enabled (using felt_detection module)
             if (uiControls.showFelt) {
                 FeltDetectionResult feltResult = detectFelt(currentFrame, uiControls.feltParams);
-                if (!feltResult.contour.empty()) {
-                    std::vector<std::vector<cv::Point>> contours;
-                    contours.push_back(feltResult.contour);
-                    cv::drawContours(processedImage, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
-                    
-                    if (uiControls.feltParams.isFilled) {
-                        cv::Mat overlay = processedImage.clone();
-                        cv::fillPoly(overlay, contours, uiControls.feltParams.color);
-                        const double a = std::clamp(uiControls.feltParams.fillAlpha, 0, 255) / 255.0;
-                        cv::addWeighted(processedImage, 1.0 - a, overlay, a, 0, processedImage);
-                    }
-                }
+                drawFeltOverlay(processedImage, feltResult, uiControls.feltParams);
             }
         }
         
@@ -3449,15 +3282,6 @@ void createSidebarControls(HWND hwnd) {
                     yPos += lineHeight + gap;
                 }
 
-                // Debug overlay checkbox
-                {
-                    HWND hDebug = CreateWindowW(L"BUTTON", L"Show Debug", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
-                                                xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
-                                                (HMENU)(INT_PTR)IDC_RECTIFY_DEBUG_CB, NULL, NULL);
-                    applyFont(hDebug, false);
-                    SendMessage(hDebug, BM_SETCHECK, uiControls.showRectifyDebug ? BST_CHECKED : BST_UNCHECKED, 0);
-                    yPos += lineHeight + gap;
-                }
             } // End of rectifyExpanded block
         }
 

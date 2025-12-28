@@ -19,7 +19,6 @@ add_executable(table_detector
     src/main.cpp
     src/FeltDetection/felt_detection.cpp
     src/Rectification/rectification.cpp
-    src/RailsDetection/rails_detection.cpp
 )
 
 # Set Windows subsystem to prevent console window

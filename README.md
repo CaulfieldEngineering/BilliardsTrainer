@@ -1,25 +1,10 @@
-# To Buld
+# To Build
 cd C:\Users\jpcfo\Documents\_GitHub\_CaulfieldEngineering\BilliardsTrainer\build; cmake --build . --config Release
 
 
 # To-Do
-## Table Setup & Table Detection
-- Flow to "setting up table"
-  
-1) Felt Dection
-   - User picks color (sensitivity slider)
-2) Rail Detection
-   - User picks color (sensitivity slider)
-  
-   - Rudimentary success
-   - Uses Felt Detection to subtract felt
-3) Diamond Detection
-   - Uses Rail detection bounds to know where to look
-
-* TBD
-- Grid Extrapolation of Diamonds
-- Playing Field Definition based on Felt
-- Detection / Overlay of pockets
+- Clean up Main ... too large.
+- Move Yellow quad into felt_detection (from Main)
 
 # Billiards Trainer - Table Detection Proof of Concept
 

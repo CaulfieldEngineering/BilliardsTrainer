@@ -317,7 +317,7 @@ cv::Mat drawFeltDebug(const cv::Mat& bgr, const FeltDetectionResult& result) {
     maskOverlay.setTo(cv::Scalar(0, 255, 0), result.feltMask);
     cv::addWeighted(debug, 0.7, maskOverlay, 0.3, 0, debug);
 
-    // Draw yellow quad if corners are available
+    // Draw quad if corners are available (using default green color for debug view)
     if (result.hasCorners) {
         std::vector<cv::Point> quadPts;
         for (const auto& corner : result.corners) {
@@ -327,6 +327,84 @@ cv::Mat drawFeltDebug(const cv::Mat& bgr, const FeltDetectionResult& result) {
     }
 
     return debug;
+}
+
+// Draw felt overlay on an image (in-place modification)
+// Applies the felt contour overlay with styling from params
+void drawFeltOverlay(cv::Mat& img, const FeltDetectionResult& result, const FeltParams& params) {
+    if (result.contour.empty()) {
+        return;
+    }
+    
+    std::vector<std::vector<cv::Point>> contours{result.contour};
+    
+    if (params.isFilled) {
+        cv::Mat overlay = img.clone();
+        cv::fillPoly(overlay, contours, params.color);
+        const double a = std::clamp(params.fillAlpha, 0, 255) / 255.0;
+        cv::addWeighted(img, 1.0 - a, overlay, a, 0, img);
+        // Outline for definition
+        cv::drawContours(img, contours, -1, params.color, std::max(1, params.outlineThicknessPx));
+    } else {
+        cv::drawContours(img, contours, -1, params.color, std::max(1, params.outlineThicknessPx));
+    }
+}
+
+// Draw felt overlay from a mask (in-place modification)
+// Applies the felt mask overlay with styling from params
+void drawFeltOverlayFromMask(cv::Mat& img, const cv::Mat& feltMask, const FeltParams& params) {
+    if (feltMask.empty()) {
+        return;
+    }
+    
+    if (params.isFilled) {
+        cv::Mat overlay = img.clone();
+        // Create a 3-channel mask for blending
+        std::vector<cv::Mat> maskChannels;
+        cv::split(feltMask, maskChannels);
+        cv::Mat mask3ch;
+        cv::merge(std::vector<cv::Mat>{maskChannels[0], maskChannels[0], maskChannels[0]}, mask3ch);
+        
+        // Apply color overlay where mask is non-zero
+        overlay.setTo(params.color, mask3ch);
+        const double a = std::clamp(params.fillAlpha, 0, 255) / 255.0;
+        cv::addWeighted(img, 1.0 - a, overlay, a, 0, img);
+        
+        // Draw outline for definition
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(feltMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        if (!contours.empty()) {
+            cv::drawContours(img, contours, -1, params.color, std::max(1, params.outlineThicknessPx));
+        }
+    } else {
+        // Draw outline only
+        std::vector<std::vector<cv::Point>> contours;
+        cv::findContours(feltMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+        if (!contours.empty()) {
+            cv::drawContours(img, contours, -1, params.color, std::max(1, params.outlineThicknessPx));
+        }
+    }
+}
+
+// Draw felt corners quad on an image (in-place modification)
+// This draws the quad that hugs the felt table corners (tightest path around felt)
+// Uses a darker version of the felt overlay color
+void drawFeltCornersQuad(cv::Mat& img, const FeltDetectionResult& result, const FeltParams& params) {
+    if (result.hasCorners) {
+        std::vector<cv::Point> quadPts;
+        for (const auto& corner : result.corners) {
+            quadPts.push_back(cv::Point(static_cast<int>(corner.x), static_cast<int>(corner.y)));
+        }
+        
+        // Use a darker version of the felt overlay color (multiply each channel by 0.7)
+        cv::Scalar darkerColor(
+            params.color[0] * 0.7,
+            params.color[1] * 0.7,
+            params.color[2] * 0.7
+        );
+        
+        cv::polylines(img, std::vector<std::vector<cv::Point>>{quadPts}, true, darkerColor, 2);
+    }
 }
 
 // Wrapper functions for backward compatibility

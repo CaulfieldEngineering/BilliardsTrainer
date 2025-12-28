@@ -58,6 +58,19 @@ FeltDetectionResult detectFelt(const cv::Mat& bgr, const FeltParams& params);
 // Debug visualization function - draws mask overlay, contour, corners, and bbox
 cv::Mat drawFeltDebug(const cv::Mat& bgr, const FeltDetectionResult& result);
 
+// Draw felt overlay on an image (in-place modification)
+// Applies the felt contour overlay with styling from params
+void drawFeltOverlay(cv::Mat& img, const FeltDetectionResult& result, const FeltParams& params);
+
+// Draw felt overlay from a mask (in-place modification)
+// Applies the felt mask overlay with styling from params
+void drawFeltOverlayFromMask(cv::Mat& img, const cv::Mat& feltMask, const FeltParams& params);
+
+// Draw felt corners quad on an image (in-place modification)
+// This draws the quad that hugs the felt table corners (tightest path around felt)
+// Uses a darker version of the felt overlay color
+void drawFeltCornersQuad(cv::Mat& img, const FeltDetectionResult& result, const FeltParams& params);
+
 // Detect the felt/table surface (blue or green)
 // Returns the bounding rectangle
 cv::Rect detectFeltArea(const cv::Mat& src);
