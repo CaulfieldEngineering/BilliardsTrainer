@@ -3,6 +3,7 @@
 #include <fstream> // std::ifstream/std::ofstream
 #include <cctype>  // std::isspace
 #include <cstdio>  // std::sscanf
+#include <cstring> // std::memcpy
 
 // Define global UI state (declared as `extern` in `main.h`)
 UIControls uiControls{};
@@ -115,36 +116,13 @@ static void saveSettingsToDisk() {
     // ---- UIControls ----
     f << "ui.selectedSource=" << uiControls.selectedSource << "\n";
     f << "ui.showOverlay=" << toStringBool(uiControls.showOverlay) << "\n";
-    f << "ui.showDiamonds=" << toStringBool(uiControls.showDiamonds) << "\n";
     f << "ui.showFelt=" << toStringBool(uiControls.showFelt) << "\n";
-    f << "ui.showRail=" << toStringBool(uiControls.showRail) << "\n";
+    f << "ui.feltExpanded=" << toStringBool(uiControls.feltExpanded) << "\n";
+    f << "ui.rectifyExpanded=" << toStringBool(uiControls.rectifyExpanded) << "\n";
+    f << "ui.rectifyMarginScale=" << uiControls.rectifyMarginScale << "\n";
+    f << "ui.rectifyPadPx=" << uiControls.rectifyPadPx << "\n";
+    f << "ui.showRectifyDebug=" << toStringBool(uiControls.showRectifyDebug) << "\n";
     f << "ui.smoothingPercent=" << uiControls.smoothingPercent << "\n";
-
-    // ---- Diamonds ----
-    const auto& d = uiControls.diamondParams;
-    f << "diamond.min_threshold=" << d.min_threshold << "\n";
-    f << "diamond.minArea=" << d.minArea << "\n";
-    f << "diamond.maxArea=" << d.maxArea << "\n";
-    f << "diamond.min_circularity=" << d.min_circularity << "\n";
-    f << "diamond.morph_kernel_size=" << d.morph_kernel_size << "\n";
-    f << "diamond.skip_morph_enhancement=" << toStringBool(d.skip_morph_enhancement) << "\n";
-    f << "diamond.adaptive_thresh_blocksize=" << d.adaptive_thresh_blocksize << "\n";
-    f << "diamond.adaptive_thresh_C=" << d.adaptive_thresh_C << "\n";
-    f << "diamond.hasPickedColor=" << toStringBool(d.hasPickedColor) << "\n";
-    f << "diamond.pickedHSV=" << toStringVec3b(d.pickedHSV) << "\n";
-    f << "diamond.pickedBGR=" << toStringVec3b(d.pickedBGR) << "\n";
-    f << "diamond.colorSensitivity=" << d.colorSensitivity << "\n";
-    f << "diamond.colorHMin=" << d.colorHMin << "\n";
-    f << "diamond.colorHMax=" << d.colorHMax << "\n";
-    f << "diamond.colorSMin=" << d.colorSMin << "\n";
-    f << "diamond.colorSMax=" << d.colorSMax << "\n";
-    f << "diamond.colorVMin=" << d.colorVMin << "\n";
-    f << "diamond.colorVMax=" << d.colorVMax << "\n";
-    f << "diamond.overlayColor=" << toStringScalarBgr(d.color) << "\n";
-    f << "diamond.alpha=" << d.alpha << "\n";
-    f << "diamond.isFilled=" << toStringBool(d.isFilled) << "\n";
-    f << "diamond.radiusPx=" << d.radiusPx << "\n";
-    f << "diamond.outlineThicknessPx=" << d.outlineThicknessPx << "\n";
 
     // ---- Felt ----
     const auto& fp = uiControls.feltParams;
@@ -162,17 +140,6 @@ static void saveSettingsToDisk() {
     f << "felt.isFilled=" << toStringBool(fp.isFilled) << "\n";
     f << "felt.fillAlpha=" << fp.fillAlpha << "\n";
     f << "felt.outlineThicknessPx=" << fp.outlineThicknessPx << "\n";
-
-    // ---- Rails ----
-    const auto& rp = uiControls.railParams;
-    f << "rail.blackVMax=" << rp.blackVMax << "\n";
-    f << "rail.brownHMax=" << rp.brownHMax << "\n";
-    f << "rail.brownSMax=" << rp.brownSMax << "\n";
-    f << "rail.brownVMax=" << rp.brownVMax << "\n";
-    f << "rail.overlayColor=" << toStringScalarBgr(rp.color) << "\n";
-    f << "rail.isFilled=" << toStringBool(rp.isFilled) << "\n";
-    f << "rail.fillAlpha=" << rp.fillAlpha << "\n";
-    f << "rail.outlineThicknessPx=" << rp.outlineThicknessPx << "\n";
 }
 
 static void loadSettingsFromDisk() {
@@ -195,35 +162,13 @@ static void loadSettingsFromDisk() {
         // ---- UIControls ----
         if (key == "ui.selectedSource") { int v; if (parseInt(val, v)) uiControls.selectedSource = v; }
         else if (key == "ui.showOverlay") { bool b; if (parseBool(val, b)) uiControls.showOverlay = b; }
-        else if (key == "ui.showDiamonds") { bool b; if (parseBool(val, b)) uiControls.showDiamonds = b; }
         else if (key == "ui.showFelt") { bool b; if (parseBool(val, b)) uiControls.showFelt = b; }
-        else if (key == "ui.showRail") { bool b; if (parseBool(val, b)) uiControls.showRail = b; }
         else if (key == "ui.smoothingPercent") { int v; if (parseInt(val, v)) uiControls.smoothingPercent = std::clamp(v, 0, 100); }
-
-        // ---- Diamonds ----
-        else if (key == "diamond.min_threshold") { int v; if (parseInt(val, v)) uiControls.diamondParams.min_threshold = v; }
-        else if (key == "diamond.minArea") { int v; if (parseInt(val, v)) uiControls.diamondParams.minArea = v; }
-        else if (key == "diamond.maxArea") { int v; if (parseInt(val, v)) uiControls.diamondParams.maxArea = v; }
-        else if (key == "diamond.min_circularity") { float x; if (parseFloat(val, x)) uiControls.diamondParams.min_circularity = std::clamp(x, 0.0f, 1.0f); }
-        else if (key == "diamond.morph_kernel_size") { int v; if (parseInt(val, v)) uiControls.diamondParams.morph_kernel_size = v; }
-        else if (key == "diamond.skip_morph_enhancement") { bool b; if (parseBool(val, b)) uiControls.diamondParams.skip_morph_enhancement = b; }
-        else if (key == "diamond.adaptive_thresh_blocksize") { int v; if (parseInt(val, v)) uiControls.diamondParams.adaptive_thresh_blocksize = v; }
-        else if (key == "diamond.adaptive_thresh_C") { int v; if (parseInt(val, v)) uiControls.diamondParams.adaptive_thresh_C = v; }
-        else if (key == "diamond.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.diamondParams.hasPickedColor = b; }
-        else if (key == "diamond.pickedHSV") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.diamondParams.pickedHSV = vv; }
-        else if (key == "diamond.pickedBGR") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.diamondParams.pickedBGR = vv; }
-        else if (key == "diamond.colorSensitivity") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSensitivity = std::clamp(v, 0, 100); }
-        else if (key == "diamond.colorHMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorHMin = std::clamp(v, 0, 180); }
-        else if (key == "diamond.colorHMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorHMax = std::clamp(v, 0, 180); }
-        else if (key == "diamond.colorSMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSMin = std::clamp(v, 0, 255); }
-        else if (key == "diamond.colorSMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSMax = std::clamp(v, 0, 255); }
-        else if (key == "diamond.colorVMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorVMin = std::clamp(v, 0, 255); }
-        else if (key == "diamond.colorVMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorVMax = std::clamp(v, 0, 255); }
-        else if (key == "diamond.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.diamondParams.color = c; }
-        else if (key == "diamond.alpha") { int v; if (parseInt(val, v)) uiControls.diamondParams.alpha = std::clamp(v, 0, 255); }
-        else if (key == "diamond.isFilled") { bool b; if (parseBool(val, b)) uiControls.diamondParams.isFilled = b; }
-        else if (key == "diamond.radiusPx") { int v; if (parseInt(val, v)) uiControls.diamondParams.radiusPx = std::max(1, v); }
-        else if (key == "diamond.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.diamondParams.outlineThicknessPx = std::max(1, v); }
+        else if (key == "ui.feltExpanded") { bool b; if (parseBool(val, b)) uiControls.feltExpanded = b; }
+        else if (key == "ui.rectifyExpanded") { bool b; if (parseBool(val, b)) uiControls.rectifyExpanded = b; }
+        else if (key == "ui.rectifyMarginScale") { float v; if (std::sscanf(val.c_str(), "%f", &v) == 1) uiControls.rectifyMarginScale = std::clamp(v, 1.0f, 1.4f); }
+        else if (key == "ui.rectifyPadPx") { int v; if (parseInt(val, v)) uiControls.rectifyPadPx = std::clamp(v, 0, 200); }
+        else if (key == "ui.showRectifyDebug") { bool b; if (parseBool(val, b)) uiControls.showRectifyDebug = b; }
 
         // ---- Felt ----
         else if (key == "felt.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.feltParams.hasPickedColor = b; }
@@ -240,16 +185,6 @@ static void loadSettingsFromDisk() {
         else if (key == "felt.isFilled") { bool b; if (parseBool(val, b)) uiControls.feltParams.isFilled = b; }
         else if (key == "felt.fillAlpha") { int v; if (parseInt(val, v)) uiControls.feltParams.fillAlpha = std::clamp(v, 0, 255); }
         else if (key == "felt.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.feltParams.outlineThicknessPx = std::max(1, v); }
-
-        // ---- Rails ----
-        else if (key == "rail.blackVMax") { int v; if (parseInt(val, v)) uiControls.railParams.blackVMax = std::clamp(v, 0, 255); }
-        else if (key == "rail.brownHMax") { int v; if (parseInt(val, v)) uiControls.railParams.brownHMax = std::clamp(v, 0, 180); }
-        else if (key == "rail.brownSMax") { int v; if (parseInt(val, v)) uiControls.railParams.brownSMax = std::clamp(v, 0, 255); }
-        else if (key == "rail.brownVMax") { int v; if (parseInt(val, v)) uiControls.railParams.brownVMax = std::clamp(v, 0, 255); }
-        else if (key == "rail.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.railParams.color = c; }
-        else if (key == "rail.isFilled") { bool b; if (parseBool(val, b)) uiControls.railParams.isFilled = b; }
-        else if (key == "rail.fillAlpha") { int v; if (parseInt(val, v)) uiControls.railParams.fillAlpha = std::clamp(v, 0, 255); }
-        else if (key == "rail.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.railParams.outlineThicknessPx = std::max(1, v); }
     }
 }
 
@@ -258,6 +193,9 @@ static cv::Mat g_lastProcessedFrame;
 static cv::Mat g_lastSourceFrame;  // Original unscaled source frame for color picking
 static FeltDetectionResult g_lastFeltResult;  // Last felt detection result for export
 static int g_lastFrameIndex = -1;  // Last processed frame index (for video)
+
+// Latest frame analysis (accessible to UI and exporter)
+FrameAnalysis latestAnalysis;
 
 
 // Choose a deterministic capture directory.
@@ -274,6 +212,85 @@ static std::filesystem::path getCaptureDirectory() {
 #endif
     // Fallback: current working directory.
     return std::filesystem::current_path() / "captures";
+}
+
+// Forward declaration
+extern HWND g_hwnd;
+
+// Capture the entire application window as a screenshot
+static cv::Mat captureWindowScreenshot(HWND hwnd) {
+    if (!hwnd || !IsWindow(hwnd)) {
+        return cv::Mat();
+    }
+
+    RECT windowRect;
+    if (!GetWindowRect(hwnd, &windowRect)) {
+        return cv::Mat();
+    }
+
+    const int width = windowRect.right - windowRect.left;
+    const int height = windowRect.bottom - windowRect.top;
+    if (width <= 0 || height <= 0) {
+        return cv::Mat();
+    }
+
+    // Create device contexts
+    HDC hdcScreen = GetDC(NULL);
+    HDC hdcMem = CreateCompatibleDC(hdcScreen);
+    HBITMAP hBitmap = CreateCompatibleBitmap(hdcScreen, width, height);
+    HGDIOBJ hOldBitmap = SelectObject(hdcMem, hBitmap);
+
+    // Capture the full window including title bar and borders
+    // Try PrintWindow first (better color handling), fallback to BitBlt
+    BOOL printResult = PrintWindow(hwnd, hdcMem, 0);
+    if (!printResult) {
+        // Fallback: use BitBlt to copy directly from screen coordinates
+        BitBlt(hdcMem, 0, 0, width, height, hdcScreen, windowRect.left, windowRect.top, SRCCOPY);
+    }
+
+    // Get bitmap info - use 24-bit RGB format
+    BITMAPINFO bmpInfo = {};
+    bmpInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmpInfo.bmiHeader.biWidth = width;
+    bmpInfo.bmiHeader.biHeight = -height; // Negative for top-down DIB
+    bmpInfo.bmiHeader.biPlanes = 1;
+    bmpInfo.bmiHeader.biBitCount = 24; // RGB (24-bit)
+    bmpInfo.bmiHeader.biCompression = BI_RGB;
+
+    // Allocate buffer for RGB data (DIB_RGB_COLORS returns RGB, not BGR)
+    const int stride = ((width * 3 + 3) / 4) * 4; // Align to 4 bytes
+    std::vector<unsigned char> rgbData(stride * height);
+
+    // Get the bitmap bits - read raw bitmap format (BGR) without DIB_RGB_COLORS conversion
+    // This should give us the bitmap in its native BGR format
+    if (GetDIBits(hdcMem, hBitmap, 0, height, rgbData.data(), &bmpInfo, 0)) {
+        // Create OpenCV Mat - copy data handling stride differences
+        // Bitmap data is already in BGR format, so direct copy
+        cv::Mat bgrMat(height, width, CV_8UC3);
+        const int dstStride = bgrMat.step;
+        for (int y = 0; y < height; ++y) {
+            const unsigned char* src = rgbData.data() + y * stride;
+            unsigned char* dst = bgrMat.data + y * dstStride;
+            // Direct copy - bitmap is already BGR format
+            std::memcpy(dst, src, width * 3);
+        }
+
+        // Cleanup
+        SelectObject(hdcMem, hOldBitmap);
+        DeleteObject(hBitmap);
+        DeleteDC(hdcMem);
+        ReleaseDC(NULL, hdcScreen);
+
+        return bgrMat;
+    }
+
+    // Cleanup on failure
+    SelectObject(hdcMem, hOldBitmap);
+    DeleteObject(hBitmap);
+    DeleteDC(hdcMem);
+    ReleaseDC(NULL, hdcScreen);
+
+    return cv::Mat();
 }
 
 // Export the current overlay + diamond intermediate buffers to disk.
@@ -344,8 +361,86 @@ static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem:
         attempts.push_back(std::move(a));
     };
 
-    // Always attempt overlay first.
+    // Always attempt overlay first (live view with overlays).
     writeImageChecked(dir / (stem + "-overlay.png"), processedImage);
+
+    // Export rectified image if available
+    if (latestAnalysis.rect.ok && !latestAnalysis.rect.rectifiedBgr.empty()) {
+        cv::Mat rectifiedWithOverlay = latestAnalysis.rect.rectifiedBgr.clone();
+        
+        // Apply felt mask overlay if enabled
+        if (uiControls.showOverlay && uiControls.showFelt && !latestAnalysis.rect.rectifiedFeltMask.empty()) {
+            cv::Mat mask = latestAnalysis.rect.rectifiedFeltMask;
+            if (uiControls.feltParams.isFilled) {
+                cv::Mat overlay = rectifiedWithOverlay.clone();
+                // Create a 3-channel mask for blending
+                std::vector<cv::Mat> maskChannels;
+                cv::split(mask, maskChannels);
+                cv::Mat mask3ch;
+                cv::merge(std::vector<cv::Mat>{maskChannels[0], maskChannels[0], maskChannels[0]}, mask3ch);
+                
+                // Apply color overlay where mask is non-zero
+                overlay.setTo(uiControls.feltParams.color, mask3ch);
+                const double a = std::clamp(uiControls.feltParams.fillAlpha, 0, 255) / 255.0;
+                cv::addWeighted(rectifiedWithOverlay, 1.0 - a, overlay, a, 0, rectifiedWithOverlay);
+            }
+        }
+        
+        writeImageChecked(dir / (stem + "-rect.png"), rectifiedWithOverlay);
+    }
+
+
+    // Export rectification debug images
+    if (latestAnalysis.rect.ok) {
+        // Export live_with_quads.png (live view with debug quads)
+        cv::Mat liveWithQuads = processedImage.clone();
+        if (uiControls.showRectifyDebug) {
+            // Draw original felt quad (green)
+            std::vector<cv::Point> feltQuad;
+            for (const auto& pt : latestAnalysis.rect.srcQuad) {
+                feltQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+            }
+            if (feltQuad.size() == 4) {
+                cv::polylines(liveWithQuads, std::vector<std::vector<cv::Point>>{feltQuad}, true, cv::Scalar(0, 255, 0), 2);
+            }
+            
+            // Draw expanded source quad (yellow)
+            std::vector<cv::Point> expandedQuad;
+            for (const auto& pt : latestAnalysis.rect.expandedSrcQuad) {
+                expandedQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+            }
+            if (expandedQuad.size() == 4) {
+                cv::polylines(liveWithQuads, std::vector<std::vector<cv::Point>>{expandedQuad}, true, cv::Scalar(0, 255, 255), 2);
+            }
+        }
+        writeImageChecked(dir / (stem + "-live_with_quads.png"), liveWithQuads);
+        
+        // Export rect_with_guides.png (rectified view with debug guides)
+        cv::Mat rectWithGuides = latestAnalysis.rect.rectifiedBgr.clone();
+        if (uiControls.showRectifyDebug) {
+            // Draw border rectangle (cyan)
+            cv::Rect borderRect(0, 0, rectWithGuides.cols, rectWithGuides.rows);
+            cv::rectangle(rectWithGuides, borderRect, cv::Scalar(255, 255, 0), 2);
+            
+            // Draw mapped felt quad region (green)
+            std::vector<cv::Point> dstQuadPts;
+            for (const auto& pt : latestAnalysis.rect.dstQuad) {
+                dstQuadPts.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+            }
+            if (dstQuadPts.size() == 4) {
+                cv::polylines(rectWithGuides, std::vector<std::vector<cv::Point>>{dstQuadPts}, true, cv::Scalar(0, 255, 0), 2);
+            }
+        }
+        writeImageChecked(dir / (stem + "-rect_with_guides.png"), rectWithGuides);
+    }
+
+    // Export full window screenshot
+    if (g_hwnd) {
+        cv::Mat windowScreenshot = captureWindowScreenshot(g_hwnd);
+        if (!windowScreenshot.empty()) {
+            writeImageChecked(dir / (stem + "-window.png"), windowScreenshot);
+        }
+    }
 
     // Write felt detection telemetry JSON sidecar
     {
@@ -390,6 +485,87 @@ static bool exportCapturesToDisk(const cv::Mat& processedImage, std::filesystem:
                 jsonFile << "      \"VMin\":" << uiControls.feltParams.colorVMin << ",\n";
                 jsonFile << "      \"VMax\":" << uiControls.feltParams.colorVMax << "\n";
                 jsonFile << "    }\n";
+                jsonFile << "  },\n";
+                
+                // Rectification data
+                jsonFile << "  \"rectification\": {\n";
+                jsonFile << "    \"ok\": " << (latestAnalysis.rect.ok ? "true" : "false") << ",\n";
+                jsonFile << "    \"rectifyMarginScale\": " << uiControls.rectifyMarginScale << ",\n";
+                jsonFile << "    \"rectifyPadPx\": " << uiControls.rectifyPadPx << ",\n";
+                if (latestAnalysis.rect.ok) {
+                    jsonFile << "    \"dstSize\": {\"w\":" << latestAnalysis.rect.dstSize.width 
+                             << ",\"h\":" << latestAnalysis.rect.dstSize.height << "},\n";
+                    
+                    // Source quad (original felt corners)
+                    jsonFile << "    \"srcQuad\": [\n";
+                    for (int i = 0; i < 4; ++i) {
+                        jsonFile << "      {\"x\":" << latestAnalysis.rect.srcQuad[i].x 
+                                 << ",\"y\":" << latestAnalysis.rect.srcQuad[i].y << "}";
+                        if (i < 3) jsonFile << ",";
+                        jsonFile << "\n";
+                    }
+                    jsonFile << "    ],\n";
+                    
+                    // Expanded source quad
+                    jsonFile << "    \"expandedSrcQuad\": [\n";
+                    for (int i = 0; i < 4; ++i) {
+                        jsonFile << "      {\"x\":" << latestAnalysis.rect.expandedSrcQuad[i].x 
+                                 << ",\"y\":" << latestAnalysis.rect.expandedSrcQuad[i].y << "}";
+                        if (i < 3) jsonFile << ",";
+                        jsonFile << "\n";
+                    }
+                    jsonFile << "    ],\n";
+                    
+                    // Destination quad
+                    jsonFile << "    \"dstQuad\": [\n";
+                    for (int i = 0; i < 4; ++i) {
+                        jsonFile << "      {\"x\":" << latestAnalysis.rect.dstQuad[i].x 
+                                 << ",\"y\":" << latestAnalysis.rect.dstQuad[i].y << "}";
+                        if (i < 3) jsonFile << ",";
+                        jsonFile << "\n";
+                    }
+                    jsonFile << "    ],\n";
+                    
+                    // Write homography matrix H
+                    if (!latestAnalysis.rect.H.empty() && latestAnalysis.rect.H.rows == 3 && latestAnalysis.rect.H.cols == 3) {
+                        jsonFile << "    \"H\": [\n";
+                        for (int i = 0; i < 3; ++i) {
+                            jsonFile << "      [";
+                            for (int j = 0; j < 3; ++j) {
+                                jsonFile << latestAnalysis.rect.H.at<double>(i, j);
+                                if (j < 2) jsonFile << ",";
+                            }
+                            jsonFile << "]";
+                            if (i < 2) jsonFile << ",";
+                            jsonFile << "\n";
+                        }
+                        jsonFile << "    ],\n";
+                    } else {
+                        jsonFile << "    \"H\": null,\n";
+                    }
+                    
+                    // Write inverse homography matrix Hinv
+                    if (!latestAnalysis.rect.Hinv.empty() && latestAnalysis.rect.Hinv.rows == 3 && latestAnalysis.rect.Hinv.cols == 3) {
+                        jsonFile << "    \"Hinv\": [\n";
+                        for (int i = 0; i < 3; ++i) {
+                            jsonFile << "      [";
+                            for (int j = 0; j < 3; ++j) {
+                                jsonFile << latestAnalysis.rect.Hinv.at<double>(i, j);
+                                if (j < 2) jsonFile << ",";
+                            }
+                            jsonFile << "]";
+                            if (i < 2) jsonFile << ",";
+                            jsonFile << "\n";
+                        }
+                        jsonFile << "    ]\n";
+                    } else {
+                        jsonFile << "    \"Hinv\": null\n";
+                    }
+                } else {
+                    jsonFile << "    \"dstSize\": null,\n";
+                    jsonFile << "    \"H\": null,\n";
+                    jsonFile << "    \"Hinv\": null\n";
+                }
                 jsonFile << "  }\n";
                 jsonFile << "}\n";
                 jsonFile.close();
@@ -492,7 +668,10 @@ std::vector<int> g_availableCameras;
 #define IDC_FELT_COLOR_PICKER_RANGE 10062
 #define IDC_FELT_COLOR_PICKER_SWATCH 10065
 
+#define IDC_COMBO_BASE 40000
+
 static HWND g_imageViewHwnd = NULL;
+static HWND g_rectifiedViewHwnd = NULL;  // Second viewport for top-down rectified view
 static HWND g_zoomWindowHwnd = NULL;  // Zoom window for color picker
 static HBRUSH g_imageBgBrush = NULL;
 static HBRUSH g_sidebarBgBrush = NULL;
@@ -555,6 +734,7 @@ struct ImageDibBuffer {
 };
 
 static ImageDibBuffer g_imageDib;
+static ImageDibBuffer g_rectifiedDib;  // DIB buffer for rectified view
 
 // App data sources
 static cv::Mat g_testImage;
@@ -1079,6 +1259,35 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
     }
 }
 
+// Helper function to calculate aspect-ratio-preserving scaled image bounds
+static void calculateScaledImageBounds(int imageW, int imageH, int viewportW, int viewportH,
+                                        int& outScaledW, int& outScaledH, int& outOffsetX, int& outOffsetY) {
+    if (imageW <= 0 || imageH <= 0 || viewportW <= 0 || viewportH <= 0) {
+        outScaledW = 0;
+        outScaledH = 0;
+        outOffsetX = 0;
+        outOffsetY = 0;
+        return;
+    }
+
+    const double imageAspect = static_cast<double>(imageW) / static_cast<double>(imageH);
+    const double viewportAspect = static_cast<double>(viewportW) / static_cast<double>(viewportH);
+    
+    if (imageAspect > viewportAspect) {
+        // Image is wider - fit to width, letterbox top/bottom
+        outScaledW = viewportW;
+        outScaledH = static_cast<int>(viewportW / imageAspect);
+        outOffsetX = 0;
+        outOffsetY = (viewportH - outScaledH) / 2;
+    } else {
+        // Image is taller - fit to height, pillarbox left/right
+        outScaledH = viewportH;
+        outScaledW = static_cast<int>(viewportH * imageAspect);
+        outOffsetX = (viewportW - outScaledW) / 2;
+        outOffsetY = 0;
+    }
+}
+
 // ImageView WndProc: draws the latest DIB scaled to fit.
 static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -1104,18 +1313,35 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
             if (!g_imageBgBrush) g_imageBgBrush = CreateSolidBrush(RGB(30, 30, 30));
             FillRect(memDC, &rc, g_imageBgBrush);
 
-            if (g_imageDib.width > 0 && g_imageDib.height > 0 && !g_imageDib.bgra.empty()) {
+            // Determine which DIB buffer to use based on which window is being painted
+            const bool isRectifiedView = (hwnd == g_rectifiedViewHwnd);
+            const ImageDibBuffer& dib = isRectifiedView ? g_rectifiedDib : g_imageDib;
+
+            if (dib.width > 0 && dib.height > 0 && !dib.bgra.empty()) {
                 SetStretchBltMode(memDC, HALFTONE);
+
+                // Calculate aspect-ratio-preserving dimensions
+                int scaledW, scaledH, offsetX, offsetY;
+                calculateScaledImageBounds(dib.width, dib.height, dstW, dstH, scaledW, scaledH, offsetX, offsetY);
 
                 StretchDIBits(
                     memDC,
-                    0, 0, dstW, dstH,
-                    0, 0, g_imageDib.width, g_imageDib.height,
-                    g_imageDib.bgra.data(),
-                    &g_imageDib.bmi,
+                    offsetX, offsetY, scaledW, scaledH,
+                    0, 0, dib.width, dib.height,
+                    dib.bgra.data(),
+                    &dib.bmi,
                     DIB_RGB_COLORS,
                     SRCCOPY
                 );
+            } else if (isRectifiedView) {
+                // Show "Top-Down unavailable" text for rectified view when not available
+                SetBkMode(memDC, TRANSPARENT);
+                SetTextColor(memDC, RGB(200, 200, 200));
+                HFONT hOldFont = (HFONT)SelectObject(memDC, GetStockObject(DEFAULT_GUI_FONT));
+                const wchar_t* text = L"Top-Down unavailable";
+                RECT textRect = rc;
+                DrawTextW(memDC, text, -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                SelectObject(memDC, hOldFont);
             }
 
             BitBlt(hdc, 0, 0, dstW, dstH, memDC, 0, 0, SRCCOPY);
@@ -1148,14 +1374,26 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                 
                 int imgX, imgY;
                 // Use g_imageDib dimensions for coordinate conversion (displayed image)
-                // Then clamp to g_lastSourceFrame dimensions (source image we're sampling from)
+                // Account for aspect-ratio-preserving scaling
                 if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
-                    // Scale coordinates back to displayed image, then to source image
-                    imgX = (int)((double)x / dstW * g_imageDib.width);
-                    imgY = (int)((double)y / dstH * g_imageDib.height);
-                    // Clamp to source frame dimensions
-                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
-                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                    int scaledW, scaledH, offsetX, offsetY;
+                    calculateScaledImageBounds(g_imageDib.width, g_imageDib.height, dstW, dstH, scaledW, scaledH, offsetX, offsetY);
+                    
+                    // Check if mouse is within the scaled image bounds
+                    if (x >= offsetX && x < offsetX + scaledW && y >= offsetY && y < offsetY + scaledH) {
+                        // Convert coordinates relative to the scaled image area
+                        const int relX = x - offsetX;
+                        const int relY = y - offsetY;
+                        imgX = (int)((double)relX / scaledW * g_imageDib.width);
+                        imgY = (int)((double)relY / scaledH * g_imageDib.height);
+                        // Clamp to source frame dimensions
+                        imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                        imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                    } else {
+                        // Mouse is outside the image area (in letterbox/pillarbox region)
+                        imgX = -1;
+                        imgY = -1;
+                    }
                 } else {
                     imgX = std::clamp(x, 0, g_lastSourceFrame.cols - 1);
                     imgY = std::clamp(y, 0, g_lastSourceFrame.rows - 1);
@@ -1165,7 +1403,10 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                 POINT pt = {x, y};
                 ClientToScreen(hwnd, &pt);
                 
-                updateMagnifierWindow(imgX, imgY, pt.x, pt.y);
+                // Only update magnifier if mouse is over the image
+                if (imgX >= 0 && imgY >= 0) {
+                    updateMagnifierWindow(imgX, imgY, pt.x, pt.y);
+                }
             }
             return DefWindowProc(hwnd, msg, wParam, lParam);
         }
@@ -1190,14 +1431,26 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                 
                 int imgX, imgY;
                 // Use g_imageDib dimensions for coordinate conversion (displayed image)
-                // Then clamp to g_lastSourceFrame dimensions (source image we're sampling from)
+                // Account for aspect-ratio-preserving scaling
                 if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
-                    // Scale coordinates back to displayed image, then to source image
-                    imgX = (int)((double)x / dstW * g_imageDib.width);
-                    imgY = (int)((double)y / dstH * g_imageDib.height);
-                    // Clamp to source frame dimensions
-                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
-                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                    int scaledW, scaledH, offsetX, offsetY;
+                    calculateScaledImageBounds(g_imageDib.width, g_imageDib.height, dstW, dstH, scaledW, scaledH, offsetX, offsetY);
+                    
+                    // Check if mouse is within the scaled image bounds
+                    if (x >= offsetX && x < offsetX + scaledW && y >= offsetY && y < offsetY + scaledH) {
+                        // Convert coordinates relative to the scaled image area
+                        const int relX = x - offsetX;
+                        const int relY = y - offsetY;
+                        imgX = (int)((double)relX / scaledW * g_imageDib.width);
+                        imgY = (int)((double)relY / scaledH * g_imageDib.height);
+                        // Clamp to source frame dimensions
+                        imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                        imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+                    } else {
+                        // Mouse is outside the image area (in letterbox/pillarbox region)
+                        imgX = -1;
+                        imgY = -1;
+                    }
                 } else {
                     imgX = std::clamp(x, 0, g_lastSourceFrame.cols - 1);
                     imgY = std::clamp(y, 0, g_lastSourceFrame.rows - 1);
@@ -1279,6 +1532,187 @@ static void updateImageDibFromBgr(const cv::Mat& bgr) {
     }
 }
 
+// Update rectified DIB buffer from BGR image
+static void updateRectifiedDibFromBgr(const cv::Mat& bgr) {
+    if (bgr.empty()) {
+        // Clear the DIB if image is empty
+        g_rectifiedDib = {};
+        return;
+    }
+    if (bgr.type() != CV_8UC3) return;
+
+    const int w = bgr.cols;
+    const int h = bgr.rows;
+
+    if (g_rectifiedDib.width != w || g_rectifiedDib.height != h) {
+        g_rectifiedDib = {};
+        g_rectifiedDib.width = w;
+        g_rectifiedDib.height = h;
+        g_rectifiedDib.bgra.resize((size_t)w * (size_t)h * 4);
+
+        g_rectifiedDib.bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        g_rectifiedDib.bmi.bmiHeader.biWidth = w;
+        g_rectifiedDib.bmi.bmiHeader.biHeight = -h; // top-down
+        g_rectifiedDib.bmi.bmiHeader.biPlanes = 1;
+        g_rectifiedDib.bmi.bmiHeader.biBitCount = 32;
+        g_rectifiedDib.bmi.bmiHeader.biCompression = BI_RGB;
+        g_rectifiedDib.bmi.bmiHeader.biSizeImage = 0;
+    }
+
+    // Convert BGR -> BGRA (alpha = 255)
+    const int srcStride = (int)bgr.step;
+    const unsigned char* src = bgr.data;
+    unsigned char* dst = g_rectifiedDib.bgra.data();
+    for (int y = 0; y < h; ++y) {
+        const unsigned char* s = src + y * srcStride;
+        unsigned char* d = dst + (size_t)y * (size_t)w * 4;
+        for (int x = 0; x < w; ++x) {
+            d[x * 4 + 0] = s[x * 3 + 0]; // B
+            d[x * 4 + 1] = s[x * 3 + 1]; // G
+            d[x * 4 + 2] = s[x * 3 + 2]; // R
+            d[x * 4 + 3] = 255;          // A
+        }
+    }
+}
+
+// Build display frame for rectified (top-down) view with optional overlay
+static cv::Mat buildRectifiedDisplayFrame() {
+    if (!latestAnalysis.rect.ok || latestAnalysis.rect.rectifiedBgr.empty()) {
+        // Return empty mat if rectification is not available
+        return cv::Mat();
+    }
+
+    cv::Mat processed = latestAnalysis.rect.rectifiedBgr.clone();
+
+    // Apply felt mask overlay if enabled
+    if (uiControls.showOverlay && uiControls.showFelt && !latestAnalysis.rect.rectifiedFeltMask.empty()) {
+        cv::Mat mask = latestAnalysis.rect.rectifiedFeltMask;
+        if (uiControls.feltParams.isFilled) {
+            cv::Mat overlay = processed.clone();
+            // Create a 3-channel mask for blending
+            std::vector<cv::Mat> maskChannels;
+            cv::split(mask, maskChannels);
+            cv::Mat mask3ch;
+            cv::merge(std::vector<cv::Mat>{maskChannels[0], maskChannels[0], maskChannels[0]}, mask3ch);
+            
+            // Apply color overlay where mask is non-zero
+            overlay.setTo(uiControls.feltParams.color, mask3ch);
+            const double a = std::clamp(uiControls.feltParams.fillAlpha, 0, 255) / 255.0;
+            cv::addWeighted(processed, 1.0 - a, overlay, a, 0, processed);
+            
+            // Draw outline for definition
+            std::vector<std::vector<cv::Point>> contours;
+            cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            if (!contours.empty()) {
+                cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
+            }
+        } else {
+            // Draw outline only
+            std::vector<std::vector<cv::Point>> contours;
+            cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            if (!contours.empty()) {
+                cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
+            }
+        }
+    }
+
+    // Draw rectification debug overlay on rectified view
+    if (uiControls.showRectifyDebug && latestAnalysis.rect.ok) {
+        // Transform source quad to rectified space using homography
+        std::vector<cv::Point2f> srcQuadF;
+        for (const auto& pt : latestAnalysis.rect.srcQuad) {
+            srcQuadF.push_back(pt);
+        }
+        std::vector<cv::Point2f> transformedSrcQuad;
+        if (!srcQuadF.empty() && !latestAnalysis.rect.H.empty()) {
+            cv::perspectiveTransform(srcQuadF, transformedSrcQuad, latestAnalysis.rect.H);
+        }
+        
+        // Draw source quad in rectified space (cyan)
+        if (transformedSrcQuad.size() == 4) {
+            std::vector<cv::Point> srcQuadPts;
+            for (const auto& pt : transformedSrcQuad) {
+                srcQuadPts.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+            }
+            cv::polylines(processed, std::vector<std::vector<cv::Point>>{srcQuadPts}, true, cv::Scalar(255, 255, 0), 2); // Cyan
+            
+            // Label corner indices (0-3)
+            const char* labels[] = {"0", "1", "2", "3"};
+            for (size_t i = 0; i < 4; ++i) {
+                cv::Point labelPos(static_cast<int>(transformedSrcQuad[i].x) + 10, 
+                                   static_cast<int>(transformedSrcQuad[i].y) - 10);
+                cv::putText(processed, labels[i], labelPos, cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 0), 2);
+            }
+        }
+        
+        // Draw rectified felt edges and check alignment
+        if (!latestAnalysis.rect.rectifiedFeltMask.empty()) {
+            // Find felt contour edges
+            std::vector<std::vector<cv::Point>> contours;
+            cv::findContours(latestAnalysis.rect.rectifiedFeltMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+            
+            if (!contours.empty()) {
+                // Find bounding rect of largest contour
+                auto largestContour = std::max_element(contours.begin(), contours.end(),
+                    [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) {
+                        return cv::contourArea(a) < cv::contourArea(b);
+                    });
+                
+                if (largestContour != contours.end() && !largestContour->empty()) {
+                    cv::Rect bbox = cv::boundingRect(*largestContour);
+                    
+                    // Extract edge points
+                    cv::Point topLeft(bbox.x, bbox.y);
+                    cv::Point topRight(bbox.x + bbox.width, bbox.y);
+                    cv::Point bottomLeft(bbox.x, bbox.y + bbox.height);
+                    cv::Point bottomRight(bbox.x + bbox.width, bbox.y + bbox.height);
+                    
+                    // Draw edges
+                    cv::line(processed, topLeft, topRight, cv::Scalar(0, 255, 0), 2); // Top edge (green)
+                    cv::line(processed, bottomLeft, bottomRight, cv::Scalar(0, 255, 0), 2); // Bottom edge (green)
+                    cv::line(processed, topLeft, bottomLeft, cv::Scalar(255, 0, 255), 2); // Left edge (magenta)
+                    cv::line(processed, topRight, bottomRight, cv::Scalar(255, 0, 255), 2); // Right edge (magenta)
+                    
+                    // Check if edges are near horizontal/vertical
+                    // Top edge: check if near horizontal (dy should be small relative to dx)
+                    float topDx = static_cast<float>(topRight.x - topLeft.x);
+                    float topDy = static_cast<float>(topRight.y - topLeft.y);
+                    float topAngle = std::atan2(std::abs(topDy), std::abs(topDx)) * 180.0f / 3.14159f;
+                    bool topHorizontal = topAngle < 5.0f; // Within 5 degrees of horizontal
+                    
+                    // Bottom edge: check if near horizontal
+                    float botDx = static_cast<float>(bottomRight.x - bottomLeft.x);
+                    float botDy = static_cast<float>(bottomRight.y - bottomLeft.y);
+                    float botAngle = std::atan2(std::abs(botDy), std::abs(botDx)) * 180.0f / 3.14159f;
+                    bool botHorizontal = botAngle < 5.0f;
+                    
+                    // Left edge: check if near vertical (dx should be small relative to dy)
+                    float leftDx = static_cast<float>(bottomLeft.x - topLeft.x);
+                    float leftDy = static_cast<float>(bottomLeft.y - topLeft.y);
+                    float leftAngle = std::atan2(std::abs(leftDx), std::abs(leftDy)) * 180.0f / 3.14159f;
+                    bool leftVertical = leftAngle < 5.0f;
+                    
+                    // Right edge: check if near vertical
+                    float rightDx = static_cast<float>(bottomRight.x - topRight.x);
+                    float rightDy = static_cast<float>(bottomRight.y - topRight.y);
+                    float rightAngle = std::atan2(std::abs(rightDx), std::abs(rightDy)) * 180.0f / 3.14159f;
+                    bool rightVertical = rightAngle < 5.0f;
+                    
+                    // Draw status text
+                    std::string status = "T:" + std::string(topHorizontal ? "H" : "~") + 
+                                        " B:" + std::string(botHorizontal ? "H" : "~") +
+                                        " L:" + std::string(leftVertical ? "V" : "~") +
+                                        " R:" + std::string(rightVertical ? "V" : "~");
+                    cv::putText(processed, status, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 2);
+                }
+            }
+        }
+    }
+
+
+    return processed;
+}
+
 static void ensureSidebarAndImageChildren(HWND mainHwnd) {
     if (!g_imageViewHwnd) {
         g_imageViewHwnd = CreateWindowExW(
@@ -1289,6 +1723,20 @@ static void ensureSidebarAndImageChildren(HWND mainHwnd) {
             0, 0, 100, 100,
             mainHwnd,
             (HMENU)(INT_PTR)(10000 + 400),
+            GetModuleHandleW(NULL),
+            NULL
+        );
+    }
+
+    if (!g_rectifiedViewHwnd) {
+        g_rectifiedViewHwnd = CreateWindowExW(
+            0,
+            kImageViewClass,
+            L"",
+            WS_VISIBLE | WS_CHILD,
+            0, 0, 100, 100,
+            mainHwnd,
+            (HMENU)(INT_PTR)(10000 + 401),
             GetModuleHandleW(NULL),
             NULL
         );
@@ -1323,50 +1771,6 @@ static void updateColorPickerLabels() {
             swprintf_s(out, outCount, L"Range: H[0-%d] U [%d-180] S[%d-%d] V[%d-%d]", hMax, hMin, sMin, sMax, vMin, vMax);
         }
     };
-
-    // -----------------------------
-    // Diamonds picker labels/swatch
-    // -----------------------------
-    {
-        wchar_t bgrText[64] = L"BGR: --";
-        wchar_t hsvText[64] = L"HSV: --";
-        wchar_t rangeText[128] = L"Range: --";
-
-        const cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
-        swprintf_s(bgrText, L"BGR: (%d, %d, %d)", (int)bgr[2], (int)bgr[1], (int)bgr[0]);
-
-        if (uiControls.diamondParams.hasPickedColor) {
-            const cv::Vec3b hsv = uiControls.diamondParams.pickedHSV;
-            swprintf_s(hsvText, L"HSV: (%d, %d, %d)", (int)hsv[0], (int)hsv[1], (int)hsv[2]);
-        }
-
-        formatRange(uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
-                    uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
-                    uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax,
-                    rangeText, _countof(rangeText));
-
-        HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_BGR);
-        if (hBGR) SetWindowTextW(hBGR, bgrText);
-        HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_HSV);
-        if (hHSV) SetWindowTextW(hHSV, hsvText);
-        HWND hRange = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_RANGE);
-        if (hRange) SetWindowTextW(hRange, rangeText);
-
-        HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_SWATCH);
-        if (hSwatch) {
-            const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
-            setSwatchBrush(g_diamondColorPickerSwatchBrush, swatchColor);
-            InvalidateRect(hSwatch, NULL, TRUE);
-            UpdateWindow(hSwatch);
-        }
-
-        HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER);
-        if (hColorPicker) {
-            const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamonds);
-            const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
-            SetWindowTextW(hColorPicker, btnText);
-        }
-    }
 
     // --------------------------
     // Felt picker labels/swatch
@@ -1461,7 +1865,7 @@ static void computeHsvRangeFromPickedHsv(
 // Felt-specific HSV tolerance:
 // Shadows are the dominant failure mode for felt segmentation (V drops substantially and S can soften),
 // so we intentionally allow a *much larger* tolerance toward darker values than toward brighter values.
-// This helps keep the felt mask connected up to the rails even under uneven lighting.
+// This helps keep the felt mask connected even under uneven lighting.
 static void computeFeltHsvRangeFromPickedHsv(
     const cv::Vec3b& pickedHSV,
     int sensitivity,
@@ -1534,16 +1938,30 @@ static void layoutChildren(HWND mainHwnd) {
         (uiControls.showSidebar && !uiControls.sidebarCollapsed) ? 300 :
         (uiControls.showSidebar && uiControls.sidebarCollapsed) ? 30 : 0;
 
-    const int imageW = std::max(0, w - sidebarW);
+    // Split available width between two viewports (Live View and Top-Down View)
+    const int availableW = std::max(0, w - sidebarW);
     const int imageH = std::max(0, h);
+    
+    // Each viewport gets half the available width
+    const int viewportW = availableW / 2;
+    const int liveViewW = viewportW;
+    const int topDownViewW = availableW - viewportW;  // Remaining width goes to top-down view
 
+    // Position Live View (left viewport)
     if (g_imageViewHwnd) {
-        MoveWindow(g_imageViewHwnd, 0, 0, imageW, imageH, TRUE);
+        MoveWindow(g_imageViewHwnd, 0, 0, liveViewW, imageH, TRUE);
     }
+    
+    // Position Top-Down View (middle viewport)
+    if (g_rectifiedViewHwnd) {
+        MoveWindow(g_rectifiedViewHwnd, liveViewW, 0, topDownViewW, imageH, TRUE);
+    }
+    
+    // Position Sidebar (right column)
     if (g_sidebarPanel) {
         if (uiControls.showSidebar) {
             ShowWindow(g_sidebarPanel, SW_SHOW);
-            MoveWindow(g_sidebarPanel, imageW, 0, sidebarW, imageH, TRUE);
+            MoveWindow(g_sidebarPanel, availableW, 0, sidebarW, imageH, TRUE);
         } else {
             ShowWindow(g_sidebarPanel, SW_HIDE);
         }
@@ -1557,23 +1975,34 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     if (currentFrame.empty()) return {};
     cv::Mat processed = currentFrame.clone();
 
+    // Felt detection - always run for rectification, regardless of showFelt toggle
+    // showFelt only controls whether the overlay is displayed
+    g_lastFeltResult = detectFelt(currentFrame, uiControls.feltParams);
+    std::vector<cv::Point> feltContour = g_lastFeltResult.contour;
+
+    // Draw rectification debug overlay on live view
+    if (uiControls.showRectifyDebug && latestAnalysis.rect.ok) {
+        // Draw original felt quad (green)
+        std::vector<cv::Point> feltQuad;
+        for (const auto& pt : latestAnalysis.rect.srcQuad) {
+            feltQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+        }
+        if (feltQuad.size() == 4) {
+            cv::polylines(processed, std::vector<std::vector<cv::Point>>{feltQuad}, true, cv::Scalar(0, 255, 0), 2); // Green
+        }
+        
+        // Draw expanded source quad (yellow)
+        std::vector<cv::Point> expandedQuad;
+        for (const auto& pt : latestAnalysis.rect.expandedSrcQuad) {
+            expandedQuad.push_back(cv::Point(static_cast<int>(pt.x), static_cast<int>(pt.y)));
+        }
+        if (expandedQuad.size() == 4) {
+            cv::polylines(processed, std::vector<std::vector<cv::Point>>{expandedQuad}, true, cv::Scalar(0, 255, 255), 2); // Yellow
+        }
+    }
+
     if (uiControls.showOverlay) {
-        // Felt detection - use full detectFelt to get complete result for export
-        std::vector<cv::Point> feltContour;
-        if (uiControls.showFelt || uiControls.showRail) {
-            g_lastFeltResult = detectFelt(currentFrame, uiControls.feltParams);
-            feltContour = g_lastFeltResult.contour;
-        } else {
-            // Reset result if felt detection is not being run
-            g_lastFeltResult = FeltDetectionResult();
-        }
-
-        // Rail mask is needed for rail overlay.
-        cv::Mat railMask;
-        if (uiControls.showRail && !feltContour.empty()) {
-            railMask = detectRailMask(currentFrame, feltContour, uiControls.railParams);
-        }
-
+        // Apply felt overlay only if showFelt is enabled
         if (uiControls.showFelt && !feltContour.empty()) {
             std::vector<std::vector<cv::Point>> contours{feltContour};
             if (uiControls.feltParams.isFilled) {
@@ -1587,46 +2016,24 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
                 cv::drawContours(processed, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
             }
         }
+    }
 
-        if (uiControls.showRail && !railMask.empty() && cv::countNonZero(railMask) > 0) {
-                if (uiControls.railParams.isFilled) {
-                    cv::Mat overlay = processed.clone();
-                    overlay.setTo(uiControls.railParams.color, railMask);
-                    const double a = std::clamp(uiControls.railParams.fillAlpha, 0, 255) / 255.0;
-                    cv::addWeighted(processed, 1.0 - a, overlay, a, 0, processed);
-                } else {
-                    // Outline-only mode: draw the actual mask contour (not a fitted box).
-                    std::vector<std::vector<cv::Point>> contours;
-                    cv::findContours(railMask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-                    if (!contours.empty()) {
-                        cv::drawContours(processed, contours, -1, uiControls.railParams.color, std::max(1, uiControls.railParams.outlineThicknessPx));
-                    }
-                }
-                
-                // Draw the four edge lines (top, bottom, left, right) that best fit the rail mask edges
-                RailEdgeLines edgeLines;
-                if (detectRailEdgeLines(railMask, processed.size(), edgeLines)) {
-                    // Use a slightly different color or style for the edge lines to distinguish them
-                    // Using a brighter version of the rail color
-                    cv::Scalar edgeLineColor = uiControls.railParams.color;
-                    const int edgeLineThickness = std::max(2, uiControls.railParams.outlineThicknessPx);
-                    
-                    // Draw top edge line
-                    cv::line(processed, edgeLines.topLinePt1, edgeLines.topLinePt2, edgeLineColor, edgeLineThickness);
-                    // Draw bottom edge line
-                    cv::line(processed, edgeLines.bottomLinePt1, edgeLines.bottomLinePt2, edgeLineColor, edgeLineThickness);
-                    // Draw left edge line
-                    cv::line(processed, edgeLines.leftLinePt1, edgeLines.leftLinePt2, edgeLineColor, edgeLineThickness);
-                    // Draw right edge line
-                    cv::line(processed, edgeLines.rightLinePt1, edgeLines.rightLinePt2, edgeLineColor, edgeLineThickness);
-                }
-        }
+    // Store felt result in latestAnalysis
+    latestAnalysis.felt = g_lastFeltResult;
 
-        if (uiControls.showDiamonds) {
-            detectDiamonds(currentFrame, processed, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondProcessingImage);
-        } else {
-            g_lastDiamondProcessingImage.release();
-        }
+    // Perform rectification if felt detection succeeded and has corners
+    if (latestAnalysis.felt.ok && latestAnalysis.felt.hasCorners) {
+        latestAnalysis.rect = rectifyTabletop(
+            currentFrame,
+            latestAnalysis.felt.feltMask,
+            latestAnalysis.felt.corners,
+            uiControls.rectifyMarginScale,
+            uiControls.rectifyPadPx
+        );
+        
+    } else {
+        // Reset rectification results if felt detection failed
+        latestAnalysis.rect = RectificationResult();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -1710,6 +2117,21 @@ static void onFrameTick(HWND mainHwnd) {
             RedrawWindow(g_imageViewHwnd, NULL, NULL, RDW_INVALIDATE | RDW_NOERASE);
         }
     }
+
+    // Update rectified (top-down) view
+    cv::Mat rectifiedDisplay = buildRectifiedDisplayFrame();
+    if (!rectifiedDisplay.empty()) {
+        updateRectifiedDibFromBgr(rectifiedDisplay);
+        if (g_rectifiedViewHwnd) {
+            RedrawWindow(g_rectifiedViewHwnd, NULL, NULL, RDW_INVALIDATE | RDW_NOERASE);
+        }
+    } else {
+        // Clear rectified view if not available
+        g_rectifiedDib = {};
+        if (g_rectifiedViewHwnd) {
+            RedrawWindow(g_rectifiedViewHwnd, NULL, NULL, RDW_INVALIDATE | RDW_NOERASE);
+        }
+    }
 }
 
 static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -1789,7 +2211,8 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             const int kIdSidebarDiamonds = 30101;
             const int kIdSidebarFelt = 30102;
             const int kIdSidebarRail = 30103;
-            if (id == kIdSidebarCollapse || id == kIdSidebarDiamonds || id == kIdSidebarFelt || id == kIdSidebarRail) {
+            const int kIdSidebarRectify = 30104;
+            if (id == kIdSidebarCollapse || id == kIdSidebarDiamonds || id == kIdSidebarFelt || id == kIdSidebarRail || id == kIdSidebarRectify) {
                 // Reuse existing handler
                 handleSidebarButton(id);
                 layoutChildren(hwnd);
@@ -1799,54 +2222,31 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
             // Debug sidebar checkboxes (IDs match defines below: 30200..30203)
             const int kIdOverlayMaster = 30200;
-            const int kIdOverlayDiamonds = 30201;
             const int kIdOverlayFelt = 30202;
-            const int kIdOverlayRail = 30203;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRail)) {
+            const int kIdRectifyDebug = 30250;
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayFelt || id == kIdRectifyDebug)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
-                else if (id == kIdOverlayDiamonds) uiControls.showDiamonds = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
-                else if (id == kIdOverlayRail) uiControls.showRail = isChecked;
+                else if (id == kIdRectifyDebug) uiControls.showRectifyDebug = isChecked;
                 saveSettingsToDisk();  // Save settings immediately when overlay toggles change
                 return 0;
             }
 
-            // Overlay style buttons/checkboxes (IDs match defines below: 30220+)
-            const int kIdDiamondsColor = 30220;
-            const int kIdDiamondsFilled = 30221;
+            // Overlay style buttons/checkboxes (IDs match defines below: 30230+)
             const int kIdFeltColor = 30230;
             const int kIdFeltFilled = 30231;
-            const int kIdRailColor = 30240;
-            const int kIdRailFilled = 30241;
-            const int kIdDiamondSkipMorph = 30250;  // IDC_DIAMOND_SKIP_MORPH
             if (code == BN_CLICKED) {
-                if (id == kIdDiamondsFilled) {
-                    uiControls.diamondParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
-                    return 0;
-                }
                 if (id == kIdFeltFilled) {
                     uiControls.feltParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     saveSettingsToDisk();  // Save settings immediately when checkbox toggles
                     return 0;
                 }
-                if (id == kIdRailFilled) {
-                    uiControls.railParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
-                    return 0;
-                }
-                if (id == kIdDiamondSkipMorph) {
-                    uiControls.diamondParams.skip_morph_enhancement = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
-                    return 0;
-                }
-                if (id == IDC_DIAMOND_COLOR_PICKER || id == IDC_FELT_COLOR_PICKER) {
+                if (id == IDC_FELT_COLOR_PICKER) {
                     // Activate/deactivate color picker mode.
                     //
                     // Only one picker can be active at a time; the active one is identified by `g_colorPickerTarget`.
-                    const ColorPickerTarget requested =
-                        (id == IDC_DIAMOND_COLOR_PICKER) ? ColorPickerTarget::Diamonds : ColorPickerTarget::Felt;
+                    const ColorPickerTarget requested = ColorPickerTarget::Felt;
 
                     if (g_colorPickerTarget == requested) {
                         // Deactivate
@@ -1894,15 +2294,6 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     updateColorPickerLabels();  // Update button text and UI
                     return 0;
                 }
-
-                if (id == kIdDiamondsColor) {
-                    cv::Scalar newColor = uiControls.diamondParams.color;
-                    if (chooseColor(hwnd, uiControls.diamondParams.color, newColor)) {
-                        uiControls.diamondParams.color = newColor;
-                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
-                    }
-                    return 0;
-                }
                 if (id == kIdFeltColor) {
                     cv::Scalar newColor = uiControls.feltParams.color;
                     if (chooseColor(hwnd, uiControls.feltParams.color, newColor)) {
@@ -1911,17 +2302,10 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     }
                     return 0;
                 }
-                if (id == kIdRailColor) {
-                    cv::Scalar newColor = uiControls.railParams.color;
-                    if (chooseColor(hwnd, uiControls.railParams.color, newColor)) {
-                        uiControls.railParams.color = newColor;
-                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
-                    }
-                    return 0;
-                }
             }
 
             // (Accordion toggles removed)
+
 
             // Display sidebar combobox (ID 40001)
             const int kIdDisplaySourceCombo = 40001;
@@ -2158,13 +2542,13 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_SIDEBAR_COLLAPSE (IDC_BUTTON_BASE + 100)
 #define IDC_SIDEBAR_DIAMONDS (IDC_BUTTON_BASE + 101)
 #define IDC_SIDEBAR_FELT (IDC_BUTTON_BASE + 102)
-#define IDC_SIDEBAR_RAIL (IDC_BUTTON_BASE + 103)
+#define IDC_SIDEBAR_RECTIFY (IDC_BUTTON_BASE + 104)
 
 // Control IDs for sidebar controls
 #define IDC_STATIC_BASE 10000
 #define IDC_TRACKBAR_BASE 20000
 #define IDC_BUTTON_BASE 30000
-#define IDC_COMBO_BASE 40000
+// IDC_COMBO_BASE is defined earlier in the file
 
 // Trackbar IDs
 #define IDC_DIAMOND_THRESH1 (IDC_TRACKBAR_BASE + 1)  // Maps to min_threshold
@@ -2179,29 +2563,19 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DIAMOND_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 8)
 // Felt color picker sensitivity (tolerance) slider: 0..100 (0=strict, 100=loose)
 #define IDC_FELT_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 9)
-#define IDC_RAIL_BLACK_VMAX (IDC_TRACKBAR_BASE + 10)
-#define IDC_RAIL_BROWN_HMAX (IDC_TRACKBAR_BASE + 11)
-#define IDC_RAIL_BROWN_SMAX (IDC_TRACKBAR_BASE + 12)
-#define IDC_RAIL_BROWN_VMAX (IDC_TRACKBAR_BASE + 13)
-
 // Button IDs
 #define IDC_DIAMOND_COLOR (IDC_BUTTON_BASE + 1)
 #define IDC_FELT_COLOR (IDC_BUTTON_BASE + 2)
-#define IDC_RAIL_COLOR (IDC_BUTTON_BASE + 3)
 
 // Sidebar checkbox IDs (Debug page)
 #define IDC_DEBUG_OVERLAY_MASTER (IDC_BUTTON_BASE + 200)
 #define IDC_DEBUG_OVERLAY_DIAMONDS_CB (IDC_BUTTON_BASE + 201)
 #define IDC_DEBUG_OVERLAY_FELT_CB (IDC_BUTTON_BASE + 202)
-#define IDC_DEBUG_OVERLAY_RAIL_CB (IDC_BUTTON_BASE + 203)
-
 // Overlay style controls
 #define IDC_DIAMONDS_STYLE_COLOR (IDC_BUTTON_BASE + 220)
 #define IDC_DIAMONDS_STYLE_FILLED (IDC_BUTTON_BASE + 221)
 #define IDC_FELT_STYLE_COLOR (IDC_BUTTON_BASE + 230)
 #define IDC_FELT_STYLE_FILLED (IDC_BUTTON_BASE + 231)
-#define IDC_RAIL_STYLE_COLOR (IDC_BUTTON_BASE + 240)
-#define IDC_RAIL_STYLE_FILLED (IDC_BUTTON_BASE + 241)
 
 // Sidebar combobox IDs (Display page)
 #define IDC_DISPLAY_SOURCE_COMBO (IDC_COMBO_BASE + 1)
@@ -2213,8 +2587,9 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DIAMONDS_ALPHA (IDC_TRACKBAR_BASE + 62)
 #define IDC_FELT_ALPHA (IDC_TRACKBAR_BASE + 70)
 #define IDC_FELT_THICKNESS (IDC_TRACKBAR_BASE + 71)
-#define IDC_RAIL_ALPHA (IDC_TRACKBAR_BASE + 80)
-#define IDC_RAIL_THICKNESS (IDC_TRACKBAR_BASE + 81)
+#define IDC_RECTIFY_MARGIN_SCALE (IDC_TRACKBAR_BASE + 90)
+#define IDC_RECTIFY_PAD_PX (IDC_TRACKBAR_BASE + 91)
+#define IDC_RECTIFY_DEBUG_CB (IDC_BUTTON_BASE + 250)
 
 // Global tuning trackbars
 #define IDC_SMOOTHING (IDC_TRACKBAR_BASE + 95)
@@ -2460,55 +2835,21 @@ int legacyHighGuiMain(int argc, char** argv) {
         // Apply overlays only if master overlay toggle is enabled
         // Master toggle acts as a gate - individual toggles control what's shown
         if (uiControls.showOverlay) {
-            // Detect felt contour first (needed for rail and diamond detection)
-            std::vector<cv::Point> feltContour = detectFeltContour(currentFrame);
-            cv::Rect feltRect = feltContour.empty() ? cv::Rect(0, 0, currentFrame.cols, currentFrame.rows) 
-                                                     : cv::boundingRect(feltContour);
-            
             // Apply felt detection overlay if enabled
             if (uiControls.showFelt) {
-                if (!feltContour.empty()) {
-                    // Draw the detailed perimeter contour
+                FeltDetectionResult feltResult = detectFelt(currentFrame, uiControls.feltParams);
+                if (!feltResult.contour.empty()) {
                     std::vector<std::vector<cv::Point>> contours;
-                    contours.push_back(feltContour);
-                    cv::drawContours(processedImage, contours, -1, cv::Scalar(0, 255, 0), 2);
+                    contours.push_back(feltResult.contour);
+                    cv::drawContours(processedImage, contours, -1, uiControls.feltParams.color, std::max(1, uiControls.feltParams.outlineThicknessPx));
                     
-                    // Also draw a semi-transparent overlay
-                    cv::Mat overlay = processedImage.clone();
-                    cv::fillPoly(overlay, contours, cv::Scalar(0, 255, 0));
-                    cv::addWeighted(processedImage, 0.7, overlay, 0.3, 0, processedImage);
-                }
-            }
-            
-            // Apply rail detection overlay if enabled
-            if (uiControls.showRail) {
-                if (!feltContour.empty()) {
-                    std::vector<std::vector<cv::Point>> railContours = detectRailContours(currentFrame, feltContour);
-                    if (!railContours.empty()) {
-                        // Draw rail contours with orange/brown color
-                        cv::drawContours(processedImage, railContours, -1, cv::Scalar(0, 165, 255), 2);
-                        
-                        // Draw semi-transparent overlay for rail areas
+                    if (uiControls.feltParams.isFilled) {
                         cv::Mat overlay = processedImage.clone();
-                        cv::fillPoly(overlay, railContours, cv::Scalar(0, 165, 255));
-                        cv::addWeighted(processedImage, 0.7, overlay, 0.3, 0, processedImage);
-                    } else {
-                        // Fallback: Draw the rail mask directly if contours are empty
-                        cv::Mat railMask = detectRailMask(currentFrame, feltContour);
-                        if (cv::countNonZero(railMask) > 0) {
-                            cv::Mat overlay = processedImage.clone();
-                            overlay.setTo(cv::Scalar(0, 165, 255), railMask); // Blue overlay for rail
-                            cv::addWeighted(processedImage, 0.7, overlay, 0.3, 0, processedImage);
-                        }
+                        cv::fillPoly(overlay, contours, uiControls.feltParams.color);
+                        const double a = std::clamp(uiControls.feltParams.fillAlpha, 0, 255) / 255.0;
+                        cv::addWeighted(processedImage, 1.0 - a, overlay, a, 0, processedImage);
                     }
                 }
-            }
-            
-            // Apply diamond detection if enabled
-            if (uiControls.showDiamonds) {
-                detectDiamonds(currentFrame, processedImage, true, uiControls.diamondParams, uiControls.feltParams, uiControls.railParams, &g_lastDiamondProcessingImage);
-            } else {
-                g_lastDiamondProcessingImage.release();
             }
         }
         
@@ -2775,6 +3116,17 @@ void createSidebarControls(HWND hwnd) {
         addDivider(yPos - dividerPadY);
         yPos += dividerPadY;
     };
+    
+    // Accordion header helper (clickable button with expand/collapse indicator)
+    auto addAccordionHeader = [&](const wchar_t* title, int buttonId, bool& expanded) {
+        const wchar_t* indicator = expanded ? L"\u25BC " : L"\u25BA "; // ▼ for expanded, ▶ for collapsed
+        std::wstring buttonText = std::wstring(indicator) + title;
+        HWND hHeader = CreateWindowW(L"BUTTON", buttonText.c_str(), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_LEFT,
+                                    xPos, yPos - g_sidebarScrollPos, usableWidth, 24, g_sidebarPanel,
+                                    (HMENU)(INT_PTR)buttonId, NULL, NULL);
+        applyFont(hHeader, true);
+        yPos += lineHeight + 4;
+    };
 
     // Helper to create a static label - relative to panel
     auto createLabel = [&](const wchar_t* text, int y, int id) {
@@ -2852,7 +3204,7 @@ void createSidebarControls(HWND hwnd) {
     yPos += dividerPadY;
 
     if (uiControls.sidebarPage == SidebarPage::Debug) {
-        // ===== Debug page sections (ordered): Global, Felt, Rails, Diamonds =====
+        // ===== Debug page sections (ordered): Global, Felt, Diamonds =====
 
         // GLOBAL section
         //
@@ -2940,19 +3292,16 @@ void createSidebarControls(HWND hwnd) {
         // - Input params: felt color + sensitivity (what pixels are considered "felt")
         // - Output params: overlay styling (how we render the detected felt contour)
         {
-            addHeader(L"Felt");
+            addAccordionHeader(L"Felt", IDC_SIDEBAR_FELT, uiControls.feltExpanded);
 
-            auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
-                HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
-                                       xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
-                                       (HMENU)(INT_PTR)id, NULL, NULL);
-                applyFont(h, false);
-                return h;
-            };
-
-            // Separator (no "Input"/"Output" labels; keep a clean visual grouping)
-            addDivider(yPos - 2);
-            yPos += 6;
+            if (uiControls.feltExpanded) {
+                auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
+                    HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                           xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)id, NULL, NULL);
+                    applyFont(h, false);
+                    return h;
+                };
 
             // Pick felt color (click-to-sample)
             {
@@ -3005,9 +3354,9 @@ void createSidebarControls(HWND hwnd) {
             addDivider(yPos - 2);
             yPos += 6;
 
-            // Enabled
+            // Show/Hide
             {
-                HWND hEnabled = CreateWindowW(L"BUTTON", L"Enabled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                HWND hEnabled = CreateWindowW(L"BUTTON", L"Show/Hide", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
                                               xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
                                               (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_FELT_CB, NULL, NULL);
                 applyFont(hEnabled, false);
@@ -3046,139 +3395,46 @@ void createSidebarControls(HWND hwnd) {
                 createValueLabel(yPos, IDC_STATIC_BASE + 119);
                 yPos += lineHeight + gap;
             }
+            } // End of feltExpanded block
         }
 
-        // RAILS group
+
+        // RECTIFICATION section
         {
-            addFeatureGroup(L"Rails",
-                            IDC_DEBUG_OVERLAY_RAIL_CB, uiControls.showRail,
-                            IDC_RAIL_STYLE_COLOR,
-                            IDC_RAIL_ALPHA, uiControls.railParams.fillAlpha, IDC_STATIC_BASE + 520,
-                            IDC_RAIL_STYLE_FILLED, uiControls.railParams.isFilled,
-                            yPos);
-
-            yPos += 6;
-            createLabel(L"Black V Max:", yPos, IDC_STATIC_BASE + 10);
-            createTrackbar(IDC_RAIL_BLACK_VMAX, yPos, 0, 255, uiControls.railParams.blackVMax);
-            createValueLabel(yPos, IDC_STATIC_BASE + 11);
-            yPos += lineHeight;
-
-            createLabel(L"Brown H Max:", yPos, IDC_STATIC_BASE + 12);
-            createTrackbar(IDC_RAIL_BROWN_HMAX, yPos, 0, 180, uiControls.railParams.brownHMax);
-            createValueLabel(yPos, IDC_STATIC_BASE + 13);
-            yPos += lineHeight;
-
-            createLabel(L"Brown S Max:", yPos, IDC_STATIC_BASE + 14);
-            createTrackbar(IDC_RAIL_BROWN_SMAX, yPos, 0, 255, uiControls.railParams.brownSMax);
-            createValueLabel(yPos, IDC_STATIC_BASE + 15);
-            yPos += lineHeight;
-
-            createLabel(L"Brown V Max:", yPos, IDC_STATIC_BASE + 16);
-            createTrackbar(IDC_RAIL_BROWN_VMAX, yPos, 0, 255, uiControls.railParams.brownVMax);
-            createValueLabel(yPos, IDC_STATIC_BASE + 17);
-            yPos += lineHeight;
-
-            yPos += 6;
-            createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 122);
-            createTrackbar(IDC_RAIL_THICKNESS, yPos, 1, 10, uiControls.railParams.outlineThicknessPx);
-            createValueLabel(yPos, IDC_STATIC_BASE + 123);
-            yPos += lineHeight + gap;
-        }
-
-        // DIAMONDS group - Simplified Color Picker UI
-        {
-            addFeatureGroup(L"Diamonds",
-                            IDC_DEBUG_OVERLAY_DIAMONDS_CB, uiControls.showDiamonds,
-                            IDC_DIAMONDS_STYLE_COLOR,
-                            IDC_DIAMONDS_ALPHA, uiControls.diamondParams.alpha, IDC_STATIC_BASE + 530,
-                            IDC_DIAMONDS_STYLE_FILLED, uiControls.diamondParams.isFilled,
-                            yPos);
-
-            yPos += 12;
+            addAccordionHeader(L"Rectification", IDC_SIDEBAR_RECTIFY, uiControls.rectifyExpanded);
             
-            // Header
-            {
-                HWND hHeader = CreateWindowW(L"STATIC", L"Color Picker", WS_VISIBLE | WS_CHILD | SS_LEFT,
-                                            xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel, NULL, NULL, NULL);
-                applyFont(hHeader, true);
-            }
-            yPos += lineHeight + 6;
-
-            // Color picker button
-            {
-                const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamonds);
-                const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
-                HWND hColorPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                                                 xPos, yPos - g_sidebarScrollPos, usableWidth, rowH + 5, g_sidebarPanel,
-                                                 (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER, NULL, NULL);
-                applyFont(hColorPicker, true);
-            }
-            yPos += lineHeight + 8;
-
-            // Color swatch (visual color display)
-            {
-                // Label
-                createLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 200);
-                yPos += lineHeight;
-                
-                // Color swatch rectangle
-                cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
-                COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]); // BGR to RGB
-                
-                // IMPORTANT:
-                // - Do NOT use SS_WHITERECT / SS_BLACKRECT here: those styles cause the STATIC control
-                //   to paint a fixed-color rectangle (white/black) in its own WM_PAINT, which prevents
-                //   our WM_CTLCOLORSTATIC brush from showing up.
-                // - We rely on WM_CTLCOLORSTATIC (handled in SidebarPanelProc) to provide a solid brush.
-                HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
-                                            xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 40, 
-                                            g_sidebarPanel, (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER_SWATCH, NULL, NULL);
-                if (hSwatch) {
-                    // Keep the swatch brush in sync even when the sidebar is rebuilt.
-                    setSwatchBrush(g_diamondColorPickerSwatchBrush, swatchColor);
-                    InvalidateRect(hSwatch, NULL, TRUE);
+            if (uiControls.rectifyExpanded) {
+                // Margin Scale slider (1.00 to 1.40, step 0.01, default 1.18)
+                // Store as integer (100-140) for trackbar, convert to float
+                {
+                    createLabel(L"Margin Scale:", yPos, IDC_STATIC_BASE + 470);
+                    int marginScaleInt = static_cast<int>(std::round(uiControls.rectifyMarginScale * 100.0f));
+                    marginScaleInt = std::clamp(marginScaleInt, 100, 140);
+                    createTrackbar(IDC_RECTIFY_MARGIN_SCALE, yPos, 100, 140, marginScaleInt);
+                    createValueLabel(yPos, IDC_STATIC_BASE + 530);
+                    yPos += lineHeight;
                 }
-            }
-            yPos += 45;
 
-            // Sensitivity slider (tolerance for how far from the picked color we accept)
-            {
-                // IDs chosen in the IDC_STATIC_BASE + 200+ range to keep them local to the color picker UI.
-                createLabel(L"Sensitivity:", yPos, IDC_STATIC_BASE + 205);
-                createTrackbar(IDC_DIAMOND_COLOR_SENSITIVITY, yPos, 0, 100, uiControls.diamondParams.colorSensitivity);
-                createValueLabel(yPos, IDC_STATIC_BASE + 206);
-                yPos += lineHeight + 6;
-            }
+                // Padding slider (0 to 200, step 1, default 40)
+                {
+                    createLabel(L"Pad (px):", yPos, IDC_STATIC_BASE + 471);
+                    createTrackbar(IDC_RECTIFY_PAD_PX, yPos, 0, 200, uiControls.rectifyPadPx);
+                    createValueLabel(yPos, IDC_STATIC_BASE + 531);
+                    yPos += lineHeight + gap;
+                }
 
-            // Color info display (compact)
-            {
-                wchar_t bgrText[64] = L"BGR: --";
-                wchar_t hsvText[64] = L"HSV: --";
-                wchar_t rangeText[128] = L"Range: --";
-                
-                // Color filtering is always enabled; show current values unconditionally.
-                cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
-                swprintf_s(bgrText, L"BGR: (%d, %d, %d)",
-                          (int)bgr[2], (int)bgr[1], (int)bgr[0]);
-                swprintf_s(hsvText, L"HSV: (%d, %d, %d)",
-                          (uiControls.diamondParams.colorHMin + uiControls.diamondParams.colorHMax) / 2,
-                          (uiControls.diamondParams.colorSMin + uiControls.diamondParams.colorSMax) / 2,
-                          (uiControls.diamondParams.colorVMin + uiControls.diamondParams.colorVMax) / 2);
-                swprintf_s(rangeText, L"Range: H[%d-%d] S[%d-%d] V[%d-%d]",
-                          uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
-                          uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
-                          uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax);
-                
-                createLabel(bgrText, yPos, IDC_DIAMOND_COLOR_PICKER_BGR);
-                yPos += lineHeight;
-                createLabel(hsvText, yPos, IDC_DIAMOND_COLOR_PICKER_HSV);
-                yPos += lineHeight;
-                createLabel(rangeText, yPos, IDC_DIAMOND_COLOR_PICKER_RANGE);
-                yPos += lineHeight;
-            }
-
-            yPos += lineHeight + gap;
+                // Debug overlay checkbox
+                {
+                    HWND hDebug = CreateWindowW(L"BUTTON", L"Show Debug", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                                xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
+                                                (HMENU)(INT_PTR)IDC_RECTIFY_DEBUG_CB, NULL, NULL);
+                    applyFont(hDebug, false);
+                    SendMessage(hDebug, BM_SETCHECK, uiControls.showRectifyDebug ? BST_CHECKED : BST_UNCHECKED, 0);
+                    yPos += lineHeight + gap;
+                }
+            } // End of rectifyExpanded block
         }
+
     }
     else {
         // ===== Display page: source selection =====
@@ -3285,139 +3541,42 @@ void updateSidebarControls() {
     if (!g_sidebarPanel || !IsWindow(g_sidebarPanel)) return;
     
     // Update trackbar positions
-    HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH1);
-    if (hTrackbar) {
-        int thresholdVal = (uiControls.diamondParams.min_threshold > 0) ? uiControls.diamondParams.min_threshold : uiControls.diamondParams.threshold1;
-        SendMessage(hTrackbar, TBM_SETPOS, TRUE, thresholdVal);
-    }
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_THRESH2);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.threshold2);
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MINAREA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.minArea);
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MAXAREA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.maxArea);
-
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_CIRCULARITY);
-    if (hTrackbar) {
-        int circularityVal = static_cast<int>(uiControls.diamondParams.min_circularity * 100.0f);
-        SendMessage(hTrackbar, TBM_SETPOS, TRUE, circularityVal);
-    }
-
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_MORPH_KERNEL);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.morph_kernel_size);
-
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_SENSITIVITY);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.colorSensitivity);
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BLACK_VMAX);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.blackVMax);
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BROWN_HMAX);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.brownHMax);
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BROWN_SMAX);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.brownSMax);
-    
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_BROWN_VMAX);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.brownVMax);
-
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMONDS_RADIUS);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.radiusPx);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMONDS_THICKNESS);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.outlineThicknessPx);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMONDS_ALPHA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.alpha);
-
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_SENSITIVITY);
+    HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_SENSITIVITY);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.colorSensitivity);
 
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_ALPHA);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.fillAlpha);
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_THICKNESS);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.outlineThicknessPx);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_ALPHA);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.fillAlpha);
-    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_THICKNESS);
-    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.outlineThicknessPx);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RECTIFY_MARGIN_SCALE);
+    if (hTrackbar) {
+        int marginScaleInt = static_cast<int>(std::round(uiControls.rectifyMarginScale * 100.0f));
+        marginScaleInt = std::clamp(marginScaleInt, 100, 140);
+        SendMessage(hTrackbar, TBM_SETPOS, TRUE, marginScaleInt);
+    }
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RECTIFY_PAD_PX);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.rectifyPadPx);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RECTIFY_MARGIN_SCALE);
+    if (hTrackbar) {
+        int marginScaleInt = static_cast<int>(std::round(uiControls.rectifyMarginScale * 100.0f));
+        marginScaleInt = std::clamp(marginScaleInt, 100, 140);
+        SendMessage(hTrackbar, TBM_SETPOS, TRUE, marginScaleInt);
+    }
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RECTIFY_PAD_PX);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.rectifyPadPx);
 
-            hTrackbar = GetDlgItem(g_sidebarPanel, IDC_SMOOTHING);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_SMOOTHING);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.smoothingPercent);
     
     // Update value labels
     wchar_t buffer[32];
-    HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 2);
-    if (hLabel) {
-        int thresholdVal = (uiControls.diamondParams.min_threshold > 0) ? uiControls.diamondParams.min_threshold : uiControls.diamondParams.threshold1;
-        swprintf_s(buffer, L"%d", thresholdVal);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 6);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.minArea);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 8);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.maxArea);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 19);
-    if (hLabel) {
-        swprintf_s(buffer, L"%.2f", uiControls.diamondParams.min_circularity);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 21);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.morph_kernel_size);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 23);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.adaptive_thresh_C);
-        SetWindowTextW(hLabel, buffer);
-    }
-    // Color picker sensitivity value label (0..100)
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 206);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.diamondParams.colorSensitivity);
-        SetWindowTextW(hLabel, buffer);
-    }
 
     // Felt color picker sensitivity value label (0..100)
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 602);
+    HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 602);
     if (hLabel) {
         swprintf_s(buffer, L"%d", uiControls.feltParams.colorSensitivity);
         SetWindowTextW(hLabel, buffer);
     }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 11);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.railParams.blackVMax);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 13);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.railParams.brownHMax);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 15);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.railParams.brownSMax);
-        SetWindowTextW(hLabel, buffer);
-    }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 17);
-    if (hLabel) {
-        swprintf_s(buffer, L"%d", uiControls.railParams.brownVMax);
-        SetWindowTextW(hLabel, buffer);
-    }
-
-    // Diamond style values
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 91);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.radiusPx); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 93);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
 
     // Felt color filtering values are presented via the Felt color picker labels (BGR/HSV/Range),
     // not via individual HSV sliders.
@@ -3430,22 +3589,14 @@ void updateSidebarControls() {
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 119);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 121);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 123);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
 
     // Inline alpha value labels (next to Color buttons)
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 510);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 520);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 530);
-    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.alpha); SetWindowTextW(hLabel, buffer); }
 
     // The color picker info labels (BGR/HSV/Range) are STATIC controls; keep them in sync here so
-    // rebuilding the sidebar immediately reflects the current picked colors/ranges for both
-    // Diamonds and Felt.
+    // rebuilding the sidebar immediately reflects the current picked colors/ranges for Felt.
     updateColorPickerLabels();
 }
 
@@ -3454,14 +3605,13 @@ void handleSidebarButton(int buttonId) {
     if (buttonId == IDC_SIDEBAR_COLLAPSE) {
         uiControls.sidebarCollapsed = !uiControls.sidebarCollapsed;
     }
-    else if (buttonId == IDC_SIDEBAR_DIAMONDS) {
-        uiControls.sidebarContext = SidebarContext::Diamonds;
-    }
     else if (buttonId == IDC_SIDEBAR_FELT) {
-        uiControls.sidebarContext = SidebarContext::Felt;
+        uiControls.feltExpanded = !uiControls.feltExpanded;
+        saveSettingsToDisk();
     }
-    else if (buttonId == IDC_SIDEBAR_RAIL) {
-        uiControls.sidebarContext = SidebarContext::Rail;
+    else if (buttonId == IDC_SIDEBAR_RECTIFY) {
+        uiControls.rectifyExpanded = !uiControls.rectifyExpanded;
+        saveSettingsToDisk();
     }
 }
 
@@ -3474,62 +3624,10 @@ void updateSidebarContext(SidebarContext context) {
 // Handle trackbar value changes
 void handleTrackbarChange(int trackbarId, int value) {
     switch (trackbarId) {
-        case IDC_DIAMOND_THRESH1:
-            uiControls.diamondParams.threshold1 = value;
-            uiControls.diamondParams.min_threshold = value;  // Keep in sync
-            break;
-        case IDC_DIAMOND_THRESH2:
-            uiControls.diamondParams.threshold2 = value;
-            break;
-        case IDC_DIAMOND_MINAREA:
-            uiControls.diamondParams.minArea = value;
-            break;
-        case IDC_DIAMOND_MAXAREA:
-            uiControls.diamondParams.maxArea = value;
-            break;
-        case IDC_DIAMOND_CIRCULARITY:
-            // Scale from 0-100 to 0.0-1.0
-            uiControls.diamondParams.min_circularity = static_cast<float>(value) / 100.0f;
-            break;
-        case IDC_DIAMOND_MORPH_KERNEL:
-            // Ensure odd number for morphological kernel
-            uiControls.diamondParams.morph_kernel_size = (value % 2 == 0) ? (value + 1) : value;
-            uiControls.diamondParams.morph_kernel_size = std::clamp(uiControls.diamondParams.morph_kernel_size, 5, 31);
-            break;
-        case IDC_DIAMOND_ADAPTIVE_C:
-            uiControls.diamondParams.adaptive_thresh_C = value;
-            break;
-        case IDC_DIAMOND_COLOR_SENSITIVITY:
-            uiControls.diamondParams.colorSensitivity = std::clamp(value, 0, 100);
-            // If a color has already been picked, update the HSV range immediately so the filter reacts live.
-            applyDiamondColorSensitivityToRangesFromPickedHSV();
-            updateColorPickerLabels();
-            break;
         case IDC_FELT_COLOR_SENSITIVITY:
             uiControls.feltParams.colorSensitivity = std::clamp(value, 0, 100);
             applyFeltColorSensitivityToRangesFromPickedHSV();
             updateColorPickerLabels();
-            break;
-        case IDC_RAIL_BLACK_VMAX:
-            uiControls.railParams.blackVMax = value;
-            break;
-        case IDC_RAIL_BROWN_HMAX:
-            uiControls.railParams.brownHMax = value;
-            break;
-        case IDC_RAIL_BROWN_SMAX:
-            uiControls.railParams.brownSMax = value;
-            break;
-        case IDC_RAIL_BROWN_VMAX:
-            uiControls.railParams.brownVMax = value;
-            break;
-        case IDC_DIAMONDS_RADIUS:
-            uiControls.diamondParams.radiusPx = value;
-            break;
-        case IDC_DIAMONDS_THICKNESS:
-            uiControls.diamondParams.outlineThicknessPx = value;
-            break;
-        case IDC_DIAMONDS_ALPHA:
-            uiControls.diamondParams.alpha = value;
             break;
         case IDC_FELT_ALPHA:
             uiControls.feltParams.fillAlpha = value;
@@ -3537,11 +3635,31 @@ void handleTrackbarChange(int trackbarId, int value) {
         case IDC_FELT_THICKNESS:
             uiControls.feltParams.outlineThicknessPx = value;
             break;
-        case IDC_RAIL_ALPHA:
-            uiControls.railParams.fillAlpha = value;
+        case IDC_RECTIFY_MARGIN_SCALE:
+            uiControls.rectifyMarginScale = value / 100.0f;
+            // Update value label
+            {
+                HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 530);
+                if (hLabel) {
+                    wchar_t buffer[32];
+                    swprintf_s(buffer, L"%.2f", uiControls.rectifyMarginScale);
+                    SetWindowTextW(hLabel, buffer);
+                }
+            }
+            saveSettingsToDisk();
             break;
-        case IDC_RAIL_THICKNESS:
-            uiControls.railParams.outlineThicknessPx = value;
+        case IDC_RECTIFY_PAD_PX:
+            uiControls.rectifyPadPx = value;
+            // Update value label
+            {
+                HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 531);
+                if (hLabel) {
+                    wchar_t buffer[32];
+                    swprintf_s(buffer, L"%d", uiControls.rectifyPadPx);
+                    SetWindowTextW(hLabel, buffer);
+                }
+            }
+            saveSettingsToDisk();
             break;
         case IDC_SMOOTHING:
             uiControls.smoothingPercent = value;

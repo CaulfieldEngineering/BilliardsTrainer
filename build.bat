@@ -49,5 +49,23 @@ cd ..
 REM Launch the application
 echo.
 echo Launching application...
+REM Copy runtime DLLs from vcpkg to the Release folder so the exe can find them
+set VCPKG_BIN=C:\vcpkg\installed\x64-windows\bin
+if exist "%VCPKG_BIN%" (
+    echo Copying vcpkg runtime DLLs to build\Release...
+    for %%f in (opencv_videoio4.dll opencv_imgcodecs4.dll opencv_imgproc4.dll opencv_core4.dll zlib1.dll jpeg62.dll libwebpdecoder.dll libwebp.dll libsharpyuv.dll libwebpdemux.dll libwebpmux.dll libpng16.dll tiff.dll liblzma.dll) do (
+        if exist "%VCPKG_BIN%\%%f" (
+            copy /Y "%VCPKG_BIN%\%%f" "build\Release\" >nul 2>&1 && echo Copied %%f || echo Failed to copy %%f
+        ) else (
+            echo MISSING IN VCPKG: %%f
+        )
+    )
+) else (
+    echo vcpkg bin folder not found at %VCPKG_BIN% - skipping DLL copy
+)
+
+REM Launch the application
+echo.
+echo Launching application...
 start "" "build\Release\table_detector.exe"
 

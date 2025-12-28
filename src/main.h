@@ -44,6 +44,7 @@
 #endif
 
 #include "FeltDetection/felt_detection.h"
+#include "Rectification/rectification.h"
 
 // Sidebar context types
 enum class SidebarContext {
@@ -73,6 +74,10 @@ struct UIControls {
     bool sidebarCollapsed = false; // Sidebar collapsed state
     SidebarPage sidebarPage = SidebarPage::Debug; // Top-level sidebar page (default: Debug)
     SidebarContext sidebarContext = SidebarContext::Felt; // Current sidebar context (default to Felt)
+    
+    // Accordion section states
+    bool feltExpanded = true; // Felt section expanded by default
+    bool rectifyExpanded = true; // Rectification section expanded by default
 
     // Selected input source.
     //
@@ -99,9 +104,23 @@ struct UIControls {
 
     // Overlay parameters (defined in respective detection headers)
     FeltParams feltParams;
+    
+    // Rectification parameters
+    float rectifyMarginScale = 1.18f; // Expand source quad by this factor (default 1.18)
+    int rectifyPadPx = 40; // Padding in destination space (default 40)
+    bool showRectifyDebug = false; // Show debug overlay for rectification quads
 };
 
 // Defined in `main.cpp`
 extern UIControls uiControls;
+
+// Frame analysis result structure (accessible to UI and exporter)
+struct FrameAnalysis {
+    FeltDetectionResult felt;
+    RectificationResult rect;
+};
+
+// Latest frame analysis (defined in main.cpp)
+extern FrameAnalysis latestAnalysis;
 
 

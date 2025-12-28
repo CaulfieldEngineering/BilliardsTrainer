@@ -163,89 +163,142 @@ FeltDetectionResult detectFelt(const cv::Mat& bgr, const FeltParams& params) {
     result.contour = contours[largestIdx];
     result.feltMask = feltMask;
     result.hasCorners = false;
-    
-    // Geometric normalization: compute convex hull to remove pocket indentations
-    // This restores the true rectangular shape and prevents corners from being pulled inward by pockets
-    std::vector<cv::Point> hull;
-    cv::convexHull(result.contour, hull);
-    
-    // Extract 4-corner quadrilateral from the convex hull
-    double perim = cv::arcLength(hull, true);
-    std::vector<cv::Point> poly;
-    
-    // Try epsilon sweep to get exactly 4 points
-    const double epsFracs[] = {0.005, 0.01, 0.015, 0.02, 0.03};
-    bool found4Points = false;
-    for (double epsFrac : epsFracs) {
-        double eps = epsFrac * perim;
-        cv::approxPolyDP(hull, poly, eps, true);
-        if (poly.size() == 4) {
-            found4Points = true;
-            break;
+
+    // FIT 4 STRAIGHT LINES TO EXTREME EDGES OF FELT MASK
+    // Strategy: Sample entire width/height, then use median filtering to reject pocket curve outliers
+
+    const int h = feltMask.rows;
+    const int w = feltMask.cols;
+
+    std::vector<cv::Point> topEdge, bottomEdge, leftEdge, rightEdge;
+    std::vector<int> topY, bottomY, leftX, rightX;
+
+    // TOP EDGE: scan all columns, find topmost white pixel
+    for (int x = 0; x < w; ++x) {
+        for (int y = 0; y < h; ++y) {
+            if (feltMask.at<uchar>(y, x) > 0) {
+                topEdge.push_back(cv::Point(x, y));
+                topY.push_back(y);
+                break;
+            }
         }
     }
-    
-    // Fallback: use minimum area rectangle if we couldn't get 4 points
-    if (!found4Points) {
-        cv::RotatedRect minRect = cv::minAreaRect(hull);
-        cv::Point2f boxPoints[4];
-        minRect.points(boxPoints);
-        poly.clear();
-        for (int i = 0; i < 4; ++i) {
-            poly.push_back(cv::Point(static_cast<int>(boxPoints[i].x), static_cast<int>(boxPoints[i].y)));
+
+    // BOTTOM EDGE: scan all columns, find bottommost white pixel
+    for (int x = 0; x < w; ++x) {
+        for (int y = h - 1; y >= 0; --y) {
+            if (feltMask.at<uchar>(y, x) > 0) {
+                bottomEdge.push_back(cv::Point(x, y));
+                bottomY.push_back(y);
+                break;
+            }
         }
     }
-    
-    // Store raw poly for debug visualization
-    result.polyDebug = poly;
-    
-    // Convert to Point2f and order as TL, TR, BR, BL
-    // After the above, we should always have at least 4 points (either from approxPolyDP or minAreaRect fallback)
-    if (poly.size() >= 4) {
-        for (int i = 0; i < 4; ++i) {
-            result.corners[i] = cv::Point2f(static_cast<float>(poly[i].x), static_cast<float>(poly[i].y));
+
+    // LEFT EDGE: scan all rows, find leftmost white pixel
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            if (feltMask.at<uchar>(y, x) > 0) {
+                leftEdge.push_back(cv::Point(x, y));
+                leftX.push_back(x);
+                break;
+            }
         }
-        orderCorners(result.corners);
-        result.hasCorners = true;
     }
-    
-    // Store telemetry fields
-    result.polySize = static_cast<int>(poly.size());
-    result.found4Points = found4Points;
-    
-    // Debug prints to verify corner computation
-    std::cout << "hull size=" << hull.size()
-              << " poly size=" << poly.size()
-              << " found4=" << found4Points
-              << " hasCorners=" << result.hasCorners
-              << std::endl;
-    
-    // VALIDATION GUARDRAILS - use convex hull envelope for all geometry checks
-    double envArea = cv::contourArea(hull);
-    cv::Rect envBox = cv::boundingRect(hull);
-    result.bbox = envBox; // Use envelope bbox
-    
-    double imageArea = static_cast<double>(bgr.cols * bgr.rows);
-    double areaRatio = envArea / imageArea;
-    
-    // Store telemetry fields
-    result.envArea = envArea;
-    result.areaRatio = areaRatio;
-    
-    // Area ratio check: should cover significant portion of image
-    if (areaRatio < 0.05) {
-        return result; // ok = false
+
+    // RIGHT EDGE: scan all rows, find rightmost white pixel
+    for (int y = 0; y < h; ++y) {
+        for (int x = w - 1; x >= 0; --x) {
+            if (feltMask.at<uchar>(y, x) > 0) {
+                rightEdge.push_back(cv::Point(x, y));
+                rightX.push_back(x);
+                break;
+            }
+        }
     }
-    
-    // Aspect ratio check: plausible for pool table (wide or tall)
-    double aspectRatio = static_cast<double>(envBox.width) / static_cast<double>(envBox.height);
-    if (aspectRatio < 0.8 || aspectRatio > 3.0) {
-        return result; // ok = false
+
+    // Filter outliers using median +/- threshold approach
+    // Pocket curves will pull the edge inward, so we filter those out
+    auto filterOutliers = [](std::vector<cv::Point>& edge, const std::vector<int>& values, bool keepLarger) {
+        if (values.empty()) return;
+
+        // Compute median
+        std::vector<int> sorted = values;
+        std::sort(sorted.begin(), sorted.end());
+        int median = sorted[sorted.size() / 2];
+
+        // Keep only points within reasonable distance of median
+        // Pocket curves typically pull 10-30 pixels inward
+        const int threshold = 15;
+
+        std::vector<cv::Point> filtered;
+        for (size_t i = 0; i < edge.size(); ++i) {
+            int val = values[i];
+            if (keepLarger) {
+                // For right/bottom edges, keep values >= median - threshold
+                if (val >= median - threshold) {
+                    filtered.push_back(edge[i]);
+                }
+            } else {
+                // For left/top edges, keep values <= median + threshold
+                if (val <= median + threshold) {
+                    filtered.push_back(edge[i]);
+                }
+            }
+        }
+        edge = filtered;
+    };
+
+    filterOutliers(topEdge, topY, false);      // Keep smaller y values (closer to top)
+    filterOutliers(bottomEdge, bottomY, true); // Keep larger y values (closer to bottom)
+    filterOutliers(leftEdge, leftX, false);    // Keep smaller x values (closer to left)
+    filterOutliers(rightEdge, rightX, true);   // Keep larger x values (closer to right)
+
+    // Check if we have enough points to fit lines
+    if (topEdge.size() < 10 || bottomEdge.size() < 10 ||
+        leftEdge.size() < 10 || rightEdge.size() < 10) {
+        result.ok = true;
+        return result;
     }
-    
-    // Solidity check removed: hull/hull = 1.0, so not meaningful
-    // The hull is our envelope, so we validate based on it directly
-    
+
+    // Fit lines using cv::fitLine with HUBER distance (robust to outliers)
+    cv::Vec4f topLine, bottomLine, leftLine, rightLine;
+    cv::fitLine(topEdge, topLine, cv::DIST_HUBER, 0, 0.01, 0.01);
+    cv::fitLine(bottomEdge, bottomLine, cv::DIST_HUBER, 0, 0.01, 0.01);
+    cv::fitLine(leftEdge, leftLine, cv::DIST_HUBER, 0, 0.01, 0.01);
+    cv::fitLine(rightEdge, rightLine, cv::DIST_HUBER, 0, 0.01, 0.01);
+
+    // Helper lambda: find intersection of two lines
+    // Line format: [vx, vy, x0, y0] where (vx,vy) is direction vector, (x0,y0) is point on line
+    auto lineIntersection = [](const cv::Vec4f& L1, const cv::Vec4f& L2) -> cv::Point2f {
+        // Line 1: (x,y) = (x1,y1) + t*(vx1,vy1)
+        // Line 2: (x,y) = (x2,y2) + s*(vx2,vy2)
+        // Solve for intersection
+        float vx1 = L1[0], vy1 = L1[1], x1 = L1[2], y1 = L1[3];
+        float vx2 = L2[0], vy2 = L2[1], x2 = L2[2], y2 = L2[3];
+
+        float det = vx1 * vy2 - vy1 * vx2;
+        if (std::abs(det) < 1e-6) {
+            // Lines are parallel, return midpoint
+            return cv::Point2f((x1 + x2) / 2, (y1 + y2) / 2);
+        }
+
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float t = (dx * vy2 - dy * vx2) / det;
+
+        return cv::Point2f(x1 + t * vx1, y1 + t * vy1);
+    };
+
+    // Compute 4 corner intersections
+    cv::Point2f topLeft = lineIntersection(topLine, leftLine);
+    cv::Point2f topRight = lineIntersection(topLine, rightLine);
+    cv::Point2f bottomRight = lineIntersection(bottomLine, rightLine);
+    cv::Point2f bottomLeft = lineIntersection(bottomLine, leftLine);
+
+    result.corners = {topLeft, topRight, bottomRight, bottomLeft};
+    result.hasCorners = true;
+
     // All checks passed
     result.ok = true;
     return result;
@@ -254,68 +307,25 @@ FeltDetectionResult detectFelt(const cv::Mat& bgr, const FeltParams& params) {
 // Debug visualization function
 cv::Mat drawFeltDebug(const cv::Mat& bgr, const FeltDetectionResult& result) {
     cv::Mat debug = bgr.clone();
-    
+
     if (result.feltMask.empty() || result.contour.empty()) {
         return debug;
     }
-    
+
     // Draw mask overlay (alpha blend)
     cv::Mat maskOverlay = debug.clone();
     maskOverlay.setTo(cv::Scalar(0, 255, 0), result.feltMask);
     cv::addWeighted(debug, 0.7, maskOverlay, 0.3, 0, debug);
-    
-    // Draw contour in green
-    std::vector<std::vector<cv::Point>> contours = {result.contour};
-    cv::drawContours(debug, contours, -1, cv::Scalar(0, 255, 0), 2);
-    
-    // Draw hull (cyan) so you can see the envelope you're using
-    std::vector<cv::Point> hull;
-    cv::convexHull(result.contour, hull);
-    if (!hull.empty()) {
-        std::vector<std::vector<cv::Point>> hullContours = {hull};
-        cv::polylines(debug, hull, true, cv::Scalar(255, 255, 0), 2); // cyan
-    }
-    
-    // Draw raw poly (magenta) regardless of hasCorners flag
-    if (!result.polyDebug.empty()) {
-        cv::polylines(debug, result.polyDebug, true, cv::Scalar(255, 0, 255), 2);
-        for (size_t i = 0; i < result.polyDebug.size(); ++i) {
-            cv::circle(debug, result.polyDebug[i], 8, cv::Scalar(255, 0, 255), 2);
-        }
-    }
-    
-    // Draw corners as numbered circles and lines connecting them
-    // Draw whenever corners were successfully computed, independent of validation (ok)
+
+    // Draw yellow quad if corners are available
     if (result.hasCorners) {
-        const cv::Scalar cornerColor(255, 0, 255); // Magenta
-        const int cornerRadius = 8;
-        const int cornerThickness = 2;
-        
-        // Draw corner points with numbers
-        for (size_t i = 0; i < 4; ++i) {
-            cv::Point p(static_cast<int>(result.corners[i].x), static_cast<int>(result.corners[i].y));
-            cv::circle(debug, p, cornerRadius, cornerColor, cornerThickness);
-            
-            // Draw number label
-            std::string label = std::to_string(i);
-            int baseline = 0;
-            cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.6, 2, &baseline);
-            cv::putText(debug, label, cv::Point(p.x - textSize.width / 2, p.y - cornerRadius - 5),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.6, cornerColor, 2);
+        std::vector<cv::Point> quadPts;
+        for (const auto& corner : result.corners) {
+            quadPts.push_back(cv::Point(static_cast<int>(corner.x), static_cast<int>(corner.y)));
         }
-        
-        // Draw lines connecting corners
-        for (int i = 0; i < 4; ++i) {
-            cv::Point p1(static_cast<int>(result.corners[i].x), static_cast<int>(result.corners[i].y));
-            cv::Point p2(static_cast<int>(result.corners[(i + 1) % 4].x), 
-                        static_cast<int>(result.corners[(i + 1) % 4].y));
-            cv::line(debug, p1, p2, cornerColor, 2);
-        }
+        cv::polylines(debug, std::vector<std::vector<cv::Point>>{quadPts}, true, cv::Scalar(0, 255, 255), 2);
     }
-    
-    // Draw bounding box
-    cv::rectangle(debug, result.bbox, cv::Scalar(255, 255, 0), 2);
-    
+
     return debug;
 }
 
