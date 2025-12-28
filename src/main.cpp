@@ -1228,6 +1228,7 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
     }
 }
 
+// MOVE?
 // Helper function to calculate aspect-ratio-preserving scaled image bounds
 static void calculateScaledImageBounds(int imageW, int imageH, int viewportW, int viewportH,
                                         int& outScaledW, int& outScaledH, int& outOffsetX, int& outOffsetY) {
@@ -1256,6 +1257,7 @@ static void calculateScaledImageBounds(int imageW, int imageH, int viewportW, in
         outOffsetY = 0;
     }
 }
+
 
 // ImageView WndProc: draws the latest DIB scaled to fit.
 static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -1544,6 +1546,7 @@ static void updateRectifiedDibFromBgr(const cv::Mat& bgr) {
     }
 }
 
+// MOVE?
 // Build display frame for rectified (top-down) view with optional overlay
 static cv::Mat buildRectifiedDisplayFrame() {
     if (!latestAnalysis.rect.ok || latestAnalysis.rect.rectifiedBgr.empty()) {
@@ -1790,6 +1793,7 @@ static void computeFeltHsvRangeFromPickedHsv(
     outVMax = std::clamp(v + vTolUp, 0, 255);
 }
 
+// MOVE?
 static void applyFeltColorSensitivityToRangesFromPickedHSV() {
     if (!uiControls.feltParams.hasPickedColor) return;
     computeFeltHsvRangeFromPickedHsv(
@@ -1850,6 +1854,7 @@ static cv::Mat g_prevOverlayDeltaF; // CV_32FC3: (processed - rawFrame) from pre
 static std::array<cv::Point2f, 4> g_smoothedCorners; // Temporally smoothed corners for stable rectification
 static bool g_cornersInitialized = false;
 
+// MOVE?
 static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     if (currentFrame.empty()) return {};
     cv::Mat processed = currentFrame.clone();

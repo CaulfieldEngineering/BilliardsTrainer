@@ -3,8 +3,12 @@ cd C:\Users\jpcfo\Documents\_GitHub\_CaulfieldEngineering\BilliardsTrainer\build
 
 
 # To-Do
-- Clean up Main ... too large.
-- Move Yellow quad into felt_detection (from Main)
+- Review & Clean Main
+- Review & Clean Felt_Detection
+- Review & Clean Rectification
+- Implement Rail_Detection
+- Implement Diamond_Detection
+- Implement Pocket_Detection
 
 # Billiards Trainer - Table Detection Proof of Concept
 
