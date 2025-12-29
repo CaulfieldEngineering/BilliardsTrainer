@@ -10,6 +10,24 @@ cd C:\Users\jpcfo\Documents\_GitHub\_CaulfieldEngineering\BilliardsTrainer\build
 - Implement Diamond_Detection
 - Implement Pocket_Detection
 
+
+# Architecture
+- Perspective View
+- Rectified View
+- Animated View
+- Sidebar / Settings
+- Ability to "Capture" table without constant DSP
+- Settings
+  - Table Settings
+  - Display Settings
+- Table Calibration
+  - Table Size
+  - Select Felt
+  - Select Rails
+  - Select Diamonds
+  - Cushion Type
+  - "Find Table" / Calibrate Button
+
 # Billiards Trainer - Table Detection Proof of Concept
 
 A computer vision application that detects a billiards table in real-time video and overlays visualizations for the felt, rails, pockets, and diamonds.

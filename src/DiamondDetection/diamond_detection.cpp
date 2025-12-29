@@ -6,8 +6,12 @@
 // D) EMA threshold smoothing per rail (reduces frame-to-frame churn)
 static float T_ema[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-// E) Temporal smoothing of output centers per (railIndex, positionOnRail)
-struct TrackPt { cv::Point2f p; bool init = false; };
+// E) Temporal smoothing of output centers and bbox per (railIndex, positionOnRail)
+struct TrackPt {
+    cv::Point2f p;
+    float radius;
+    bool init = false;
+};
 static TrackPt track[4][6];  // max 6 diamonds per rail
 
 // Helper: Compute median of a vector
@@ -125,7 +129,7 @@ static std::vector<Diamond> detectDiamondsOnRail(
     int T = std::max(5, (int)vals[p90_idx]);
 
     // D) Apply EMA smoothing to threshold (reduces frame-to-frame churn)
-    float alpha = 0.2f; // smaller = steadier
+    float alpha = 0.12f; // smaller = steadier (reduced from 0.2 for more stability)
     if (T_ema[railIndex] <= 0) T_ema[railIndex] = (float)T;
     T_ema[railIndex] = (1.0f - alpha) * T_ema[railIndex] + alpha * (float)T;
     int Tstable = (int)std::round(T_ema[railIndex]);
@@ -410,8 +414,8 @@ DiamondDetectionResult detectDiamonds(
         // Assign positions along the rail
         assignDiamondPositions(railDiamonds, i);
 
-        // E) Apply temporal smoothing to reduce 1-3 px jitter
-        float beta = 0.15f; // 0.1-0.2, smaller = steadier
+        // E) Apply temporal smoothing to reduce 1-3 px jitter and shape shifts
+        float beta = 0.12f; // 0.1-0.2, smaller = steadier (reduced for more stability)
         for (auto& d : railDiamonds) {
             int k = d.positionOnRail;
             if (k < 0 || k >= 6) continue;
@@ -419,17 +423,23 @@ DiamondDetectionResult detectDiamonds(
             auto& t = track[i][k];
             if (!t.init) {
                 t.p = d.center;
+                t.radius = d.radius;
                 t.init = true;
             }
+            // Smooth both center and radius
             t.p = (1.0f - beta) * t.p + beta * d.center;
-            d.center = t.p;
+            t.radius = (1.0f - beta) * t.radius + beta * d.radius;
 
-            // Recompute bounding box from smoothed center
-            // (Keep original radius/contour, just update bbox center)
-            int halfW = d.boundingBox.width / 2;
-            int halfH = d.boundingBox.height / 2;
-            d.boundingBox.x = (int)std::round(d.center.x) - halfW;
-            d.boundingBox.y = (int)std::round(d.center.y) - halfH;
+            d.center = t.p;
+            d.radius = t.radius;
+
+            // Recompute bounding box from smoothed center and radius
+            int smoothedSize = (int)std::round(t.radius * 2.0f);
+            smoothedSize = std::max(3, smoothedSize);  // Minimum 3px
+            d.boundingBox.width = smoothedSize;
+            d.boundingBox.height = smoothedSize;
+            d.boundingBox.x = (int)std::round(d.center.x) - smoothedSize / 2;
+            d.boundingBox.y = (int)std::round(d.center.y) - smoothedSize / 2;
         }
 
         // Add to results

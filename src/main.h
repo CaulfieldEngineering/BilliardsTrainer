@@ -80,6 +80,8 @@ struct UIControls {
     // Accordion section states
     bool feltExpanded = true; // Felt section expanded by default
     bool rectifyExpanded = true; // Rectification section expanded by default
+    bool railsExpanded = true; // Rails section expanded by default
+    bool diamondsExpanded = true; // Diamonds section expanded by default
 
     // Selected input source.
     //

@@ -121,6 +121,8 @@ static void saveSettingsToDisk() {
     f << "ui.showDiamonds=" << toStringBool(uiControls.showDiamonds) << "\n";
     f << "ui.feltExpanded=" << toStringBool(uiControls.feltExpanded) << "\n";
     f << "ui.rectifyExpanded=" << toStringBool(uiControls.rectifyExpanded) << "\n";
+    f << "ui.railsExpanded=" << toStringBool(uiControls.railsExpanded) << "\n";
+    f << "ui.diamondsExpanded=" << toStringBool(uiControls.diamondsExpanded) << "\n";
     f << "ui.rectifyMarginScale=" << uiControls.rectifyMarginScale << "\n";
     f << "ui.rectifyPadPx=" << uiControls.rectifyPadPx << "\n";
     f << "ui.smoothingPercent=" << uiControls.smoothingPercent << "\n";
@@ -215,6 +217,8 @@ static void loadSettingsFromDisk() {
         else if (key == "ui.smoothingPercent") { int v; if (parseInt(val, v)) uiControls.smoothingPercent = std::clamp(v, 0, 100); }
         else if (key == "ui.feltExpanded") { bool b; if (parseBool(val, b)) uiControls.feltExpanded = b; }
         else if (key == "ui.rectifyExpanded") { bool b; if (parseBool(val, b)) uiControls.rectifyExpanded = b; }
+        else if (key == "ui.railsExpanded") { bool b; if (parseBool(val, b)) uiControls.railsExpanded = b; }
+        else if (key == "ui.diamondsExpanded") { bool b; if (parseBool(val, b)) uiControls.diamondsExpanded = b; }
         else if (key == "ui.rectifyMarginScale") { float v; if (std::sscanf(val.c_str(), "%f", &v) == 1) uiControls.rectifyMarginScale = std::clamp(v, 1.0f, 1.4f); }
         else if (key == "ui.rectifyPadPx") { int v; if (parseInt(val, v)) uiControls.rectifyPadPx = std::clamp(v, 0, 200); }
 
@@ -1827,9 +1831,53 @@ static void updateColorPickerLabels() {
     }
 
     // --------------------------
-    // Rail picker labels/swatch
+    // Diamond picker labels/swatch (only update if section is expanded)
     // --------------------------
-    {
+    if (uiControls.diamondsExpanded) {
+        wchar_t bgrText[64] = L"BGR: --";
+        wchar_t hsvText[64] = L"HSV: --";
+        wchar_t rangeText[128] = L"Range: --";
+
+        const cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+        swprintf_s(bgrText, L"BGR: (%d, %d, %d)", (int)bgr[2], (int)bgr[1], (int)bgr[0]);
+
+        if (uiControls.diamondParams.hasPickedColor) {
+            const cv::Vec3b hsv = uiControls.diamondParams.pickedHSV;
+            swprintf_s(hsvText, L"HSV: (%d, %d, %d)", (int)hsv[0], (int)hsv[1], (int)hsv[2]);
+        }
+
+        formatRange(uiControls.diamondParams.colorHMin, uiControls.diamondParams.colorHMax,
+                    uiControls.diamondParams.colorSMin, uiControls.diamondParams.colorSMax,
+                    uiControls.diamondParams.colorVMin, uiControls.diamondParams.colorVMax,
+                    rangeText, _countof(rangeText));
+
+        HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_BGR);
+        if (hBGR) SetWindowTextW(hBGR, bgrText);
+        HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_HSV);
+        if (hHSV) SetWindowTextW(hHSV, hsvText);
+        HWND hRange = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_RANGE);
+        if (hRange) SetWindowTextW(hRange, rangeText);
+
+        HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER_SWATCH);
+        if (hSwatch) {
+            const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
+            setSwatchBrush(g_diamondColorPickerSwatchBrush, swatchColor);
+            InvalidateRect(hSwatch, NULL, TRUE);
+            UpdateWindow(hSwatch);
+        }
+
+        HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_PICKER);
+        if (hColorPicker) {
+            const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamond);
+            const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
+            SetWindowTextW(hColorPicker, btnText);
+        }
+    }
+
+    // --------------------------
+    // Rail picker labels/swatch (only update if section is expanded)
+    // --------------------------
+    if (uiControls.railsExpanded) {
         wchar_t bgrText[64] = L"BGR: --";
         wchar_t hsvText[64] = L"HSV: --";
         wchar_t rangeText[128] = L"Range: --";
@@ -2860,6 +2908,7 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_SIDEBAR_COLLAPSE (IDC_BUTTON_BASE + 100)
 #define IDC_SIDEBAR_DIAMONDS (IDC_BUTTON_BASE + 101)
 #define IDC_SIDEBAR_FELT (IDC_BUTTON_BASE + 102)
+#define IDC_SIDEBAR_RAILS (IDC_BUTTON_BASE + 103)
 #define IDC_SIDEBAR_RECTIFY (IDC_BUTTON_BASE + 104)
 
 // Control IDs for sidebar controls
@@ -3370,6 +3419,7 @@ void createSidebarControls(HWND hwnd) {
 
 #ifdef _WIN32
     if (!g_sidebarPanel || !IsWindow(g_sidebarPanel)) {
+        std::cerr << "[ERROR] createSidebarControls: g_sidebarPanel is invalid\n";
         return;
     }
 #else
@@ -3440,7 +3490,9 @@ void createSidebarControls(HWND hwnd) {
         HWND hHeader = CreateWindowW(L"BUTTON", buttonText.c_str(), WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_LEFT,
                                     xPos, yPos - g_sidebarScrollPos, usableWidth, 24, g_sidebarPanel,
                                     (HMENU)(INT_PTR)buttonId, NULL, NULL);
-        applyFont(hHeader, true);
+        if (hHeader) {
+            applyFont(hHeader, true);
+        }
         yPos += lineHeight + 4;
     };
 
@@ -3716,19 +3768,20 @@ void createSidebarControls(HWND hwnd) {
 
         // RAILS section
         {
-            addHeader(L"Rails");
+            addAccordionHeader(L"Rails", IDC_SIDEBAR_RAILS, uiControls.railsExpanded);
 
-            // Lambda for creating full-width labels (same as felt section)
-            auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
-                HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
-                                       xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
-                                       (HMENU)(INT_PTR)id, NULL, NULL);
-                applyFont(h, false);
-                return h;
-            };
+            if (uiControls.railsExpanded) {
+                // Lambda for creating full-width labels (same as felt section)
+                auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
+                    HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                           xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)id, NULL, NULL);
+                    applyFont(h, false);
+                    return h;
+                };
 
-            // Show/Hide
-            {
+                // Show/Hide
+                {
                 HWND hEnabled = CreateWindowW(L"BUTTON", L"Show/Hide", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
                                               xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
                                               (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_RAILS_CB, NULL, NULL);
@@ -3819,23 +3872,25 @@ void createSidebarControls(HWND hwnd) {
                 createValueLabel(yPos, IDC_STATIC_BASE + 123);
                 yPos += lineHeight + gap;
             }
+            } // End of railsExpanded block
         }
 
         // DIAMONDS section
         {
-            addHeader(L"Diamonds");
+            addAccordionHeader(L"Diamonds", IDC_SIDEBAR_DIAMONDS, uiControls.diamondsExpanded);
 
-            // Lambda for creating full-width labels (same as felt/rail sections)
-            auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
-                HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
-                                       xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
-                                       (HMENU)(INT_PTR)id, NULL, NULL);
-                applyFont(h, false);
-                return h;
-            };
+            if (uiControls.diamondsExpanded) {
+                // Lambda for creating full-width labels (same as felt/rail sections)
+                auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
+                    HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                           xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)id, NULL, NULL);
+                    applyFont(h, false);
+                    return h;
+                };
 
-            // Pick diamond color (click-to-sample)
-            {
+                // Pick diamond color (click-to-sample)
+                {
                 const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamond);
                 const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
                 HWND hPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
@@ -3941,6 +3996,7 @@ void createSidebarControls(HWND hwnd) {
                 createValueLabel(yPos, IDC_STATIC_BASE + 125);
                 yPos += lineHeight + gap;
             }
+            } // End of diamondsExpanded block
         }
 
         // RECTIFICATION section
@@ -4078,6 +4134,8 @@ void updateSidebarControls() {
     // Update trackbar positions
     HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_SENSITIVITY);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.colorSensitivity);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COLOR_SENSITIVITY);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.colorSensitivity);
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_SENSITIVITY);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.colorSensitivity);
 
@@ -4123,6 +4181,13 @@ void updateSidebarControls() {
         SetWindowTextW(hLabel, buffer);
     }
 
+    // Diamond color picker sensitivity value label (0..100)
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 502);
+    if (hLabel) {
+        swprintf_s(buffer, L"%d", uiControls.diamondParams.colorSensitivity);
+        SetWindowTextW(hLabel, buffer);
+    }
+
     // Rail color picker sensitivity value label (0..100)
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 702);
     if (hLabel) {
@@ -4143,16 +4208,22 @@ void updateSidebarControls() {
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 123);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 124);
+    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 125);
+    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
 
     // Inline alpha value labels (next to Color buttons)
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 510);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 522);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 523);
+    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.diamondParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
 
-    // Diamond detection count label
+    // Diamond detection count label (only exists when diamonds section is expanded)
     hLabel = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COUNT);
-    if (hLabel) {
+    if (hLabel && uiControls.diamondsExpanded) {
         swprintf_s(buffer, L"Detected: %d / 18", latestAnalysis.diamonds.numDiamondsDetected);
         SetWindowTextW(hLabel, buffer);
     }
@@ -4169,6 +4240,14 @@ void handleSidebarButton(int buttonId) {
     }
     else if (buttonId == IDC_SIDEBAR_FELT) {
         uiControls.feltExpanded = !uiControls.feltExpanded;
+        saveSettingsToDisk();
+    }
+    else if (buttonId == IDC_SIDEBAR_RAILS) {
+        uiControls.railsExpanded = !uiControls.railsExpanded;
+        saveSettingsToDisk();
+    }
+    else if (buttonId == IDC_SIDEBAR_DIAMONDS) {
+        uiControls.diamondsExpanded = !uiControls.diamondsExpanded;
         saveSettingsToDisk();
     }
     else if (buttonId == IDC_SIDEBAR_RECTIFY) {
