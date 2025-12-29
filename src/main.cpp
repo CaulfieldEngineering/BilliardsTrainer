@@ -117,6 +117,7 @@ static void saveSettingsToDisk() {
     f << "ui.selectedSource=" << uiControls.selectedSource << "\n";
     f << "ui.showOverlay=" << toStringBool(uiControls.showOverlay) << "\n";
     f << "ui.showFelt=" << toStringBool(uiControls.showFelt) << "\n";
+    f << "ui.showRails=" << toStringBool(uiControls.showRails) << "\n";
     f << "ui.feltExpanded=" << toStringBool(uiControls.feltExpanded) << "\n";
     f << "ui.rectifyExpanded=" << toStringBool(uiControls.rectifyExpanded) << "\n";
     f << "ui.rectifyMarginScale=" << uiControls.rectifyMarginScale << "\n";
@@ -139,6 +140,28 @@ static void saveSettingsToDisk() {
     f << "felt.isFilled=" << toStringBool(fp.isFilled) << "\n";
     f << "felt.fillAlpha=" << fp.fillAlpha << "\n";
     f << "felt.outlineThicknessPx=" << fp.outlineThicknessPx << "\n";
+
+    // ---- Rails ----
+    const auto& rp = uiControls.railParams;
+    f << "rail.hasPickedColor=" << toStringBool(rp.hasPickedColor) << "\n";
+    f << "rail.pickedHSV=" << toStringVec3b(rp.pickedHSV) << "\n";
+    f << "rail.pickedBGR=" << toStringVec3b(rp.pickedBGR) << "\n";
+    f << "rail.colorSensitivity=" << rp.colorSensitivity << "\n";
+    f << "rail.colorHMin=" << rp.colorHMin << "\n";
+    f << "rail.colorHMax=" << rp.colorHMax << "\n";
+    f << "rail.colorSMin=" << rp.colorSMin << "\n";
+    f << "rail.colorSMax=" << rp.colorSMax << "\n";
+    f << "rail.colorVMin=" << rp.colorVMin << "\n";
+    f << "rail.colorVMax=" << rp.colorVMax << "\n";
+    f << "rail.railBandWidth=" << rp.railBandWidth << "\n";
+    f << "rail.railMaxWidth=" << rp.railMaxWidth << "\n";
+    f << "rail.railMinArea=" << rp.railMinArea << "\n";
+    f << "rail.railEdgeThreshold=" << rp.railEdgeThreshold << "\n";
+    f << "rail.railEdgeThreshold2=" << rp.railEdgeThreshold2 << "\n";
+    f << "rail.overlayColor=" << toStringScalarBgr(rp.color) << "\n";
+    f << "rail.isFilled=" << toStringBool(rp.isFilled) << "\n";
+    f << "rail.fillAlpha=" << rp.fillAlpha << "\n";
+    f << "rail.outlineThicknessPx=" << rp.outlineThicknessPx << "\n";
 }
 
 static void loadSettingsFromDisk() {
@@ -162,6 +185,7 @@ static void loadSettingsFromDisk() {
         if (key == "ui.selectedSource") { int v; if (parseInt(val, v)) uiControls.selectedSource = v; }
         else if (key == "ui.showOverlay") { bool b; if (parseBool(val, b)) uiControls.showOverlay = b; }
         else if (key == "ui.showFelt") { bool b; if (parseBool(val, b)) uiControls.showFelt = b; }
+        else if (key == "ui.showRails") { bool b; if (parseBool(val, b)) uiControls.showRails = b; }
         else if (key == "ui.smoothingPercent") { int v; if (parseInt(val, v)) uiControls.smoothingPercent = std::clamp(v, 0, 100); }
         else if (key == "ui.feltExpanded") { bool b; if (parseBool(val, b)) uiControls.feltExpanded = b; }
         else if (key == "ui.rectifyExpanded") { bool b; if (parseBool(val, b)) uiControls.rectifyExpanded = b; }
@@ -183,6 +207,27 @@ static void loadSettingsFromDisk() {
         else if (key == "felt.isFilled") { bool b; if (parseBool(val, b)) uiControls.feltParams.isFilled = b; }
         else if (key == "felt.fillAlpha") { int v; if (parseInt(val, v)) uiControls.feltParams.fillAlpha = std::clamp(v, 0, 255); }
         else if (key == "felt.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.feltParams.outlineThicknessPx = std::max(1, v); }
+
+        // ---- Rails ----
+        else if (key == "rail.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.railParams.hasPickedColor = b; }
+        else if (key == "rail.pickedHSV") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.railParams.pickedHSV = vv; }
+        else if (key == "rail.pickedBGR") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.railParams.pickedBGR = vv; }
+        else if (key == "rail.colorSensitivity") { int v; if (parseInt(val, v)) uiControls.railParams.colorSensitivity = std::clamp(v, 0, 100); }
+        else if (key == "rail.colorHMin") { int v; if (parseInt(val, v)) uiControls.railParams.colorHMin = std::clamp(v, 0, 180); }
+        else if (key == "rail.colorHMax") { int v; if (parseInt(val, v)) uiControls.railParams.colorHMax = std::clamp(v, 0, 180); }
+        else if (key == "rail.colorSMin") { int v; if (parseInt(val, v)) uiControls.railParams.colorSMin = std::clamp(v, 0, 255); }
+        else if (key == "rail.colorSMax") { int v; if (parseInt(val, v)) uiControls.railParams.colorSMax = std::clamp(v, 0, 255); }
+        else if (key == "rail.colorVMin") { int v; if (parseInt(val, v)) uiControls.railParams.colorVMin = std::clamp(v, 0, 255); }
+        else if (key == "rail.colorVMax") { int v; if (parseInt(val, v)) uiControls.railParams.colorVMax = std::clamp(v, 0, 255); }
+        else if (key == "rail.railBandWidth") { int v; if (parseInt(val, v)) uiControls.railParams.railBandWidth = std::max(1, v); }
+        else if (key == "rail.railMaxWidth") { int v; if (parseInt(val, v)) uiControls.railParams.railMaxWidth = std::max(1, v); }
+        else if (key == "rail.railMinArea") { int v; if (parseInt(val, v)) uiControls.railParams.railMinArea = std::max(1, v); }
+        else if (key == "rail.railEdgeThreshold") { int v; if (parseInt(val, v)) uiControls.railParams.railEdgeThreshold = std::max(1, v); }
+        else if (key == "rail.railEdgeThreshold2") { int v; if (parseInt(val, v)) uiControls.railParams.railEdgeThreshold2 = std::max(1, v); }
+        else if (key == "rail.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.railParams.color = c; }
+        else if (key == "rail.isFilled") { bool b; if (parseBool(val, b)) uiControls.railParams.isFilled = b; }
+        else if (key == "rail.fillAlpha") { int v; if (parseInt(val, v)) uiControls.railParams.fillAlpha = std::clamp(v, 0, 255); }
+        else if (key == "rail.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.railParams.outlineThicknessPx = std::max(1, v); }
     }
 }
 
@@ -624,6 +669,8 @@ std::vector<int> g_availableCameras;
 #define IDC_DIAMOND_COLOR_PICKER 30251
 // Felt color picker button ID
 #define IDC_FELT_COLOR_PICKER 30252
+// Rail color picker button ID
+#define IDC_RAIL_COLOR_PICKER 30253
 
 // Diamond color picker info labels (defined early for use in update function)
 #define IDC_DIAMOND_COLOR_PICKER_BGR 10050
@@ -636,6 +683,12 @@ std::vector<int> g_availableCameras;
 #define IDC_FELT_COLOR_PICKER_HSV 10061
 #define IDC_FELT_COLOR_PICKER_RANGE 10062
 #define IDC_FELT_COLOR_PICKER_SWATCH 10065
+
+// Rail color picker info labels (defined early for use in update function)
+#define IDC_RAIL_COLOR_PICKER_BGR 10070
+#define IDC_RAIL_COLOR_PICKER_HSV 10071
+#define IDC_RAIL_COLOR_PICKER_RANGE 10072
+#define IDC_RAIL_COLOR_PICKER_SWATCH 10075
 
 #define IDC_COMBO_BASE 40000
 
@@ -650,13 +703,15 @@ static HBRUSH g_sidebarBgBrush = NULL;
 // - We own this brush and must delete it on replacement / shutdown to avoid leaking GDI objects.
 static HBRUSH g_diamondColorPickerSwatchBrush = NULL;
 static HBRUSH g_feltColorPickerSwatchBrush = NULL;
+static HBRUSH g_railColorPickerSwatchBrush = NULL;
 static HFONT g_sidebarFont = NULL;
 static HFONT g_sidebarFontBold = NULL;
 
 // Which target (if any) the color picker is currently sampling for.
 enum class ColorPickerTarget {
     None,
-    Felt
+    Felt,
+    Rail
 };
 static ColorPickerTarget g_colorPickerTarget = ColorPickerTarget::None;
 static int g_scaledImageX = 0, g_scaledImageY = 0, g_scaledImageW = 0, g_scaledImageH = 0;  // Scaled image position/size for coordinate conversion
@@ -878,6 +933,7 @@ static void ensureSidebarAndImageChildren(HWND mainHwnd);
 static void layoutChildren(HWND mainHwnd);
 static void updateColorPickerLabels();
 static void applyFeltColorSensitivityToRangesFromPickedHSV();
+static void applyRailColorSensitivityToRangesFromPickedHSV();
 static void updateImageDibFromBgr(const cv::Mat& bgr);
 
 // Update the global swatch brush used by WM_CTLCOLORSTATIC.
@@ -917,6 +973,10 @@ static LRESULT CALLBACK SidebarPanelProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             if (child && childId == IDC_FELT_COLOR_PICKER_SWATCH && g_feltColorPickerSwatchBrush) {
                 SetBkMode(hdc, OPAQUE);
                 return (INT_PTR)g_feltColorPickerSwatchBrush;
+            }
+            if (child && childId == IDC_RAIL_COLOR_PICKER_SWATCH && g_railColorPickerSwatchBrush) {
+                SetBkMode(hdc, OPAQUE);
+                return (INT_PTR)g_railColorPickerSwatchBrush;
             }
             break;
         }
@@ -1211,6 +1271,11 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
             uiControls.feltParams.pickedHSV = hsv;
             uiControls.feltParams.hasPickedColor = true;
             applyFeltColorSensitivityToRangesFromPickedHSV();
+        } else if (g_colorPickerTarget == ColorPickerTarget::Rail) {
+            uiControls.railParams.pickedBGR = bgr;
+            uiControls.railParams.pickedHSV = hsv;
+            uiControls.railParams.hasPickedColor = true;
+            applyRailColorSensitivityToRangesFromPickedHSV();
         }
 
         // Hide magnifier and deactivate picker FIRST, then refresh UI.
@@ -1443,6 +1508,11 @@ static LRESULT CALLBACK ImageViewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
                         uiControls.feltParams.pickedHSV = hsv;
                         uiControls.feltParams.hasPickedColor = true;
                         applyFeltColorSensitivityToRangesFromPickedHSV();
+                    } else if (g_colorPickerTarget == ColorPickerTarget::Rail) {
+                        uiControls.railParams.pickedBGR = bgr;
+                        uiControls.railParams.pickedHSV = hsv;
+                        uiControls.railParams.hasPickedColor = true;
+                        applyRailColorSensitivityToRangesFromPickedHSV();
                     }
                     
                     // Hide magnifier and deactivate picker FIRST, then refresh UI.
@@ -1589,6 +1659,11 @@ static cv::Mat buildRectifiedDisplayFrame() {
         }
     }
 
+    // Apply rail overlay if enabled (using rail_detection module)
+    if (uiControls.showOverlay && uiControls.showRails && latestAnalysis.rails.ok) {
+        drawRailOverlay(processed, latestAnalysis.rails, uiControls.railParams);
+    }
+
     return processed;
 }
 
@@ -1691,6 +1766,50 @@ static void updateColorPickerLabels() {
         if (hColorPicker) {
             const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Felt);
             const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Felt Color";
+            SetWindowTextW(hColorPicker, btnText);
+        }
+    }
+
+    // --------------------------
+    // Rail picker labels/swatch
+    // --------------------------
+    {
+        wchar_t bgrText[64] = L"BGR: --";
+        wchar_t hsvText[64] = L"HSV: --";
+        wchar_t rangeText[128] = L"Range: --";
+
+        const cv::Vec3b bgr = uiControls.railParams.pickedBGR;
+        swprintf_s(bgrText, L"BGR: (%d, %d, %d)", (int)bgr[2], (int)bgr[1], (int)bgr[0]);
+
+        if (uiControls.railParams.hasPickedColor) {
+            const cv::Vec3b hsv = uiControls.railParams.pickedHSV;
+            swprintf_s(hsvText, L"HSV: (%d, %d, %d)", (int)hsv[0], (int)hsv[1], (int)hsv[2]);
+        }
+
+        formatRange(uiControls.railParams.colorHMin, uiControls.railParams.colorHMax,
+                    uiControls.railParams.colorSMin, uiControls.railParams.colorSMax,
+                    uiControls.railParams.colorVMin, uiControls.railParams.colorVMax,
+                    rangeText, _countof(rangeText));
+
+        HWND hBGR = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_PICKER_BGR);
+        if (hBGR) SetWindowTextW(hBGR, bgrText);
+        HWND hHSV = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_PICKER_HSV);
+        if (hHSV) SetWindowTextW(hHSV, hsvText);
+        HWND hRange = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_PICKER_RANGE);
+        if (hRange) SetWindowTextW(hRange, rangeText);
+
+        HWND hSwatch = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_PICKER_SWATCH);
+        if (hSwatch) {
+            const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
+            setSwatchBrush(g_railColorPickerSwatchBrush, swatchColor);
+            InvalidateRect(hSwatch, NULL, TRUE);
+            UpdateWindow(hSwatch);
+        }
+
+        HWND hColorPicker = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_PICKER);
+        if (hColorPicker) {
+            const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Rail);
+            const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Rail Color";
             SetWindowTextW(hColorPicker, btnText);
         }
     }
@@ -1808,6 +1927,28 @@ static void applyFeltColorSensitivityToRangesFromPickedHSV() {
     );
 }
 
+// Apply rail color sensitivity to HSV ranges (similar to felt)
+static void applyRailColorSensitivityToRangesFromPickedHSV() {
+    if (!uiControls.railParams.hasPickedColor) return;
+
+    computeHsvRangeFromPickedHsv(
+        uiControls.railParams.pickedHSV,
+        uiControls.railParams.colorSensitivity,
+        uiControls.railParams.colorHMin,
+        uiControls.railParams.colorHMax,
+        uiControls.railParams.colorSMin,
+        uiControls.railParams.colorSMax,
+        uiControls.railParams.colorVMin,
+        uiControls.railParams.colorVMax
+    );
+
+    // Enable color filtering automatically when color is picked
+    uiControls.railParams.useColorFilter = true;
+
+    // Note: railColorMin/Max in BGR format are not used anymore
+    // The detection now uses the HSV ranges directly
+}
+
 static void layoutChildren(HWND mainHwnd) {
     RECT rc{};
     GetClientRect(mainHwnd, &rc);
@@ -1853,6 +1994,8 @@ static void layoutChildren(HWND mainHwnd) {
 static cv::Mat g_prevOverlayDeltaF; // CV_32FC3: (processed - rawFrame) from previous frame
 static std::array<cv::Point2f, 4> g_smoothedCorners; // Temporally smoothed corners for stable rectification
 static bool g_cornersInitialized = false;
+static cv::Mat g_prevRailMask; // Previous frame's rail mask for temporal smoothing
+static bool g_railMaskInitialized = false;
 
 // MOVE?
 static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
@@ -1870,6 +2013,11 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
             drawFeltOverlay(processed, g_lastFeltResult, uiControls.feltParams);
             // Draw felt corners quad (from felt_detection module) - darker version of felt color
             drawFeltCornersQuad(processed, g_lastFeltResult, uiControls.feltParams);
+        }
+        
+        // Apply rail overlay only if showRails is enabled (using rail_detection module)
+        if (uiControls.showRails && latestAnalysis.railsPerspective.ok) {
+            drawRailOverlay(processed, latestAnalysis.railsPerspective, uiControls.railParams);
         }
     }
 
@@ -1912,6 +2060,63 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         // Reset rectification results if felt detection failed
         latestAnalysis.rect = RectificationResult();
         g_cornersInitialized = false;  // Reset smoothing when corners are lost
+    }
+
+    // Perform rail detection on rectified view if rectification succeeded
+    if (latestAnalysis.rect.ok && !latestAnalysis.rect.rectifiedBgr.empty() && !latestAnalysis.rect.rectifiedFeltMask.empty()) {
+        latestAnalysis.rails = detectRails(
+            latestAnalysis.rect.rectifiedBgr,
+            latestAnalysis.rect.rectifiedFeltMask,
+            uiControls.railParams
+        );
+        
+        // Apply temporal smoothing to rail mask to reduce jitter
+        // Use a higher smoothing factor for rails to reduce intermittent detection
+        const int sPct = std::clamp(uiControls.smoothingPercent, 0, 100);
+        if (sPct > 0 && latestAnalysis.rails.ok && !latestAnalysis.rails.railMask.empty()) {
+            // Apply stronger smoothing for rails (1.5x the slider value, clamped to max 95%)
+            const float boostedAlpha = std::min(0.95f, static_cast<float>(sPct) * 1.5f / 100.0f);
+
+            if (!g_railMaskInitialized || g_prevRailMask.size() != latestAnalysis.rails.railMask.size()) {
+                latestAnalysis.rails.railMask.convertTo(g_prevRailMask, CV_32FC1, 1.0 / 255.0);
+                g_railMaskInitialized = true;
+            } else {
+                // Exponential moving average smoothing on rail mask
+                cv::Mat currentMaskF;
+                latestAnalysis.rails.railMask.convertTo(currentMaskF, CV_32FC1, 1.0 / 255.0);
+                cv::Mat smoothedMaskF;
+                cv::addWeighted(currentMaskF, 1.0f - boostedAlpha, g_prevRailMask, boostedAlpha, 0.0, smoothedMaskF);
+
+                // Use a higher threshold (0.6 instead of 0.5) to reduce noise and flickering
+                // This provides hysteresis - rails must be consistently detected to appear
+                cv::threshold(smoothedMaskF, smoothedMaskF, 0.6, 1.0, cv::THRESH_BINARY);
+                smoothedMaskF.convertTo(latestAnalysis.rails.railMask, CV_8UC1, 255.0);
+                g_prevRailMask = smoothedMaskF;
+            }
+        } else if (latestAnalysis.rails.ok && !latestAnalysis.rails.railMask.empty()) {
+            // Initialize or reset smoothing state
+            if (g_prevRailMask.empty() || latestAnalysis.rails.railMask.size() != g_prevRailMask.size()) {
+                latestAnalysis.rails.railMask.convertTo(g_prevRailMask, CV_32FC1, 1.0 / 255.0);
+                g_railMaskInitialized = true;
+            }
+        } else {
+            g_railMaskInitialized = false;
+        }
+        
+        // Project rails to perspective view for display on main view
+        if (latestAnalysis.rails.ok && !latestAnalysis.rect.Hinv.empty()) {
+            latestAnalysis.railsPerspective = projectRailsToPerspective(
+                latestAnalysis.rails,
+                latestAnalysis.rect.Hinv,
+                currentFrame.size()
+            );
+        } else {
+            latestAnalysis.railsPerspective = RailDetectionResult();
+        }
+    } else {
+        latestAnalysis.rails = RailDetectionResult();
+        latestAnalysis.railsPerspective = RailDetectionResult();
+        g_railMaskInitialized = false;
     }
 
     // --------------------------------------------------------------------------------------------
@@ -2101,10 +2306,12 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             // Debug sidebar checkboxes (IDs match defines below: 30200..30203)
             const int kIdOverlayMaster = 30200;
             const int kIdOverlayFelt = 30202;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayFelt)) {
+            const int kIdOverlayRails = 30203;
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayFelt || id == kIdOverlayRails)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
+                else if (id == kIdOverlayRails) uiControls.showRails = isChecked;
                 saveSettingsToDisk();  // Save settings immediately when overlay toggles change
                 return 0;
             }
@@ -2112,9 +2319,16 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             // Overlay style buttons/checkboxes (IDs match defines below: 30230+)
             const int kIdFeltColor = 30230;
             const int kIdFeltFilled = 30231;
+            const int kIdRailsColor = 30240;
+            const int kIdRailsFilled = 30241;
             if (code == BN_CLICKED) {
                 if (id == kIdFeltFilled) {
                     uiControls.feltParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
+                    return 0;
+                }
+                if (id == kIdRailsFilled) {
+                    uiControls.railParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     saveSettingsToDisk();  // Save settings immediately when checkbox toggles
                     return 0;
                 }
@@ -2170,10 +2384,68 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                     updateColorPickerLabels();  // Update button text and UI
                     return 0;
                 }
+                if (id == IDC_RAIL_COLOR_PICKER) {
+                    // Activate/deactivate rail color picker mode.
+                    const ColorPickerTarget requested = ColorPickerTarget::Rail;
+
+                    if (g_colorPickerTarget == requested) {
+                        // Deactivate
+                        g_colorPickerTarget = ColorPickerTarget::None;
+                        if (g_magnifierHwnd) ShowWindow(g_magnifierHwnd, SW_HIDE);
+                    } else {
+                        // Switch to requested picker
+                        g_colorPickerTarget = requested;
+
+                        // Enable mouse tracking in ImageView to get mouse move events
+                        if (g_imageViewHwnd) {
+                            TRACKMOUSEEVENT tme = {};
+                            tme.cbSize = sizeof(TRACKMOUSEEVENT);
+                            tme.dwFlags = TME_HOVER | TME_LEAVE;
+                            tme.hwndTrack = g_imageViewHwnd;
+                            tme.dwHoverTime = 1;  // Immediate hover
+                            TrackMouseEvent(&tme);
+
+                            // Get current mouse position and show magnifier immediately
+                            POINT pt;
+                            GetCursorPos(&pt);
+                            ScreenToClient(g_imageViewHwnd, &pt);
+
+                            // Convert to image coordinates and show magnifier
+                            if (!g_lastSourceFrame.empty()) {
+                                RECT rc;
+                                GetClientRect(g_imageViewHwnd, &rc);
+                                const int dstW = std::max(0L, rc.right - rc.left);
+                                const int dstH = std::max(0L, rc.bottom - rc.top);
+
+                                int imgX, imgY;
+                                if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
+                                    imgX = (int)((double)pt.x / dstW * g_imageDib.width);
+                                    imgY = (int)((double)pt.y / dstH * g_imageDib.height);
+                                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+
+                                    POINT screenPt = {pt.x, pt.y};
+                                    ClientToScreen(g_imageViewHwnd, &screenPt);
+                                    updateMagnifierWindow(imgX, imgY, screenPt.x, screenPt.y);
+                                }
+                            }
+                        }
+                    }
+                    updateColorPickerLabels();  // Update button text and UI
+                    return 0;
+                }
                 if (id == kIdFeltColor) {
                     cv::Scalar newColor = uiControls.feltParams.color;
                     if (chooseColor(hwnd, uiControls.feltParams.color, newColor)) {
                         uiControls.feltParams.color = newColor;
+                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
+                    }
+                    return 0;
+                }
+                if (id == kIdRailsColor) {
+                    cv::Scalar newColor = uiControls.railParams.color;
+                    if (chooseColor(hwnd, uiControls.railParams.color, newColor)) {
+                        uiControls.railParams.color = newColor;
                         saveSettingsToDisk();  // Save settings immediately when overlay color changes
                     }
                     return 0;
@@ -2439,6 +2711,8 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DIAMOND_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 8)
 // Felt color picker sensitivity (tolerance) slider: 0..100 (0=strict, 100=loose)
 #define IDC_FELT_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 9)
+// Rail color picker sensitivity (tolerance) slider: 0..100 (0=strict, 100=loose)
+#define IDC_RAIL_COLOR_SENSITIVITY (IDC_TRACKBAR_BASE + 10)
 // Button IDs
 #define IDC_DIAMOND_COLOR (IDC_BUTTON_BASE + 1)
 #define IDC_FELT_COLOR (IDC_BUTTON_BASE + 2)
@@ -2447,11 +2721,14 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DEBUG_OVERLAY_MASTER (IDC_BUTTON_BASE + 200)
 #define IDC_DEBUG_OVERLAY_DIAMONDS_CB (IDC_BUTTON_BASE + 201)
 #define IDC_DEBUG_OVERLAY_FELT_CB (IDC_BUTTON_BASE + 202)
+#define IDC_DEBUG_OVERLAY_RAILS_CB (IDC_BUTTON_BASE + 203)
 // Overlay style controls
 #define IDC_DIAMONDS_STYLE_COLOR (IDC_BUTTON_BASE + 220)
 #define IDC_DIAMONDS_STYLE_FILLED (IDC_BUTTON_BASE + 221)
 #define IDC_FELT_STYLE_COLOR (IDC_BUTTON_BASE + 230)
 #define IDC_FELT_STYLE_FILLED (IDC_BUTTON_BASE + 231)
+#define IDC_RAILS_STYLE_COLOR (IDC_BUTTON_BASE + 240)
+#define IDC_RAILS_STYLE_FILLED (IDC_BUTTON_BASE + 241)
 
 // Sidebar combobox IDs (Display page)
 #define IDC_DISPLAY_SOURCE_COMBO (IDC_COMBO_BASE + 1)
@@ -2463,6 +2740,8 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DIAMONDS_ALPHA (IDC_TRACKBAR_BASE + 62)
 #define IDC_FELT_ALPHA (IDC_TRACKBAR_BASE + 70)
 #define IDC_FELT_THICKNESS (IDC_TRACKBAR_BASE + 71)
+#define IDC_RAILS_ALPHA (IDC_TRACKBAR_BASE + 80)
+#define IDC_RAILS_THICKNESS (IDC_TRACKBAR_BASE + 81)
 #define IDC_RECTIFY_MARGIN_SCALE (IDC_TRACKBAR_BASE + 90)
 #define IDC_RECTIFY_PAD_PX (IDC_TRACKBAR_BASE + 91)
 
@@ -3262,6 +3541,112 @@ void createSidebarControls(HWND hwnd) {
             } // End of feltExpanded block
         }
 
+        // RAILS section
+        {
+            addHeader(L"Rails");
+
+            // Lambda for creating full-width labels (same as felt section)
+            auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
+                HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                       xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                       (HMENU)(INT_PTR)id, NULL, NULL);
+                applyFont(h, false);
+                return h;
+            };
+
+            // Show/Hide
+            {
+                HWND hEnabled = CreateWindowW(L"BUTTON", L"Show/Hide", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                              xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
+                                              (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_RAILS_CB, NULL, NULL);
+                applyFont(hEnabled, false);
+                SendMessage(hEnabled, BM_SETCHECK, uiControls.showRails ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Pick rail color (click-to-sample)
+            {
+                const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Rail);
+                const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Rail Color";
+                HWND hPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                             xPos, yPos - g_sidebarScrollPos, usableWidth, 28, g_sidebarPanel,
+                                             (HMENU)(INT_PTR)IDC_RAIL_COLOR_PICKER, NULL, NULL);
+                applyFont(hPicker, true);
+                yPos += 32;
+            }
+
+            // Swatch
+            {
+                createFullWidthLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 700);
+                yPos += lineHeight;
+
+                const cv::Vec3b bgr = uiControls.railParams.pickedBGR;
+                const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]); // BGR->RGB
+
+                HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
+                                             xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 28,
+                                             g_sidebarPanel, (HMENU)(INT_PTR)IDC_RAIL_COLOR_PICKER_SWATCH, NULL, NULL);
+                if (hSwatch) {
+                    setSwatchBrush(g_railColorPickerSwatchBrush, swatchColor);
+                    InvalidateRect(hSwatch, NULL, TRUE);
+                }
+                yPos += 34;
+            }
+
+            // Sensitivity slider
+            {
+                createLabel(L"Sensitivity:", yPos, IDC_STATIC_BASE + 701);
+                createTrackbar(IDC_RAIL_COLOR_SENSITIVITY, yPos, 0, 100, uiControls.railParams.colorSensitivity);
+                createValueLabel(yPos, IDC_STATIC_BASE + 702);
+                yPos += lineHeight + 2;
+            }
+
+            // Readouts
+            {
+                createFullWidthLabel(L"BGR: --", yPos, IDC_RAIL_COLOR_PICKER_BGR);
+                yPos += lineHeight;
+                createFullWidthLabel(L"HSV: --", yPos, IDC_RAIL_COLOR_PICKER_HSV);
+                yPos += lineHeight;
+                createFullWidthLabel(L"Range: --", yPos, IDC_RAIL_COLOR_PICKER_RANGE);
+                yPos += lineHeight + gap;
+            }
+
+            // Separator between rail detection parameters and overlay styling
+            addDivider(yPos - 2);
+            yPos += 6;
+
+            // Style row: Color + Filled
+            {
+                HWND hColor = CreateWindowW(L"BUTTON", L"Color\u2026", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                            xPos, (yPos - 2) - g_sidebarScrollPos, colorW, colorH, g_sidebarPanel,
+                                            (HMENU)(INT_PTR)IDC_RAILS_STYLE_COLOR, NULL, NULL);
+                applyFont(hColor, false);
+
+                const int filledX = xPos + usableWidth - filledW;
+                HWND hFill = CreateWindowW(L"BUTTON", L"Filled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                           filledX, yPos - g_sidebarScrollPos, filledW, rowH, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)IDC_RAILS_STYLE_FILLED, NULL, NULL);
+                applyFont(hFill, false);
+                SendMessage(hFill, BM_SETCHECK, uiControls.railParams.isFilled ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Alpha
+            {
+                createLabel(L"Alpha:", yPos, IDC_STATIC_BASE + 462);
+                createTrackbar(IDC_RAILS_ALPHA, yPos, 0, 255, uiControls.railParams.fillAlpha);
+                createValueLabel(yPos, IDC_STATIC_BASE + 522);
+                yPos += lineHeight;
+            }
+
+            // Outline thickness
+            {
+                createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 122);
+                createTrackbar(IDC_RAILS_THICKNESS, yPos, 1, 10, uiControls.railParams.outlineThicknessPx);
+                createValueLabel(yPos, IDC_STATIC_BASE + 123);
+                yPos += lineHeight + gap;
+            }
+        }
 
         // RECTIFICATION section
         {
@@ -3398,11 +3783,17 @@ void updateSidebarControls() {
     // Update trackbar positions
     HWND hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_COLOR_SENSITIVITY);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.colorSensitivity);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_SENSITIVITY);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.colorSensitivity);
 
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_ALPHA);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.fillAlpha);
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_THICKNESS);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.outlineThicknessPx);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAILS_ALPHA);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.fillAlpha);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAILS_THICKNESS);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.outlineThicknessPx);
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RECTIFY_MARGIN_SCALE);
     if (hTrackbar) {
         int marginScaleInt = static_cast<int>(std::round(uiControls.rectifyMarginScale * 100.0f));
@@ -3433,6 +3824,13 @@ void updateSidebarControls() {
         SetWindowTextW(hLabel, buffer);
     }
 
+    // Rail color picker sensitivity value label (0..100)
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 702);
+    if (hLabel) {
+        swprintf_s(buffer, L"%d", uiControls.railParams.colorSensitivity);
+        SetWindowTextW(hLabel, buffer);
+    }
+
     // Felt color filtering values are presented via the Felt color picker labels (BGR/HSV/Range),
     // not via individual HSV sliders.
 
@@ -3444,11 +3842,14 @@ void updateSidebarControls() {
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 119);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 123);
+    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.outlineThicknessPx); SetWindowTextW(hLabel, buffer); }
 
     // Inline alpha value labels (next to Color buttons)
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 510);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.feltParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
-    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 520);
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 522);
+    if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
 
     // The color picker info labels (BGR/HSV/Range) are STATIC controls; keep them in sync here so
     // rebuilding the sidebar immediately reflects the current picked colors/ranges for Felt.
@@ -3484,11 +3885,23 @@ void handleTrackbarChange(int trackbarId, int value) {
             applyFeltColorSensitivityToRangesFromPickedHSV();
             updateColorPickerLabels();
             break;
+        case IDC_RAIL_COLOR_SENSITIVITY:
+            uiControls.railParams.colorSensitivity = std::clamp(value, 0, 100);
+            applyRailColorSensitivityToRangesFromPickedHSV();
+            updateColorPickerLabels();
+            break;
         case IDC_FELT_ALPHA:
             uiControls.feltParams.fillAlpha = value;
             break;
         case IDC_FELT_THICKNESS:
             uiControls.feltParams.outlineThicknessPx = value;
+            break;
+        case IDC_RAILS_ALPHA:
+            uiControls.railParams.fillAlpha = value;
+            saveSettingsToDisk();
+            break;
+        case IDC_RAILS_THICKNESS:
+            uiControls.railParams.outlineThicknessPx = value;
             break;
         case IDC_RECTIFY_MARGIN_SCALE:
             uiControls.rectifyMarginScale = value / 100.0f;

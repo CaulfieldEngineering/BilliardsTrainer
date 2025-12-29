@@ -45,6 +45,7 @@
 
 #include "FeltDetection/felt_detection.h"
 #include "Rectification/rectification.h"
+#include "RailDetection/rail_detection.h"
 
 // Sidebar context types
 enum class SidebarContext {
@@ -104,10 +105,14 @@ struct UIControls {
 
     // Overlay parameters (defined in respective detection headers)
     FeltParams feltParams;
+    RailParams railParams;
     
     // Rectification parameters
     float rectifyMarginScale = 1.18f; // Expand source quad by this factor (default 1.18)
     int rectifyPadPx = 40; // Padding in destination space (default 40)
+    
+    // Rail overlay toggle (similar to showFelt)
+    bool showRails = true;
 };
 
 // Defined in `main.cpp`
@@ -117,6 +122,8 @@ extern UIControls uiControls;
 struct FrameAnalysis {
     FeltDetectionResult felt;
     RectificationResult rect;
+    RailDetectionResult rails;  // Rails detected in rectified view
+    RailDetectionResult railsPerspective;  // Rails projected to perspective view
 };
 
 // Latest frame analysis (defined in main.cpp)
