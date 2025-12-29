@@ -118,6 +118,7 @@ static void saveSettingsToDisk() {
     f << "ui.showOverlay=" << toStringBool(uiControls.showOverlay) << "\n";
     f << "ui.showFelt=" << toStringBool(uiControls.showFelt) << "\n";
     f << "ui.showRails=" << toStringBool(uiControls.showRails) << "\n";
+    f << "ui.showDiamonds=" << toStringBool(uiControls.showDiamonds) << "\n";
     f << "ui.feltExpanded=" << toStringBool(uiControls.feltExpanded) << "\n";
     f << "ui.rectifyExpanded=" << toStringBool(uiControls.rectifyExpanded) << "\n";
     f << "ui.rectifyMarginScale=" << uiControls.rectifyMarginScale << "\n";
@@ -162,6 +163,30 @@ static void saveSettingsToDisk() {
     f << "rail.isFilled=" << toStringBool(rp.isFilled) << "\n";
     f << "rail.fillAlpha=" << rp.fillAlpha << "\n";
     f << "rail.outlineThicknessPx=" << rp.outlineThicknessPx << "\n";
+
+    // ---- Diamonds ----
+    const auto& dp = uiControls.diamondParams;
+    f << "diamond.hasPickedColor=" << toStringBool(dp.hasPickedColor) << "\n";
+    f << "diamond.pickedHSV=" << toStringVec3b(dp.pickedHSV) << "\n";
+    f << "diamond.pickedBGR=" << toStringVec3b(dp.pickedBGR) << "\n";
+    f << "diamond.colorSensitivity=" << dp.colorSensitivity << "\n";
+    f << "diamond.colorHMin=" << dp.colorHMin << "\n";
+    f << "diamond.colorHMax=" << dp.colorHMax << "\n";
+    f << "diamond.colorSMin=" << dp.colorSMin << "\n";
+    f << "diamond.colorSMax=" << dp.colorSMax << "\n";
+    f << "diamond.colorVMin=" << dp.colorVMin << "\n";
+    f << "diamond.colorVMax=" << dp.colorVMax << "\n";
+    f << "diamond.minArea=" << dp.minArea << "\n";
+    f << "diamond.maxArea=" << dp.maxArea << "\n";
+    f << "diamond.edgeThreshold=" << dp.edgeThreshold << "\n";
+    f << "diamond.edgeThreshold2=" << dp.edgeThreshold2 << "\n";
+    f << "diamond.shortRailDiamonds=" << dp.shortRailDiamonds << "\n";
+    f << "diamond.longRailDiamonds=" << dp.longRailDiamonds << "\n";
+    f << "diamond.minDiamondSpacingPx=" << dp.minDiamondSpacingPx << "\n";
+    f << "diamond.overlayColor=" << toStringScalarBgr(dp.color) << "\n";
+    f << "diamond.isFilled=" << toStringBool(dp.isFilled) << "\n";
+    f << "diamond.fillAlpha=" << dp.fillAlpha << "\n";
+    f << "diamond.outlineThicknessPx=" << dp.outlineThicknessPx << "\n";
 }
 
 static void loadSettingsFromDisk() {
@@ -186,6 +211,7 @@ static void loadSettingsFromDisk() {
         else if (key == "ui.showOverlay") { bool b; if (parseBool(val, b)) uiControls.showOverlay = b; }
         else if (key == "ui.showFelt") { bool b; if (parseBool(val, b)) uiControls.showFelt = b; }
         else if (key == "ui.showRails") { bool b; if (parseBool(val, b)) uiControls.showRails = b; }
+        else if (key == "ui.showDiamonds") { bool b; if (parseBool(val, b)) uiControls.showDiamonds = b; }
         else if (key == "ui.smoothingPercent") { int v; if (parseInt(val, v)) uiControls.smoothingPercent = std::clamp(v, 0, 100); }
         else if (key == "ui.feltExpanded") { bool b; if (parseBool(val, b)) uiControls.feltExpanded = b; }
         else if (key == "ui.rectifyExpanded") { bool b; if (parseBool(val, b)) uiControls.rectifyExpanded = b; }
@@ -228,6 +254,29 @@ static void loadSettingsFromDisk() {
         else if (key == "rail.isFilled") { bool b; if (parseBool(val, b)) uiControls.railParams.isFilled = b; }
         else if (key == "rail.fillAlpha") { int v; if (parseInt(val, v)) uiControls.railParams.fillAlpha = std::clamp(v, 0, 255); }
         else if (key == "rail.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.railParams.outlineThicknessPx = std::max(1, v); }
+
+        // ---- Diamonds ----
+        else if (key == "diamond.hasPickedColor") { bool b; if (parseBool(val, b)) uiControls.diamondParams.hasPickedColor = b; }
+        else if (key == "diamond.pickedHSV") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.diamondParams.pickedHSV = vv; }
+        else if (key == "diamond.pickedBGR") { cv::Vec3b vv; if (parseVec3b(val, vv)) uiControls.diamondParams.pickedBGR = vv; }
+        else if (key == "diamond.colorSensitivity") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSensitivity = std::clamp(v, 0, 100); }
+        else if (key == "diamond.colorHMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorHMin = std::clamp(v, 0, 180); }
+        else if (key == "diamond.colorHMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorHMax = std::clamp(v, 0, 180); }
+        else if (key == "diamond.colorSMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSMin = std::clamp(v, 0, 255); }
+        else if (key == "diamond.colorSMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorSMax = std::clamp(v, 0, 255); }
+        else if (key == "diamond.colorVMin") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorVMin = std::clamp(v, 0, 255); }
+        else if (key == "diamond.colorVMax") { int v; if (parseInt(val, v)) uiControls.diamondParams.colorVMax = std::clamp(v, 0, 255); }
+        else if (key == "diamond.minArea") { int v; if (parseInt(val, v)) uiControls.diamondParams.minArea = std::max(1, v); }
+        else if (key == "diamond.maxArea") { int v; if (parseInt(val, v)) uiControls.diamondParams.maxArea = std::max(1, v); }
+        else if (key == "diamond.edgeThreshold") { int v; if (parseInt(val, v)) uiControls.diamondParams.edgeThreshold = std::max(1, v); }
+        else if (key == "diamond.edgeThreshold2") { int v; if (parseInt(val, v)) uiControls.diamondParams.edgeThreshold2 = std::max(1, v); }
+        else if (key == "diamond.shortRailDiamonds") { int v; if (parseInt(val, v)) uiControls.diamondParams.shortRailDiamonds = std::max(0, v); }
+        else if (key == "diamond.longRailDiamonds") { int v; if (parseInt(val, v)) uiControls.diamondParams.longRailDiamonds = std::max(0, v); }
+        else if (key == "diamond.minDiamondSpacingPx") { float v; if (std::sscanf(val.c_str(), "%f", &v) == 1) uiControls.diamondParams.minDiamondSpacingPx = std::max(0.0f, v); }
+        else if (key == "diamond.overlayColor") { cv::Scalar c; if (parseScalarBgr(val, c)) uiControls.diamondParams.color = c; }
+        else if (key == "diamond.isFilled") { bool b; if (parseBool(val, b)) uiControls.diamondParams.isFilled = b; }
+        else if (key == "diamond.fillAlpha") { int v; if (parseInt(val, v)) uiControls.diamondParams.fillAlpha = std::clamp(v, 0, 255); }
+        else if (key == "diamond.outlineThicknessPx") { int v; if (parseInt(val, v)) uiControls.diamondParams.outlineThicknessPx = std::max(1, v); }
     }
 }
 
@@ -710,6 +759,7 @@ static HFONT g_sidebarFontBold = NULL;
 // Which target (if any) the color picker is currently sampling for.
 enum class ColorPickerTarget {
     None,
+    Diamond,
     Felt,
     Rail
 };
@@ -932,6 +982,7 @@ static const wchar_t* kSidebarPanelClass = L"BilliardsTrainerSidebarPanel";
 static void ensureSidebarAndImageChildren(HWND mainHwnd);
 static void layoutChildren(HWND mainHwnd);
 static void updateColorPickerLabels();
+static void applyDiamondColorSensitivityToRangesFromPickedHSV();
 static void applyFeltColorSensitivityToRangesFromPickedHSV();
 static void applyRailColorSensitivityToRangesFromPickedHSV();
 static void updateImageDibFromBgr(const cv::Mat& bgr);
@@ -1664,6 +1715,11 @@ static cv::Mat buildRectifiedDisplayFrame() {
         drawRailOverlay(processed, latestAnalysis.rails, uiControls.railParams);
     }
 
+    // Apply diamond overlay if enabled (using diamond_detection module)
+    if (uiControls.showOverlay && uiControls.showDiamonds && latestAnalysis.diamonds.ok) {
+        drawDiamondOverlay(processed, latestAnalysis.diamonds, uiControls.diamondParams);
+    }
+
     return processed;
 }
 
@@ -1912,6 +1968,25 @@ static void computeFeltHsvRangeFromPickedHsv(
     outVMax = std::clamp(v + vTolUp, 0, 255);
 }
 
+// Apply diamond color sensitivity to HSV ranges (similar to felt/rail)
+static void applyDiamondColorSensitivityToRangesFromPickedHSV() {
+    if (!uiControls.diamondParams.hasPickedColor) return;
+
+    computeHsvRangeFromPickedHsv(
+        uiControls.diamondParams.pickedHSV,
+        uiControls.diamondParams.colorSensitivity,
+        uiControls.diamondParams.colorHMin,
+        uiControls.diamondParams.colorHMax,
+        uiControls.diamondParams.colorSMin,
+        uiControls.diamondParams.colorSMax,
+        uiControls.diamondParams.colorVMin,
+        uiControls.diamondParams.colorVMax
+    );
+
+    // Enable color filtering automatically when color is picked
+    uiControls.diamondParams.useColorFilter = true;
+}
+
 // MOVE?
 static void applyFeltColorSensitivityToRangesFromPickedHSV() {
     if (!uiControls.feltParams.hasPickedColor) return;
@@ -2019,6 +2094,11 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         if (uiControls.showRails && latestAnalysis.railsPerspective.ok) {
             drawRailOverlay(processed, latestAnalysis.railsPerspective, uiControls.railParams);
         }
+
+        // Apply diamond overlay if enabled (using diamond_detection module)
+        if (uiControls.showDiamonds && !latestAnalysis.diamondsPerspective.diamonds.empty()) {
+            drawDiamondOverlay(processed, latestAnalysis.diamondsPerspective, uiControls.diamondParams);
+        }
     }
 
     // Store felt result in latestAnalysis
@@ -2117,6 +2197,29 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         latestAnalysis.rails = RailDetectionResult();
         latestAnalysis.railsPerspective = RailDetectionResult();
         g_railMaskInitialized = false;
+    }
+
+    // Perform diamond detection on rectified view if rail detection succeeded
+    if (latestAnalysis.rails.ok && !latestAnalysis.rails.railMasks.empty()) {
+        latestAnalysis.diamonds = detectDiamonds(
+            latestAnalysis.rect.rectifiedBgr,
+            latestAnalysis.rails.railMasks,
+            uiControls.diamondParams
+        );
+
+        // Project diamonds to perspective view for display on main view
+        if (latestAnalysis.diamonds.ok && !latestAnalysis.rect.Hinv.empty()) {
+            latestAnalysis.diamondsPerspective = projectDiamondsToPerspective(
+                latestAnalysis.diamonds,
+                latestAnalysis.rect.Hinv,
+                currentFrame.size()
+            );
+        } else {
+            latestAnalysis.diamondsPerspective = DiamondDetectionResult();
+        }
+    } else {
+        latestAnalysis.diamonds = DiamondDetectionResult();
+        latestAnalysis.diamondsPerspective = DiamondDetectionResult();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -2305,11 +2408,13 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
             // Debug sidebar checkboxes (IDs match defines below: 30200..30203)
             const int kIdOverlayMaster = 30200;
+            const int kIdOverlayDiamonds = 30201;
             const int kIdOverlayFelt = 30202;
             const int kIdOverlayRails = 30203;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayFelt || id == kIdOverlayRails)) {
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRails)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
+                else if (id == kIdOverlayDiamonds) uiControls.showDiamonds = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
                 else if (id == kIdOverlayRails) uiControls.showRails = isChecked;
                 saveSettingsToDisk();  // Save settings immediately when overlay toggles change
@@ -2317,11 +2422,18 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
             }
 
             // Overlay style buttons/checkboxes (IDs match defines below: 30230+)
+            const int kIdDiamondsColor = 30220;
+            const int kIdDiamondsFilled = 30221;
             const int kIdFeltColor = 30230;
             const int kIdFeltFilled = 30231;
             const int kIdRailsColor = 30240;
             const int kIdRailsFilled = 30241;
             if (code == BN_CLICKED) {
+                if (id == kIdDiamondsFilled) {
+                    uiControls.diamondParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    saveSettingsToDisk();  // Save settings immediately when checkbox toggles
+                    return 0;
+                }
                 if (id == kIdFeltFilled) {
                     uiControls.feltParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     saveSettingsToDisk();  // Save settings immediately when checkbox toggles
@@ -2330,6 +2442,56 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 if (id == kIdRailsFilled) {
                     uiControls.railParams.isFilled = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     saveSettingsToDisk();  // Save settings immediately when checkbox toggles
+                    return 0;
+                }
+                if (id == IDC_DIAMOND_COLOR_PICKER) {
+                    // Activate/deactivate diamond color picker mode.
+                    const ColorPickerTarget requested = ColorPickerTarget::Diamond;
+
+                    if (g_colorPickerTarget == requested) {
+                        // Deactivate
+                        g_colorPickerTarget = ColorPickerTarget::None;
+                        if (g_magnifierHwnd) ShowWindow(g_magnifierHwnd, SW_HIDE);
+                    } else {
+                        // Switch to requested picker
+                        g_colorPickerTarget = requested;
+
+                        // Enable mouse tracking in ImageView to get mouse move events
+                        if (g_imageViewHwnd) {
+                            TRACKMOUSEEVENT tme = {};
+                            tme.cbSize = sizeof(TRACKMOUSEEVENT);
+                            tme.dwFlags = TME_HOVER | TME_LEAVE;
+                            tme.hwndTrack = g_imageViewHwnd;
+                            tme.dwHoverTime = 1;  // Immediate hover
+                            TrackMouseEvent(&tme);
+
+                            // Get current mouse position and show magnifier immediately
+                            POINT pt;
+                            GetCursorPos(&pt);
+                            ScreenToClient(g_imageViewHwnd, &pt);
+
+                            // Convert to image coordinates and show magnifier
+                            if (!g_lastSourceFrame.empty()) {
+                                RECT rc;
+                                GetClientRect(g_imageViewHwnd, &rc);
+                                const int dstW = std::max(0L, rc.right - rc.left);
+                                const int dstH = std::max(0L, rc.bottom - rc.top);
+
+                                int imgX, imgY;
+                                if (dstW > 0 && dstH > 0 && g_imageDib.width > 0 && g_imageDib.height > 0) {
+                                    imgX = (int)((double)pt.x / dstW * g_imageDib.width);
+                                    imgY = (int)((double)pt.y / dstH * g_imageDib.height);
+                                    imgX = std::clamp(imgX, 0, g_lastSourceFrame.cols - 1);
+                                    imgY = std::clamp(imgY, 0, g_lastSourceFrame.rows - 1);
+
+                                    POINT screenPt = {pt.x, pt.y};
+                                    ClientToScreen(g_imageViewHwnd, &screenPt);
+                                    updateMagnifierWindow(imgX, imgY, screenPt.x, screenPt.y);
+                                }
+                            }
+                        }
+                    }
+                    updateColorPickerLabels();  // Update button text and UI
                     return 0;
                 }
                 if (id == IDC_FELT_COLOR_PICKER) {
@@ -2432,6 +2594,14 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                         }
                     }
                     updateColorPickerLabels();  // Update button text and UI
+                    return 0;
+                }
+                if (id == kIdDiamondsColor) {
+                    cv::Scalar newColor = uiControls.diamondParams.color;
+                    if (chooseColor(hwnd, uiControls.diamondParams.color, newColor)) {
+                        uiControls.diamondParams.color = newColor;
+                        saveSettingsToDisk();  // Save settings immediately when overlay color changes
+                    }
                     return 0;
                 }
                 if (id == kIdFeltColor) {
@@ -2733,6 +2903,9 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 // Sidebar combobox IDs (Display page)
 #define IDC_DISPLAY_SOURCE_COMBO (IDC_COMBO_BASE + 1)
 #define IDC_DISPLAY_REFRESH_CAMERAS (IDC_BUTTON_BASE + 280)
+
+// Diamond detection info display
+#define IDC_DIAMOND_COUNT (IDC_STATIC_BASE + 800)
 
 // Overlay style trackbars
 #define IDC_DIAMONDS_RADIUS (IDC_TRACKBAR_BASE + 60)
@@ -3648,6 +3821,128 @@ void createSidebarControls(HWND hwnd) {
             }
         }
 
+        // DIAMONDS section
+        {
+            addHeader(L"Diamonds");
+
+            // Lambda for creating full-width labels (same as felt/rail sections)
+            auto createFullWidthLabel = [&](const wchar_t* text, int y, int id) {
+                HWND h = CreateWindowW(L"STATIC", text, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                       xPos, y - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                       (HMENU)(INT_PTR)id, NULL, NULL);
+                applyFont(h, false);
+                return h;
+            };
+
+            // Pick diamond color (click-to-sample)
+            {
+                const bool isActive = (g_colorPickerTarget == ColorPickerTarget::Diamond);
+                const wchar_t* btnText = isActive ? L"Cancel (Click to Pick)" : L"Pick Diamond Color";
+                HWND hPicker = CreateWindowW(L"BUTTON", btnText, WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                             xPos, yPos - g_sidebarScrollPos, usableWidth, 28, g_sidebarPanel,
+                                             (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER, NULL, NULL);
+                applyFont(hPicker, true);
+                yPos += 32;
+            }
+
+            // Swatch (tightened height)
+            {
+                createFullWidthLabel(L"Picked Color:", yPos, IDC_STATIC_BASE + 500);
+                yPos += lineHeight;
+
+                const cv::Vec3b bgr = uiControls.diamondParams.pickedBGR;
+                const COLORREF swatchColor = RGB(bgr[2], bgr[1], bgr[0]);
+
+                HWND hSwatch = CreateWindowW(L"STATIC", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_NOTIFY,
+                                             xPos + 10, yPos - g_sidebarScrollPos, usableWidth - 20, 28,
+                                             g_sidebarPanel, (HMENU)(INT_PTR)IDC_DIAMOND_COLOR_PICKER_SWATCH, NULL, NULL);
+                if (hSwatch) {
+                    setSwatchBrush(g_diamondColorPickerSwatchBrush, swatchColor);
+                    InvalidateRect(hSwatch, NULL, TRUE);
+                }
+                yPos += 34;
+            }
+
+            // Sensitivity slider
+            {
+                createLabel(L"Sensitivity:", yPos, IDC_STATIC_BASE + 501);
+                createTrackbar(IDC_DIAMOND_COLOR_SENSITIVITY, yPos, 0, 100, uiControls.diamondParams.colorSensitivity);
+                createValueLabel(yPos, IDC_STATIC_BASE + 502);
+                yPos += lineHeight;
+            }
+
+            // Readouts (full width so "Range" doesn't clip)
+            {
+                createFullWidthLabel(L"BGR: --", yPos, IDC_DIAMOND_COLOR_PICKER_BGR);
+                yPos += lineHeight;
+                createFullWidthLabel(L"HSV: --", yPos, IDC_DIAMOND_COLOR_PICKER_HSV);
+                yPos += lineHeight;
+                createFullWidthLabel(L"Range: --", yPos, IDC_DIAMOND_COLOR_PICKER_RANGE);
+                yPos += lineHeight + gap;
+            }
+
+            // Separator between diamond detection parameters and overlay styling
+            addDivider(yPos - 2);
+            yPos += 6;
+
+            // Show/Hide
+            {
+                HWND hEnabled = CreateWindowW(L"BUTTON", L"Show/Hide", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                              xPos, yPos - g_sidebarScrollPos, usableWidth, rowH, g_sidebarPanel,
+                                              (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_DIAMONDS_CB, NULL, NULL);
+                applyFont(hEnabled, false);
+                SendMessage(hEnabled, BM_SETCHECK, uiControls.showDiamonds ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Detection count info
+            {
+                wchar_t countText[64];
+                swprintf_s(countText, L"Detected: %d / 18", latestAnalysis.diamonds.numDiamondsDetected);
+                HWND hCount = CreateWindowW(L"STATIC", countText, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                           xPos, yPos - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)IDC_DIAMOND_COUNT, NULL, NULL);
+                applyFont(hCount, false);
+            }
+            yPos += lineHeight;
+
+            // Separator
+            addDivider(yPos - 2);
+            yPos += 6;
+
+            // Style row: Color + Filled
+            {
+                HWND hColor = CreateWindowW(L"BUTTON", L"Color\u2026", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                                            xPos, (yPos - 2) - g_sidebarScrollPos, colorW, colorH, g_sidebarPanel,
+                                            (HMENU)(INT_PTR)IDC_DIAMONDS_STYLE_COLOR, NULL, NULL);
+                applyFont(hColor, false);
+
+                const int filledX = xPos + usableWidth - filledW;
+                HWND hFill = CreateWindowW(L"BUTTON", L"Filled", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                           filledX, yPos - g_sidebarScrollPos, filledW, rowH, g_sidebarPanel,
+                                           (HMENU)(INT_PTR)IDC_DIAMONDS_STYLE_FILLED, NULL, NULL);
+                applyFont(hFill, false);
+                SendMessage(hFill, BM_SETCHECK, uiControls.diamondParams.isFilled ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
+            yPos += lineHeight;
+
+            // Alpha
+            {
+                createLabel(L"Alpha:", yPos, IDC_STATIC_BASE + 463);
+                createTrackbar(IDC_DIAMONDS_ALPHA, yPos, 0, 255, uiControls.diamondParams.fillAlpha);
+                createValueLabel(yPos, IDC_STATIC_BASE + 523);
+                yPos += lineHeight;
+            }
+
+            // Outline thickness
+            {
+                createLabel(L"Outline:", yPos, IDC_STATIC_BASE + 124);
+                createTrackbar(IDC_DIAMONDS_THICKNESS, yPos, 1, 10, uiControls.diamondParams.outlineThicknessPx);
+                createValueLabel(yPos, IDC_STATIC_BASE + 125);
+                yPos += lineHeight + gap;
+            }
+        }
+
         // RECTIFICATION section
         {
             addAccordionHeader(L"Rectification", IDC_SIDEBAR_RECTIFY, uiControls.rectifyExpanded);
@@ -3786,6 +4081,10 @@ void updateSidebarControls() {
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_RAIL_COLOR_SENSITIVITY);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.railParams.colorSensitivity);
 
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMONDS_ALPHA);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.fillAlpha);
+    hTrackbar = GetDlgItem(g_sidebarPanel, IDC_DIAMONDS_THICKNESS);
+    if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.diamondParams.outlineThicknessPx);
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_ALPHA);
     if (hTrackbar) SendMessage(hTrackbar, TBM_SETPOS, TRUE, uiControls.feltParams.fillAlpha);
     hTrackbar = GetDlgItem(g_sidebarPanel, IDC_FELT_THICKNESS);
@@ -3851,6 +4150,13 @@ void updateSidebarControls() {
     hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 522);
     if (hLabel) { swprintf_s(buffer, L"%d", uiControls.railParams.fillAlpha); SetWindowTextW(hLabel, buffer); }
 
+    // Diamond detection count label
+    hLabel = GetDlgItem(g_sidebarPanel, IDC_DIAMOND_COUNT);
+    if (hLabel) {
+        swprintf_s(buffer, L"Detected: %d / 18", latestAnalysis.diamonds.numDiamondsDetected);
+        SetWindowTextW(hLabel, buffer);
+    }
+
     // The color picker info labels (BGR/HSV/Range) are STATIC controls; keep them in sync here so
     // rebuilding the sidebar immediately reflects the current picked colors/ranges for Felt.
     updateColorPickerLabels();
@@ -3880,6 +4186,11 @@ void updateSidebarContext(SidebarContext context) {
 // Handle trackbar value changes
 void handleTrackbarChange(int trackbarId, int value) {
     switch (trackbarId) {
+        case IDC_DIAMOND_COLOR_SENSITIVITY:
+            uiControls.diamondParams.colorSensitivity = std::clamp(value, 0, 100);
+            applyDiamondColorSensitivityToRangesFromPickedHSV();
+            updateColorPickerLabels();
+            break;
         case IDC_FELT_COLOR_SENSITIVITY:
             uiControls.feltParams.colorSensitivity = std::clamp(value, 0, 100);
             applyFeltColorSensitivityToRangesFromPickedHSV();
@@ -3889,6 +4200,12 @@ void handleTrackbarChange(int trackbarId, int value) {
             uiControls.railParams.colorSensitivity = std::clamp(value, 0, 100);
             applyRailColorSensitivityToRangesFromPickedHSV();
             updateColorPickerLabels();
+            break;
+        case IDC_DIAMONDS_ALPHA:
+            uiControls.diamondParams.fillAlpha = value;
+            break;
+        case IDC_DIAMONDS_THICKNESS:
+            uiControls.diamondParams.outlineThicknessPx = value;
             break;
         case IDC_FELT_ALPHA:
             uiControls.feltParams.fillAlpha = value;

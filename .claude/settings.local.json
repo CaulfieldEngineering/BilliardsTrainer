@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cmake --build:*)",
-      "Bash(timeout /t 2)"
+      "Bash(timeout /t 2)",
+      "Bash(taskkill:*)"
     ]
   }
 }
