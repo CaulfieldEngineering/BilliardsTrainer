@@ -34,21 +34,23 @@ class Palette:
 
 PALETTE = Palette()
 
-# Modern system font stack. Win11 ships Segoe UI Variable (clean, geometric);
-# we fall back through good cross-platform options. Inter/Geist can be embedded
-# later as bundled .ttf via QFontDatabase.addApplicationFont().
-_FONT_STACK = ['"Segoe UI Variable Display"', '"Segoe UI"', '"Inter"', '"Roboto"', "sans-serif"]
-_MONO_STACK = ['"Cascadia Code"', '"JetBrains Mono"', '"Consolas"', "monospace"]
+# Font stack. "Segoe UI" is present on every Win10/11 install and renders
+# cleanly; we keep modern fallbacks for other platforms. (Qt's QSS font-family
+# is happiest with a known-present first entry, so Segoe UI leads.) Inter/Geist
+# can be embedded later as bundled .ttf via QFontDatabase.addApplicationFont().
+_FONT_STACK = ['"Segoe UI"', '"Inter"', '"Roboto"', "system-ui", "sans-serif"]
+_MONO_STACK = ['"Consolas"', '"Cascadia Code"', '"JetBrains Mono"', "monospace"]
+_PRIMARY_FAMILY = "Segoe UI"
 
 
 def primary_font(size: int = 10, weight: int = QFont.Normal) -> QFont:
-    f = QFont("Segoe UI Variable Display", size, weight)
+    f = QFont(_PRIMARY_FAMILY, size, weight)
     f.setStyleStrategy(QFont.PreferAntialias)
     return f
 
 
 def mono_font(size: int = 10) -> QFont:
-    f = QFont("Cascadia Code", size)
+    f = QFont("Consolas", size)
     f.setStyleStrategy(QFont.PreferAntialias)
     return f
 

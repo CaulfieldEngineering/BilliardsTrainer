@@ -4,11 +4,14 @@ Populated from the DB in Phase 5. Until a session exists it shows an empty
 state. ``refresh()`` re-queries the repository.
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
+    QPushButton,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -16,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...config import EXPORTS_DIR
 from ..widgets.common import Card, EmptyState, StatCard, section_header
 
 
@@ -43,7 +47,22 @@ class StatsPage(QWidget):
         root = QVBoxLayout(w)
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(16)
-        root.addWidget(section_header("Performance"))
+
+        header = QHBoxLayout()
+        header.addWidget(section_header("Performance"))
+        header.addStretch(1)
+        self._export_status = QLabel("")
+        self._export_status.setObjectName("Faint")
+        header.addWidget(self._export_status)
+        csv_btn = QPushButton("Export CSV")
+        csv_btn.setCursor(Qt.PointingHandCursor)
+        csv_btn.clicked.connect(lambda: self._export("csv"))
+        json_btn = QPushButton("Export JSON")
+        json_btn.setCursor(Qt.PointingHandCursor)
+        json_btn.clicked.connect(lambda: self._export("json"))
+        header.addWidget(csv_btn)
+        header.addWidget(json_btn)
+        root.addLayout(header)
 
         kpis = QHBoxLayout()
         kpis.setSpacing(14)
@@ -89,6 +108,21 @@ class StatsPage(QWidget):
         t.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         t.setShowGrid(False)
         return t
+
+    def _export(self, kind: str) -> None:
+        if self._repo is None:
+            return
+        EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            if kind == "csv":
+                dest = self._repo.export_csv(EXPORTS_DIR / "shots.csv")
+            else:
+                dest = self._repo.export_json(EXPORTS_DIR / "sessions.json")
+        except Exception as exc:  # noqa: BLE001
+            self._export_status.setText(f"Export failed: {exc}")
+            return
+        self._export_status.setText(f"Saved {dest.name}")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(dest.parent)))
 
     def refresh(self) -> None:
         if self._repo is None:

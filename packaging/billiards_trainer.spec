@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: python -*-
+# -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec — builds a single-file Windows executable.
 
 Heavy optional backends (torch/ultralytics/mediapipe) are excluded to keep the
@@ -12,10 +12,13 @@ import os
 
 block_cipher = None
 
-ROOT = os.path.abspath(os.getcwd())
+# SPECPATH is injected by PyInstaller and is the directory containing this spec
+# (``packaging/``); the repo root is its parent. Using it makes paths robust
+# regardless of the current working directory.
+ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 a = Analysis(
-    [os.path.join("packaging", "launch.py")],
+    [os.path.join(ROOT, "packaging", "launch.py")],
     pathex=[os.path.join(ROOT, "src")],
     binaries=[],
     datas=[],
@@ -53,6 +56,6 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,            # GUI app, no console window
     disable_windowed_traceback=False,
-    icon=os.path.join("packaging", "app.ico") if os.path.exists(
-        os.path.join("packaging", "app.ico")) else None,
+    icon=(os.path.join(ROOT, "packaging", "app.ico")
+          if os.path.exists(os.path.join(ROOT, "packaging", "app.ico")) else None),
 )
