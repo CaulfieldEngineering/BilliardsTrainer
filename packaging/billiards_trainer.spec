@@ -21,7 +21,8 @@ a = Analysis(
     [os.path.join(ROOT, "packaging", "launch.py")],
     pathex=[os.path.join(ROOT, "src")],
     binaries=[],
-    datas=[],
+    datas=([(os.path.join(ROOT, "packaging", "app.ico"), ".")]
+           if os.path.exists(os.path.join(ROOT, "packaging", "app.ico")) else []),
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",
         "billiards_trainer",

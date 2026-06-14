@@ -42,6 +42,15 @@ def main() -> int:
     app.setOrganizationName(ORG_NAME)
     app.setApplicationVersion(__version__)
 
+    from .config import resource_path
+
+    for cand in ("app.ico", "packaging/app.ico"):
+        icon_path = resource_path(cand)
+        if icon_path.exists():
+            from PySide6.QtGui import QIcon
+            app.setWindowIcon(QIcon(str(icon_path)))
+            break
+
     settings = Settings.load()
 
     from .ui.theme import apply_theme, load_bundled_fonts
