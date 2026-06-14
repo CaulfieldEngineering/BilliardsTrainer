@@ -72,6 +72,9 @@ class Pipeline:
                 if annotate:
                     res.frame_bgr = frame
                 return res
+            # Use the effective (possibly auto-estimated) felt colour for ball
+            # detection too, so its non-felt test matches the locked table.
+            self.detector = make_detector(self.settings.balls, self.calib.calib.felt)
 
         calib = self.calib.calib
         res.corners = calib.corners

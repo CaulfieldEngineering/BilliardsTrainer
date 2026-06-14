@@ -17,8 +17,8 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from ..config import Settings
-from .felt import detect_felt
+from ..config import FeltSettings, Settings
+from .felt import detect_felt, estimate_felt_settings
 from .geometry import TableModel
 from .rectify import rectify_tabletop
 
@@ -33,6 +33,7 @@ class Calibration:
     dst_size: tuple[int, int]
     table: TableModel
     rect_mask: np.ndarray
+    felt: FeltSettings  # effective felt colour key (possibly auto-estimated)
 
 
 class CalibrationManager:
@@ -51,7 +52,18 @@ class CalibrationManager:
         """Run full felt + rectify detection and lock the result. Returns success."""
         if frame is None or frame.size == 0:
             return False
-        felt = detect_felt(frame, settings.felt)
+        felt_settings = settings.felt
+        felt = detect_felt(frame, felt_settings)
+        # Fallback: if the configured colour matches too little of the frame,
+        # auto-estimate the felt colour from the centre and retry. This makes
+        # calibration work across tables/lighting without manual tuning.
+        if not felt.has_corners or felt.area_ratio < 0.04:
+            est = estimate_felt_settings(frame, settings.felt)
+            felt_est = detect_felt(frame, est)
+            if felt_est.has_corners and felt_est.area_ratio > felt.area_ratio:
+                log.info("Auto-estimated felt colour (hue~%d); area %.3f -> %.3f",
+                         est.picked_hsv[0], felt.area_ratio, felt_est.area_ratio)
+                felt, felt_settings = felt_est, est
         if not felt.has_corners:
             log.info("Calibration failed: no felt corners")
             return False
@@ -66,6 +78,7 @@ class CalibrationManager:
         self.calib = Calibration(
             corners=felt.corners, H=rect.H, Hinv=rect.Hinv,
             dst_size=rect.dst_size, table=table, rect_mask=rect.rectified_mask,
+            felt=felt_settings,
         )
         self.deviated = False
         self._consecutive = 0
@@ -84,7 +97,7 @@ class CalibrationManager:
         ``deviated`` flag using a consecutive-frame debounce. Returns RMSE px."""
         if self.calib is None:
             return 0.0
-        felt = detect_felt(frame, settings.felt)
+        felt = detect_felt(frame, self.calib.felt)
         if not felt.has_corners:
             return 0.0
         rmse = float(np.sqrt(np.mean(np.sum((felt.corners - self.calib.corners) ** 2, axis=1))))

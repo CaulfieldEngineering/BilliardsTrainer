@@ -179,6 +179,32 @@ def detect_felt(bgr: np.ndarray, felt: FeltSettings) -> FeltResult:
     return result
 
 
+def estimate_felt_settings(frame: np.ndarray, base: FeltSettings) -> FeltSettings:
+    """Auto-estimate the felt colour from the frame centre.
+
+    For a centred/overhead table the middle of the frame is reliably felt, so the
+    dominant saturated hue there gives a good colour key without any manual
+    tuning. Used as a calibration fallback when the configured range matches too
+    little of the frame (different felt shade / lighting than the defaults).
+    """
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    h, w = frame.shape[:2]
+    region = hsv[int(h * 0.30):int(h * 0.70), int(w * 0.30):int(w * 0.70)].reshape(-1, 3)
+    sat = region[(region[:, 1] > 40) & (region[:, 2] > 40)]
+    if len(sat) < 50:
+        return base
+    peak = int(np.argmax(np.bincount(sat[:, 0], minlength=180)))
+    near = sat[np.abs(sat[:, 0].astype(int) - peak) <= 12]
+    s_med = int(np.median(near[:, 1]))
+    v_med = int(np.median(near[:, 2]))
+    return FeltSettings(
+        h_min=(peak - 18) % 180, h_max=(peak + 18) % 180,
+        s_min=max(0, s_med - 90), s_max=255,
+        v_min=max(0, v_med - 120), v_max=255,
+        sensitivity=base.sensitivity, picked_hsv=[peak, s_med, v_med],
+    )
+
+
 def derive_hsv_range(picked_hsv: tuple[int, int, int], sensitivity: int) -> dict:
     """Translate a sampled felt colour + a 0..100 sensitivity into an HSV range.
 

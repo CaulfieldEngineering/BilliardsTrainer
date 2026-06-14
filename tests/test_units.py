@@ -92,3 +92,18 @@ def test_classify_colored_is_solid():
     patch[:, :] = (40, 90, 200)  # red-ish (BGR)
     cls, _ = classify_ball(patch)
     assert cls in (BallClass.SOLID, BallClass.STRIPE)
+
+
+# ---- felt auto-estimation ------------------------------------------------- #
+def test_estimate_felt_settings_keys_on_centre_colour():
+    import cv2
+
+    from billiards_trainer.config import FeltSettings
+    from billiards_trainer.vision.felt import estimate_felt_settings
+
+    # a frame whose centre is a distinctly blue felt (hue 110) the defaults miss
+    hsv = np.full((400, 400, 3), (110, 150, 200), np.uint8)
+    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    fs = estimate_felt_settings(bgr, FeltSettings())
+    assert abs(fs.picked_hsv[0] - 110) <= 2
+    assert fs.h_min <= 110 <= fs.h_max
