@@ -17,14 +17,31 @@ rectified view + colour classification + a dedicated white-blob pass for the cue
 ball). It needs no model and no `torch`, keeping the installer ~150 MB instead of
 ~2 GB.
 
-**Upgrade path (no code changes needed):**
-1. `pip install -e ".[yolo]"` (or bundle it in a "pro" build).
-2. Get weights — e.g. search **Roboflow Universe** for "pool balls" / "billiards"
-   and export a YOLOv8 `.pt`, or fine-tune `yolov8n` on a few hundred frames from
-   your own camera.
-3. Drop the file in the app's `models/` folder (named `pool_balls.pt`, `best.pt`,
-   or `billiards.pt`) and set **Settings → Ball detection → Backend = yolo**.
-   The factory auto-loads it and falls back to classical if anything's missing.
+**Update (v0.1.5): I went looking for a turnkey pre-trained model — there isn't
+one that's freely auto-downloadable.** The good community pool-ball models live on
+**Roboflow Universe** (e.g. `pooltafel/pooltable-balls`, `mark-dj0yk/pool-balls-
+detection-srlqi`, `ben-gann-lscqy/pool-ball-detection`), but Roboflow serves
+weights through its API behind a **per-user (free) API key**, so I can't bundle or
+silently fetch one. HuggingFace only has generic COCO/face YOLOv8 models (no pool
+balls). So YOLO stays a wired-up slot, not a shipped feature.
+
+**Upgrade path (now one settings field):**
+1. `pip install -e ".[yolo]"` (the frozen exe excludes torch, so this is a
+   source/dev install or a future "pro" build).
+2. Get a `.pt` — easiest is a free Roboflow account → open one of the models
+   above → Download → YOLOv8 weights. Or fine-tune `yolov8n` on a few hundred
+   frames from your own camera.
+3. Either drop the file in the app's `models/` folder (named `pool_balls.pt`,
+   `best.pt`, or `billiards.pt`), **or** paste a direct download URL into
+   **Settings → Ball detection → YOLO weights URL** and the app auto-fetches it on
+   first use.
+4. Set **Backend = yolo**. The factory loads it and falls back to classical if
+   anything's missing.
+
+Sources:
+[pooltable-balls](https://universe.roboflow.com/pooltafel/pooltable-balls) ·
+[pool-balls-detection](https://universe.roboflow.com/mark-dj0yk/pool-balls-detection-srlqi) ·
+[pool-ball-detection](https://universe.roboflow.com/ben-gann-lscqy/pool-ball-detection)
 
 ### 2. Distribution is a **portable `.exe`**, not an Inno/NSIS installer
 The CI builds a single-file PyInstaller `.exe` and publishes it to GitHub Releases

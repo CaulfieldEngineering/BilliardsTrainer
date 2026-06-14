@@ -205,6 +205,32 @@ def estimate_felt_settings(frame: np.ndarray, base: FeltSettings) -> FeltSetting
     )
 
 
+def felt_from_point(frame: np.ndarray, x: int, y: int, sensitivity: int = 82,
+                    patch: int = 12) -> FeltSettings:
+    """Build felt settings by sampling the colour the user clicked on.
+
+    Samples a small patch around (x, y) on the original frame, takes the median
+    HSV, and expands it into a range by ``sensitivity``. This is the click-to-pick
+    tuning helper for when the auto-estimate or defaults don't match a table.
+    """
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    h, w = frame.shape[:2]
+    x = int(np.clip(x, 0, w - 1))
+    y = int(np.clip(y, 0, h - 1))
+    x0, x1 = max(0, x - patch), min(w, x + patch + 1)
+    y0, y1 = max(0, y - patch), min(h, y + patch + 1)
+    region = hsv[y0:y1, x0:x1].reshape(-1, 3)
+    med = np.median(region, axis=0)
+    picked = (int(med[0]), int(med[1]), int(med[2]))
+    rng = derive_hsv_range(picked, sensitivity)
+    return FeltSettings(
+        h_min=rng["h_min"], h_max=rng["h_max"],
+        s_min=rng["s_min"], s_max=rng["s_max"],
+        v_min=rng["v_min"], v_max=rng["v_max"],
+        sensitivity=sensitivity, picked_hsv=list(picked),
+    )
+
+
 def derive_hsv_range(picked_hsv: tuple[int, int, int], sensitivity: int) -> dict:
     """Translate a sampled felt colour + a 0..100 sensitivity into an HSV range.
 

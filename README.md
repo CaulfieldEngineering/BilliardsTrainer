@@ -16,12 +16,35 @@ cloud APIs, no subscriptions).
 
 1. Download `BilliardsTrainer-<version>.exe` from the
    [latest release](https://github.com/CaulfieldEngineering/BilliardsTrainer/releases/latest).
-2. Run it. On the **Live** tab, click **Try demo** — a synthetic table runs the
-   whole pipeline and you'll see make/miss stats accumulate.
+2. Run it. You land on the **Sandbox** tab — click **Try demo** and a synthetic
+   table runs the whole pipeline so you can watch the big **MAKES / MISSES**
+   counter move.
 3. To use your own table: open **Settings**, set **Source** to your camera index
-   (usually `0`), Save, then go to **Live → Start**.
+   (usually `0`), Save, then go to **Sandbox → Start**.
 
 The app checks for updates on launch and prompts you when a newer build exists.
+
+### Sandbox = the core loop
+
+The Sandbox tab is deliberately simple: detect the table, shoot freely, count
+makes and misses. The table is detected and **locked once** automatically (and
+remembered between launches); the big counter is the only thing you need to
+watch. Drills and the shot clock are separate, optional, and off by default.
+
+### Tuning for your real table
+
+If detection looks off under your lighting, the Sandbox control bar has three
+tools (top-right):
+
+- **Pick felt** (crosshair) — click it, then tap your cloth in the live view to
+  seed the felt colour from your actual table.
+- **Toggle overlays** (layers) — hide/show the detection drawing to see the raw
+  camera.
+- **Recalibrate** (refresh) — re-detect the table if it shifted.
+
+And **Save last 5s** writes a clip of exactly what the detector saw to
+`%APPDATA%/BilliardsTrainer/exports/` — handy when something looks wrong. Every
+shot is also logged to `…/logs/shots.jsonl`.
 
 ## Run from source
 

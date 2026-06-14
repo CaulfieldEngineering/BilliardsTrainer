@@ -124,6 +124,15 @@ class SettingsPage(QWidget):
         hw = QWidget()
         hw.setLayout(hue_row)
         form.addRow("Felt hue range", hw)
+        self._auto_relock = QCheckBox("Auto re-lock if the table shifts")
+        form.addRow("", self._auto_relock)
+        self._persist_calib = QCheckBox("Remember calibration between launches")
+        form.addRow("", self._persist_calib)
+        tip = QLabel("Tip: on the Sandbox tab, click 'Pick felt' then tap the "
+                     "cloth to seed these from your real table.")
+        tip.setObjectName("Faint")
+        tip.setWordWrap(True)
+        form.addRow("", tip)
         return card
 
     def _ball_card(self) -> Card:
@@ -138,6 +147,9 @@ class SettingsPage(QWidget):
         form.addRow("", note)
         self._param2 = self._spin(5, 60)
         form.addRow("Detector strictness", self._param2)
+        self._yolo_url = QLineEdit()
+        self._yolo_url.setPlaceholderText("https://…/pool_balls.pt (auto-fetched)")
+        form.addRow("YOLO weights URL", self._yolo_url)
         return card
 
     def _clock_card(self) -> Card:
@@ -159,6 +171,8 @@ class SettingsPage(QWidget):
         self._accent = QLineEdit()
         self._accent.setPlaceholderText("#3DDC97")
         form.addRow("Accent colour", self._accent)
+        self._show_overlays = QCheckBox("Show detection overlays")
+        form.addRow("", self._show_overlays)
         self._show_traj = QCheckBox("Show ball trajectories")
         form.addRow("", self._show_traj)
         self._show_ids = QCheckBox("Show ball IDs")
@@ -185,6 +199,10 @@ class SettingsPage(QWidget):
         return s
 
     # ------------------------------------------------------------------ #
+    def reload(self) -> None:
+        """Refresh the controls from the (possibly externally-mutated) settings."""
+        self._load_from_settings()
+
     def _load_from_settings(self) -> None:
         s = self._s
         self._source_edit.setText(s.source)
@@ -194,8 +212,12 @@ class SettingsPage(QWidget):
         self._sens_label.setText(str(s.felt.sensitivity))
         self._h_min.setValue(s.felt.h_min)
         self._h_max.setValue(s.felt.h_max)
+        self._auto_relock.setChecked(s.table.auto_relock)
+        self._persist_calib.setChecked(s.table.persist_calibration)
         self._backend.setCurrentText(s.balls.backend)
         self._param2.setValue(s.balls.detect_param2)
+        self._yolo_url.setText(s.balls.yolo_weights_url)
+        self._show_overlays.setChecked(s.ui.show_overlays)
         self._clock_enabled.setChecked(s.shot_clock.enabled)
         self._clock_seconds.setValue(s.shot_clock.seconds)
         self._clock_warn.setValue(s.shot_clock.warn_seconds)
@@ -214,8 +236,11 @@ class SettingsPage(QWidget):
         s.felt.sensitivity = self._sensitivity.value()
         s.felt.h_min = self._h_min.value()
         s.felt.h_max = self._h_max.value()
+        s.table.auto_relock = self._auto_relock.isChecked()
+        s.table.persist_calibration = self._persist_calib.isChecked()
         s.balls.backend = self._backend.currentText()
         s.balls.detect_param2 = self._param2.value()
+        s.balls.yolo_weights_url = self._yolo_url.text().strip()
         s.shot_clock.enabled = self._clock_enabled.isChecked()
         s.shot_clock.seconds = self._clock_seconds.value()
         s.shot_clock.warn_seconds = self._clock_warn.value()
@@ -224,6 +249,7 @@ class SettingsPage(QWidget):
         accent = self._accent.text().strip()
         if accent:
             s.ui.accent = accent
+        s.ui.show_overlays = self._show_overlays.isChecked()
         s.ui.show_trajectories = self._show_traj.isChecked()
         s.ui.show_ball_ids = self._show_ids.isChecked()
         s.updates.auto_check = self._auto_check.isChecked()

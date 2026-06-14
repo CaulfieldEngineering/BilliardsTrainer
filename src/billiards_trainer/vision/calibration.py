@@ -11,8 +11,10 @@ homography. A lightweight watchdog periodically re-checks the corners and raises
 ``deviated`` if the table appears to have shifted.
 """
 
+import json
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -32,7 +34,7 @@ class Calibration:
     Hinv: np.ndarray
     dst_size: tuple[int, int]
     table: TableModel
-    rect_mask: np.ndarray
+    rect_mask: np.ndarray | None  # None when restored from disk (detectors recompute)
     felt: FeltSettings  # effective felt colour key (possibly auto-estimated)
 
 
@@ -115,3 +117,56 @@ class CalibrationManager:
         self.calib = None
         self.deviated = False
         self._consecutive = 0
+
+    # ------------------------------------------------------------------ #
+    # Persistence — reuse the locked table across launches
+    # ------------------------------------------------------------------ #
+    def save(self, path: Path, source: str, frame_shape: tuple, settings: Settings) -> None:
+        if self.calib is None:
+            return
+        h, w = frame_shape[:2]
+        payload = {
+            "source": source,
+            "frame_w": int(w), "frame_h": int(h),
+            "pad": settings.rectify.pad_px,
+            "pocket_frac": settings.table.pocket_radius_frac,
+            "dst_size": list(self.calib.dst_size),
+            "corners": self.calib.corners.tolist(),
+            "H": self.calib.H.tolist(),
+            "Hinv": self.calib.Hinv.tolist(),
+            "felt": asdict(self.calib.felt),
+        }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError as exc:
+            log.warning("Could not save calibration: %s", exc)
+
+    def try_load(self, path: Path, source: str, frame_shape: tuple) -> bool:
+        """Restore a saved calibration if it matches this source + resolution."""
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        h, w = frame_shape[:2]
+        if data.get("source") != source or data.get("frame_w") != int(w) \
+                or data.get("frame_h") != int(h):
+            return False
+        try:
+            dst_size = tuple(data["dst_size"])
+            felt_keys = {f.name for f in fields(FeltSettings)}
+            felt = FeltSettings(**{k: v for k, v in data["felt"].items() if k in felt_keys})
+            table = TableModel.from_rect(dst_size, data["pad"], data["pocket_frac"])
+            self.calib = Calibration(
+                corners=np.array(data["corners"], dtype=np.float32),
+                H=np.array(data["H"], dtype=np.float64),
+                Hinv=np.array(data["Hinv"], dtype=np.float64),
+                dst_size=dst_size, table=table, rect_mask=None, felt=felt,
+            )
+            self.deviated = False
+            self._consecutive = 0
+            log.info("Restored saved calibration for source %s (%dx%d)", source, w, h)
+            return True
+        except (KeyError, ValueError, TypeError) as exc:
+            log.warning("Saved calibration invalid: %s", exc)
+            return False

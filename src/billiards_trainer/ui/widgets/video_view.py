@@ -6,7 +6,7 @@ reference to the current ndarray so its buffer stays alive while Qt paints it.
 
 
 import numpy as np
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -14,14 +14,33 @@ from ..theme import PALETTE
 
 
 class VideoView(QWidget):
+    # Emitted on click with normalised image coords (0..1), accounting for the
+    # letterbox. Used by the felt colour picker.
+    clicked = Signal(float, float)
+
     def __init__(self, placeholder: str = "No signal", parent=None):
         super().__init__(parent)
         self._buf: np.ndarray | None = None
         self._pixmap: QPixmap | None = None
         self._placeholder = placeholder
+        self._draw_rect: QRectF | None = None  # where the image is painted
+        self._pickable = False
         self.setMinimumSize(160, 120)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+
+    def set_pickable(self, on: bool) -> None:
+        self._pickable = on
+        self.setCursor(Qt.CrossCursor if on else Qt.ArrowCursor)
+
+    def mousePressEvent(self, event) -> None:
+        if self._pickable and self._draw_rect is not None and self._pixmap is not None:
+            pos = event.position()
+            if self._draw_rect.contains(pos):
+                xf = (pos.x() - self._draw_rect.x()) / self._draw_rect.width()
+                yf = (pos.y() - self._draw_rect.y()) / self._draw_rect.height()
+                self.clicked.emit(float(xf), float(yf))
+        super().mousePressEvent(event)
 
     def set_frame(self, frame: np.ndarray) -> None:
         if frame is None or frame.size == 0:
@@ -54,6 +73,6 @@ class VideoView(QWidget):
         scaled = self._pixmap.size().scaled(rect.size(), Qt.KeepAspectRatio)
         x = (rect.width() - scaled.width()) // 2
         y = (rect.height() - scaled.height()) // 2
-        p.drawPixmap(QRectF(x, y, scaled.width(), scaled.height()),
-                     self._pixmap, QRectF(self._pixmap.rect()))
+        self._draw_rect = QRectF(x, y, scaled.width(), scaled.height())
+        p.drawPixmap(self._draw_rect, self._pixmap, QRectF(self._pixmap.rect()))
         p.end()

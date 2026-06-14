@@ -26,6 +26,11 @@ class ShotClock:
         return self._running
 
     def start(self, t: float) -> None:
+        # When disabled the clock never runs — it must not interfere with
+        # sandbox/free-play (no countdown, no warn/expire edges, no audio).
+        if not self.settings.enabled:
+            self._running = False
+            return
         self._start_t = t
         self._running = True
         self._warned = False

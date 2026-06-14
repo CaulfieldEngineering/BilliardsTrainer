@@ -40,6 +40,8 @@ DB_PATH = APP_DIR / "billiards.db"
 MODELS_DIR = APP_DIR / "models"
 LOGS_DIR = APP_DIR / "logs"
 EXPORTS_DIR = APP_DIR / "exports"
+CALIBRATION_PATH = APP_DIR / "calibration.json"
+SHOTLOG_PATH = LOGS_DIR / "shots.jsonl"
 
 
 def ensure_dirs() -> None:
@@ -87,6 +89,8 @@ class TableSettings:
     size: str = "9ft"           # 9ft | 8ft | 7ft (display/scale only)
     pocket_radius_frac: float = 0.045  # pocket capture radius as frac of short side
     nose_inset_frac: float = 0.0       # playable-area inset from felt edge
+    auto_relock: bool = True           # re-detect automatically if the table shifts
+    persist_calibration: bool = True   # save/reuse the locked table across launches
 
 
 @dataclass
@@ -97,6 +101,11 @@ class BallSettings:
     detect_param2: int = 18         # Hough accumulator threshold (lower => more circles)
     cue_speed_strike: float = 14.0  # px/frame on rectified view that counts as a strike
     stop_speed: float = 1.2         # px/frame below which a ball is "stopped"
+    # Optional YOLO backend: weights are auto-fetched from this URL into the
+    # models dir on first use (no turnkey public pool-ball model exists, so this
+    # is blank by default — see docs/BLOCKERS.md for how to point it at one).
+    yolo_weights_url: str = ""
+    yolo_conf: float = 0.25
 
 
 @dataclass
@@ -114,6 +123,7 @@ class UiSettings:
     accent: str = "#3DDC97"      # mint/green — nods to the felt
     show_trajectories: bool = True
     show_ball_ids: bool = True
+    show_overlays: bool = True   # master toggle for all detection overlays
     mirror_preview: bool = False
 
 

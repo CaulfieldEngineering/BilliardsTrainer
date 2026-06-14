@@ -216,6 +216,28 @@ def _dedupe(dets: list[Detection], min_dist: float) -> list[Detection]:
     return kept
 
 
+def _fetch_weights(url: str, dest) -> bool:
+    """Download YOLO weights to ``dest`` if not already present. Best-effort."""
+    if dest.exists():
+        return True
+    try:
+        import requests
+        log.info("Fetching YOLO weights: %s", url)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with requests.get(url, stream=True, timeout=60) as r:
+            r.raise_for_status()
+            tmp = dest.with_suffix(".part")
+            with open(tmp, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1 << 16):
+                    if chunk:
+                        f.write(chunk)
+            tmp.replace(dest)
+        return True
+    except Exception as exc:  # noqa: BLE001 - network/io best effort
+        log.warning("Could not fetch YOLO weights (%s)", exc)
+        return False
+
+
 def make_detector(balls: BallSettings, felt: FeltSettings, models_dir=None) -> BallDetector:
     """Build the configured detector, falling back to classical on any problem."""
     if balls.backend == "yolo":
@@ -227,12 +249,17 @@ def make_detector(balls: BallSettings, felt: FeltSettings, models_dir=None) -> B
             if cand.exists():
                 weights = cand
                 break
+        # auto-fetch from a configured URL if nothing is on disk
+        if weights is None and getattr(balls, "yolo_weights_url", ""):
+            target = mdir / "pool_balls.pt"
+            if _fetch_weights(balls.yolo_weights_url, target):
+                weights = target
         if weights is not None:
             try:
                 log.info("Using YOLO ball detector: %s", weights)
-                return YoloBallDetector(weights)
+                return YoloBallDetector(weights, conf=getattr(balls, "yolo_conf", 0.25))
             except RuntimeError as exc:
                 log.warning("YOLO unavailable (%s); falling back to classical", exc)
         else:
-            log.warning("No YOLO weights found in %s; falling back to classical", mdir)
+            log.warning("No YOLO weights in %s and no fetch URL; using classical", mdir)
     return ClassicalBallDetector(balls, felt)

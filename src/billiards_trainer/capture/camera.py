@@ -27,6 +27,7 @@ _IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 class FrameSource:
     name = "source"
+    is_live = False  # True for real cameras (transient empty reads are tolerated)
 
     def read(self) -> np.ndarray | None:
         raise NotImplementedError
@@ -40,6 +41,8 @@ class FrameSource:
 
 
 class CameraSource(FrameSource):
+    is_live = True
+
     def __init__(self, index: int):
         self.name = f"Camera {index}"
         backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY

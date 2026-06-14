@@ -11,14 +11,14 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..config import Settings
+from ..config import CALIBRATION_PATH, Settings
 from ..events.shot_detector import ShotDetector, ShotEvent
 from .balls import make_detector
 from .calibration import CalibrationManager
 from .geometry import TableModel
 from .overlay import draw_perspective, draw_rectified
 from .tracking import BallTracker
-from .types import Track
+from .types import Detection, Track
 
 log = logging.getLogger("vision.pipeline")
 
@@ -29,6 +29,7 @@ class PipelineResult:
     frame_bgr: np.ndarray | None = None
     rect_bgr: np.ndarray | None = None
     tracks: list[Track] = field(default_factory=list)
+    detections: list[Detection] = field(default_factory=list)
     table: TableModel | None = None
     corners: np.ndarray | None = None
     shot_event: ShotEvent | None = None
@@ -38,14 +39,16 @@ class PipelineResult:
 
 
 class Pipeline:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, source: str = ""):
         self.settings = settings
+        self.source = source
         self.calib = CalibrationManager()
         self.detector = make_detector(settings.balls, settings.felt)
         self.tracker = BallTracker()
         self.shots = ShotDetector(settings.balls)
         self._frame_idx = 0
         self._deviation_every = 30  # frames between watchdog checks
+        self._tried_load = False
 
     def reconfigure(self, settings: Settings) -> None:
         """Apply edited settings (e.g. new felt range / backend) and recalibrate."""
@@ -59,6 +62,7 @@ class Pipeline:
         self.calib.clear()
         self.tracker.reset()
         self.shots.reset()
+        self._tried_load = True  # don't immediately reload the stale saved one
 
     # ------------------------------------------------------------------ #
     def process(self, frame: np.ndarray, t: float,
@@ -67,13 +71,11 @@ class Pipeline:
         res = PipelineResult(frame_bgr=frame)
 
         if not self.calib.is_calibrated:
-            if not self.calib.calibrate(frame, self.settings):
+            if not self._acquire_calibration(frame):
                 res.status = "calibrating"
                 if annotate:
                     res.frame_bgr = frame
                 return res
-            # Use the effective (possibly auto-estimated) felt colour for ball
-            # detection too, so its non-felt test matches the locked table.
             self.detector = make_detector(self.settings.balls, self.calib.calib.felt)
 
         calib = self.calib.calib
@@ -88,6 +90,7 @@ class Pipeline:
         detections = self.detector.detect(rect, calib.rect_mask, calib.table)
         tracks = self.tracker.update(detections, calib.table.short_side)
         res.tracks = tracks
+        res.detections = detections
         res.n_balls = len(tracks)
 
         event = self.shots.update(tracks, calib.table, t)
@@ -97,10 +100,14 @@ class Pipeline:
         # periodic deviation watchdog (cheap: only every N frames)
         if self._frame_idx % self._deviation_every == 0:
             self.calib.check_deviation(frame, self.settings)
+            if self.calib.deviated and self.settings.table.auto_relock:
+                log.info("Auto-relocking table after deviation")
+                self.request_recalibration()
         res.deviated = self.calib.deviated
         res.status = "deviated" if self.calib.deviated else "tracking"
 
-        if annotate:
+        overlays = annotate and self.settings.ui.show_overlays
+        if overlays:
             res.rect_bgr = draw_rectified(
                 rect, tracks, calib.table,
                 show_traj=self.settings.ui.show_trajectories,
@@ -112,4 +119,20 @@ class Pipeline:
             )
         else:
             res.rect_bgr = rect
+            res.frame_bgr = frame
         return res
+
+    # ------------------------------------------------------------------ #
+    def _acquire_calibration(self, frame: np.ndarray) -> bool:
+        """Restore a saved calibration if available + matching, else detect and
+        persist a fresh one."""
+        if (not self._tried_load and self.settings.table.persist_calibration
+                and self.source):
+            self._tried_load = True
+            if self.calib.try_load(CALIBRATION_PATH, self.source, frame.shape):
+                return True
+        if not self.calib.calibrate(frame, self.settings):
+            return False
+        if self.settings.table.persist_calibration and self.source:
+            self.calib.save(CALIBRATION_PATH, self.source, frame.shape, self.settings)
+        return True

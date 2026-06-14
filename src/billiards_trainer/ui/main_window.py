@@ -7,7 +7,7 @@ work never runs on the UI thread.
 
 import logging
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -35,6 +35,11 @@ log = logging.getLogger("ui")
 
 
 class MainWindow(QMainWindow):
+    # Signals carrying a Python ``object`` marshal cleanly across the thread
+    # boundary (unlike QMetaObject.invokeMethod + Q_ARG(object)), so settings
+    # pushes to the worker thread go through this.
+    apply_settings_requested = Signal(object)
+
     def __init__(self, settings: Settings):
         super().__init__()
         self._settings = settings
@@ -90,7 +95,7 @@ class MainWindow(QMainWindow):
         self._nav_group.setExclusive(True)
         self._nav_items = []
         for idx, (ic, label) in enumerate([
-            ("activity", "Live"), ("target", "Drills"),
+            ("activity", "Sandbox"), ("target", "Drills"),
             ("stats", "Stats"), ("settings", "Settings"),
         ]):
             btn = nav_button(ic, label)
@@ -118,6 +123,10 @@ class MainWindow(QMainWindow):
         self._live.start_requested.connect(self._controller.start, q)
         self._live.stop_requested.connect(self._controller.stop, q)
         self._live.recalibrate_requested.connect(self._controller.recalibrate, q)
+        self._live.pick_felt_requested.connect(self._controller.pick_felt, q)
+        self._live.save_replay_requested.connect(self._controller.save_replay, q)
+        self._live.overlays_toggled.connect(self._on_overlays_toggled)
+        self.apply_settings_requested.connect(self._controller.apply_settings, q)
 
         # controller -> UI
         self._controller.frame_ready.connect(self._live.on_frame)
@@ -128,6 +137,8 @@ class MainWindow(QMainWindow):
         self._controller.status_changed.connect(self._on_status)
         self._controller.clock_event.connect(self._on_clock_event)
         self._controller.error.connect(self._on_error)
+        self._controller.settings_changed.connect(self._on_settings_changed)
+        self._controller.replay_saved.connect(self._on_replay_saved)
 
         # settings + drills
         self._settings_page.applied.connect(self._on_settings_applied)
@@ -147,13 +158,30 @@ class MainWindow(QMainWindow):
         # Asset-free audio cue.
         QApplication.beep()
 
+    def _push_settings(self) -> None:
+        self.apply_settings_requested.emit(self._settings)
+
     def _on_settings_applied(self) -> None:
         apply_theme(QApplication.instance(), self._settings.ui.accent)
-        # push the edited settings onto the worker thread
-        from PySide6.QtCore import Q_ARG, QMetaObject
-        QMetaObject.invokeMethod(self._controller, "apply_settings",
-                                 Qt.QueuedConnection, Q_ARG(object, self._settings))
+        self._push_settings()
         self.statusBar().showMessage("Settings saved", 4000)
+
+    def _on_overlays_toggled(self, on: bool) -> None:
+        # live page already flipped self._settings.ui.show_overlays (shared object)
+        self._push_settings()
+        self._settings.save()
+        self.statusBar().showMessage(
+            f"Detection overlays {'on' if on else 'off'}", 3000)
+
+    def _on_settings_changed(self, settings) -> None:
+        # came from an in-view tweak on the worker thread (e.g. felt pick)
+        self._settings.save()
+        self._settings_page.reload()
+        self.statusBar().showMessage("Felt colour updated — recalibrating", 4000)
+
+    def _on_replay_saved(self, path: str) -> None:
+        self._live.on_replay_saved(path)
+        self.statusBar().showMessage(f"Replay saved: {path}", 6000)
 
     def _on_drill_chosen(self, drill) -> None:
         self._live.set_drill(drill.key, drill.name)
