@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Test + build toolchain
+pytest>=8.0
+pyinstaller>=6.3
+ruff>=0.4

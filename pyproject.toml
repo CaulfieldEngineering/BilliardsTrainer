@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "billiards-trainer"
+dynamic = ["version"]
+description = "Local real-time pool/billiards practice analyst — table & ball detection, shot tracking, make/miss stats."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Caulfield Engineering" }]
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26,<3",
+    "opencv-python-headless>=4.8",
+    "PySide6>=6.6",
+    "SQLAlchemy>=2.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Optional ML ball detector. Pulls in torch (~2 GB) — power-user install only.
+yolo = ["ultralytics>=8.1", "supervision>=0.18"]
+# Optional pose/body-fundamentals analysis (Phase 8).
+pose = ["mediapipe>=0.10"]
+dev = ["pytest>=8.0", "pyinstaller>=6.3", "ruff>=0.4"]
+
+[project.scripts]
+billiards-trainer = "billiards_trainer.app:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "billiards_trainer.version.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# QtMultimedia/Qt is never constructed during the headless CV tests.
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501", "B008"]

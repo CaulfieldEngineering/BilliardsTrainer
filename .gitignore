@@ -55,11 +55,19 @@ x86/
 *.dylib
 
 # =========================
-# Python virtualenv (present in this repo)
+# Python
 # =========================
 venv/
+.venv/
 __pycache__/
 *.pyc
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+*.spec.bak
 
 # =========================
 # OS / editor noise

@@ -1,0 +1,13 @@
+# Runtime dependencies for the base Billiards Trainer installer.
+# These are intentionally lean — they pack to ~150 MB with PyInstaller.
+#
+# Heavy / optional backends (Ultralytics YOLO, MediaPipe Pose) are declared as
+# extras in pyproject.toml and are NOT bundled in the base installer, because
+# torch alone would add ~2 GB. The app degrades gracefully without them:
+#   - Ball detection falls back to the classical Hough+colour detector.
+#   - Pose analysis is simply unavailable until the [pose] extra is installed.
+numpy>=1.26,<3
+opencv-python-headless>=4.8
+PySide6>=6.6
+SQLAlchemy>=2.0
+requests>=2.31

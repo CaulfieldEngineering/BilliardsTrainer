@@ -1,121 +1,110 @@
-# To Build
-cd C:\Users\jpcfo\Documents\_GitHub\_CaulfieldEngineering\BilliardsTrainer\build; cmake --build . --config Release
+# 🎱 Billiards Trainer
 
+A local, real-time **pool/billiards practice analyst** for Windows. Point a camera
+at your table, and it detects the table, tracks the balls, recognises your shots,
+and keeps your **make/miss statistics** — all running **locally and free** (no
+cloud APIs, no subscriptions).
 
-# To-Do
-- Review & Clean Main
-- Review & Clean Felt_Detection
-- Review & Clean Rectification
-- Implement Rail_Detection
-- Implement Diamond_Detection
-- Implement Pocket_Detection
+> Rebuilt from the original C++/Win32 table-detection prototype into a Python +
+> PySide6 application. The hard-won CV (felt → corners → homography) was ported
+> faithfully; ball tracking, shot detection, stats, drills, and a shot clock are
+> new. The old C++ code is archived under [`legacy/`](legacy/).
 
+---
 
-# Architecture
-- Perspective View
-- Rectified View
-- Animated View
-- Sidebar / Settings
-- Ability to "Capture" table without constant DSP
-- Settings
-  - Table Settings
-  - Display Settings
-- Table Calibration
-  - Table Size
-  - Select Felt
-  - Select Rails
-  - Select Diamonds
-  - Cushion Type
-  - "Find Table" / Calibrate Button
+## Quick start (no camera needed)
 
-# Billiards Trainer - Table Detection Proof of Concept
+1. Download `BilliardsTrainer-<version>.exe` from the
+   [latest release](https://github.com/CaulfieldEngineering/BilliardsTrainer/releases/latest).
+2. Run it. On the **Live** tab, click **Try demo** — a synthetic table runs the
+   whole pipeline and you'll see make/miss stats accumulate.
+3. To use your own table: open **Settings**, set **Source** to your camera index
+   (usually `0`), Save, then go to **Live → Start**.
 
-A computer vision application that detects a billiards table in real-time video and overlays visualizations for the felt, rails, pockets, and diamonds.
+The app checks for updates on launch and prompts you when a newer build exists.
 
-## Features
+## Run from source
 
-- **Felt Detection**: Automatically detects the playing surface using color-based segmentation (supports both green and blue felt)
-- **Rail Detection**: Identifies and visualizes the four cushion rails around the table
-- **Pocket Detection**: Detects the six pockets (4 corners + 2 side pockets) using circular Hough transform
-- **Diamond Detection**: Identifies and marks the diamond markers on each rail
-- **Real-time Overlay**: Draws semi-transparent overlays on detected elements
-
-## Requirements
-
-- OpenCV 4.x
-- CMake 3.16 or higher
-- C++17 compatible compiler
-- Webcam or video file input
-
-## Building
-
-```bash
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements-dev.txt
+pip install -e .
+python -m billiards_trainer        # launch the app
+pytest                              # run the test suite
+python tools/eval_table.py          # table-detection eval vs the reference capture
 ```
 
-## Usage
+Optional power-user backends:
 
-### Camera Input (Default Camera)
-```bash
-.\build\Release\table_detector.exe
+```powershell
+pip install -e ".[yolo]"    # Ultralytics YOLO ball detector (pulls in torch, ~2 GB)
+pip install -e ".[pose]"    # MediaPipe pose / body-fundamentals analysis
 ```
 
-### Camera Input (Specific Camera Index)
-```bash
-.\build\Release\table_detector.exe 0    # Use camera 0
-.\build\Release\table_detector.exe 1    # Use camera 1
-.\build\Release\table_detector.exe 2    # Use camera 2
+---
+
+## How it works
+
+```
+Camera / video / demo
+        │
+        ▼
+One-shot table calibration            felt HSV → 4 corners → homography (locked)
+        │   (re-checked periodically by a deviation watchdog)
+        ▼
+Per-frame bird's-eye warp  ──►  ball detection  ──►  multi-object tracking
+        │                       (Hough + colour,      (ByteTrack-style +
+        │                        or optional YOLO)      constant-velocity)
+        ▼
+Shot state machine             cue strike → motion → pocket entry → make/miss
+        │
+        ▼
+SQLite (sessions, shots)  ──►  live + historical stats, streaks, by-pocket, export
 ```
 
-### Video File Input
-```bash
-.\build\Release\table_detector.exe path/to/video.mp4
+Key design principle (a fix for the prototype's biggest cost): **calibrate the
+table once, lock the homography, then spend the whole per-frame budget on balls.**
+The CV pipeline runs on a dedicated worker thread, never the UI thread.
+
+### Ball detection: classical by default
+
+Pre-trained YOLO has no pool-ball classes, and fine-tuning needs a labelled
+dataset, so the **default detector is classical** — Hough circles on the
+bird's-eye view, each validated as non-felt and colour-classified (cue / solid /
+stripe / 8-ball), with a dedicated white-blob pass for the cue ball. It needs no
+model and no torch, so the installer stays ~150 MB. The detector is **pluggable**:
+drop fine-tuned weights into the app's `models/` folder and switch the backend to
+`yolo` in Settings. See [`docs/BLOCKERS.md`](docs/BLOCKERS.md) for the upgrade path.
+
+---
+
+## Project layout
+
+```
+src/billiards_trainer/
+  vision/      felt detection, rectification, balls, tracking, calibration, pipeline
+  events/      shot / make / miss state machine
+  game/        drills, shot clock, modes
+  db/          SQLAlchemy models + repository (stats, export)
+  ui/          PySide6 dark-themed UI: pages, widgets, dialogs, theme, icons
+  capture/     camera / video / image / synthetic-demo frame sources
+  workers/     capture+pipeline controller thread
+  update/      in-app updater (version.json poll → download → relaunch)
+tests/         pytest suite + the labelled reference capture fixtures
+tools/         eval_table.py — corner-RMSE eval harness
+packaging/     PyInstaller spec, launcher, version.json generator
+.github/       CI: build → test → publish installer + version.json to Releases
+legacy/cpp/    archived original C++/Win32 prototype
 ```
 
-### Image Input
-```bash
-.\build\Release\table_detector.exe path/to/image.jpg
-```
+## CI/CD
 
-## Controls
+Every push to `main` runs the test suite, builds a Windows `.exe` with
+PyInstaller, and publishes it + `version.json` to a GitHub Release. The in-app
+updater polls `releases/latest/download/version.json` on launch. See
+[`.github/workflows/build.yml`](.github/workflows/build.yml).
 
-- **'q' or ESC**: Quit the application
-- **'s'**: Save current frame with overlay to disk
-- **'r'**: Reset detection (for future calibration features)
-- **'c'**: Cycle through available cameras
-- **'0'-'9'**: Switch to camera 0-9 directly
+## License
 
-## Detection Algorithm
-
-1. **Felt Detection**: Uses HSV color space to segment green or blue felt from the background
-2. **Corner Detection**: Finds the four corners of the felt using contour approximation
-3. **Pocket Detection**: Uses Hough circle transform to detect circular pockets
-4. **Rail Detection**: Calculates rail positions based on felt corners and extends outward
-5. **Diamond Detection**: Places diamond markers at standard positions along each rail
-
-## Overlay Visualization
-
-- **Green Overlay**: Semi-transparent overlay on the felt surface
-- **Orange Lines**: Rail boundaries
-- **Red Circles**: Detected pockets
-- **Yellow Diamonds**: Rail markers (diamonds)
-- **Magenta Circles**: Corner markers (for debugging)
-
-## Notes
-
-- The camera should be stable on a tripod for best results
-- Good lighting conditions improve detection accuracy
-- The algorithm works best when the table fills a significant portion of the frame
-- Detection parameters may need adjustment based on camera angle and table size
-
-## Future Enhancements
-
-- Calibration mode for fine-tuning detection parameters
-- Ball tracking and trajectory prediction
-- Shot analysis and recommendations
-- Multi-table support
-- Improved diamond detection using template matching
-- Perspective correction for accurate measurements
+MIT.

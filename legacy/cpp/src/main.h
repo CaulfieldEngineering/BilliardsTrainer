@@ -47,6 +47,7 @@
 #include "Rectification/rectification.h"
 #include "RailDetection/rail_detection.h"
 #include "DiamondDetection/diamond_detection.h"
+#include "CushionDetection/CushionDetection.h"
 
 // Sidebar context types
 enum class SidebarContext {
@@ -55,10 +56,11 @@ enum class SidebarContext {
 };
 
 // Which *top-level* sidebar page is currently shown.
-// This is driven by the top menu (Debug / Display).
+// This is driven by the top menu (Debug / Display / Table Setup).
 enum class SidebarPage {
     Debug,
-    Display
+    Display,
+    TableSetup
 };
 
 // Selected input source sentinel values (match UIControls::selectedSource contract below)
@@ -118,6 +120,16 @@ struct UIControls {
     // Overlay toggles
     bool showRails = true;
     bool showDiamonds = true;
+    bool showPlayableArea = true;
+
+    // Table Setup parameters
+    TableSize tableSize = TableSize::NineFt;  // Default to 9ft tournament table
+    CushionType cushionType = CushionType::K66;  // Default to K-66 cushion
+    bool noseInsetOverrideEnabled = false;
+    float noseInsetOverrideIn = 1.50f;  // Default 1.5 inches
+
+    // Table Setup accordion state
+    bool tableSetupExpanded = true;
 };
 
 // Defined in `main.cpp`
@@ -131,6 +143,8 @@ struct FrameAnalysis {
     RailDetectionResult railsPerspective;  // Rails projected to perspective view
     DiamondDetectionResult diamonds;  // Diamonds detected in rectified view
     DiamondDetectionResult diamondsPerspective;  // Diamonds projected to perspective view
+    PlayableAreaResult playable;  // Playable area (nose line boundary) in rectified view
+    PlayableAreaResult playablePerspective;  // Playable area projected to perspective view
 };
 
 // Latest frame analysis (defined in main.cpp)

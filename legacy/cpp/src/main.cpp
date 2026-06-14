@@ -1742,6 +1742,18 @@ static cv::Mat buildRectifiedDisplayFrame() {
         drawDiamondOverlay(processed, latestAnalysis.diamonds, uiControls.diamondParams);
     }
 
+    // Apply playable area overlay if enabled (using cushion_detection module)
+    if (uiControls.showOverlay && uiControls.showPlayableArea && latestAnalysis.playable.ok) {
+        drawPlayableAreaOverlayRectified(
+            processed,
+            latestAnalysis.playable,
+            cv::Scalar(0, 255, 0),  // Green color
+            2,                       // Thickness
+            true,                    // Filled
+            40                       // Alpha (0-255)
+        );
+    }
+
     return processed;
 }
 
@@ -2165,6 +2177,18 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
         if (uiControls.showDiamonds && !latestAnalysis.diamondsPerspective.diamonds.empty()) {
             drawDiamondOverlay(processed, latestAnalysis.diamondsPerspective, uiControls.diamondParams);
         }
+
+        // Apply playable area overlay if enabled (using cushion_detection module)
+        if (uiControls.showPlayableArea && latestAnalysis.playablePerspective.ok) {
+            drawPlayableAreaOverlayRectified(
+                processed,
+                latestAnalysis.playablePerspective,
+                cv::Scalar(0, 255, 0),  // Green color
+                2,                       // Thickness
+                true,                    // Filled
+                40                       // Alpha (0-255)
+            );
+        }
     }
 
     // Store felt result in latestAnalysis
@@ -2286,6 +2310,43 @@ static cv::Mat buildDisplayFrame(const cv::Mat& currentFrame) {
     } else {
         latestAnalysis.diamonds = DiamondDetectionResult();
         latestAnalysis.diamondsPerspective = DiamondDetectionResult();
+    }
+
+    // Compute playable area (cushion nose line boundary) if rectification succeeded
+    if (latestAnalysis.rect.ok && !latestAnalysis.rect.rectifiedBgr.empty() && latestAnalysis.felt.hasCorners) {
+        // Get felt corners in rectified space
+        std::vector<cv::Point2f> srcCornersF;
+        for (const auto& corner : latestAnalysis.felt.corners) {
+            srcCornersF.push_back(corner);
+        }
+        std::vector<cv::Point2f> rectifiedCornersF;
+        cv::perspectiveTransform(srcCornersF, rectifiedCornersF, latestAnalysis.rect.H);
+
+        std::array<cv::Point2f, 4> feltCornersRectified;
+        std::copy(rectifiedCornersF.begin(), rectifiedCornersF.end(), feltCornersRectified.begin());
+
+        latestAnalysis.playable = computePlayableAreaRectified(
+            latestAnalysis.rect.rectifiedBgr.size(),
+            feltCornersRectified,
+            uiControls.tableSize,
+            uiControls.cushionType,
+            uiControls.noseInsetOverrideEnabled,
+            uiControls.noseInsetOverrideIn
+        );
+
+        // Project playable area to perspective view for display on main view
+        if (latestAnalysis.playable.ok && !latestAnalysis.rect.Hinv.empty()) {
+            latestAnalysis.playablePerspective = projectPlayableAreaToPerspective(
+                latestAnalysis.playable,
+                latestAnalysis.rect.Hinv,
+                currentFrame.size()
+            );
+        } else {
+            latestAnalysis.playablePerspective = PlayableAreaResult();
+        }
+    } else {
+        latestAnalysis.playable = PlayableAreaResult();
+        latestAnalysis.playablePerspective = PlayableAreaResult();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -2475,17 +2536,19 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 return 0;
             }
 
-            // Debug sidebar checkboxes (IDs match defines below: 30200..30203)
+            // Debug sidebar checkboxes (IDs match defines below: 30200..30204)
             const int kIdOverlayMaster = 30200;
             const int kIdOverlayDiamonds = 30201;
             const int kIdOverlayFelt = 30202;
             const int kIdOverlayRails = 30203;
-            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRails)) {
+            const int kIdOverlayPlayable = 30204;
+            if (code == BN_CLICKED && (id == kIdOverlayMaster || id == kIdOverlayDiamonds || id == kIdOverlayFelt || id == kIdOverlayRails || id == kIdOverlayPlayable)) {
                 const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
                 if (id == kIdOverlayMaster) uiControls.showOverlay = isChecked;
                 else if (id == kIdOverlayDiamonds) uiControls.showDiamonds = isChecked;
                 else if (id == kIdOverlayFelt) uiControls.showFelt = isChecked;
                 else if (id == kIdOverlayRails) uiControls.showRails = isChecked;
+                else if (id == kIdOverlayPlayable) uiControls.showPlayableArea = isChecked;
                 saveSettingsToDisk();  // Save settings immediately when overlay toggles change
                 return 0;
             }
@@ -2766,6 +2829,43 @@ static LRESULT CALLBACK MainWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
                 return 0;
             }
 
+            // Table Setup: Table Size dropdown (ID: IDC_BUTTON_BASE + 300)
+            const int kIdTableSizeCombo = 30300;
+            if (id == kIdTableSizeCombo && hwndCtl && code == CBN_SELCHANGE) {
+                const int sel = (int)SendMessage(hwndCtl, CB_GETCURSEL, 0, 0);
+                if (sel != CB_ERR && sel >= 0 && sel <= 3) {
+                    uiControls.tableSize = static_cast<TableSize>(sel);
+                    saveSettingsToDisk();
+                    destroySidebarControls();
+                    createSidebarControls(hwnd);
+                }
+                return 0;
+            }
+
+            // Table Setup: Cushion Type dropdown (ID: IDC_BUTTON_BASE + 301)
+            const int kIdCushionTypeCombo = 30301;
+            if (id == kIdCushionTypeCombo && hwndCtl && code == CBN_SELCHANGE) {
+                const int sel = (int)SendMessage(hwndCtl, CB_GETCURSEL, 0, 0);
+                if (sel != CB_ERR && sel >= 0 && sel <= 4) {
+                    uiControls.cushionType = static_cast<CushionType>(sel);
+                    saveSettingsToDisk();
+                    destroySidebarControls();
+                    createSidebarControls(hwnd);
+                }
+                return 0;
+            }
+
+            // Table Setup: Override Nose Inset checkbox (ID: IDC_BUTTON_BASE + 302)
+            const int kIdOverrideInsetCheck = 30302;
+            if (id == kIdOverrideInsetCheck && code == BN_CLICKED) {
+                const bool isChecked = (SendMessage(hwndCtl, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                uiControls.noseInsetOverrideEnabled = isChecked;
+                saveSettingsToDisk();
+                destroySidebarControls();
+                createSidebarControls(hwnd);
+                return 0;
+            }
+
             // If this WM_COMMAND came from a control we don't handle, stop here.
             if (hwndCtl != NULL) {
                 return 0;
@@ -2918,7 +3018,8 @@ static int runWin32HostedApp(int argc, char** argv) {
 // Menu command IDs
 #define IDM_NAV_DEBUG 900
 #define IDM_NAV_DISPLAY 901
-#define IDM_EXPORT_CAPTURES 902
+#define IDM_NAV_TABLE_SETUP 902
+#define IDM_EXPORT_CAPTURES 903
 #define IDM_DEBUG_OVERLAY 1000
 #define IDM_DEBUG_OVERLAY_DIAMONDS 1001
 #define IDM_DEBUG_OVERLAY_FELT 1002
@@ -2966,6 +3067,7 @@ const int SIDEBAR_COLLAPSED_WIDTH = 30; // Width when collapsed (just for collap
 #define IDC_DEBUG_OVERLAY_DIAMONDS_CB (IDC_BUTTON_BASE + 201)
 #define IDC_DEBUG_OVERLAY_FELT_CB (IDC_BUTTON_BASE + 202)
 #define IDC_DEBUG_OVERLAY_RAILS_CB (IDC_BUTTON_BASE + 203)
+#define IDC_DEBUG_OVERLAY_PLAYABLE (IDC_BUTTON_BASE + 204)
 // Overlay style controls
 #define IDC_DIAMONDS_STYLE_COLOR (IDC_BUTTON_BASE + 220)
 #define IDC_DIAMONDS_STYLE_FILLED (IDC_BUTTON_BASE + 221)
@@ -3336,12 +3438,14 @@ void createNativeMenu(HWND hwnd, const std::vector<int>& cameras) {
     HMENU hMenuBar = CreateMenu();
     
     // Top-level menu items are now direct commands (no dropdown).
-    // Clicking "Debug" or "Display" switches the sidebar page.
+    // Clicking "Debug", "Display", or "Table Setup" switches the sidebar page.
     (void)cameras;
     AppendMenuW(hMenuBar, MF_STRING | ((uiControls.sidebarPage == SidebarPage::Debug) ? MF_CHECKED : MF_UNCHECKED),
                 IDM_NAV_DEBUG, L"Debug");
     AppendMenuW(hMenuBar, MF_STRING | ((uiControls.sidebarPage == SidebarPage::Display) ? MF_CHECKED : MF_UNCHECKED),
                 IDM_NAV_DISPLAY, L"Display");
+    AppendMenuW(hMenuBar, MF_STRING | ((uiControls.sidebarPage == SidebarPage::TableSetup) ? MF_CHECKED : MF_UNCHECKED),
+                IDM_NAV_TABLE_SETUP, L"Table Setup");
     AppendMenuW(hMenuBar, MF_STRING, IDM_EXPORT_CAPTURES, L"Export Captures");
     
     // Set the menu bar
@@ -3622,6 +3726,16 @@ void createSidebarControls(HWND hwnd) {
             createLabel(L"Smoothing:", yPos, IDC_STATIC_BASE + 400);
             createTrackbar(IDC_SMOOTHING, yPos, 0, 100, uiControls.smoothingPercent);
             createValueLabel(yPos, IDC_STATIC_BASE + 401);
+            yPos += lineHeight;
+
+            // Show Playable Area toggle
+            {
+                HWND h = CreateWindowW(L"BUTTON", L"Playable Area", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                       xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
+                                       (HMENU)(INT_PTR)IDC_DEBUG_OVERLAY_PLAYABLE, NULL, NULL);
+                applyFont(h, false);
+                SendMessage(h, BM_SETCHECK, uiControls.showPlayableArea ? BST_CHECKED : BST_UNCHECKED, 0);
+            }
             yPos += lineHeight + gap;
         }
 
@@ -4055,7 +4169,170 @@ void createSidebarControls(HWND hwnd) {
         }
 
     }
-    else {
+    else if (uiControls.sidebarPage == SidebarPage::TableSetup) {
+        // ===== Table Setup page: table size and cushion configuration =====
+        addHeader(L"Table Configuration");
+
+        // Table Size dropdown
+        {
+            createLabel(L"Table Size:", yPos, IDC_STATIC_BASE + 800);
+            yPos += lineHeight;
+
+            HWND hCombo = CreateWindowW(L"COMBOBOX", L"", WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL,
+                                        xPos, yPos - g_sidebarScrollPos, usableWidth, 200, g_sidebarPanel,
+                                        (HMENU)(INT_PTR)(IDC_BUTTON_BASE + 300), NULL, NULL);
+            if (hCombo) {
+                applyFont(hCombo, false);
+                SetWindowTheme(hCombo, L"Explorer", NULL);
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"7ft (Bar Table)");
+                SendMessageW(hCombo, CB_SETITEMDATA, 0, (LPARAM)static_cast<int>(TableSize::SevenFt));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"8ft (Home Table)");
+                SendMessageW(hCombo, CB_SETITEMDATA, 1, (LPARAM)static_cast<int>(TableSize::EightFt));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"8.5ft (Pro-Am)");
+                SendMessageW(hCombo, CB_SETITEMDATA, 2, (LPARAM)static_cast<int>(TableSize::EightHalfFt));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"9ft (Tournament)");
+                SendMessageW(hCombo, CB_SETITEMDATA, 3, (LPARAM)static_cast<int>(TableSize::NineFt));
+
+                // Select current table size
+                int selectedIdx = static_cast<int>(uiControls.tableSize);
+                SendMessageW(hCombo, CB_SETCURSEL, selectedIdx, 0);
+            }
+            yPos += lineHeight + gap;
+        }
+
+        // Cushion Type dropdown
+        {
+            createLabel(L"Cushion Type:", yPos, IDC_STATIC_BASE + 801);
+            yPos += lineHeight;
+
+            HWND hCombo = CreateWindowW(L"COMBOBOX", L"", WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL,
+                                        xPos, yPos - g_sidebarScrollPos, usableWidth, 200, g_sidebarPanel,
+                                        (HMENU)(INT_PTR)(IDC_BUTTON_BASE + 301), NULL, NULL);
+            if (hCombo) {
+                applyFont(hCombo, false);
+                SetWindowTheme(hCombo, L"Explorer", NULL);
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Brunswick K-66");
+                SendMessageW(hCombo, CB_SETITEMDATA, 0, (LPARAM)static_cast<int>(CushionType::K66));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Brunswick K-55");
+                SendMessageW(hCombo, CB_SETITEMDATA, 1, (LPARAM)static_cast<int>(CushionType::K55));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Artemis U-23");
+                SendMessageW(hCombo, CB_SETITEMDATA, 2, (LPARAM)static_cast<int>(CushionType::U23));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Super Aramith U-56");
+                SendMessageW(hCombo, CB_SETITEMDATA, 3, (LPARAM)static_cast<int>(CushionType::U56));
+
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)L"Default");
+                SendMessageW(hCombo, CB_SETITEMDATA, 4, (LPARAM)static_cast<int>(CushionType::Default));
+
+                // Select current cushion type
+                int selectedIdx = static_cast<int>(uiControls.cushionType);
+                SendMessageW(hCombo, CB_SETCURSEL, selectedIdx, 0);
+            }
+            yPos += lineHeight + gap;
+        }
+
+        addDivider(yPos - 2);
+        yPos += 6;
+
+        // Display computed values
+        {
+            TableSpec tableSpec = getTableSpec(uiControls.tableSize);
+            CushionSpec cushionSpec = getCushionSpec(uiControls.cushionType);
+
+            // Playing surface dimensions
+            wchar_t dimText[128];
+            swprintf_s(dimText, L"Playing Surface: %.0f\" x %.0f\"",
+                      tableSpec.playWidthIn, tableSpec.playHeightIn);
+            HWND hDim = CreateWindowW(L"STATIC", dimText, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                      xPos, yPos - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                      (HMENU)(INT_PTR)(IDC_STATIC_BASE + 802), NULL, NULL);
+            applyFont(hDim, false);
+            yPos += lineHeight;
+
+            // Nose inset
+            float insetIn = uiControls.noseInsetOverrideEnabled
+                          ? uiControls.noseInsetOverrideIn
+                          : cushionSpec.noseInsetInDefault;
+
+            wchar_t insetText[128];
+            swprintf_s(insetText, L"Nose Inset: %.2f\"", insetIn);
+            HWND hInset = CreateWindowW(L"STATIC", insetText, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                        xPos, yPos - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                        (HMENU)(INT_PTR)(IDC_STATIC_BASE + 803), NULL, NULL);
+            applyFont(hInset, false);
+            yPos += lineHeight;
+
+            // Computed inset in pixels (if playable area has been computed)
+            if (latestAnalysis.playable.ok) {
+                wchar_t pxText[128];
+                swprintf_s(pxText, L"Inset (px): %.1f px", latestAnalysis.playable.insetPx);
+                HWND hPx = CreateWindowW(L"STATIC", pxText, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                        xPos, yPos - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                        (HMENU)(INT_PTR)(IDC_STATIC_BASE + 804), NULL, NULL);
+                applyFont(hPx, false);
+                yPos += lineHeight;
+
+                // Scaling factor
+                wchar_t scaleText[128];
+                swprintf_s(scaleText, L"Scale: %.2f px/in", latestAnalysis.playable.pxPerIn);
+                HWND hScale = CreateWindowW(L"STATIC", scaleText, WS_VISIBLE | WS_CHILD | SS_LEFT,
+                                            xPos, yPos - g_sidebarScrollPos, usableWidth, 18, g_sidebarPanel,
+                                            (HMENU)(INT_PTR)(IDC_STATIC_BASE + 805), NULL, NULL);
+                applyFont(hScale, false);
+                yPos += lineHeight;
+            }
+
+            yPos += gap;
+        }
+
+        addDivider(yPos - 2);
+        yPos += 6;
+
+        // Override checkbox
+        {
+            HWND hOverride = CreateWindowW(L"BUTTON", L"Override Nose Inset", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                                          xPos, yPos - g_sidebarScrollPos, usableWidth, 20, g_sidebarPanel,
+                                          (HMENU)(INT_PTR)(IDC_BUTTON_BASE + 302), NULL, NULL);
+            applyFont(hOverride, false);
+            SendMessage(hOverride, BM_SETCHECK,
+                       uiControls.noseInsetOverrideEnabled ? BST_CHECKED : BST_UNCHECKED, 0);
+            yPos += lineHeight;
+        }
+
+        // Override value slider (only shown if override is enabled)
+        if (uiControls.noseInsetOverrideEnabled) {
+            createLabel(L"Custom Inset (in):", yPos, IDC_STATIC_BASE + 806);
+
+            // Slider range: 0.5" to 2.5" in 0.05" increments
+            // Store as integer (50 to 250), divide by 100 to get inches
+            int sliderValue = static_cast<int>(std::round(uiControls.noseInsetOverrideIn * 100.0f));
+            sliderValue = std::clamp(sliderValue, 50, 250);
+
+            createTrackbar(IDC_BUTTON_BASE + 303, yPos, 50, 250, sliderValue);
+
+            // Value label
+            HWND hValueLabel = CreateWindowW(L"STATIC", L"0.00\"", WS_VISIBLE | WS_CHILD | SS_RIGHT,
+                                             xPos + usableWidth - 60, yPos - g_sidebarScrollPos, 60, 20,
+                                             g_sidebarPanel, (HMENU)(INT_PTR)(IDC_STATIC_BASE + 807), NULL, NULL);
+            applyFont(hValueLabel, false);
+
+            // Update the label immediately
+            wchar_t valueText[32];
+            swprintf_s(valueText, L"%.2f\"", uiControls.noseInsetOverrideIn);
+            SetWindowTextW(hValueLabel, valueText);
+
+            yPos += lineHeight + gap;
+        }
+
+    }
+    else if (uiControls.sidebarPage == SidebarPage::Display) {
         // ===== Display page: source selection =====
         addHeader(L"Source");
 
@@ -4384,6 +4661,18 @@ void handleTrackbarChange(int trackbarId, int value) {
         case IDC_SMOOTHING:
             uiControls.smoothingPercent = value;
             break;
+        case (IDC_BUTTON_BASE + 303):  // Custom Nose Inset slider
+            uiControls.noseInsetOverrideIn = value / 100.0f;  // Convert from 50-250 to 0.5-2.5
+            // Update value label
+            {
+                HWND hLabel = GetDlgItem(g_sidebarPanel, IDC_STATIC_BASE + 807);
+                if (hLabel) {
+                    wchar_t buffer[32];
+                    swprintf_s(buffer, L"%.2f\"", uiControls.noseInsetOverrideIn);
+                    SetWindowTextW(hLabel, buffer);
+                }
+            }
+            break;
         default:
             break;
     }
@@ -4403,6 +4692,8 @@ void updateOverlayMenu() {
                       (uiControls.sidebarPage == SidebarPage::Debug) ? MF_CHECKED : MF_UNCHECKED);
         CheckMenuItem(hMenu, IDM_NAV_DISPLAY,
                       (uiControls.sidebarPage == SidebarPage::Display) ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hMenu, IDM_NAV_TABLE_SETUP,
+                      (uiControls.sidebarPage == SidebarPage::TableSetup) ? MF_CHECKED : MF_UNCHECKED);
     }
 }
 
@@ -4419,6 +4710,14 @@ void handleMenuCommand(int menuId) {
     else if (menuId == IDM_NAV_DISPLAY) {
         uiControls.showSidebar = true;
         uiControls.sidebarPage = SidebarPage::Display;
+        updateOverlayMenu();
+        layoutChildren(g_hwnd);
+        destroySidebarControls();
+        createSidebarControls(g_hwnd);
+    }
+    else if (menuId == IDM_NAV_TABLE_SETUP) {
+        uiControls.showSidebar = true;
+        uiControls.sidebarPage = SidebarPage::TableSetup;
         updateOverlayMenu();
         layoutChildren(g_hwnd);
         destroySidebarControls();
