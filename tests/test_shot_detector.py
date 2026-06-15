@@ -14,7 +14,9 @@ BR = next(p for p in TABLE.pockets if p.name == "bottom-right")  # (448, 855)
 
 
 def det() -> ShotDetector:
-    d = DetectionSettings(warmup_seconds=0.0, cooldown_seconds=0.0,
+    # fusion off here so these gate tests can drive plain motion energy; the
+    # multi-modal fusion is validated separately (test_fusion_*).
+    d = DetectionSettings(warmup_seconds=0.0, cooldown_seconds=0.0, use_fusion=False,
                           motion_active=0.4, motion_quiet=0.2, strike_frames=3,
                           min_travel_px=50.0, pocket_frames=5)
     return ShotDetector(d, BallSettings(), settle_frames=3, min_shot_frames=2)

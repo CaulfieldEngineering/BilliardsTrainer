@@ -149,6 +149,21 @@ class DetectionSettings:
     require_cue: bool = True          # no cue ball identified => no shot detection
     confidence_floor: float = 0.45    # drop ball detections below this score
     manual_confirm: bool = False      # auto-detect SUGGESTS; user commits make/miss
+    # Multi-modal evidence fusion: combine motion energy + optical-flow activity +
+    # background-subtraction foreground into one weighted "activity" score, so a
+    # single noisy signal (e.g. a flickering highlight) can't trip a shot on its
+    # own. Weights/threshold are tunable; presets set sensible bundles.
+    use_fusion: bool = True
+    # Measured on real ball motion vs a flickering specular highlight:
+    #   fg: 0.74 vs 0.013  (50x separation — the strong discriminator)
+    #   flow: 1.9 vs 10.5  (HIGHER for flicker — misleading, so weighted ~0)
+    #   motion: 0.6 vs 0.8 (overlaps — weak on its own)
+    # So bgsub foreground dominates, motion corroborates, flow barely counts.
+    w_motion: float = 0.30
+    w_flow: float = 0.05
+    w_fg: float = 0.65
+    fusion_active: float = 0.45       # fused activity (0..1) needed to be "active"
+    preset: str = "balanced"          # conservative | balanced | aggressive
 
 
 @dataclass
@@ -222,6 +237,29 @@ class Settings:
         except (OSError, json.JSONDecodeError):
             return cls()
         return cls.from_dict(data)
+
+
+DETECTION_PRESETS = {
+    "conservative": dict(motion_active=0.6, strike_frames=8, min_travel_px=160.0,
+                         pocket_frames=15, warmup_seconds=8.0, cooldown_seconds=5.0,
+                         require_cue=True, confidence_floor=0.55, fusion_active=0.55),
+    "balanced": dict(motion_active=0.4, strike_frames=6, min_travel_px=120.0,
+                     pocket_frames=12, warmup_seconds=6.0, cooldown_seconds=4.0,
+                     require_cue=True, confidence_floor=0.45, fusion_active=0.45),
+    "aggressive": dict(motion_active=0.28, strike_frames=4, min_travel_px=80.0,
+                       pocket_frames=8, warmup_seconds=4.0, cooldown_seconds=2.5,
+                       require_cue=False, confidence_floor=0.35, fusion_active=0.35),
+}
+
+
+def apply_detection_preset(det: "DetectionSettings", name: str) -> None:
+    """Bulk-set the detection gates from a named preset (one-click tuning)."""
+    p = DETECTION_PRESETS.get(name)
+    if not p:
+        return
+    for k, v in p.items():
+        setattr(det, k, v)
+    det.preset = name
 
 
 def _build(dc_type: type, data: dict[str, Any]) -> Any:

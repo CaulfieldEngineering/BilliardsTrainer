@@ -275,6 +275,13 @@ class SettingsPage(QWidget):
         banner.setWordWrap(True)
         form.addRow("", banner)
 
+        self._preset = QComboBox()
+        self._preset.addItems(["conservative", "balanced", "aggressive"])
+        self._preset.activated.connect(self._on_preset_changed)
+        form.addRow("Preset", self._preset)
+        self._fusion = QCheckBox("Multi-modal evidence fusion (bg-subtraction + optical flow)")
+        form.addRow("", self._fusion)
+
         self._manual_confirm = QCheckBox("Confirm shots manually (auto-detect only suggests)")
         form.addRow("", self._manual_confirm)
         self._require_cue = QCheckBox("Require a cue ball to count a shot")
@@ -298,6 +305,18 @@ class SettingsPage(QWidget):
         self._schematic = QCheckBox("Clean schematic overhead view (vs warped camera)")
         form.addRow("", self._schematic)
         return card
+
+    def _on_preset_changed(self, _index: int) -> None:
+        from ...config import apply_detection_preset
+        apply_detection_preset(self._s.detection, self._preset.currentText())
+        # reflect the preset's gate values in the widgets
+        d = self._s.detection
+        self._require_cue.setChecked(d.require_cue)
+        self._motion_active.setValue(d.motion_active)
+        self._min_travel.setValue(int(d.min_travel_px))
+        self._warmup.setValue(int(d.warmup_seconds))
+        self._cooldown.setValue(int(d.cooldown_seconds))
+        self._pocket_frames.setValue(d.pocket_frames)
 
     def _clock_card(self) -> Card:
         card, form = self._card("Shot clock")
@@ -425,6 +444,8 @@ class SettingsPage(QWidget):
         self._param2.setValue(s.balls.detect_param2)
         self._yolo_url.setText(s.balls.yolo_weights_url)
         self._show_overlays.setChecked(s.ui.show_overlays)
+        self._preset.setCurrentText(s.detection.preset)
+        self._fusion.setChecked(s.detection.use_fusion)
         self._manual_confirm.setChecked(s.detection.manual_confirm)
         self._require_cue.setChecked(s.detection.require_cue)
         self._motion_active.setValue(s.detection.motion_active)
@@ -459,6 +480,8 @@ class SettingsPage(QWidget):
         s.balls.backend = self._backend.currentText()
         s.balls.detect_param2 = self._param2.value()
         s.balls.yolo_weights_url = self._yolo_url.text().strip()
+        s.detection.preset = self._preset.currentText()
+        s.detection.use_fusion = self._fusion.isChecked()
         s.detection.manual_confirm = self._manual_confirm.isChecked()
         s.detection.require_cue = self._require_cue.isChecked()
         s.detection.motion_active = self._motion_active.value()

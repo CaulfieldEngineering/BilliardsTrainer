@@ -126,11 +126,15 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (235, 235, 235), 1, cv2.LINE_AA)
 
     if debug and diag:
-        txt = (f"state={diag.get('state')} cue={diag.get('cue')} "
-               f"spd={diag.get('max_speed')} travel={diag.get('max_travel')} "
-               f"pot={diag.get('potted')}")
-        cv2.putText(img, txt, (8, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+        line1 = (f"state={diag.get('state')} cue={diag.get('cue')} "
+                 f"travel={diag.get('travel')} pot={diag.get('potted')} "
+                 f"fps={diag.get('fps', 0)}")
+        line2 = (f"motion={diag.get('motion')} flow={diag.get('flow')} "
+                 f"fg={diag.get('fg')} -> fused={diag.get('fused')}")
+        cv2.putText(img, line1, (8, h - 26), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
                     (200, 220, 255), 1, cv2.LINE_AA)
+        cv2.putText(img, line2, (8, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
+                    (180, 255, 200), 1, cv2.LINE_AA)
     return img
 
 

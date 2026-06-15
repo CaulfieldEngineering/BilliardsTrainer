@@ -96,6 +96,8 @@ class ShotDetector:
         self._start_t = 0.0
         self._max_travel = 0.0
         self._motion = 0.0
+        self._fused = 0.0
+        self._evidence: dict = {}
         self.last_event: ShotEvent | None = None
         self.last_diag: dict = {}
 
@@ -114,16 +116,24 @@ class ShotDetector:
 
     # ------------------------------------------------------------------ #
     def update(self, tracks: list[Track], table: TableModel, t: float,
-               motion: float = 0.0) -> ShotEvent | None:
+               motion: float = 0.0, evidence: dict | None = None) -> ShotEvent | None:
         if self._first_t is None:
             self._first_t = t
         det = self.det
         self._motion = motion
+        self._evidence = evidence or {"motion": motion, "flow": 0.0, "fg": 0.0}
         by_id = {tr.id: tr for tr in tracks}
 
         cue_present = self._update_cue(tracks)
-        active = motion > det.motion_active
-        quiet = motion < det.motion_quiet
+        # Fused multi-modal activity (or plain motion energy if fusion is off).
+        if det.use_fusion:
+            self._fused = self._fuse(motion, self._evidence)
+            active = self._fused >= det.fusion_active
+            quiet = self._fused < (det.fusion_active * 0.5)
+        else:
+            self._fused = motion
+            active = motion > det.motion_active
+            quiet = motion < det.motion_quiet
         warming = (t - self._first_t) < det.warmup_seconds
         cooling = (t - self._last_shot_t) < det.cooldown_seconds
 
@@ -153,6 +163,17 @@ class ShotDetector:
         return event
 
     # ------------------------------------------------------------------ #
+    def _fuse(self, motion: float, ev: dict) -> float:
+        """Weighted evidence score in 0..1 from the three modalities.
+        Normalisation references were set from measured demo-shot vs flicker
+        values: ~1% motion, ~5% coherent flow, ~3% foreground == "full"."""
+        nm = min(1.0, motion / 1.0)
+        nf = min(1.0, ev.get("flow", 0.0) / 6.0)
+        ng = min(1.0, ev.get("fg", 0.0) / 0.8)
+        d = self.det
+        total = (d.w_motion + d.w_flow + d.w_fg) or 1.0
+        return (d.w_motion * nm + d.w_flow * nf + d.w_fg * ng) / total
+
     def _update_cue(self, tracks: list[Track]) -> bool:
         cues = [tr for tr in tracks if tr.cls == BallClass.CUE]
         if cues and (self._cue_id is None or self._cue_id not in {tr.id for tr in tracks}):
@@ -247,6 +268,9 @@ class ShotDetector:
             "state": self._state.value,
             "cue": cue,
             "motion": round(motion, 1),
+            "flow": round(self._evidence.get("flow", 0.0), 1),
+            "fg": round(self._evidence.get("fg", 0.0), 1),
+            "fused": round(self._fused, 2),
             "active_run": self._active_run,
             "travel": round(self._max_travel, 0),
             "warming": warming,

@@ -7,6 +7,7 @@ touch Qt or the DB — those are wired in the controller, keeping this testable.
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 
 import cv2
@@ -14,6 +15,7 @@ import numpy as np
 
 from ..config import CALIBRATION_PATH, Settings
 from ..events.shot_detector import ShotDetector, ShotEvent
+from .background import BackgroundModel, downscale, flow_activity
 from .balls import make_detector
 from .calibration import CalibrationManager
 from .geometry import TableModel
@@ -53,6 +55,10 @@ class Pipeline:
         self._deviation_every = 30  # frames between watchdog checks
         self._tried_load = False
         self._prev_gray = None
+        self._bg = BackgroundModel()
+        self._prev_small = None
+        self._last_flow = 0.0
+        self._last_ms = 0.0
 
     def reconfigure(self, settings: Settings) -> None:
         """Apply edited settings (e.g. new felt range / backend) and recalibrate."""
@@ -61,16 +67,25 @@ class Pipeline:
         self.tracker.reset()
         self.shots = ShotDetector(settings.detection, settings.balls)
         self.calib.clear()
+        self._reset_motion()
 
     def request_recalibration(self) -> None:
         self.calib.clear()
         self.tracker.reset()
         self.shots.reset()
+        self._reset_motion()
         self._tried_load = True  # don't immediately reload the stale saved one
+
+    def _reset_motion(self) -> None:
+        # ROI size can change after recalibration; relearn the table baseline.
+        self._bg.reset()
+        self._prev_gray = None
+        self._prev_small = None
 
     # ------------------------------------------------------------------ #
     def process(self, frame: np.ndarray, t: float,
                 annotate: bool = True) -> PipelineResult:
+        t_start = time.perf_counter()
         self._frame_idx += 1
         res = PipelineResult(frame_bgr=frame)
 
@@ -113,15 +128,27 @@ class Pipeline:
             motion = 0.0
         self._prev_gray = roi
 
+        # extra modalities for evidence fusion: background-subtraction foreground
+        # area + coherent optical-flow activity (both on a downscaled ROI)
+        small = downscale(roi)
+        fg = self._bg.update(small)
+        # optical flow is the costliest + least-weighted signal — every 2nd frame
+        if self._frame_idx % 2 == 0:
+            self._last_flow = flow_activity(self._prev_small, small)
+        self._prev_small = small
+        evidence = {"motion": motion, "flow": self._last_flow * 100.0, "fg": fg * 100.0}
+
         if self.paused:
             # keep showing video + tracking, but never count shots while paused
             self.shots.reset()
             res.shot_state = "paused"
         else:
-            event = self.shots.update(tracks, calib.table, t, motion)
+            event = self.shots.update(tracks, calib.table, t, motion, evidence)
             res.shot_event = event
             res.shot_state = self.shots.state
-            res.diag = self.shots.last_diag
+            res.diag = dict(self.shots.last_diag)
+            res.diag["ms"] = round(self._last_ms, 1)
+            res.diag["fps"] = int(1000 / self._last_ms) if self._last_ms > 0.1 else 0
 
         # periodic deviation watchdog (cheap: only every N frames)
         if self._frame_idx % self._deviation_every == 0:
@@ -157,6 +184,7 @@ class Pipeline:
             )
         else:
             res.frame_bgr = frame
+        self._last_ms = (time.perf_counter() - t_start) * 1000.0
         return res
 
     # ------------------------------------------------------------------ #

@@ -13,14 +13,14 @@ from billiards_trainer.vision.pipeline import Pipeline
 
 def test_demo_calibrates_and_detects_make():
     settings = Settings()
-    settings.detection.warmup_seconds = 0.5   # don't wait the full warm-up in tests
+    settings.detection.warmup_seconds = 3.0   # > MOG2 bg warm-up so fusion's fg is ready
     settings.detection.cooldown_seconds = 0.5
     src = DemoSource()
     pipe = Pipeline(settings)
 
     makes = []
     calibrated = False
-    for i in range(480):  # ~2 full cycles past warm-up
+    for i in range(560):  # a couple of cycles past warm-up
         frame = src.read()
         res = pipe.process(frame, t=i * 0.033)
         calibrated = calibrated or pipe.calib.is_calibrated
