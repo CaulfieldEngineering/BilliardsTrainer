@@ -207,9 +207,13 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ #
     def _maybe_check_updates(self) -> None:
         if self._settings.updates.auto_check:
+            log.info("Auto update-check on launch (current v%s)", __version__)
             self._run_update_check(forced=False)
+        else:
+            log.info("Auto update-check disabled in settings")
 
     def _check_for_updates_forced(self) -> None:
+        log.info("Manual update-check requested")
         self._run_update_check(forced=True)
 
     def _run_update_check(self, forced: bool) -> None:

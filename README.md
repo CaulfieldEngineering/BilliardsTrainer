@@ -51,9 +51,18 @@ shot is also logged to `…/logs/shots.jsonl`.
 
 ### Updating & feedback
 
-- **Settings → Check for updates now** — one click checks the latest release; if a
+- **Settings → Check for updates** — the button is in the Settings header (always
+  visible) and in the Updates card. One click checks the latest release; if a
   newer build exists you get a prompt → download with a progress bar → the app
-  swaps itself and relaunches. (It also checks silently on launch.)
+  swaps itself and relaunches. (It also checks silently on launch and logs the
+  result to `…/logs/billiards_trainer.log`.)
+
+> **On a build older than v0.1.6?** The in-app "Check for updates" button didn't
+> exist before v0.1.6, so you won't see it. Do a **one-time manual download** of
+> the newest `BilliardsTrainer-*.exe` from the
+> [releases page](https://github.com/CaulfieldEngineering/BilliardsTrainer/releases/latest)
+> and run it. From v0.1.6 onward the in-app updater takes over — you won't need
+> to visit GitHub again.
 - **Settings → Send feedback** — file a bug or feature request from inside the app
   (optionally attaching a screenshot and the last-5s replay). It's saved locally
   and, if you set up cloud backup, synced to Supabase. See

@@ -42,9 +42,20 @@ class SettingsPage(QWidget):
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(16)
 
+        from ..icons import icon
+        from ..theme import PALETTE
         header = QHBoxLayout()
         header.addWidget(section_header("Settings"))
         header.addStretch(1)
+        # Always-visible "Check for updates" button so it can't be missed,
+        # regardless of scroll position or window size.
+        self._header_check_btn = QPushButton("  Check for updates")
+        self._header_check_btn.setObjectName("Ghost")
+        self._header_check_btn.setIcon(icon("download", PALETTE.text))
+        self._header_check_btn.setToolTip("Manually check for new versions")
+        self._header_check_btn.setCursor(Qt.PointingHandCursor)
+        self._header_check_btn.clicked.connect(self._on_check_clicked)
+        header.addWidget(self._header_check_btn)
         self._save_btn = QPushButton("Save changes")
         self._save_btn.setObjectName("Accent")
         self._save_btn.setCursor(Qt.PointingHandCursor)
@@ -61,12 +72,14 @@ class SettingsPage(QWidget):
         grid.setSpacing(16)
         grid.setContentsMargins(0, 0, 8, 0)
 
+        # Updates card sits in the top row so the button is visible without
+        # scrolling; the header button covers every other case.
         grid.addWidget(self._source_card(), 0, 0)
-        grid.addWidget(self._felt_card(), 0, 1)
-        grid.addWidget(self._ball_card(), 1, 0)
-        grid.addWidget(self._clock_card(), 1, 1)
-        grid.addWidget(self._appearance_card(), 2, 0)
-        grid.addWidget(self._updates_card(), 2, 1)
+        grid.addWidget(self._updates_card(), 0, 1)
+        grid.addWidget(self._felt_card(), 1, 0)
+        grid.addWidget(self._ball_card(), 1, 1)
+        grid.addWidget(self._clock_card(), 2, 0)
+        grid.addWidget(self._appearance_card(), 2, 1)
         grid.addWidget(self._feedback_card(), 3, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
@@ -276,6 +289,7 @@ class SettingsPage(QWidget):
 
         self._check_btn = QPushButton("  Check for updates now")
         self._check_btn.setObjectName("Accent")
+        self._check_btn.setToolTip("Manually check for new versions")
         self._check_btn.setCursor(Qt.PointingHandCursor)
         self._check_btn.clicked.connect(self._on_check_clicked)
         form.addRow("", self._check_btn)
@@ -311,11 +325,13 @@ class SettingsPage(QWidget):
     def _on_check_clicked(self) -> None:
         self._update_status.setText("Checking…")
         self._check_btn.setEnabled(False)
+        self._header_check_btn.setEnabled(False)
         self.check_updates_requested.emit()
 
     def set_update_status(self, text: str) -> None:
         self._update_status.setText(text)
         self._check_btn.setEnabled(True)
+        self._header_check_btn.setEnabled(True)
 
     @staticmethod
     def _spin(lo: int, hi: int) -> QSpinBox:

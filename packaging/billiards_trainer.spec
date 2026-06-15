@@ -32,6 +32,8 @@ a = Analysis(
         "comtypes",
         "comtypes.client",
         "comtypes.stream",
+        # ensure HTTPS verification works in the frozen build (update check)
+        "certifi",
     ],
     hookspath=[],
     runtime_hooks=[],

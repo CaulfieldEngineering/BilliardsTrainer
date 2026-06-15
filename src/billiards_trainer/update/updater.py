@@ -11,6 +11,7 @@ The pure functions here (``parse_version``, ``is_newer``, ``fetch_manifest``)
 are unit-tested; the Qt threading wrapper is a thin shell over them.
 """
 
+import logging
 import re
 import tempfile
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from ..version import UPDATE_MANIFEST_URL, __version__
 
+log = logging.getLogger("updater")
 _VERSION_RE = re.compile(r"(\d+)")
 
 
@@ -60,22 +62,40 @@ class UpdateInfo:
 
 
 def fetch_manifest(url: str = UPDATE_MANIFEST_URL, timeout: float = 6.0) -> UpdateInfo | None:
-    """Fetch + parse version.json. Returns None on any network/parse error."""
+    """Fetch + parse version.json. Returns None on any network/parse error.
+
+    Logs every step so "I don't see an update" reports have a diagnostic trail
+    (this path used to fail silently — e.g. a frozen-build SSL/cert problem would
+    leave no trace at all)."""
+    log.info("Update check: fetching manifest %s", url)
     try:
         resp = requests.get(url, timeout=timeout, headers={"Accept": "application/json"})
+        log.info("Update check: HTTP %s from %s", resp.status_code, resp.url)
         resp.raise_for_status()
-        return UpdateInfo.from_manifest(resp.json())
-    except (requests.RequestException, ValueError):
-        return None
+        info = UpdateInfo.from_manifest(resp.json())
+        log.info("Update check: manifest version=%s url=%s", info.version, info.url)
+        return info
+    except requests.exceptions.SSLError as exc:
+        log.warning("Update check FAILED (SSL/cert): %s — the bundled CA store may "
+                    "be missing; updates can't be verified.", exc)
+    except requests.RequestException as exc:
+        log.warning("Update check FAILED (network): %s", exc)
+    except ValueError as exc:
+        log.warning("Update check FAILED (bad JSON): %s", exc)
+    return None
 
 
 def check_for_update(current: str = __version__,
                      url: str = UPDATE_MANIFEST_URL) -> UpdateInfo | None:
     """Return UpdateInfo if a newer release is available, else None."""
     info = fetch_manifest(url)
-    if info and info.version and is_newer(info.version, current):
-        return info
-    return None
+    if not info or not info.version:
+        log.info("Update check: no usable manifest; staying on v%s", current)
+        return None
+    newer = is_newer(info.version, current)
+    log.info("Update check: available=%s current=%s -> %s",
+             info.version, current, "OFFER UPDATE" if newer else "up to date")
+    return info if newer else None
 
 
 # --------------------------------------------------------------------------- #

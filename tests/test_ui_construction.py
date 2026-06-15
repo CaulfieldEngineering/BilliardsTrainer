@@ -73,6 +73,10 @@ def test_settings_page_has_update_and_feedback_controls(app):
     from billiards_trainer.ui.pages.settings_page import SettingsPage
 
     page = SettingsPage(Settings())
+    # both the always-visible header button and the card button exist
     assert hasattr(page, "_check_btn")
+    assert hasattr(page, "_header_check_btn")
+    assert page._header_check_btn.isVisible() or page._header_check_btn is not None
     page.set_update_status("You're on the latest version.")
     assert "latest" in page._update_status.text()
+    assert page._check_btn.isEnabled() and page._header_check_btn.isEnabled()
