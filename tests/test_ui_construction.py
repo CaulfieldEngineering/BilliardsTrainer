@@ -80,3 +80,25 @@ def test_settings_page_has_update_and_feedback_controls(app):
     page.set_update_status("You're on the latest version.")
     assert "latest" in page._update_status.text()
     assert page._check_btn.isEnabled() and page._header_check_btn.isEnabled()
+
+
+def test_camera_dropdown_autosaves_without_save_click(app, tmp_path, monkeypatch):
+    """The P0 fix: picking a camera in the dropdown must persist immediately —
+    no Save click needed — so Start opens the selected camera."""
+    import billiards_trainer.config as cfg
+    from billiards_trainer.capture import devices
+    from billiards_trainer.capture.devices import CameraInfo
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
+
+    monkeypatch.setattr(cfg, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(devices, "list_cameras",
+                        lambda: [CameraInfo(0, "Cam A"), CameraInfo(1, "Cam B")])
+    s = Settings()
+    page = SettingsPage(s)
+    assert s.source == "0"  # default before selecting
+
+    page._select_source_data("1")  # user picks "Cam B (1)" — no Save click
+    assert s.source == "1"
+    assert s.source_name == "Cam B"
+    assert (tmp_path / "settings.json").exists()  # persisted to disk

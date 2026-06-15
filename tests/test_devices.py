@@ -26,6 +26,14 @@ def test_resolve_by_index_when_no_name(monkeypatch):
     assert idx == 1 and name == "BRIO" and warn == ""
 
 
+def test_resolve_name_gone_uses_index_with_warning(monkeypatch):
+    # saved name no longer present, but the saved index is still a valid camera
+    _patch(monkeypatch, [CameraInfo(0, "Integrated"), CameraInfo(1, "NewCam")])
+    idx, name, warn = resolve_camera(1, "OldCamThatLeft")
+    assert idx == 1 and name == "NewCam"
+    assert "not found" in warn and "camera 1" in warn
+
+
 def test_resolve_invalid_index_falls_back_to_first(monkeypatch):
     _patch(monkeypatch, [CameraInfo(0, "Integrated")])
     idx, name, warn = resolve_camera(5, "Gone Cam")

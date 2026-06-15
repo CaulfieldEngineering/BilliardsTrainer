@@ -33,8 +33,10 @@ class SettingsPage(QWidget):
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self._s = settings
+        self._loaded = False  # guards auto-save during initial population
         self._build()
         self._load_from_settings()
+        self._loaded = True
 
     # ------------------------------------------------------------------ #
     def _build(self) -> None:
@@ -144,7 +146,20 @@ class SettingsPage(QWidget):
 
         self._cam_names: dict[str, str] = {}
         self._populate_cameras()
+        # Auto-save the camera the moment it's picked — no Save click needed, so
+        # the dropdown is actually wired to what Start opens.
+        self._source_combo.currentIndexChanged.connect(self._on_source_changed)
         return card
+
+    def _on_source_changed(self) -> None:
+        if not self._loaded:
+            return  # ignore programmatic population during load
+        spec = str(self._source_combo.currentData() or "0")
+        self._s.source = spec
+        self._s.source_name = self._cam_names.get(spec, "") if spec.isdigit() else ""
+        self._s.save()
+        self.applied.emit()  # persists + pushes the new source to the worker thread
+        self._source_hint.setText(f"Using {self._source_combo.currentText()} — saved.")
 
     def _populate_cameras(self, keep: bool = False) -> None:
         from ...capture.devices import list_cameras

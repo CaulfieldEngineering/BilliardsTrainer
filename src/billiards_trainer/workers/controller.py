@@ -97,12 +97,16 @@ class PipelineController(QObject):
         self.stop()
         # For a camera index, re-resolve by saved friendly name so a reshuffled
         # USB camera still opens the right device (and warn if it moved).
+        resolved_name = ""
         if source_spec.isdigit():
             from ..capture.devices import resolve_camera
-            idx, _name, warn = resolve_camera(int(source_spec), self._settings.source_name)
+            idx, resolved_name, warn = resolve_camera(int(source_spec), self._settings.source_name)
             if warn:
                 self.error.emit(warn)
             source_spec = str(idx)
+        # Sanity log on every Start so "wrong camera" issues are diagnosable.
+        log.info('[start] opening source=%s name="%s" mode=%s (settings.source=%s name="%s")',
+                 source_spec, resolved_name, mode, self._settings.source, self._settings.source_name)
         try:
             self._source = open_source(source_spec)
         except Exception as exc:  # noqa: BLE001

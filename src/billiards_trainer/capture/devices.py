@@ -82,8 +82,11 @@ def resolve_camera(index: int, name: str = "") -> tuple[int, str, str]:
                 if c.index != index:
                     return c.index, c.name, f"'{name}' is now camera {c.index} (was {index})."
                 return c.index, c.name, ""
+    # name didn't match (or none saved) — fall back to the saved index if valid
     for c in cams:
         if c.index == index:
+            if name and c.name != name:
+                return c.index, c.name, f"'{name}' not found — using camera {index} ({c.name})."
             return c.index, c.name, ""
     first = cams[0]
     return first.index, first.name, f"Camera {index} not found — using {first.name}."
