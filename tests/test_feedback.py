@@ -33,8 +33,8 @@ def test_add_and_list_feedback(repo):
 def test_feedback_sync_flags(repo):
     fid = repo.add_feedback(kind="feature", title="Add a timer")
     unsynced = {f["id"] for f in repo.unsynced_feedback()}
-    assert fid in unsynced and 147 in unsynced
-    repo.mark_feedback_synced([fid, 147])
+    assert fid in unsynced and 147 in unsynced  # the dev notes seed as unsynced too
+    repo.mark_feedback_synced(list(unsynced))
     assert repo.unsynced_feedback() == []
 
 

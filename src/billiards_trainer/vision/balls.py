@@ -120,10 +120,11 @@ class ClassicalBallDetector(BallDetector):
             # must sit on the playing surface, away from the rail band
             if not table.on_table(cx, cy, margin=-r * 0.2):
                 continue
-            # reject the dark pocket holes themselves (a ball *entering* a pocket
-            # is handled by the shot detector's vanish logic, not here)
+            # reject the dark pocket holes themselves, but keep a small radius so a
+            # ball *entering* a pocket is still tracked right up to the lip (the
+            # shot detector needs that to register the pot)
             pocket, pdist = table.nearest_pocket(cx, cy)
-            if pdist < table.pocket_radius * 0.85:
+            if pdist < table.pocket_radius * 0.5:
                 continue
             x0, y0 = max(0, cx - r), max(0, cy - r)
             x1, y1 = min(w, cx + r + 1), min(h, cy + r + 1)

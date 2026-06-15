@@ -43,20 +43,31 @@ class Repository:
                     if name not in existing:
                         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
 
+    # Dev notes carried forward in the local feedback table (idempotent by id).
+    _DEVNOTES = [
+        (147, "Self-update button + in-app feedback form + Supabase sync skeleton",
+         "v0.1.6: explicit Check-for-Updates button, local-first feedback form, "
+         "and a config-gated Supabase sync skeleton."),
+        (148, "#1 reliability blockers: false-positive make/miss counts + warped overhead",
+         "v0.2.x live testing: the make/miss counter incremented on a still table "
+         "(classical-CV noise), and the overhead view showed the warped camera. "
+         "Fixed by motion-energy-gated shot detection (cue + sustained motion + "
+         "ball travel + pocket approach/vanish, warm-up/cool-down, confidence "
+         "floor) plus a clean rendered schematic overhead. Classical detection "
+         "remains demo-grade; YOLO weights in models/ are the accuracy upgrade."),
+    ]
+
     def _seed_devnote(self) -> None:
-        """Seed BilliardsTrainer's feedback numbering from #147 with a dev note,
-        so the local feedback table carries our running log forward."""
         with self._Session() as s:
-            if s.get(Feedback, 147) is not None:
-                return
-            s.add(Feedback(
-                id=147, kind="devnote",
-                title="Self-update button + in-app feedback form + Supabase sync skeleton",
-                description="v0.1.6: explicit Check-for-Updates button, local-first "
-                            "feedback form, and a config-gated Supabase sync skeleton.",
-                app_version=_app_version(), synced=False,
-            ))
-            s.commit()
+            changed = False
+            for nid, title, desc in self._DEVNOTES:
+                if s.get(Feedback, nid) is None:
+                    s.add(Feedback(id=nid, kind="devnote", title=title,
+                                   description=desc, app_version=_app_version(),
+                                   synced=False))
+                    changed = True
+            if changed:
+                s.commit()
 
     # ------------------------------------------------------------------ #
     # Lifecycle

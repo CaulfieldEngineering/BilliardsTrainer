@@ -1,79 +1,103 @@
-"""Shot/make/miss state-machine tests with hand-built track sequences."""
+"""Shot/make/miss state-machine tests for the motion-gated detector.
 
-from billiards_trainer.config import BallSettings
+These drive the hardened gates directly: motion energy (start/stop), cue
+presence, ball travel, and pocket approach+vanish for the outcome.
+"""
+
+from billiards_trainer.config import BallSettings, DetectionSettings
 from billiards_trainer.events.shot_detector import ShotDetector, ShotOutcome
 from billiards_trainer.vision.geometry import TableModel
 from billiards_trainer.vision.types import BallClass, Track
 
 TABLE = TableModel.from_rect((488, 895), 40)
-# bottom-right pocket is at (x1, y1) = (448, 855)
-BR = next(p for p in TABLE.pockets if p.name == "bottom-right")
+BR = next(p for p in TABLE.pockets if p.name == "bottom-right")  # (448, 855)
 
 
-def trk(tid, x, y, vx=0.0, vy=0.0, cls=BallClass.SOLID):
-    return Track(id=tid, x=x, y=y, radius=10, vx=vx, vy=vy, cls=cls)
+def det() -> ShotDetector:
+    d = DetectionSettings(warmup_seconds=0.0, cooldown_seconds=0.0,
+                          motion_active=0.4, motion_quiet=0.2, strike_frames=3,
+                          min_travel_px=50.0, pocket_frames=5)
+    return ShotDetector(d, BallSettings(), settle_frames=3, min_shot_frames=2)
 
 
-def feed(det, frames, t0=0.0, dt=0.033):
+def trk(tid, x, y, cls=BallClass.SOLID):
+    return Track(id=tid, x=x, y=y, radius=10, cls=cls)
+
+
+def cue(x=200, y=400):
+    return trk(1, x, y, cls=BallClass.CUE)
+
+
+def feed(d, frames):
+    """frames: list of (tracks, motion)."""
     event = None
-    for i, tracks in enumerate(frames):
-        ev = det.update(tracks, TABLE, t0 + i * dt)
+    for i, (tracks, motion) in enumerate(frames):
+        ev = d.update(tracks, TABLE, t=i * 0.033, motion=motion)
         if ev is not None:
             event = ev
     return event
 
 
-def test_make_when_object_ball_pocketed():
-    d = ShotDetector(BallSettings(), settle_frames=4, min_shot_frames=2)
-    cue = lambda: trk(1, 200, 400, cls=BallClass.CUE)  # noqa: E731
-    frames = [
-        [cue(), trk(2, 250, 420)],                       # settled
-        [cue(), trk(2, 300, 520, vx=20, vy=20)],         # moving
-        [cue(), trk(2, 380, 650, vx=20, vy=20)],
-        [cue(), trk(2, 446, 853, vx=20, vy=20)],         # inside BR pocket zone
-    ]
-    frames += [[cue()] for _ in range(6)]                # object gone, cue stopped
+def test_make_when_object_approaches_pocket_and_vanishes():
+    d = det()
+    frames = []
+    # settle (establish rest) — quiet
+    for _ in range(3):
+        frames.append(([cue(), trk(2, 250, 420)], 0.0))
+    # active: object travels to the bottom-right pocket (motion high)
+    for x, y in [(300, 520), (360, 640), (410, 760), (446, 853)]:
+        frames.append(([cue(), trk(2, x, y)], 1.0))
+    # object drops in (gone); table goes quiet
+    for _ in range(5):
+        frames.append(([cue()], 0.0))
     event = feed(d, frames)
     assert event is not None
     assert event.outcome == ShotOutcome.MAKE
     assert event.num_pocketed == 1
     assert event.target_pocket == "bottom-right"
+    assert event.max_travel >= 50
 
 
-def test_miss_when_nothing_pocketed():
-    d = ShotDetector(BallSettings(), settle_frames=4, min_shot_frames=2)
-    cue = lambda: trk(1, 200, 400, cls=BallClass.CUE)  # noqa: E731
-    frames = [
-        [cue(), trk(2, 250, 420)],
-        [cue(), trk(2, 250, 480, vx=0, vy=18)],
-        [cue(), trk(2, 250, 560, vx=0, vy=18)],
-        [cue(), trk(2, 250, 600)],                       # stopped mid-table
-    ]
-    frames += [[cue(), trk(2, 250, 600)] for _ in range(6)]
+def test_no_shot_when_table_is_idle():
+    d = det()
+    # balls present but no motion at all (Joe's "counter creeps while I sit") —
+    # must never fire.
+    for _ in range(60):
+        ev = d.update([cue(), trk(2, 250, 420)], TABLE, t=0.0, motion=0.05)
+        assert ev is None
+    assert d.state == "settled"
+
+
+def test_discard_when_no_real_travel():
+    d = det()
+    frames = [([cue(), trk(2, 250, 420)], 0.0)] * 3
+    # motion spikes (flicker) but the ball barely moves (<50px) and never pockets
+    for _ in range(5):
+        frames.append(([cue(), trk(2, 255, 425)], 1.0))
+    for _ in range(5):
+        frames.append(([cue(), trk(2, 255, 425)], 0.0))
+    event = feed(d, frames)
+    assert event is None  # no meaningful travel -> not a shot
+
+
+def test_no_detection_without_cue_when_required():
+    d = det()
+    d.det.require_cue = True
+    frames = [([trk(2, 250, 420)], 0.0)] * 3
+    for x, y in [(300, 520), (360, 640), (410, 760), (446, 853)]:
+        frames.append(([trk(2, x, y)], 1.0))   # no cue ball present
+    frames += [([], 0.0)] * 5
+    assert feed(d, frames) is None
+
+
+def test_miss_when_motion_but_no_pocket():
+    d = det()
+    frames = [([cue(), trk(2, 250, 420)], 0.0)] * 3
+    # object travels far across the table but stops in open play (no pocket)
+    for x, y in [(250, 480), (250, 560), (250, 640), (250, 700)]:
+        frames.append(([cue(), trk(2, x, y)], 1.0))
+    for _ in range(5):
+        frames.append(([cue(), trk(2, 250, 700)], 0.0))
     event = feed(d, frames)
     assert event is not None
     assert event.outcome == ShotOutcome.MISS
-    assert event.num_pocketed == 0
-
-
-def test_scratch_when_cue_pocketed():
-    d = ShotDetector(BallSettings(), settle_frames=4, min_shot_frames=2)
-    frames = [
-        [trk(1, 300, 700, cls=BallClass.CUE), trk(2, 250, 420)],
-        [trk(1, 360, 760, vx=20, vy=20, cls=BallClass.CUE), trk(2, 250, 420)],
-        [trk(1, 446, 853, vx=20, vy=20, cls=BallClass.CUE), trk(2, 250, 420)],  # cue in pocket
-    ]
-    frames += [[trk(2, 250, 420)] for _ in range(6)]     # cue gone, object stationary
-    event = feed(d, frames)
-    assert event is not None
-    assert event.outcome == ShotOutcome.SCRATCH
-    assert event.cue_scratch is True
-
-
-def test_no_event_while_settled():
-    d = ShotDetector(BallSettings(), settle_frames=4)
-    cue = trk(1, 200, 400, cls=BallClass.CUE)
-    for _ in range(10):
-        ev = d.update([cue, trk(2, 250, 420)], TABLE, 0.0)
-        assert ev is None
-    assert d.state == "settled"

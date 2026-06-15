@@ -1,26 +1,28 @@
-"""Shot / make / miss detection state machine.
+"""Shot / make / miss detection — hard-evidence state machine.
 
-Consumes tracked balls (rectified coords) frame by frame and emits a ``ShotEvent``
-when a shot resolves. The model:
+Tuned to NOT fire on noise (lighting flicker, compression artifacts, a blob
+blinking in and out). The decisive signal is **motion energy** — the mean
+frame-to-frame pixel change in the playing area — which is robust even when fast
+balls outrun the tracker (per-ball velocity is unreliable exactly when it matters
+most). A shot is only counted when:
 
-    SETTLED ──(a ball starts moving)──► MOVING
-    MOVING  ──(all balls stopped for N frames)──► resolve → SETTLED
+  * a **cue ball** is identified (configurable; no cue -> no detection),
+  * the table is **actively in motion** for N consecutive frames (energy gate),
+  * a ball **travels a meaningful distance** from its rest position, and
+  * a pot only counts when a ball **approaches a pocket and then drops in**
+    (stops being detected near the pocket) — not a single-frame blink,
 
-While MOVING we watch for balls that vanish next to a pocket — those are pockets.
-On resolution:
-    * cue ball pocketed              -> SCRATCH
-    * >=1 object ball pocketed       -> MAKE
-    * nothing pocketed               -> MISS
-
-Quality is capped by tracking quality (a dropped track far from any pocket is
-not counted as a pocket). Thresholds come from ``BallSettings``.
+with a **warm-up** after Start and a **cool-down** between shots. Every gate is
+configurable from Settings -> Detection. ``last_diag`` exposes the intermediate
+signals for the debug overlay.
 """
 
 import logging
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ..config import BallSettings
+from ..config import BallSettings, DetectionSettings
 from ..vision.geometry import TableModel
 from ..vision.types import BallClass, Track
 
@@ -56,10 +58,12 @@ class ShotEvent:
     num_pocketed: int = 0
     start_t: float = 0.0
     end_t: float = 0.0
+    max_travel: float = 0.0
+    suggested: bool = False  # set by the controller in manual-confirm mode
 
 
 @dataclass
-class _LastSeen:
+class _Seen:
     x: float
     y: float
     cls: BallClass
@@ -67,8 +71,9 @@ class _LastSeen:
 
 
 class ShotDetector:
-    def __init__(self, balls: BallSettings, settle_frames: int = 7,
-                 min_shot_frames: int = 3):
+    def __init__(self, detection: DetectionSettings, balls: BallSettings,
+                 settle_frames: int = 7, min_shot_frames: int = 3):
+        self.det = detection
         self.balls = balls
         self.settle_frames = settle_frames
         self.min_shot_frames = min_shot_frames
@@ -76,14 +81,23 @@ class ShotDetector:
 
     def reset(self) -> None:
         self._state = _State.SETTLED
-        self._last: dict[int, _LastSeen] = {}
         self._cue_id: int | None = None
+        self._first_t: float | None = None
+        self._last_shot_t: float = -1e9
+        self._rest: dict[int, tuple] = {}
+        self._min_pdist: dict[int, tuple] = {}      # id -> (closest dist, pocket name)
+        self._shot_ids: set = set()                 # ids seen during this shot
+        self._shot_cls: dict[int, BallClass] = {}   # id -> last class seen
+        self._prev: dict[int, _Seen] = {}
         self._pocketed: list[PocketedBall] = []
-        self._stopped_run = 0
+        self._active_run = 0
+        self._quiet_run = 0
         self._shot_frames = 0
         self._start_t = 0.0
-        self._frames_since_start = 0
+        self._max_travel = 0.0
+        self._motion = 0.0
         self.last_event: ShotEvent | None = None
+        self.last_diag: dict = {}
 
     # ------------------------------------------------------------------ #
     @property
@@ -94,89 +108,117 @@ class ShotDetector:
     def is_shooting(self) -> bool:
         return self._state == _State.MOVING
 
-    def pocketed_this_shot(self) -> list[PocketedBall]:
-        return list(self._pocketed)
+    @property
+    def has_cue(self) -> bool:
+        return self._cue_id is not None
 
     # ------------------------------------------------------------------ #
-    def update(self, tracks: list[Track], table: TableModel, t: float) -> ShotEvent | None:
-        moving_thresh = max(self.balls.stop_speed * 2.5, 3.0)
-        stop_thresh = self.balls.stop_speed
-
+    def update(self, tracks: list[Track], table: TableModel, t: float,
+               motion: float = 0.0) -> ShotEvent | None:
+        if self._first_t is None:
+            self._first_t = t
+        det = self.det
+        self._motion = motion
         by_id = {tr.id: tr for tr in tracks}
-        self._update_cue(tracks)
 
-        # Detect pockets: ids present last frame but gone now, last seen near a pocket.
-        if self._state == _State.MOVING:
-            self._detect_vanished_pockets(by_id, table, t)
-            # also detect balls currently sitting inside a pocket capture zone
-            self._detect_inside_pockets(tracks, table, t)
+        cue_present = self._update_cue(tracks)
+        active = motion > det.motion_active
+        quiet = motion < det.motion_quiet
+        warming = (t - self._first_t) < det.warmup_seconds
+        cooling = (t - self._last_shot_t) < det.cooldown_seconds
 
-        max_speed = max((tr.speed for tr in tracks), default=0.0)
-        any_moving = max_speed > moving_thresh
-        all_stopped = max_speed < stop_thresh
+        self._active_run = self._active_run + 1 if active else 0
+        self._quiet_run = self._quiet_run + 1 if quiet else 0
+
+        # rest positions: snapshot while the table is calm and settled
+        if self._state == _State.SETTLED and quiet:
+            for tr in tracks:
+                self._rest[tr.id] = (tr.x, tr.y)
 
         event: ShotEvent | None = None
         if self._state == _State.SETTLED:
-            if any_moving:
+            if (not warming and not cooling and (not det.require_cue or cue_present)
+                    and self._active_run >= det.strike_frames):
                 self._begin_shot(t)
         else:  # MOVING
             self._shot_frames += 1
-            self._frames_since_start += 1
-            if all_stopped:
-                self._stopped_run += 1
-            else:
-                self._stopped_run = 0
-            if self._stopped_run >= self.settle_frames and \
-                    self._shot_frames >= self.min_shot_frames:
-                event = self._resolve(table, t)
+            self._accumulate(by_id, table)
+            self._track_travel(tracks)
+            if self._quiet_run >= self.settle_frames and self._shot_frames >= self.min_shot_frames:
+                self._finalize_pockets(by_id, table, t)
+                event = self._resolve(t)
 
-        # remember last-seen positions for vanish detection
-        self._last = {
-            tr.id: _LastSeen(tr.x, tr.y, tr.cls, tr.speed) for tr in tracks
-        }
+        self._prev = {tr.id: _Seen(tr.x, tr.y, tr.cls, tr.speed) for tr in tracks}
+        self._set_diag(t, motion, cue_present, warming, cooling)
         return event
 
     # ------------------------------------------------------------------ #
-    def _update_cue(self, tracks: list[Track]) -> None:
+    def _update_cue(self, tracks: list[Track]) -> bool:
         cues = [tr for tr in tracks if tr.cls == BallClass.CUE]
-        if self._cue_id in {tr.id for tr in tracks}:
-            return  # keep stable identity if still present
-        if cues:
+        if cues and (self._cue_id is None or self._cue_id not in {tr.id for tr in tracks}):
             self._cue_id = cues[0].id
+        return bool(cues)
 
     def _begin_shot(self, t: float) -> None:
         self._state = _State.MOVING
         self._pocketed = []
-        self._stopped_run = 0
+        self._min_pdist = {}
+        self._shot_ids = set()
+        self._shot_cls = {}
+        self._quiet_run = 0
         self._shot_frames = 0
-        self._frames_since_start = 0
         self._start_t = t
-        log.debug("Shot started @ %.2f", t)
+        self._max_travel = 0.0
+        log.debug("Shot started @ %.2f (motion %.1f)", t, self._motion)
 
-    def _detect_vanished_pockets(self, by_id: dict, table: TableModel, t: float) -> None:
-        present = set(by_id)
-        for tid, last in self._last.items():
-            if tid in present:
+    def _accumulate(self, by_id: dict, table: TableModel) -> None:
+        """Track, per ball seen during the shot, its class and closest-ever
+        approach to a pocket."""
+        for tr in by_id.values():
+            self._shot_ids.add(tr.id)
+            self._shot_cls[tr.id] = tr.cls
+            pk, d = table.nearest_pocket(tr.x, tr.y)
+            best, _ = self._min_pdist.get(tr.id, (1e9, ""))
+            if d < best:
+                self._min_pdist[tr.id] = (d, pk.name)
+
+    def _finalize_pockets(self, by_id: dict, table: TableModel, t: float) -> None:
+        """At resolution, count as potted any ball that approached a pocket and is
+        no longer being *actively* detected (it dropped in). Treating coasting
+        (inactive) tracks as gone is what makes this robust — a potted ball stops
+        being detected at the pocket lip while the tracker briefly coasts it. A
+        ball still actively tracked on the table is not a pot."""
+        active = {tid for tid, tr in by_id.items() if tr.active}
+        gate = table.pocket_radius * 2.2
+        for tid in self._shot_ids:
+            if tid in active or self._already(tid):
                 continue
-            pocket = table.pocket_at(last.x, last.y, scale=1.8)
-            if pocket is not None and not self._already_pocketed(tid):
-                self._pocketed.append(PocketedBall(tid, last.cls, pocket.name, t))
-                log.debug("Ball %d vanished into %s", tid, pocket.name)
+            dist, name = self._min_pdist.get(tid, (1e9, ""))
+            if dist < gate and name:
+                cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
+                self._pocketed.append(PocketedBall(tid, cls, name, t))
+                log.debug("Ball %d dropped into %s (closest %.0fpx)", tid, name, dist)
 
-    def _detect_inside_pockets(self, tracks: list[Track], table: TableModel, t: float) -> None:
+    def _track_travel(self, tracks: list[Track]) -> None:
         for tr in tracks:
-            pocket = table.pocket_at(tr.x, tr.y, scale=1.0)
-            if pocket is not None and not self._already_pocketed(tr.id):
-                self._pocketed.append(PocketedBall(tr.id, tr.cls, pocket.name, t))
-                log.debug("Ball %d inside %s", tr.id, pocket.name)
+            rest = self._rest.get(tr.id)
+            if rest is not None:
+                self._max_travel = max(self._max_travel, math.hypot(tr.x - rest[0], tr.y - rest[1]))
 
-    def _already_pocketed(self, tid: int) -> bool:
+    def _already(self, tid: int) -> bool:
         return any(p.track_id == tid for p in self._pocketed)
 
-    def _resolve(self, table: TableModel, t: float) -> ShotEvent:
-        cue_scratch = any(
-            p.track_id == self._cue_id or p.cls == BallClass.CUE for p in self._pocketed
-        )
+    def _resolve(self, t: float) -> ShotEvent | None:
+        self._state = _State.SETTLED
+        # the decisive gate: a real shot moved a ball a meaningful distance
+        if self._max_travel < self.det.min_travel_px:
+            log.debug("Discarded non-shot (travel %.0f < %.0f)", self._max_travel,
+                      self.det.min_travel_px)
+            self._pocketed = []
+            return None
+
+        cue_scratch = any(p.track_id == self._cue_id or p.cls == BallClass.CUE
+                          for p in self._pocketed)
         object_pockets = [p for p in self._pocketed if p.cls != BallClass.CUE]
         if cue_scratch:
             outcome = ShotOutcome.SCRATCH
@@ -185,20 +227,29 @@ class ShotDetector:
         else:
             outcome = ShotOutcome.MISS
 
-        target = object_pockets[0].pocket if object_pockets else None
+        self._last_shot_t = t
         event = ShotEvent(
-            outcome=outcome,
-            pocketed=list(self._pocketed),
-            target_pocket=target,
-            duration_s=max(0.0, t - self._start_t),
-            cue_scratch=cue_scratch,
-            num_pocketed=len(object_pockets),
-            start_t=self._start_t,
-            end_t=t,
+            outcome=outcome, pocketed=list(self._pocketed),
+            target_pocket=object_pockets[0].pocket if object_pockets else None,
+            duration_s=max(0.0, t - self._start_t), cue_scratch=cue_scratch,
+            num_pocketed=len(object_pockets), start_t=self._start_t, end_t=t,
+            max_travel=self._max_travel,
         )
         self.last_event = event
-        self._state = _State.SETTLED
         self._pocketed = []
-        log.info("Shot resolved: %s (%d balls, %.1fs)",
-                 outcome.value, len(object_pockets), event.duration_s)
+        log.info("Shot resolved: %s (%d balls, travel %.0fpx, %.1fs)",
+                 outcome.value, len(object_pockets), self._max_travel, event.duration_s)
         return event
+
+    def _set_diag(self, t: float, motion: float, cue: bool,
+                  warming: bool, cooling: bool) -> None:
+        self.last_diag = {
+            "state": self._state.value,
+            "cue": cue,
+            "motion": round(motion, 1),
+            "active_run": self._active_run,
+            "travel": round(self._max_travel, 0),
+            "warming": warming,
+            "cooling": cooling,
+            "potted": len(self._pocketed),
+        }

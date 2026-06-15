@@ -9,6 +9,7 @@ touch Qt or the DB — those are wired in the controller, keeping this testable.
 import logging
 from dataclasses import dataclass, field
 
+import cv2
 import numpy as np
 
 from ..config import CALIBRATION_PATH, Settings
@@ -16,7 +17,7 @@ from ..events.shot_detector import ShotDetector, ShotEvent
 from .balls import make_detector
 from .calibration import CalibrationManager
 from .geometry import TableModel
-from .overlay import draw_perspective, draw_rectified
+from .overlay import draw_perspective, draw_rectified, render_schematic
 from .tracking import BallTracker
 from .types import Detection, Track
 
@@ -36,26 +37,29 @@ class PipelineResult:
     shot_state: str = "settled"
     n_balls: int = 0
     deviated: bool = False
+    diag: dict = field(default_factory=dict)
 
 
 class Pipeline:
     def __init__(self, settings: Settings, source: str = ""):
         self.settings = settings
         self.source = source
+        self.paused = False
         self.calib = CalibrationManager()
         self.detector = make_detector(settings.balls, settings.felt)
         self.tracker = BallTracker()
-        self.shots = ShotDetector(settings.balls)
+        self.shots = ShotDetector(settings.detection, settings.balls)
         self._frame_idx = 0
         self._deviation_every = 30  # frames between watchdog checks
         self._tried_load = False
+        self._prev_gray = None
 
     def reconfigure(self, settings: Settings) -> None:
         """Apply edited settings (e.g. new felt range / backend) and recalibrate."""
         self.settings = settings
         self.detector = make_detector(settings.balls, settings.felt)
         self.tracker.reset()
-        self.shots.reset()
+        self.shots = ShotDetector(settings.detection, settings.balls)
         self.calib.clear()
 
     def request_recalibration(self) -> None:
@@ -88,14 +92,36 @@ class Pipeline:
             return res
 
         detections = self.detector.detect(rect, calib.rect_mask, calib.table)
+        # confidence floor — drop weak (noisy) detections before tracking
+        floor = self.settings.detection.confidence_floor
+        detections = [d for d in detections if d.score >= floor]
         tracks = self.tracker.update(detections, calib.table.short_side)
         res.tracks = tracks
         res.detections = detections
         res.n_balls = len(tracks)
 
-        event = self.shots.update(tracks, calib.table, t)
-        res.shot_event = event
-        res.shot_state = self.shots.state
+        # motion energy: percentage of playing-area pixels that changed
+        # *significantly* between frames. This discriminates a real moving ball
+        # (a tight cluster of big changes) from compression/lighting flicker
+        # (scattered small changes), unlike a plain mean difference.
+        gray = cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY)
+        tbl = calib.table
+        roi = gray[int(tbl.y0):int(tbl.y1), int(tbl.x0):int(tbl.x1)]
+        if self._prev_gray is not None and self._prev_gray.shape == roi.shape:
+            motion = float((cv2.absdiff(roi, self._prev_gray) > 25).mean()) * 100.0
+        else:
+            motion = 0.0
+        self._prev_gray = roi
+
+        if self.paused:
+            # keep showing video + tracking, but never count shots while paused
+            self.shots.reset()
+            res.shot_state = "paused"
+        else:
+            event = self.shots.update(tracks, calib.table, t, motion)
+            res.shot_event = event
+            res.shot_state = self.shots.state
+            res.diag = self.shots.last_diag
 
         # periodic deviation watchdog (cheap: only every N frames)
         if self._frame_idx % self._deviation_every == 0:
@@ -106,19 +132,30 @@ class Pipeline:
         res.deviated = self.calib.deviated
         res.status = "deviated" if self.calib.deviated else "tracking"
 
-        overlays = annotate and self.settings.ui.show_overlays
-        if overlays:
-            res.rect_bgr = draw_rectified(
-                rect, tracks, calib.table,
-                show_traj=self.settings.ui.show_trajectories,
-                show_ids=self.settings.ui.show_ball_ids,
-                accent=self.settings.ui.accent,
+        ui = self.settings.ui
+        overlays = annotate and ui.show_overlays
+        # Bird's-eye: a clean rendered schematic (proportional) by default, rather
+        # than the warped/clipped camera image.
+        if annotate and ui.schematic_birdseye:
+            res.rect_bgr = render_schematic(
+                calib.table, tracks, accent=ui.accent,
+                show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
+                debug=ui.debug_overlay, detections=detections, diag=res.diag,
             )
-            res.frame_bgr = draw_perspective(
-                frame, calib.corners, tracks, calib.Hinv, accent=self.settings.ui.accent
+        elif overlays:
+            res.rect_bgr = draw_rectified(
+                rect, tracks, calib.table, show_traj=ui.show_trajectories,
+                show_ids=ui.show_ball_ids, accent=ui.accent,
             )
         else:
             res.rect_bgr = rect
+
+        # Live camera view keeps the real feed (with light overlay unless off).
+        if overlays:
+            res.frame_bgr = draw_perspective(
+                frame, calib.corners, tracks, calib.Hinv, accent=ui.accent
+            )
+        else:
             res.frame_bgr = frame
         return res
 

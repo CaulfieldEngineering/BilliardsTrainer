@@ -133,6 +133,10 @@ class MainWindow(QMainWindow):
         self._live.pick_felt_requested.connect(self._controller.pick_felt, q)
         self._live.save_replay_requested.connect(self._controller.save_replay, q)
         self._live.overlays_toggled.connect(self._on_overlays_toggled)
+        self._live.pause_toggled.connect(self._controller.set_paused, q)
+        self._live.reset_requested.connect(self._controller.reset_counters, q)
+        self._live.manual_shot.connect(self._controller.record_manual_shot, q)
+        self._live.record_toggled.connect(self._controller.set_recording, q)
         self.apply_settings_requested.connect(self._controller.apply_settings, q)
 
         # controller -> UI
@@ -140,6 +144,8 @@ class MainWindow(QMainWindow):
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.stats_updated.connect(lambda _s: self._stats.refresh())
         self._controller.shot_recorded.connect(self._live.on_shot)
+        self._controller.shot_suggested.connect(self._live.on_suggestion)
+        self._controller.recording_changed.connect(self._live.on_recording)
         self._controller.status_changed.connect(self._live.on_status)
         self._controller.status_changed.connect(self._on_status)
         self._controller.clock_event.connect(self._on_clock_event)

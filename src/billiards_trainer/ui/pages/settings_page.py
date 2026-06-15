@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
@@ -82,7 +83,8 @@ class SettingsPage(QWidget):
         grid.addWidget(self._ball_card(), 1, 1)
         grid.addWidget(self._clock_card(), 2, 0)
         grid.addWidget(self._appearance_card(), 2, 1)
-        grid.addWidget(self._feedback_card(), 3, 0)
+        grid.addWidget(self._detection_card(), 3, 0)
+        grid.addWidget(self._feedback_card(), 3, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -263,6 +265,40 @@ class SettingsPage(QWidget):
         form.addRow("YOLO weights URL", self._yolo_url)
         return card
 
+    def _detection_card(self) -> Card:
+        card, form = self._card("Detection")
+        banner = QLabel("⚠ Shot detection uses on-device CV and is still being "
+                        "tuned — it can miscount on a noisy feed. Tune the gates "
+                        "below, use Confirm-manually, or drop YOLO weights in the "
+                        "models folder + set Backend = yolo for a big accuracy jump.")
+        banner.setObjectName("Faint")
+        banner.setWordWrap(True)
+        form.addRow("", banner)
+
+        self._manual_confirm = QCheckBox("Confirm shots manually (auto-detect only suggests)")
+        form.addRow("", self._manual_confirm)
+        self._require_cue = QCheckBox("Require a cue ball to count a shot")
+        form.addRow("", self._require_cue)
+
+        self._motion_active = QDoubleSpinBox()
+        self._motion_active.setRange(0.05, 5.0)
+        self._motion_active.setSingleStep(0.05)
+        form.addRow("Motion sensitivity", self._motion_active)
+        self._min_travel = self._spin(20, 600)
+        form.addRow("Min ball travel (px)", self._min_travel)
+        self._warmup = self._spin(0, 30)
+        form.addRow("Warm-up (s)", self._warmup)
+        self._cooldown = self._spin(0, 30)
+        form.addRow("Cool-down between shots (s)", self._cooldown)
+        self._pocket_frames = self._spin(2, 60)
+        form.addRow("Pocket dwell (frames)", self._pocket_frames)
+
+        self._debug_overlay = QCheckBox("Show debug overlay (raw blobs + shot state)")
+        form.addRow("", self._debug_overlay)
+        self._schematic = QCheckBox("Clean schematic overhead view (vs warped camera)")
+        form.addRow("", self._schematic)
+        return card
+
     def _clock_card(self) -> Card:
         card, form = self._card("Shot clock")
         self._clock_enabled = QCheckBox("Enable shot clock")
@@ -389,6 +425,15 @@ class SettingsPage(QWidget):
         self._param2.setValue(s.balls.detect_param2)
         self._yolo_url.setText(s.balls.yolo_weights_url)
         self._show_overlays.setChecked(s.ui.show_overlays)
+        self._manual_confirm.setChecked(s.detection.manual_confirm)
+        self._require_cue.setChecked(s.detection.require_cue)
+        self._motion_active.setValue(s.detection.motion_active)
+        self._min_travel.setValue(int(s.detection.min_travel_px))
+        self._warmup.setValue(int(s.detection.warmup_seconds))
+        self._cooldown.setValue(int(s.detection.cooldown_seconds))
+        self._pocket_frames.setValue(s.detection.pocket_frames)
+        self._debug_overlay.setChecked(s.ui.debug_overlay)
+        self._schematic.setChecked(s.ui.schematic_birdseye)
         self._clock_enabled.setChecked(s.shot_clock.enabled)
         self._clock_seconds.setValue(s.shot_clock.seconds)
         self._clock_warn.setValue(s.shot_clock.warn_seconds)
@@ -414,6 +459,15 @@ class SettingsPage(QWidget):
         s.balls.backend = self._backend.currentText()
         s.balls.detect_param2 = self._param2.value()
         s.balls.yolo_weights_url = self._yolo_url.text().strip()
+        s.detection.manual_confirm = self._manual_confirm.isChecked()
+        s.detection.require_cue = self._require_cue.isChecked()
+        s.detection.motion_active = self._motion_active.value()
+        s.detection.min_travel_px = float(self._min_travel.value())
+        s.detection.warmup_seconds = float(self._warmup.value())
+        s.detection.cooldown_seconds = float(self._cooldown.value())
+        s.detection.pocket_frames = self._pocket_frames.value()
+        s.ui.debug_overlay = self._debug_overlay.isChecked()
+        s.ui.schematic_birdseye = self._schematic.isChecked()
         s.shot_clock.enabled = self._clock_enabled.isChecked()
         s.shot_clock.seconds = self._clock_seconds.value()
         s.shot_clock.warn_seconds = self._clock_warn.value()

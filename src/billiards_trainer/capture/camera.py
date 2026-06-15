@@ -117,7 +117,7 @@ class DemoSource(FrameSource):
     def __init__(self, w: int = 1280, h: int = 720):
         self.w, self.h = w, h
         self._t = 0
-        self._cycle = 200
+        self._cycle = 220
         # felt as a perspective trapezoid (top narrower than bottom)
         self._felt_img = np.array([
             [360, 130], [920, 130], [1060, 610], [220, 610]
@@ -164,34 +164,33 @@ class DemoSource(FrameSource):
     def _script(self):
         """Return (cue_xy, obj_xy, obj_alive) for the current cycle frame.
 
-        Timeline (cycle = 200 frames):
+        Timeline (cycle = 220 frames), shaped to satisfy the hardened shot gates
+        (sustained strike, real travel, brief pocket dwell, then the ball drops):
           0-30    settle (cue home, object set)
-          30-42   cue strikes FAST (clearly above the motion threshold)
-          42-66   object rolls FAST to the bottom-right pocket, then vanishes
-          66-150  cue returns home SLOWLY (below threshold -> not a new shot)
-          150-200 settle; object reappears at loop start (new, stationary track)
-
-        The slow return is deliberate: a real repositioning of the cue ball
-        isn't a shot, and keeping it under the motion threshold yields clean
-        make-only demo events instead of phantom misses from teleporting.
+          30-44   cue strikes FAST (sustained, well above the strike threshold)
+          44-62   object rolls FAST a long way to the bottom-right pocket
+          62-70   object settles AT the pocket lip (a few frames of dwell)
+          70-160  object has dropped in (gone); cue returns home SLOWLY
+          160-220 settle; object reappears at loop start (new, stationary track)
         """
         t = self._t
         home = np.array([0.30, 1.30])
         contact = np.array([0.55, 1.55])
         pocket = np.array([1.0, 2.0])      # bottom-right corner pocket (table-space)
-        obj_start = np.array([0.62, 1.62])
+        obj_start = np.array([0.55, 1.45])
 
         if t < 30:                                   # settle
             return tuple(home), tuple(obj_start), True
-        if t < 42:                                   # strike (fast)
-            a = (t - 30) / 12.0
+        if t < 44:                                   # strike (fast, sustained)
+            a = (t - 30) / 14.0
             return tuple(home + (contact - home) * a), tuple(obj_start), True
-        if t < 66:                                   # object rolls to pocket (fast)
-            a = (t - 42) / 24.0
-            obj = obj_start + (pocket - obj_start) * a
-            return tuple(contact), tuple(obj), True
-        if t < 150:                                  # cue returns home slowly
-            a = (t - 66) / 84.0
+        if t < 58:                                   # object rolls to pocket (fast, far)
+            a = (t - 44) / 14.0
+            return tuple(contact), tuple(obj_start + (pocket - obj_start) * a), True
+        if t < 61:                                   # object at the pocket lip (a few frames)
+            return tuple(contact), tuple(pocket), True
+        if t < 160:                                  # object dropped in; cue returns slow
+            a = (t - 61) / 99.0
             return tuple(contact + (home - contact) * a), (0.0, 0.0), False
         return tuple(home), (0.0, 0.0), False        # settle, object gone until loop
 

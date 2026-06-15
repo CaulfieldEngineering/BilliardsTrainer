@@ -37,6 +37,10 @@ class LivePage(QWidget):
     pick_felt_requested = Signal(float, float)  # normalised click coords
     overlays_toggled = Signal(bool)
     save_replay_requested = Signal()
+    pause_toggled = Signal(bool)
+    reset_requested = Signal()
+    manual_shot = Signal(str)                 # 'make' | 'miss'
+    record_toggled = Signal(bool)
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -121,6 +125,16 @@ class LivePage(QWidget):
         lay.addWidget(self._fps_lbl)
 
         # tuning tools
+        self._pause_btn = self._tool_btn("pause", "Pause shot counting (video keeps running)")
+        self._pause_btn.setCheckable(True)
+        self._pause_btn.clicked.connect(self._toggle_pause)
+        lay.addWidget(self._pause_btn)
+
+        self._record_btn = self._tool_btn("activity", "Record this session to a video clip")
+        self._record_btn.setCheckable(True)
+        self._record_btn.clicked.connect(lambda: self.record_toggled.emit(self._record_btn.isChecked()))
+        lay.addWidget(self._record_btn)
+
         self._pick_btn = self._tool_btn("crosshair", "Pick felt colour (click the table)")
         self._pick_btn.clicked.connect(self._toggle_pick)
         lay.addWidget(self._pick_btn)
@@ -133,6 +147,12 @@ class LivePage(QWidget):
         self._recal_btn.clicked.connect(self.recalibrate_requested.emit)
         lay.addWidget(self._recal_btn)
         return bar
+
+    def _toggle_pause(self) -> None:
+        paused = self._pause_btn.isChecked()
+        self._pause_btn.setIcon(icon("play" if paused else "pause",
+                                     PALETTE.warn if paused else PALETTE.text_dim))
+        self.pause_toggled.emit(paused)
 
     def _tool_btn(self, ic: str, tip: str) -> QPushButton:
         btn = QPushButton()
@@ -162,6 +182,27 @@ class LivePage(QWidget):
         oc_row.addWidget(self._outcome)
         oc_row.addStretch(1)
         rail.layout().addLayout(oc_row)
+
+        # Manual entry — always available, and the reliable fallback when
+        # auto-detection isn't trusted (or in confirm-manually mode).
+        manual = QHBoxLayout()
+        make_btn = QPushButton("＋ Make")
+        make_btn.setObjectName("Accent")
+        make_btn.setCursor(Qt.PointingHandCursor)
+        make_btn.clicked.connect(lambda: self.manual_shot.emit("make"))
+        miss_btn = QPushButton("－ Miss")
+        miss_btn.setObjectName("Danger")
+        miss_btn.setCursor(Qt.PointingHandCursor)
+        miss_btn.clicked.connect(lambda: self.manual_shot.emit("miss"))
+        manual.addWidget(make_btn)
+        manual.addWidget(miss_btn)
+        rail.layout().addLayout(manual)
+
+        reset_btn = QPushButton("Reset counters")
+        reset_btn.setObjectName("Ghost")
+        reset_btn.setCursor(Qt.PointingHandCursor)
+        reset_btn.clicked.connect(self.reset_requested.emit)
+        rail.layout().addWidget(reset_btn)
 
         grid = QHBoxLayout()
         grid.setSpacing(10)
@@ -304,6 +345,14 @@ class LivePage(QWidget):
         color = {"make": PALETTE.success, "miss": PALETTE.danger,
                  "scratch": PALETTE.warn}.get(outcome, PALETTE.text_dim)
         self._outcome.set_text_color(outcome.upper(), color)
+
+    def on_suggestion(self, event) -> None:
+        # confirm-manually mode: detector suggests, user taps Make/Miss to commit
+        self._outcome.set_text_color(f"{event.outcome.value.upper()}?", PALETTE.info)
+
+    def on_recording(self, on: bool) -> None:
+        self._record_btn.setChecked(on)
+        self._record_btn.setIcon(icon("activity", PALETTE.danger if on else PALETTE.text_dim))
 
     def on_status(self, status: str) -> None:
         if status == "running":

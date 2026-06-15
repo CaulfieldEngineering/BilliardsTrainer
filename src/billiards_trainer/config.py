@@ -130,6 +130,28 @@ class BallSettings:
 
 
 @dataclass
+class DetectionSettings:
+    """Hard-evidence gates for shot detection. Defaults are deliberately strict to
+    kill false positives from lighting flicker / compression noise; all are
+    tunable from Settings -> Detection for a specific table/lighting."""
+
+    warmup_seconds: float = 6.0       # ignore shots right after Start (stabilise)
+    cooldown_seconds: float = 4.0     # min gap between counted shots
+    # Shots are gated on MOTION ENERGY (mean frame-to-frame change in the playing
+    # area) — far more robust than fragile per-ball velocity during fast motion.
+    # motion energy = % of playing-area pixels that changed significantly between
+    # frames (a moving ball is ~0.5-1.0; an idle table ~0.1).
+    motion_active: float = 0.4        # above this counts as "table active"
+    motion_quiet: float = 0.2         # below this counts as "settled"
+    strike_frames: int = 6            # consecutive active frames to start a shot
+    min_travel_px: float = 120.0      # a ball must travel this far for a shot to count
+    pocket_frames: int = 12           # consecutive frames in a pocket to count a pot
+    require_cue: bool = True          # no cue ball identified => no shot detection
+    confidence_floor: float = 0.45    # drop ball detections below this score
+    manual_confirm: bool = False      # auto-detect SUGGESTS; user commits make/miss
+
+
+@dataclass
 class ShotClockSettings:
     enabled: bool = False
     seconds: int = 30
@@ -145,6 +167,8 @@ class UiSettings:
     show_trajectories: bool = True
     show_ball_ids: bool = True
     show_overlays: bool = True   # master toggle for all detection overlays
+    debug_overlay: bool = False  # draw raw detections + shot-state diagnostics
+    schematic_birdseye: bool = True  # clean rendered overhead vs warped camera
     mirror_preview: bool = False
 
 
@@ -169,6 +193,7 @@ class Settings:
     rectify: RectifySettings = field(default_factory=RectifySettings)
     table: TableSettings = field(default_factory=TableSettings)
     balls: BallSettings = field(default_factory=BallSettings)
+    detection: DetectionSettings = field(default_factory=DetectionSettings)
     shot_clock: ShotClockSettings = field(default_factory=ShotClockSettings)
     ui: UiSettings = field(default_factory=UiSettings)
     updates: UpdateSettings = field(default_factory=UpdateSettings)

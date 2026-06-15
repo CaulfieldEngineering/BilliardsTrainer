@@ -59,6 +59,8 @@ class PipelineController(QObject):
     error = Signal(str)
     settings_changed = Signal(object)   # Settings (after an in-view tweak, e.g. felt pick)
     replay_saved = Signal(str)          # path to a saved replay clip
+    shot_suggested = Signal(object)     # ShotEvent — manual-confirm mode (not recorded)
+    recording_changed = Signal(bool)    # recording on/off
 
     def __init__(self, settings: Settings, repository: Repository):
         super().__init__()
@@ -79,6 +81,8 @@ class PipelineController(QObject):
         self._miss_count = 0
         self._last_frame: np.ndarray | None = None
         self._replay: deque = deque(maxlen=150)
+        self._recorder = None
+        self._recording_path = ""
 
     # ------------------------------------------------------------------ #
     @Slot()
@@ -153,6 +157,9 @@ class PipelineController(QObject):
         if self._running and self._session_id is not None:
             self._repo.end_session(self._session_id)
             self.stats_updated.emit(self._repo.global_summary())
+        if self._recorder is not None and hasattr(self._recorder, "release"):
+            self._recorder.release()
+        self._recorder = None
         if self._source:
             try:
                 self._source.release()
@@ -212,6 +219,49 @@ class PipelineController(QObject):
         log.info("Saved replay: %s (%d frames)", dest, len(frames))
         self.replay_saved.emit(str(dest))
 
+    @Slot(bool)
+    def set_paused(self, paused: bool) -> None:
+        if self._pipeline:
+            self._pipeline.paused = paused
+        self.status_changed.emit("paused" if paused else "running")
+
+    @Slot()
+    def reset_counters(self) -> None:
+        """Start a fresh session so the make/miss counters reset to zero."""
+        if not self._running or self._session_id is None:
+            return
+        self._repo.end_session(self._session_id)
+        self._session_id = self._repo.start_session(
+            mode=self._mode, table_size=self._settings.table.size)
+        if self._pipeline:
+            self._pipeline.shots.reset()
+        self.stats_updated.emit(self._repo.session_summary(self._session_id))
+
+    @Slot(str)
+    def record_manual_shot(self, outcome: str) -> None:
+        """Record a shot the user tapped manually (make/miss/scratch)."""
+        if self._session_id is None:
+            return
+        self._repo.record_shot(self._session_id, outcome=outcome,
+                               num_pocketed=1 if outcome == "make" else 0)
+        self.stats_updated.emit(self._repo.session_summary(self._session_id))
+
+    @Slot(bool)
+    def set_recording(self, on: bool) -> None:
+        if on and self._recorder is None:
+            EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            self._recording_path = str(EXPORTS_DIR / f"session-{stamp}.mp4")
+            self._recorder = "pending"  # opened lazily on first frame (need size)
+            self.recording_changed.emit(True)
+        elif not on and self._recorder is not None:
+            if hasattr(self._recorder, "release"):
+                self._recorder.release()
+            self._recorder = None
+            self.recording_changed.emit(False)
+            if self._recording_path:
+                self.replay_saved.emit(self._recording_path)
+
     @property
     def session_id(self) -> int | None:
         return self._session_id
@@ -250,7 +300,11 @@ class PipelineController(QObject):
 
         self._handle_state(res.shot_state, t)
         if res.shot_event is not None:
-            self._record_shot(res.shot_event, t)
+            if self._settings.detection.manual_confirm:
+                # suggest only — the user commits via the make/miss buttons
+                self.shot_suggested.emit(res.shot_event)
+            else:
+                self._record_shot(res.shot_event, t)
 
         clock_edge = self._clock.poll(t)
         if clock_edge:
@@ -259,6 +313,10 @@ class PipelineController(QObject):
         # buffer a downscaled annotated frame for instant replay
         if res.frame_bgr is not None:
             self._replay.append(self._small(res.frame_bgr))
+
+        # recording mode: write the annotated camera frame to disk for offline analysis
+        if self._recorder is not None and res.frame_bgr is not None:
+            self._write_recording(res.frame_bgr)
 
         dt = time.perf_counter() - t_wall0
         inst = 1.0 / dt if dt > 0 else 0.0
@@ -279,6 +337,18 @@ class PipelineController(QObject):
             return frame.copy()
         scale = max_w / w
         return cv2.resize(frame, (max_w, int(h * scale)))
+
+    def _write_recording(self, frame: np.ndarray) -> None:
+        small = self._small(frame, max_w=640)
+        if self._recorder == "pending":
+            h, w = small.shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            self._recorder = cv2.VideoWriter(
+                self._recording_path, fourcc, max(10.0, min(self._src_fps, 30)), (w, h))
+        try:
+            self._recorder.write(small)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _handle_state(self, state: str, t: float) -> None:
         if self._prev_state != "settled" and state == "settled":

@@ -35,6 +35,26 @@ makes and misses. The table is detected and **locked once** automatically (and
 remembered between launches); the big counter is the only thing you need to
 watch. Drills and the shot clock are separate, optional, and off by default.
 
+The **overhead view is a clean rendered schematic** (proportional felt, rails,
+pockets, diamonds, balls) — not the warped camera — so it's easy to read.
+
+**Shot detection** is gated on hard evidence to avoid false counts: a cue ball
+must be present, the table must be genuinely in motion (frame-to-frame motion
+energy, not fragile per-ball velocity), a ball must travel a real distance, and a
+pot only counts when a ball approaches a pocket and drops in — with a warm-up
+after Start and a cool-down between shots. Every threshold is tunable in
+**Settings → Detection**. Controls in the Sandbox bar/rail:
+
+- **⏸ Pause** counting (video keeps running), **Reset counters**
+- **＋Make / －Miss** to log shots by hand any time
+- **Confirm shots manually** (Settings → Detection) — auto-detect only *suggests*;
+  you tap Make/Miss to commit
+- **Debug overlay** (Settings → Detection) to see the raw blobs + shot state
+- **Record** the session to a clip for offline analysis
+
+It's still on-device classical CV (demo-grade) — drop fine-tuned YOLO weights in
+the models folder and set **Backend = yolo** for a big accuracy jump.
+
 ### Tuning for your real table
 
 If detection looks off under your lighting, the Sandbox control bar has three
