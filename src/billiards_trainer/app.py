@@ -42,6 +42,13 @@ def main() -> int:
     app.setOrganizationName(ORG_NAME)
     app.setApplicationVersion(__version__)
 
+    # We reached a live QApplication => the Python runtime + Qt DLLs loaded.
+    # Tell the self-update swap batch the new exe started OK (so it won't roll
+    # back). Done as early as possible after the window system is up.
+    from .update import recovery
+
+    recovery.mark_launched_ok()
+
     from .config import resource_path
 
     for cand in ("app.ico", "packaging/app.ico"):
@@ -69,6 +76,13 @@ def main() -> int:
         geo = screen.availableGeometry()
         window.resize(min(1480, int(geo.width() * 0.9)), min(940, int(geo.height() * 0.9)))
         window.move(geo.center() - window.rect().center())
+
+    # If a prior self-update was rolled back (or files look incomplete), explain it.
+    integrity = recovery.verify_frozen_integrity()
+    if recovery.consume_update_failed() or integrity:
+        log.warning("Showing post-update recovery dialog (integrity=%s)", integrity)
+        from .ui.dialogs.recovery_dialog import RecoveryDialog
+        RecoveryDialog(reason=integrity, parent=window).exec()
 
     return app.exec()
 

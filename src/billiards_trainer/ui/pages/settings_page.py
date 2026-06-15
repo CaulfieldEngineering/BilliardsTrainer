@@ -312,6 +312,12 @@ class SettingsPage(QWidget):
         self._update_status.setObjectName("Faint")
         self._update_status.setWordWrap(True)
         form.addRow("", self._update_status)
+        av = QLabel("Updates are checksum-verified and roll back automatically if "
+                    "they don't start. If antivirus interferes, add the install "
+                    "folder to its exclusions (see the README).")
+        av.setObjectName("Faint")
+        av.setWordWrap(True)
+        form.addRow("", av)
         return card
 
     def _feedback_card(self) -> Card:

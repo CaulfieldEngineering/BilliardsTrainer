@@ -88,7 +88,7 @@ class UpdateDialog(QDialog):
         self._status.setText("Downloading…")
         self._status.show()
 
-        self._worker = DownloadWorker(self._info.url)
+        self._worker = DownloadWorker(self._info.url, self._info.sha256)
         self._worker.progress.connect(self._progress.setValue)
         self._worker.finished.connect(self._on_downloaded)
         self._worker.failed.connect(self._on_failed)
@@ -103,10 +103,10 @@ class UpdateDialog(QDialog):
         if self._thread:
             self._thread.quit()
             self._thread.wait(2000)
-        self._status.setText("Installing update…")
+        self._status.setText("Verifying and installing…")
         try:
-            install_and_relaunch(path)
-        except OSError as exc:
+            install_and_relaunch(path, self._info.sha256)
+        except (OSError, ValueError) as exc:
             self._on_failed(str(exc))
             return
         QApplication.quit()

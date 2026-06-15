@@ -64,6 +64,25 @@ shot is also logged to `…/logs/shots.jsonl`.
 > [releases page](https://github.com/CaulfieldEngineering/BilliardsTrainer/releases/latest)
 > and run it. From v0.1.6 onward the in-app updater takes over — you won't need
 > to visit GitHub again.
+
+#### Antivirus & the auto-updater (Windows)
+
+The app is an **unsigned single-file exe**, which strict antivirus (e.g. Windows
+Defender) sometimes treats cautiously — occasionally quarantining a bundled DLL
+*while a freshly-updated copy is starting*, which can make an update fail to
+launch. v0.2.0+ guards against this: it **verifies the download's SHA256** before
+swapping, keeps a **backup and auto-rolls back** if the new version doesn't start
+within ~25 s, and then shows a recovery dialog explaining what to do.
+
+To avoid it entirely, **add the install folder to your AV exclusions** once. In an
+**admin** PowerShell (replace the path with where you keep the exe):
+
+```powershell
+Add-MpPreference -ExclusionPath "C:\Users\<you>\Downloads"
+```
+
+The recovery dialog has a button that copies this command (pre-filled with your
+actual install folder) to the clipboard.
 - **Settings → Send feedback** — file a bug or feature request from inside the app
   (optionally attaching a screenshot and the last-5s replay). It's saved locally
   and, if you set up cloud backup, synced to Supabase. See

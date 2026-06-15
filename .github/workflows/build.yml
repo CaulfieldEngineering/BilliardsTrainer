@@ -31,7 +31,7 @@ jobs:
         id: ver
         shell: pwsh
         run: |
-          $v = "0.1.$($env:GITHUB_RUN_NUMBER)"
+          $v = "0.2.$($env:GITHUB_RUN_NUMBER)"
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Version: $v"
 
@@ -60,8 +60,11 @@ jobs:
         run: |
           $v = "${{ steps.ver.outputs.version }}"
           Copy-Item dist/BilliardsTrainer.exe "dist/BilliardsTrainer-$v.exe"
+          $hash = (Get-FileHash "dist/BilliardsTrainer-$v.exe" -Algorithm SHA256).Hash.ToLower()
+          Write-Host "SHA256: $hash"
           $url = "https://github.com/${{ github.repository }}/releases/download/v$v/BilliardsTrainer-$v.exe"
-          python packaging/make_version_json.py --version $v --url $url --notes "Automated build of ${{ github.sha }}" --out dist/version.json
+          python packaging/make_version_json.py --version $v --url $url --sha256 $hash --notes "Automated build of ${{ github.sha }}" --out dist/version.json
+          Get-Content dist/version.json
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

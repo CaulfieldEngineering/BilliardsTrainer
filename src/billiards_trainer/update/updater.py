@@ -50,6 +50,7 @@ class UpdateInfo:
     url: str
     notes: str = ""
     pub_date: str = ""
+    sha256: str = ""
 
     @classmethod
     def from_manifest(cls, data: dict) -> "UpdateInfo":
@@ -58,6 +59,7 @@ class UpdateInfo:
             url=str(data.get("url", "")),
             notes=str(data.get("notes", "")),
             pub_date=str(data.get("pub_date", "")),
+            sha256=str(data.get("sha256", "")).lower(),
         )
 
 
@@ -115,16 +117,27 @@ class UpdateCheckWorker(QObject):
         self.finished.emit(check_for_update(self._current, self._url))
 
 
+def sha256_file(path: str, chunk: int = 1 << 20) -> str:
+    """SHA256 of a file as a lowercase hex string."""
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(chunk), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 class DownloadWorker(QObject):
-    """Streams an installer to a temp file, emitting progress 0..100."""
+    """Streams an installer to a temp file, verifies its SHA256, emits progress."""
 
     progress = Signal(int)
-    finished = Signal(str)   # path to downloaded file ("" on failure)
+    finished = Signal(str)   # path to verified file
     failed = Signal(str)
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, expected_sha: str = ""):
         super().__init__()
         self._url = url
+        self._expected = (expected_sha or "").lower()
 
     def run(self) -> None:
         try:
@@ -142,42 +155,118 @@ class DownloadWorker(QObject):
                         if total:
                             self.progress.emit(int(written * 100 / total))
             self.progress.emit(100)
-            self.finished.emit(str(dest))
         except (requests.RequestException, OSError) as exc:
+            log.warning("Update download failed: %s", exc)
             self.failed.emit(str(exc))
+            return
+
+        # Integrity check — never swap a corrupt/partial download.
+        if self._expected:
+            actual = sha256_file(str(dest))
+            if actual != self._expected:
+                log.warning("Update checksum mismatch: expected %s got %s",
+                            self._expected, actual)
+                self.failed.emit(
+                    "The downloaded update is corrupted (checksum mismatch). "
+                    "Please reinstall manually from the GitHub releases page.")
+                return
+            log.info("Update download verified (sha256 %s…)", actual[:12])
+        else:
+            log.info("Update download complete (no checksum to verify against)")
+        self.finished.emit(str(dest))
 
 
-def install_and_relaunch(downloaded: str) -> None:
-    """Apply a downloaded update.
+# The swap batch: wait for us to exit, clean stale onefile temp dirs, copy the
+# new exe in, relaunch, and roll back to a backup if it doesn't confirm startup.
+_SWAP_BAT = r"""@echo off
+setlocal enabledelayedexpansion
+:waitexit
+tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul
+if not errorlevel 1 (
+  timeout /t 1 /nobreak >nul
+  goto waitexit
+)
+for /d %%D in ("%TEMP%\_MEI*") do rd /s /q "%%D" 2>nul
+copy /Y "{downloaded}" "{current}" >nul
+if errorlevel 1 goto rollback
+del /f /q "{flag}" 2>nul
+start "" "{current}"
+set /a n=0
+:waitok
+if exist "{flag}" goto success
+set /a n+=1
+if !n! geq {timeout} goto rollback
+timeout /t 1 /nobreak >nul
+goto waitok
+:success
+del /f /q "{backup}" 2>nul
+del /f /q "{downloaded}" 2>nul
+goto done
+:rollback
+taskkill /F /IM "{exe_name}" >nul 2>&1
+timeout /t 1 /nobreak >nul
+if exist "{backup}" copy /Y "{backup}" "{current}" >nul
+echo failed > "{failflag}"
+start "" "{current}"
+:done
+del "%~f0"
+"""
 
-    For the frozen portable .exe we can't overwrite ourselves while running, so
-    we spawn a tiny detached batch that waits for this process to exit, swaps the
-    new exe over the current one, and relaunches it. When running from source we
-    just open the downloaded file. (The frozen path needs real-world verification
-    on a release build — see docs/BLOCKERS.md.)
+
+def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
+    """Apply a downloaded update with verification, backup and rollback.
+
+    Frozen Windows path: back up the current exe, then spawn a detached batch
+    that waits for us to exit, cleans stale ``_MEI*`` temp dirs, copies the new
+    exe in, relaunches, and — if the new exe fails to confirm startup within the
+    timeout (e.g. AV quarantined a bundled DLL) — restores the backup and flags
+    the failure so the restored app can explain it. Source/dev path just opens
+    the file.
     """
     import os
+    import shutil
     import subprocess
     import sys
 
-    if sys.platform == "win32" and getattr(sys, "frozen", False) and downloaded.lower().endswith(".exe"):
-        current = sys.executable
-        bat = Path(tempfile.gettempdir()) / "bt_update.bat"
-        bat.write_text(
-            "@echo off\r\n"
-            "ping 127.0.0.1 -n 3 > nul\r\n"
-            f'move /Y "{downloaded}" "{current}"\r\n'
-            f'start "" "{current}"\r\n'
-            'del "%~f0"\r\n',
-            encoding="utf-8",
-        )
-        # DETACHED_PROCESS so the batch survives this process exiting.
-        subprocess.Popen(["cmd", "/c", str(bat)], creationflags=0x00000008)
+    if expected_sha:
+        try:
+            if sha256_file(downloaded).lower() != expected_sha.lower():
+                raise ValueError("checksum mismatch at install time")
+        except (OSError, ValueError) as exc:
+            log.warning("Refusing to install — %s", exc)
+            raise
+
+    if not (sys.platform == "win32" and getattr(sys, "frozen", False)
+            and downloaded.lower().endswith(".exe")):
+        if sys.platform == "win32":
+            os.startfile(downloaded)  # type: ignore[attr-defined]
+        else:
+            subprocess.Popen([downloaded])
         return
-    if sys.platform == "win32":
-        os.startfile(downloaded)  # type: ignore[attr-defined]
-    else:
-        subprocess.Popen([downloaded])
+
+    from .recovery import LAUNCHED_OK, UPDATE_FAILED
+
+    current = sys.executable
+    backup = str(Path(current).with_name(Path(current).name + ".bak"))
+    try:
+        shutil.copy2(current, backup)
+    except OSError as exc:
+        log.warning("Could not back up current exe (%s); proceeding without rollback", exc)
+        backup = ""
+    for flag in (LAUNCHED_OK, UPDATE_FAILED):
+        try:
+            flag.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    bat = Path(tempfile.gettempdir()) / "bt_update.bat"
+    bat.write_text(_SWAP_BAT.format(
+        pid=os.getpid(), downloaded=downloaded, current=current,
+        backup=backup, exe_name=Path(current).name,
+        flag=str(LAUNCHED_OK), failflag=str(UPDATE_FAILED), timeout=25,
+    ), encoding="utf-8")
+    log.info("Launching update swap (backup=%s)", backup or "none")
+    subprocess.Popen(["cmd", "/c", str(bat)], creationflags=0x00000008)
 
 
 def run_in_thread(worker: QObject) -> QThread:

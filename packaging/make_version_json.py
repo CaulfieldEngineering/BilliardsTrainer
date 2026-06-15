@@ -15,12 +15,14 @@ def main() -> int:
     ap.add_argument("--version", required=True)
     ap.add_argument("--url", required=True)
     ap.add_argument("--notes", default="")
+    ap.add_argument("--sha256", default="", help="SHA256 of the installer for integrity checking")
     ap.add_argument("--out", default="dist/version.json")
     args = ap.parse_args()
 
     manifest = {
         "version": args.version,
         "url": args.url,
+        "sha256": args.sha256.lower(),
         "notes": args.notes,
         "pub_date": datetime.now(timezone.utc).isoformat(),
     }
