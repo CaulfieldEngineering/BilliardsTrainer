@@ -19,8 +19,11 @@ cloud APIs, no subscriptions).
 2. Run it. You land on the **Sandbox** tab — click **Try demo** and a synthetic
    table runs the whole pipeline so you can watch the big **MAKES / MISSES**
    counter move.
-3. To use your own table: open **Settings**, set **Source** to your camera index
-   (usually `0`), Save, then go to **Sandbox → Start**.
+3. To use your own table: open **Settings → Camera**, pick your webcam **by name**
+   from the dropdown (hit the refresh icon if you just plugged it in), click
+   **Test preview** to confirm it's the right one, **Save**, then go to
+   **Sandbox → Start**. The app remembers the camera by name, so it still finds
+   it even if Windows reshuffles the device order later.
 
 The app checks for updates on launch and prompts you when a newer build exists.
 

@@ -40,6 +40,21 @@ but don't surface `mirror_preview`/`cue_speed_strike` in the UI until wired, to
 avoid implying they work. They are intentionally NOT exposed in the v0.1.5
 settings page except where functional.
 
+### Source/camera UX (reviewed in v0.1.7 — flag only, not fixing)
+While replacing the integer source field with the camera dropdown:
+- **Resolution is fixed.** `CameraSource` requests 1280×720 and takes whatever the
+  camera clamps to — there is no resolution selector. Fine for most webcams; a
+  4K cam would be downscaled-by-request. Low priority; add a resolution combo
+  later if a camera needs it.
+- **No rotation / flip control.** `mirror_preview` exists but is still inert (see
+  above), and there's no 90°/180° rotation for an oddly-mounted camera. If Joe's
+  overhead rig ends up rotated, this becomes worth wiring (rotation must also be
+  applied before calibration so the homography is consistent).
+- **`Use a file…`** in the new picker still accepts video/image paths (kept for
+  testing with `testVideo.mp4`) — working, just secondary to the camera flow.
+
+None block the core camera-selection fix; noting them per the review mandate.
+
 ## Reliability risk to watch (not dead code, but worth a real-table pass)
 - **Phantom shots in free play.** The shot detector counts a MISS whenever balls
   move and stop with nothing pocketed — including hand-repositioning the cue

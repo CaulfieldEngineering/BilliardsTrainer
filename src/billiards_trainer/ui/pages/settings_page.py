@@ -87,18 +87,98 @@ class SettingsPage(QWidget):
         return card, form
 
     def _source_card(self) -> Card:
-        card, form = self._card("Video source")
-        self._source_edit = QLineEdit()
-        self._source_edit.setPlaceholderText("Camera index (0) or path to video/image")
-        form.addRow("Source", self._source_edit)
-        hint = QLabel("Use a camera index like 0, or a file path. "
-                      "Type 'demo' for the built-in simulation.")
-        hint.setObjectName("Faint")
-        hint.setWordWrap(True)
-        form.addRow("", hint)
+        from ..icons import icon
+        from ..theme import PALETTE
+        card, form = self._card("Camera / source")
+
+        self._source_combo = QComboBox()
+        self._source_combo.setMinimumWidth(220)
+        refresh = QPushButton()
+        refresh.setObjectName("Ghost")
+        refresh.setIcon(icon("refresh", PALETTE.text_dim))
+        refresh.setToolTip("Re-scan for cameras (e.g. after plugging one in)")
+        refresh.setCursor(Qt.PointingHandCursor)
+        refresh.clicked.connect(lambda: self._populate_cameras(keep=True))
+        crow = QHBoxLayout()
+        crow.addWidget(self._source_combo, 1)
+        crow.addWidget(refresh)
+        cw = QWidget()
+        cw.setLayout(crow)
+        form.addRow("Camera", cw)
+
+        brow = QHBoxLayout()
+        self._preview_btn = QPushButton("Test preview")
+        self._preview_btn.setCursor(Qt.PointingHandCursor)
+        self._preview_btn.clicked.connect(self._test_preview)
+        file_btn = QPushButton("Use a file…")
+        file_btn.setObjectName("Ghost")
+        file_btn.setCursor(Qt.PointingHandCursor)
+        file_btn.clicked.connect(self._choose_file)
+        brow.addWidget(self._preview_btn)
+        brow.addWidget(file_btn)
+        brow.addStretch(1)
+        bw = QWidget()
+        bw.setLayout(brow)
+        form.addRow("", bw)
+
+        self._source_hint = QLabel("")
+        self._source_hint.setObjectName("Faint")
+        self._source_hint.setWordWrap(True)
+        form.addRow("", self._source_hint)
+
         self._mirror = QCheckBox("Mirror preview horizontally")
         form.addRow("", self._mirror)
+
+        self._cam_names: dict[str, str] = {}
+        self._populate_cameras()
         return card
+
+    def _populate_cameras(self, keep: bool = False) -> None:
+        from ...capture.devices import list_cameras
+        target = self._source_combo.currentData() if keep else None
+        self._source_combo.blockSignals(True)
+        self._source_combo.clear()
+        self._cam_names = {}
+        cams = list_cameras()
+        for c in cams:
+            self._source_combo.addItem(c.label(), str(c.index))
+            self._cam_names[str(c.index)] = c.name
+        self._source_combo.addItem("Demo simulation (no camera)", "demo")
+        if not cams:
+            self._source_hint.setText("No cameras detected. Plug one in and press the "
+                                      "refresh icon, or use Demo / a file.")
+        else:
+            self._source_hint.setText("Pick your camera, then Test preview to confirm.")
+        self._source_combo.blockSignals(False)
+        if target is not None:
+            self._select_source_data(target)
+
+    def _select_source_data(self, spec: str) -> None:
+        idx = self._source_combo.findData(spec)
+        if idx < 0 and spec not in ("demo",):
+            # a file path or an index that's not currently present — add it
+            label = spec if not spec.isdigit() else f"Camera {spec} (not connected)"
+            self._source_combo.addItem(label, spec)
+            idx = self._source_combo.findData(spec)
+        if idx >= 0:
+            self._source_combo.setCurrentIndex(idx)
+
+    def _choose_file(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a video or image",
+            filter="Media (*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png);;All files (*)")
+        if path:
+            self._source_combo.addItem(f"\U0001F4C4 {path.split('/')[-1]}", path)
+            self._select_source_data(path)
+
+    def _test_preview(self) -> None:
+        spec = self._source_combo.currentData()
+        if spec is None or not str(spec).isdigit():
+            self._source_hint.setText("Test preview is for cameras. Demo/files run on Start.")
+            return
+        from ..dialogs.camera_preview import CameraPreviewDialog
+        CameraPreviewDialog(int(spec), self._cam_names.get(spec, ""), self).exec()
 
     def _felt_card(self) -> Card:
         card, form = self._card("Table & felt")
@@ -248,9 +328,18 @@ class SettingsPage(QWidget):
         """Refresh the controls from the (possibly externally-mutated) settings."""
         self._load_from_settings()
 
+    def _select_source(self, spec: str, name: str) -> None:
+        # Prefer matching the saved friendly name (survives index reshuffles).
+        if spec.isdigit() and name:
+            for data, cam_name in self._cam_names.items():
+                if cam_name == name:
+                    self._select_source_data(data)
+                    return
+        self._select_source_data(spec)
+
     def _load_from_settings(self) -> None:
         s = self._s
-        self._source_edit.setText(s.source)
+        self._select_source(s.source, s.source_name)
         self._mirror.setChecked(s.ui.mirror_preview)
         self._table_size.setCurrentText(s.table.size)
         self._sensitivity.setValue(s.felt.sensitivity)
@@ -275,7 +364,9 @@ class SettingsPage(QWidget):
 
     def _save(self) -> None:
         s = self._s
-        s.source = self._source_edit.text().strip() or "0"
+        spec = str(self._source_combo.currentData() or "0")
+        s.source = spec
+        s.source_name = self._cam_names.get(spec, "") if spec.isdigit() else ""
         s.ui.mirror_preview = self._mirror.isChecked()
         s.table.size = self._table_size.currentText()
         s.felt.sensitivity = self._sensitivity.value()

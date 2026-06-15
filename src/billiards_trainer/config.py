@@ -162,7 +162,8 @@ class PoseSettings:
 
 @dataclass
 class Settings:
-    source: str = "0"  # camera index (as str) | path to video | path to image
+    source: str = "0"  # camera index (as str) | path to video | path to image | "demo"
+    source_name: str = ""  # friendly camera name, to survive index reshuffles
     mode: str = "free_play"  # free_play | practice | drill
     felt: FeltSettings = field(default_factory=FeltSettings)
     rectify: RectifySettings = field(default_factory=RectifySettings)

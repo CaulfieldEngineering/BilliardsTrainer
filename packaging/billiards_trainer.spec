@@ -26,6 +26,12 @@ a = Analysis(
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",
         "billiards_trainer",
+        # friendly camera names on Windows (DirectShow via comtypes)
+        "pygrabber",
+        "pygrabber.dshow_graph",
+        "comtypes",
+        "comtypes.client",
+        "comtypes.stream",
     ],
     hookspath=[],
     runtime_hooks=[],

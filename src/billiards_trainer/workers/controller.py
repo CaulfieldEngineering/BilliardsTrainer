@@ -95,13 +95,26 @@ class PipelineController(QObject):
         from ..capture.camera import open_source
 
         self.stop()
+        # For a camera index, re-resolve by saved friendly name so a reshuffled
+        # USB camera still opens the right device (and warn if it moved).
+        if source_spec.isdigit():
+            from ..capture.devices import resolve_camera
+            idx, _name, warn = resolve_camera(int(source_spec), self._settings.source_name)
+            if warn:
+                self.error.emit(warn)
+            source_spec = str(idx)
         try:
             self._source = open_source(source_spec)
         except Exception as exc:  # noqa: BLE001
             self.error.emit(f"Could not open source '{source_spec}': {exc}")
             return
         if hasattr(self._source, "opened") and not self._source.opened:
-            self.error.emit(f"Source '{source_spec}' did not open. Check the camera/path.")
+            if source_spec.isdigit():
+                self.error.emit(f"Camera {source_spec} didn't open — it may be in use by "
+                                "another app (close Zoom/Teams/OBS) or disconnected. On "
+                                "Windows, also check Settings → Privacy → Camera.")
+            else:
+                self.error.emit(f"Couldn't open '{source_spec}'. Check the file path.")
             return
 
         self._pipeline = Pipeline(self._settings, source=source_spec)
