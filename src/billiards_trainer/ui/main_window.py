@@ -49,6 +49,13 @@ class MainWindow(QMainWindow):
         self._controller = PipelineController(settings, self._repo)
         self._thread = make_controller_thread(self._controller)
 
+        self._update_forced = False
+        self._pending_feedback_replay: int | None = None
+
+        from ..sync.supabase import SyncManager, make_sync_thread
+        self._sync = SyncManager(self._repo)
+        self._sync_thread = make_sync_thread(self._sync)
+
         self._build_ui()
         self._wire()
         self._maybe_check_updates()
@@ -142,7 +149,10 @@ class MainWindow(QMainWindow):
 
         # settings + drills
         self._settings_page.applied.connect(self._on_settings_applied)
+        self._settings_page.check_updates_requested.connect(self._check_for_updates_forced)
+        self._settings_page.feedback_requested.connect(self._open_feedback)
         self._drills.drill_chosen.connect(self._on_drill_chosen)
+        self._sync.status.connect(lambda msg: self.statusBar().showMessage(f"Sync: {msg}", 4000))
 
     def _on_status(self, status: str) -> None:
         self.statusBar().showMessage({"running": "Live — analysing",
@@ -180,6 +190,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Felt colour updated — recalibrating", 4000)
 
     def _on_replay_saved(self, path: str) -> None:
+        if self._pending_feedback_replay is not None:
+            self._repo.attach_to_feedback(self._pending_feedback_replay, path)
+            self._pending_feedback_replay = None
+            self.statusBar().showMessage("Replay attached to feedback", 5000)
+            return
         self._live.on_replay_saved(path)
         self.statusBar().showMessage(f"Replay saved: {path}", 6000)
 
@@ -191,9 +206,15 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ #
     def _maybe_check_updates(self) -> None:
-        if not self._settings.updates.auto_check:
-            return
+        if self._settings.updates.auto_check:
+            self._run_update_check(forced=False)
+
+    def _check_for_updates_forced(self) -> None:
+        self._run_update_check(forced=True)
+
+    def _run_update_check(self, forced: bool) -> None:
         from ..update.updater import UpdateCheckWorker, run_in_thread
+        self._update_forced = forced
         self._update_worker = UpdateCheckWorker()
         self._update_worker.finished.connect(self._on_update_info)
         self._update_thread = run_in_thread(self._update_worker)
@@ -203,17 +224,46 @@ class MainWindow(QMainWindow):
             self._update_thread.quit()
             self._update_thread.wait(2000)
         if info is None:
+            if self._update_forced:
+                self._settings_page.set_update_status(
+                    f"You're on the latest version (v{__version__}).")
             return
+        if self._update_forced:
+            self._settings_page.set_update_status(f"Version {info.version} is available.")
         from .dialogs.update_dialog import maybe_prompt_update
         maybe_prompt_update(info, self)
+
+    # ------------------------------------------------------------------ #
+    def _open_feedback(self) -> None:
+        from .dialogs.feedback_dialog import FeedbackDialog
+        dlg = FeedbackDialog(self._repo, self)
+        dlg.replay_requested.connect(self._on_feedback_replay)
+        dlg.submitted.connect(self._on_feedback_submitted)
+        dlg.exec()
+
+    def _on_feedback_replay(self, feedback_id: int) -> None:
+        # ask the controller (worker thread) to save the replay; we link it when
+        # replay_saved fires.
+        self._pending_feedback_replay = feedback_id
+        from PySide6.QtCore import QMetaObject
+        QMetaObject.invokeMethod(self._controller, "save_replay", Qt.QueuedConnection)
+
+    def _on_feedback_submitted(self, feedback_id: int) -> None:
+        self.statusBar().showMessage("Feedback saved — thank you!", 5000)
+        from ..sync.supabase import trigger_sync
+        trigger_sync(self._sync)
 
     # ------------------------------------------------------------------ #
     def closeEvent(self, event) -> None:
         try:
             from PySide6.QtCore import QMetaObject
             QMetaObject.invokeMethod(self._controller, "stop", Qt.QueuedConnection)
+            # final backup attempt (no-op if Supabase isn't configured)
+            QMetaObject.invokeMethod(self._sync, "sync_now", Qt.QueuedConnection)
             self._thread.quit()
             self._thread.wait(2500)
+            self._sync_thread.quit()
+            self._sync_thread.wait(2500)
         except Exception:  # noqa: BLE001
             pass
         super().closeEvent(event)

@@ -11,11 +11,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.orm import sessionmaker
 
 from ..config import DB_PATH
-from .models import Base, Session, Shot
+from .models import Base, Feedback, Session, Shot
 
 
 class Repository:
@@ -27,7 +27,36 @@ class Repository:
         self.engine = create_engine(url, future=True,
                                     connect_args={"check_same_thread": False})
         Base.metadata.create_all(self.engine)
+        self._migrate()
         self._Session = sessionmaker(self.engine, expire_on_commit=False)
+        self._seed_devnote()
+
+    def _migrate(self) -> None:
+        """Lightweight additive migration: SQLAlchemy create_all never ALTERs, so
+        add columns introduced after a user's DB was created."""
+        wanted = {"sessions": [("synced", "BOOLEAN DEFAULT 0")],
+                  "shots": [("synced", "BOOLEAN DEFAULT 0")]}
+        with self.engine.begin() as conn:
+            for table, cols in wanted.items():
+                existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
+                for name, ddl in cols:
+                    if name not in existing:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+    def _seed_devnote(self) -> None:
+        """Seed BilliardsTrainer's feedback numbering from #147 with a dev note,
+        so the local feedback table carries our running log forward."""
+        with self._Session() as s:
+            if s.get(Feedback, 147) is not None:
+                return
+            s.add(Feedback(
+                id=147, kind="devnote",
+                title="Self-update button + in-app feedback form + Supabase sync skeleton",
+                description="v0.1.6: explicit Check-for-Updates button, local-first "
+                            "feedback form, and a config-gated Supabase sync skeleton.",
+                app_version=_app_version(), synced=False,
+            ))
+            s.commit()
 
     # ------------------------------------------------------------------ #
     # Lifecycle
@@ -141,6 +170,115 @@ class Repository:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return dest
+
+
+    # ------------------------------------------------------------------ #
+    # Feedback
+    # ------------------------------------------------------------------ #
+    def add_feedback(self, kind: str, title: str, description: str = "",
+                     severity: str = "", app_version: str = "", system_info: str = "",
+                     attachments: list[str] | None = None) -> int:
+        with self._Session() as s:
+            row = Feedback(
+                kind=kind, title=title[:120], description=description,
+                severity=severity, app_version=app_version, system_info=system_info,
+                attachments=json.dumps(attachments or []),
+            )
+            s.add(row)
+            s.commit()
+            return row.id
+
+    def attach_to_feedback(self, feedback_id: int, path: str) -> None:
+        with self._Session() as s:
+            row = s.get(Feedback, feedback_id)
+            if row is None:
+                return
+            paths = json.loads(row.attachments or "[]")
+            paths.append(path)
+            row.attachments = json.dumps(paths)
+            row.synced = False  # changed -> needs re-sync
+            s.commit()
+
+    def recent_feedback(self, limit: int = 50) -> list[dict]:
+        with self._Session() as s:
+            rows = s.execute(
+                select(Feedback).order_by(Feedback.id.desc()).limit(limit)
+            ).scalars().all()
+            return [self._feedback_dict(r) for r in rows]
+
+    def unsynced_feedback(self) -> list[dict]:
+        with self._Session() as s:
+            rows = s.execute(
+                select(Feedback).where(Feedback.synced.is_(False)).order_by(Feedback.id)
+            ).scalars().all()
+            return [self._feedback_dict(r) for r in rows]
+
+    def mark_feedback_synced(self, ids: list[int]) -> None:
+        if not ids:
+            return
+        with self._Session() as s:
+            for fid in ids:
+                row = s.get(Feedback, fid)
+                if row:
+                    row.synced = True
+            s.commit()
+
+    @staticmethod
+    def _feedback_dict(r: Feedback) -> dict:
+        return {
+            "id": r.id, "created_at": r.created_at.isoformat() if r.created_at else None,
+            "kind": r.kind, "title": r.title, "description": r.description,
+            "severity": r.severity, "app_version": r.app_version,
+            "system_info": r.system_info,
+            "attachments": json.loads(r.attachments or "[]"), "synced": r.synced,
+        }
+
+    # ------------------------------------------------------------------ #
+    # Sync helpers (used by the Supabase sync manager)
+    # ------------------------------------------------------------------ #
+    def unsynced_sessions(self, limit: int = 500) -> list[dict]:
+        with self._Session() as s:
+            rows = s.execute(
+                select(Session).where(Session.synced.is_(False)).order_by(Session.id).limit(limit)
+            ).scalars().all()
+            return [{
+                "id": r.id,
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "ended_at": r.ended_at.isoformat() if r.ended_at else None,
+                "mode": r.mode, "drill_key": r.drill_key, "table_size": r.table_size,
+            } for r in rows]
+
+    def unsynced_shots(self, limit: int = 2000) -> list[dict]:
+        with self._Session() as s:
+            rows = s.execute(
+                select(Shot).where(Shot.synced.is_(False)).order_by(Shot.id).limit(limit)
+            ).scalars().all()
+            return [{
+                "id": r.id, "session_id": r.session_id,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "outcome": r.outcome, "num_pocketed": r.num_pocketed,
+                "target_pocket": r.target_pocket, "cue_scratch": r.cue_scratch,
+                "duration_s": r.duration_s, "shot_seconds": r.shot_seconds,
+                "streak_index": r.streak_index,
+            } for r in rows]
+
+    def mark_synced(self, table: str, ids: list[int]) -> None:
+        if not ids:
+            return
+        model = {"sessions": Session, "shots": Shot, "feedback": Feedback}.get(table)
+        if model is None:
+            return
+        with self._Session() as s:
+            for rid in ids:
+                row = s.get(model, rid)
+                if row:
+                    row.synced = True
+            s.commit()
+
+
+def _app_version() -> str:
+    from ..version import __version__
+    return __version__
 
 
 def _summarize(shots: list[Shot]) -> dict:

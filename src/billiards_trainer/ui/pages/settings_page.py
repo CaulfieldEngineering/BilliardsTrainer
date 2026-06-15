@@ -27,6 +27,8 @@ from ..widgets.common import Card, section_header
 
 class SettingsPage(QWidget):
     applied = Signal()
+    check_updates_requested = Signal()
+    feedback_requested = Signal()
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -65,6 +67,7 @@ class SettingsPage(QWidget):
         grid.addWidget(self._clock_card(), 1, 1)
         grid.addWidget(self._appearance_card(), 2, 0)
         grid.addWidget(self._updates_card(), 2, 1)
+        grid.addWidget(self._feedback_card(), 3, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -184,13 +187,55 @@ class SettingsPage(QWidget):
 
     def _updates_card(self) -> Card:
         card, form = self._card("Updates")
-        self._auto_check = QCheckBox("Check for updates on launch")
-        form.addRow("", self._auto_check)
         from ...version import __version__
         ver = QLabel(f"Installed version: <b>{__version__}</b>")
         ver.setObjectName("Muted")
         form.addRow("", ver)
+        self._auto_check = QCheckBox("Check for updates on launch")
+        form.addRow("", self._auto_check)
+
+        self._check_btn = QPushButton("  Check for updates now")
+        self._check_btn.setObjectName("Accent")
+        self._check_btn.setCursor(Qt.PointingHandCursor)
+        self._check_btn.clicked.connect(self._on_check_clicked)
+        form.addRow("", self._check_btn)
+        self._update_status = QLabel("")
+        self._update_status.setObjectName("Faint")
+        self._update_status.setWordWrap(True)
+        form.addRow("", self._update_status)
         return card
+
+    def _feedback_card(self) -> Card:
+        card, form = self._card("Feedback & backup")
+        msg = QLabel("Found a bug or want a feature? Send it from here — it's saved "
+                     "locally and backed up if cloud sync is set up.")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
+        send = QPushButton("  Send feedback")
+        send.setObjectName("Accent")
+        send.setCursor(Qt.PointingHandCursor)
+        send.clicked.connect(self.feedback_requested.emit)
+        form.addRow("", send)
+        from ...sync import sync_status
+        self._sync_status = QLabel(f"Cloud sync: <b>{sync_status()}</b>")
+        self._sync_status.setObjectName("Muted")
+        form.addRow("", self._sync_status)
+        hint = QLabel("To enable cloud backup, see docs/SUPABASE.md and drop "
+                      "credentials into supabase.json in the app data folder.")
+        hint.setObjectName("Faint")
+        hint.setWordWrap(True)
+        form.addRow("", hint)
+        return card
+
+    def _on_check_clicked(self) -> None:
+        self._update_status.setText("Checking…")
+        self._check_btn.setEnabled(False)
+        self.check_updates_requested.emit()
+
+    def set_update_status(self, text: str) -> None:
+        self._update_status.setText(text)
+        self._check_btn.setEnabled(True)
 
     @staticmethod
     def _spin(lo: int, hi: int) -> QSpinBox:

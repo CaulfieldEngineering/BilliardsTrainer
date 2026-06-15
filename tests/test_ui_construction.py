@@ -47,3 +47,32 @@ def test_icons_render(app):
     from billiards_trainer.ui.icons import icon
     ic = icon("play", "#FFFFFF", 24)
     assert not ic.isNull()
+
+
+def test_feedback_dialog_saves_locally(app):
+    from pathlib import Path
+
+    from billiards_trainer.db.repository import Repository
+    from billiards_trainer.ui.dialogs.feedback_dialog import FeedbackDialog
+
+    repo = Repository(db_path=Path(":memory:"))
+    dlg = FeedbackDialog(repo)
+    dlg._title.setText("Tracker drops the cue ball")
+    dlg._desc.setPlainText("happens under my lamp")
+    dlg._attach_shot.setChecked(False)  # no parent window to grab in this test
+    before = len(repo.recent_feedback())
+    dlg._on_submit()
+    after = repo.recent_feedback()
+    assert len(after) == before + 1
+    assert after[0]["title"] == "Tracker drops the cue ball"
+    assert after[0]["kind"] == "bug"
+
+
+def test_settings_page_has_update_and_feedback_controls(app):
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
+
+    page = SettingsPage(Settings())
+    assert hasattr(page, "_check_btn")
+    page.set_update_status("You're on the latest version.")
+    assert "latest" in page._update_status.text()

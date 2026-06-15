@@ -42,6 +42,27 @@ LOGS_DIR = APP_DIR / "logs"
 EXPORTS_DIR = APP_DIR / "exports"
 CALIBRATION_PATH = APP_DIR / "calibration.json"
 SHOTLOG_PATH = LOGS_DIR / "shots.jsonl"
+SUPABASE_CONFIG_PATH = APP_DIR / "supabase.json"
+
+
+def load_supabase_config() -> dict | None:
+    """Return Supabase credentials if configured, else None (sync stays a no-op).
+
+    Looks first at env vars (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY), then at
+    ``supabase.json`` in the app data dir. The app picks these up on launch.
+    """
+    url = os.environ.get("SUPABASE_URL", "")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not (url and key):
+        try:
+            data = json.loads(SUPABASE_CONFIG_PATH.read_text(encoding="utf-8"))
+            url = url or data.get("url", "")
+            key = key or data.get("service_role_key", "")
+        except (OSError, json.JSONDecodeError):
+            pass
+    if url and key:
+        return {"url": url.rstrip("/"), "key": key}
+    return None
 
 
 def ensure_dirs() -> None:

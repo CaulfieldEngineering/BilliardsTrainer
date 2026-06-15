@@ -46,6 +46,16 @@ And **Save last 5s** writes a clip of exactly what the detector saw to
 `%APPDATA%/BilliardsTrainer/exports/` — handy when something looks wrong. Every
 shot is also logged to `…/logs/shots.jsonl`.
 
+### Updating & feedback
+
+- **Settings → Check for updates now** — one click checks the latest release; if a
+  newer build exists you get a prompt → download with a progress bar → the app
+  swaps itself and relaunches. (It also checks silently on launch.)
+- **Settings → Send feedback** — file a bug or feature request from inside the app
+  (optionally attaching a screenshot and the last-5s replay). It's saved locally
+  and, if you set up cloud backup, synced to Supabase. See
+  [`docs/SUPABASE.md`](docs/SUPABASE.md) — the app works fully without it.
+
 ## Run from source
 
 ```powershell
