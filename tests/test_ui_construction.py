@@ -87,6 +87,36 @@ def test_settings_page_has_update_and_feedback_controls(app):
     assert page._check_btn.isEnabled() and page._header_check_btn.isEnabled()
 
 
+def test_live_detector_dropdown_lists_simple_blob(app):
+    """REGRESSION (sev-1): the 'Live detector' dropdown shipped showing ONLY
+    'legacy' because frozen strategy discovery returned nothing. The dropdown
+    must always offer simple_blob (the default) + legacy."""
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
+
+    page = SettingsPage(Settings())
+    items = [page._live_detector.itemText(i) for i in range(page._live_detector.count())]
+    assert "simple_blob" in items, f"dropdown missing simple_blob: {items}"
+    assert "legacy" in items, f"dropdown missing legacy: {items}"
+    # never the degenerate 'legacy-only' state we shipped
+    assert items != ["legacy"]
+
+
+def test_live_detector_dropdown_frozen_safe(app, monkeypatch):
+    """Even when pkgutil.iter_modules finds nothing (the frozen-onefile reality),
+    the dropdown still lists simple_blob — proves the static-core fix flows all
+    the way through to the actual widget, not just discover()."""
+    import pkgutil
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
+
+    monkeypatch.setattr(pkgutil, "iter_modules", lambda *a, **k: iter(()))
+    page = SettingsPage(Settings())
+    items = [page._live_detector.itemText(i) for i in range(page._live_detector.count())]
+    assert "simple_blob" in items, f"FROZEN dropdown missing simple_blob: {items}"
+
+
 def test_camera_dropdown_autosaves_without_save_click(app, tmp_path, monkeypatch):
     """The P0 fix: picking a camera in the dropdown must persist immediately —
     no Save click needed — so Start opens the selected camera."""

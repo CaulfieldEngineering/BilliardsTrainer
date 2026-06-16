@@ -26,6 +26,14 @@ a = Analysis(
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",
         "billiards_trainer",
+        # Detector strategies are imported via the package's static core + dynamic
+        # discovery; name them explicitly so the frozen bundle always contains the
+        # live detector (simple_blob) and friends. Without this the Settings "Live
+        # detector" dropdown and the live pipeline silently collapse to 'legacy'.
+        "billiards_trainer.detector_strategies",
+        "billiards_trainer.detector_strategies.simple_blob",
+        "billiards_trainer.detector_strategies.felt_mask_hough",
+        "billiards_trainer.detector_strategies.classical",
         # friendly camera names on Windows (DirectShow via comtypes)
         "pygrabber",
         "pygrabber.dshow_graph",

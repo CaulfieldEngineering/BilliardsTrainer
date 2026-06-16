@@ -119,16 +119,48 @@ def classify_crop(frame_bgr, cx, cy, r) -> tuple[BallClass, tuple]:
 # Discovery
 # --------------------------------------------------------------------------- #
 def discover(params: dict | None = None) -> dict:
-    """Import every strategy module and collect its module-level STRATEGIES."""
+    """Import every strategy module and collect its module-level STRATEGIES.
+
+    FROZEN-SAFE. The core strategies (``simple_blob``/``felt_mask_hough``/
+    ``classical``) are imported STATICALLY at the bottom of this module, so
+    PyInstaller's module graph bundles them and they are *always* available.
+    ``pkgutil.iter_modules`` is used only as an ADDITIVE convenience to pick up
+    extra drop-in strategy files on disk during dev.
+
+    This matters: in a PyInstaller onefile, ``iter_modules(__path__)`` finds
+    nothing (the modules live in the bundle, not on disk), so the previous
+    iter_modules-ONLY discovery returned ``{}`` in every shipped build — which
+    silently collapsed both the live detector and the Settings "Live detector"
+    dropdown to ``legacy``. The static core below is the fix.
+    """
     out: dict[str, DetectorStrategy] = {}
-    for m in pkgutil.iter_modules(__path__):
-        if m.name.startswith("_"):
-            continue
-        try:
-            mod = importlib.import_module(f"{__name__}.{m.name}")
-        except Exception as exc:  # noqa: BLE001 - a broken strategy file shouldn't kill discovery
-            log.warning("strategy module %s failed to import: %s", m.name, exc)
-            continue
+    modules = list(_CORE_MODULES)
+    seen = {m.__name__ for m in modules}
+    try:
+        for m in pkgutil.iter_modules(__path__):
+            if m.name.startswith("_"):
+                continue
+            full = f"{__name__}.{m.name}"
+            if full in seen:
+                continue
+            try:
+                modules.append(importlib.import_module(full))
+                seen.add(full)
+            except Exception as exc:  # noqa: BLE001 - a broken/optional strategy file shouldn't kill discovery
+                log.warning("strategy module %s failed to import: %s", m.name, exc)
+    except Exception as exc:  # noqa: BLE001 - iter_modules can be unavailable in a frozen build
+        log.debug("iter_modules unavailable (%s); using static core only", exc)
+    for mod in modules:
         for s in getattr(mod, "STRATEGIES", []):
             out[s.name] = s
     return out
+
+
+# Static imports of the core strategies MUST come last: each strategy module does
+# ``from . import <helpers>`` from THIS package, so it can only be imported after
+# the helpers above are defined (otherwise a partial-init circular import). These
+# explicit imports (a) make PyInstaller bundle the modules and (b) make discover()
+# work identically in frozen and source builds.
+from . import classical, felt_mask_hough, simple_blob  # noqa: E402
+
+_CORE_MODULES = (classical, felt_mask_hough, simple_blob)

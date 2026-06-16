@@ -20,6 +20,23 @@ def test_discovery_includes_nodep_strategies():
     assert {"classical_rectified", "felt_mask_hough", "simple_blob"} <= names
 
 
+def test_discovery_is_frozen_safe(monkeypatch):
+    """REGRESSION: in a PyInstaller onefile, ``pkgutil.iter_modules(__path__)``
+    finds nothing on disk. The old iter_modules-only discovery then returned {},
+    which silently collapsed the live detector and the Settings dropdown to
+    'legacy' in EVERY shipped build. The core strategies must come from static
+    imports, so discovery still works when iter_modules yields nothing.
+    """
+    import pkgutil
+
+    from billiards_trainer.detector_strategies import discover
+
+    monkeypatch.setattr(pkgutil, "iter_modules", lambda *a, **k: iter(()))
+    names = set(discover())
+    # simple_blob is the shipped default — it MUST survive a frozen build.
+    assert {"simple_blob", "felt_mask_hough", "classical_rectified"} <= names
+
+
 @pytest.mark.skipif(not FIXTURE.exists(), reason="demo fixture missing")
 def test_nodep_strategies_run_on_raw_frame():
     from billiards_trainer.config import Settings

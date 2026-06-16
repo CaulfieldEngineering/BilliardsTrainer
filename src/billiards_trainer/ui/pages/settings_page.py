@@ -270,12 +270,17 @@ class SettingsPage(QWidget):
         # Default simple_blob (Phase-1 winner, no model needed). Switching here
         # applies immediately and keeps calibration.
         self._live_detector = QComboBox()
-        names = ["simple_blob", "felt_mask_hough"]
+        names: list[str] = []
         try:
             from ...detector_strategies import discover
-            names = [n for n in sorted(discover()) if n != "classical_rectified"]
+            names = sorted(n for n in discover() if n != "classical_rectified")
         except Exception:  # noqa: BLE001 - settings must build even if strategies don't import
             pass
+        # Frozen-safe floor: simple_blob is the shipped default and must always be
+        # selectable even if discovery somehow returns nothing (the bug that left
+        # only 'legacy' in the dropdown for every shipped build).
+        if "simple_blob" not in names:
+            names = ["simple_blob", "felt_mask_hough"]
         names.append("legacy")
         self._live_detector.addItems(names)
         self._live_detector.activated.connect(

@@ -7,11 +7,14 @@ so adding a field never breaks an old settings file.
 """
 
 import json
+import logging
 import os
 import sys
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger("config")
 
 
 # --------------------------------------------------------------------------- #
@@ -124,6 +127,10 @@ class BallSettings:
     # classical-Hough-on-rectified detector (kept for A/B). Any name from
     # detector_strategies (simple_blob, felt_mask_hough, onnx_*, …) is valid.
     live_strategy: str = "simple_blob"
+    # One-time migration marker. Bumped by Settings.load() after it moves users off
+    # 'legacy' — which used to be the ONLY selectable detector in shipped builds
+    # (frozen strategy discovery was broken). 0 = not yet migrated.
+    detector_migration: int = 0
     # Ball radius bounds as a fraction of the rectified short side (the playing
     # WIDTH). Regulation: a 2.25" ball on a 50"-wide bed => radius ≈ 0.0225·W.
     # The band is kept TIGHT around that real ratio so noise/shadows of the wrong
@@ -263,7 +270,13 @@ class Settings:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return cls()
-        return cls.from_dict(data)
+        s = cls.from_dict(data)
+        if _migrate_settings(s):
+            try:
+                s.save(path)
+            except OSError:
+                pass
+        return s
 
 
 DETECTION_PRESETS = {
@@ -287,6 +300,27 @@ def apply_detection_preset(det: "DetectionSettings", name: str) -> None:
     for k, v in p.items():
         setattr(det, k, v)
     det.preset = name
+
+
+def _migrate_settings(s: "Settings") -> bool:
+    """Apply one-time forward migrations to a freshly-loaded settings object.
+
+    Returns True if anything changed (so the caller re-saves). Currently: move
+    users off ``live_strategy == 'legacy'``. Legacy was the ONLY selectable
+    detector in shipped builds while frozen strategy discovery was broken, so a
+    saved 'legacy' is almost certainly that bug, not a deliberate choice. We flip
+    it to the intended default (simple_blob) exactly once and bump the marker, so
+    a later *deliberate* choice of legacy sticks.
+    """
+    changed = False
+    if s.balls.detector_migration < 1:
+        if s.balls.live_strategy == "legacy":
+            log.info("settings migration: live_strategy 'legacy' -> 'simple_blob'")
+            s.balls.live_strategy = "simple_blob"
+            changed = True
+        s.balls.detector_migration = 1
+        changed = True
+    return changed
 
 
 def _build(dc_type: type, data: dict[str, Any]) -> Any:
