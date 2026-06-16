@@ -105,6 +105,20 @@ credit each project (e.g. "Snooker pocket and ball detection by Nxera, Roboflow
 Universe"; "Pool Billiard by billiard, Roboflow Universe"). URLs:
 `https://universe.roboflow.com/<slug>` for each slug above.
 
+## Models downloaded for Phase-1 experiments (`_eval/models/`, gitignored)
+
+Pretrained detectors wired as experiment strategies (see `docs/eval/experiments.md`).
+
+| file | source | license | runs via | result on Joe's footage |
+|---|---|---|---|---|
+| `cuedetat_ball.onnx` | HereLiesAz/CueDetat `ml/best.onnx` (12 MB, 3-class YOLOv8) | repo MIT; weights AGPL-3.0 (Ultralytics) | onnxruntime (no torch) | F1 11.8%, 5 fps — underperforms classical |
+| `cuedetat_pocket.onnx` | HereLiesAz/CueDetat `ml/pocket_detector_final.onnx` | repo MIT; weights AGPL-3.0 | onnxruntime | identical metrics to ball (caveat) |
+| `8ball_best.pt` | lakpahana/8ball-pool-detection `weights/best.pt` (6 MB) | no LICENSE (personal/offline only) | needs torch → **not run** | self-healed FAILED (no torch installed) |
+
+AGPL-via-Ultralytics weights are fine for our fully-offline, non-distributed use;
+do not redistribute. The CueDetat models came from its (public, MIT) GitHub repo;
+we did not host or commit any weights.
+
 ## Provenance / security
 
 Downloaded with `tools/fetch_datasets.py` using Joe's Roboflow API key passed via
