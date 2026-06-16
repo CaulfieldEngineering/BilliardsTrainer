@@ -350,3 +350,86 @@ our ONNX-no-torch runtime avoids the AGPL *package*, but any *weights* we ship
 need their own provenance/license check. The three MIT repos
 (pool-vision, Interactive-Pool, 8-Ball-Pool-Analysis) are safe to reuse code from
 with attribution.
+
+---
+
+# Round 2 — broader GitHub scour
+
+*Second pass (broader `gh search` across 10 query strings + topics + arXiv),
+excluding the 5 repos above. Clones are read-only under `_refs/round2/`. The big
+new signal: several of these ship **downloadable trained ball/pocket detectors** —
+the asset our build most lacks.*
+
+## Additional Repos (Round 2)
+
+A broader sweep (`gh search` across all 10 query strings + `--topic billiards/pool/snooker`, plus arXiv/web). Most "pool detection" hits are swimming-pool/satellite noise and most "billiards" hits are game clones — filtered out. Below are 9 NEW repos with real CV code (none overlap the prior 5), cloned shallow into `_refs/round2/`. **Headline:** several ship *downloadable trained ball/pocket detectors* — the exact asset our build lacks. CueDetat in particular is a near-complete parallel of our app and is the single most valuable find.
+
+### HereLiesAz/CueDetat
+- **What/maturity:** Android "IRL aiming assistant" — live camera AR overlay of aim lines/tangents/banks. Very active (last commit 2026-06-08), MIT-licensed, 2★. Far more complete than its stars suggest: full Kotlin app, DI, billing, ML training notebooks.
+- **Tech:** Kotlin + OpenCV-Android + TFLite/ONNX runtime; ARCore-style table session.
+- **Calibration:** `FeltColorDetector.kt` (felt-HSV sampling, same idea as ours) + `ArTableSession.kt`/`TableScanRepository.kt`.
+- **Ball detection — STEAL THIS:** `data/CvBallDetector.kt` — felt mask from sampled HSV mean ± 2.5·stdDev → morphological **CLOSE to seal ball-sized holes** → **subtract original mask** so leftover blobs are ball candidates → filter by area+circularity → **run Hough only in a small local crop per blob** → classify by interior colour. This "felt-mask-as-prior, Hough-locally-not-globally" trick directly targets our 2.6%-recall problem. Runs alongside an ML model (`MergedTFLiteDetector.kt`).
+- **Pretrained models w/ weights (the gap-filler):** ships `assets/ml/MASTER_POOL_MODEL.tflite` (25MB ball detector) + a **pocket detector** `ml/pocket_detector_final.onnx` (12MB) / `pocket_detector_fp16.tflite` (6MB). Training report: YOLOv8n, 640px, **mAP50 0.99 / mAP50-95 0.81**, classes `[pool-table, pool-table-hole, pool-table-side]`. Reproducible via Kaggle notebooks.
+- **Datasets named:** Kaggle `diveshcrazy/pool-table-balls-classification`, `vedester/pool-table-v3i-yolov8`, `alizaib001/pool-balls-on-table`.
+- **Aim logic — STEAL STRUCTURE:** `domain/advisor/ShotAdvisor.kt` — stateless, unit-testable: enumerate every (target × pocket) pot, reject obstructed, score by cut-angle + distance, fall back to bank/kick/combo. Geometry in a logical inches-plane.
+- **License caveat:** repo MIT, but YOLOv8 weights inherit Ultralytics **AGPL-3.0**.
+
+### lakpahana/8ball-pool-detection
+- PoC, 3★, 2025-10, no LICENSE. **Ships trained `.pt` weights.**
+- **Tech:** Python, Ultralytics + torch + OpenCV. `hybrid_pool_tracker.py`, `yolo_inference.py`.
+- **Calibration:** manual 4-corner click → `getPerspectiveTransform` → 280×560 top-down; AND **YOLO-based auto-calibration** — a table-structure model outputs `pool-table / pool-table-hole / pool-table-side` and the table bbox drives the homography (no clicking).
+- **Ball detection — STEAL:** `weights/best.pt` (6MB) numbered balls + cue; `models/best.pt` (51MB) table structure. **Hybrid merge**: YOLO boxes + HSV-contour blobs not already near a YOLO box — a recall booster identical to our YOLO+classical plan.
+- **Tracking — STEAL (free):** `model.track(persist=True)` = Ultralytics **ByteTrack** per-ball IDs for free.
+
+### AISnooker/AISnooker
+- Browser snooker/pool demo, 6★, 2025-12, no LICENSE. Code **obfuscated** (skip) — **models are the prize.**
+- TensorFlow.js, client-side. Two TFJS YOLO models (~12MB, YOLOv8, AGPL): a ball model `{0: ball, 1: stick, 2: white}` (detects the **cue stick** — we have none) + a separate **pocket** model `{0: top, 1: bottom}`; a `poolball/` variant trained 2025-12 on real match footage.
+
+### Avocadrew/AutoBilliards
+- Auto-scoring, 33★, 2022, NTUST lab, no LICENSE. Finished academic project.
+- Python + OpenCV + **YOLOv3**; full snooker colour `obj.names`.
+- **Calibration — novel auto-corner trick:** HSV `inRange` → convexHull → morphological-gradient edge → **`HoughLinesP` → merge similar-slope lines → `goodFeaturesToTrack` for the 4 corner intersections** → homography, then a **two-pass refinement** (warp, re-detect felt, warp again). Could auto-detect corners without manual clicks.
+
+### Danthewaann/snooker-ball-tracker
+- **Most architecturally aligned to us** + most mature classical pipeline — 48★, MIT-ish, polished (Poetry, PyInstaller, GUI). 2024-01.
+- **Ball detection — STEAL the detector choice:** **`cv2.SimpleBlobDetector`** on the inverted felt mask, filterByCircularity/Convexity/Inertia/Area (GUI-tunable), colour via per-colour HSV masks + `pointPolygonTest`. A documented, more-robust alternative to raw HoughCircles for our recall problem.
+- **Make/miss — STEAL the state machine:** clean 3-snapshot machine (`last`/`current`/`temp`); shot start = white ball moved, finish = white stopped; **pot = ball-count diff per colour between snapshots**. A more refined version of our motion gate (keyed on the cue ball). Perf trick: full colour detect every 5th frame.
+
+### r4stin/Sport-Video-Analysis
+- UNIPD CV course project, 2★, 2024-08, MIT. C++/OpenCV.
+- **Ball detection:** **K-means colour segmentation of the table ROI** OR'd with Canny→contour→dilate, then `connectedComponents` area filtering — a table-agnostic alternative to pure `inRange`. Builds a 2D minimap with trajectories.
+
+### SamuelLBau/Pool-Shot-Tracking-using-FPGA
+- Older academic FPGA project, has LICENSE.
+- **Ball ID — niche but novel:** per-ball colour via **KDE/histogram hue models** + **Munkres/Hungarian assignment** (`MunkresMatching.cpp`) for detection→identity — cleaner than greedy NN if we ever need stable per-ball IDs. Physics-sim shot prediction (`Edison_physics_cpp`).
+
+### Rainbowman0/YOLOv5-BilliardsDetection
+- 20★, 2022, no LICENSE, Chinese. **Ships YOLOv5 weights + training data for American pool balls.** Model/dataset source; convertible to ONNX for our backend.
+
+### ekiefl/pooltool (reference, not detection)
+- 380★, **Apache-2.0**, actively developed (2026-06). The dominant open-source billiards **physics** engine (Python). No CV — but the mature, permissively-licensed core to build on if we add trajectory/ghost-ball prediction. Bookmarked, not cloned.
+
+### Round-2 synthesis
+
+**Top 5 worth attention (ranked):**
+
+1. **HereLiesAz/CueDetat** — closest thing to a turnkey blueprint, MIT, active. Gives (a) **felt-mask-prior + local-Hough** ball detector to fix recall, (b) **downloadable trained ONNX/TFLite pocket + ball models** (0.99 mAP50) with named datasets, (c) a clean stateless **ShotAdvisor**. Highest-leverage single find.
+2. **lakpahana/8ball-pool-detection** — ready-to-run **YOLO `.pt` weights** (numbered balls + table structure), **YOLO-bbox auto-calibration**, free **ByteTrack**, YOLO+HSV hybrid. Directly actionable for our ONNX backend. (No license → personal/offline use, don't redistribute.)
+3. **Danthewaann/snooker-ball-tracker** — best **make/miss state-machine** reference (3-snapshot, cue-motion-gated, pot-by-count) + argues **SimpleBlobDetector** over HoughCircles. MIT, GUI-tunable like ours.
+4. **AISnooker/AISnooker** — pure model source: ball/`white`/**stick** + separate pocket model, trained on real 2025 footage. Only find that detects the cue stick. Obfuscated code; mine weights, AGPL.
+5. **Avocadrew/AutoBilliards** — **Hough-line-intersection auto-corner finder** + two-pass top-down refinement; calibration tricks we lack.
+
+**Genuinely novel approaches we hadn't considered:**
+- **Felt-mask hole-subtraction → local-only Hough** (CueDetat) — highest-leverage idea for our 2.6% recall; uses the felt we already auto-estimate as a prior instead of running Hough blind.
+- **YOLO-detected table structure → homography** (8ball, CueDetat pocket model) — auto-calibration that *also localizes pockets*, which our make/miss logic has no geometric model of.
+- **Free ByteTrack via Ultralytics `model.track(persist=True)`** — tracking without maintaining our own, if we go Ultralytics/ONNX.
+- **SimpleBlobDetector (circularity/convexity/inertia) over HoughCircles** — a classical upgrade needing no model/dataset.
+- **Hungarian/Munkres assignment for stable ball IDs** — cleaner than greedy NN.
+- **Real, named, downloadable models/datasets for full-table balls** — our biggest gap: CueDetat's ONNX/TFLite pocket+ball models, AISnooker's TFJS ball/cue/pocket models, 8ball's + Rainbowman0's `.pt` weights, plus the Roboflow datasets in `docs/datasets-catalog.md`.
+
+**Licensing:** CueDetat, snooker-ball-tracker, Sport-Video-Analysis, FPGA carry explicit (mostly MIT) licenses. AISnooker, AutoBilliards, 8ball, Rainbowman0 have **no LICENSE** (weights fine offline/personal; don't redistribute). All Ultralytics-trained weights inherit **AGPL-3.0** — fine for our fully-offline non-distributed app, a blocker only if we ship binaries publicly.
+
+> Follow-up worth considering (NOT done — Phase 0 is measure-only): prototype
+> CueDetat's felt-mask-prior + local-Hough detector against our eval clips, and
+> evaluate the downloadable CueDetat/8ball/AISnooker models with the harness.
+> Both are detection changes for a later phase.
