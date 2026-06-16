@@ -192,8 +192,17 @@ models are either API-key-gated or unlicensed. So the app is **manual-first**:
 - Balls render in their **real measured colour** (a blue ball looks blue), with a
   grey **?** when the class is uncertain — never a confident wrong colour.
 
-See [`docs/CV_ROADMAP.md`](docs/CV_ROADMAP.md) for the model situation and the
-path to a pool-trained model.
+**Getting a model.** No free model detects top-down pool out of the box (generic
+COCO weights detect zero pool balls). The Roboflow **Pool V2** dataset (CC BY 4.0)
+is a viable base, but Roboflow gates downloads behind a free API key. To build a
+local, offline model from it in one command:
+
+```powershell
+pip install -e ".[yolo]" roboflow
+python tools/train_pool_model.py --api-key <FREE_ROBOFLOW_KEY>   # -> models/pool_balls.onnx
+```
+
+See [`docs/CV_ROADMAP.md`](docs/CV_ROADMAP.md) for the full model situation.
 
 ---
 

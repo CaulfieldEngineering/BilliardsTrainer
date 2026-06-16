@@ -82,6 +82,18 @@ class Repository:
          "measured_ball_colors). (3) Faster iteration: run_dev.ps1, "
          "eval_detection --video, feature flags (allow_without_model), README "
          "dev-loop docs, stop local PyInstaller pre-builds (CI builds anyway)."),
+        (151, "Roboflow Pool V2: API-key-gated; turnkey local-train path shipped",
+         "v0.2.16. Joe sent universe.roboflow.com/pool-table/pool-v2 (751 imgs, "
+         "4 classes, mAP@50 66.8%, CC BY 4.0). Verified: Roboflow's public API "
+         "and the roboflow SDK both refuse anonymous access ('A valid API key "
+         "must be provided'), so neither dataset nor weights download without a "
+         "free key; the hosted inference API would stream frames off-device, "
+         "breaking the offline rule. Constraint-compliant path: download the "
+         "CC-BY dataset (free key) -> train YOLOv8n locally -> export "
+         "models/pool_balls.onnx. Shipped tools/train_pool_model.py to do this in "
+         "one command. Drop-in verified: a pool_balls.onnx auto-selects over "
+         "classical via the v0.2.15 OnnxYoloDetector, fully offline. Blocked only "
+         "on a free Roboflow key (Joe's to create) + one-time training compute."),
     ]
 
     def _seed_devnote(self) -> None:

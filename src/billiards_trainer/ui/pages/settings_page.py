@@ -266,11 +266,17 @@ class SettingsPage(QWidget):
         self._backend = QComboBox()
         self._backend.addItems(["auto", "classical", "yolo"])
         form.addRow("Backend", self._backend)
-        note = QLabel("Auto uses YOLO when weights are present, else classical. "
-                      "Classical (Hough + colour) runs everywhere with no model. "
-                      "YOLO needs the optional [yolo] extra + weights in models/.")
+        from ...config import MODELS_DIR
+        note = QLabel("Auto uses an AI model when one is present, else classical. "
+                      "Drop a pool-trained <b>pool_balls.onnx</b> into:<br>"
+                      f"<code>{MODELS_DIR}</code><br>"
+                      "and it runs locally (ONNX, no torch). To build one from the "
+                      "CC-BY Roboflow Pool V2 dataset, run "
+                      "<code>tools/train_pool_model.py</code> (needs a free Roboflow "
+                      "key). Generic COCO weights do not detect top-down pool.")
         note.setObjectName("Faint")
         note.setWordWrap(True)
+        note.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("", note)
         self._param2 = self._spin(5, 60)
         form.addRow("Detector strictness", self._param2)

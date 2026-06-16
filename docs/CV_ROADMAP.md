@@ -90,6 +90,32 @@ produce data): export a Roboflow snooker model to ONNX once
 (`ultralytics … export format=onnx`) and drop it in `models/`, or fine-tune
 YOLO-nano on **Capture-for-analysis** zips. No app change needed — it just works.
 
+### Roboflow "Pool V2" (the candidate model, v0.2.16)
+
+Project: <https://universe.roboflow.com/pool-table/pool-v2>. Verified facts
+(read off the page; license/metrics are theirs, not measured by us):
+
+- 751 images, object detection, **4 classes**, **mAP@50 66.8%** /
+  precision 66.x% / recall 63.4% — a modest starting model, not a guarantee.
+- **License: CC BY 4.0** — free to use with attribution. 
+
+**Gating (verified, honest):** Roboflow's public API and the `roboflow` SDK both
+**refuse anonymous access** ("A valid API key must be provided"). So neither the
+dataset nor the trained weights are anonymously downloadable, and the *hosted*
+inference API would stream every frame to Roboflow's servers — which breaks this
+app's local/offline rule. The constraint-compliant route uses the CC-BY dataset:
+
+```
+pip install -e ".[yolo]" roboflow
+python tools/train_pool_model.py --api-key <FREE_ROBOFLOW_KEY>
+```
+
+That downloads Pool V2, fine-tunes YOLOv8n locally, exports
+`models/pool_balls.onnx`, and the app's `OnnxYoloDetector` runs it **offline**.
+Blocked only on a free Roboflow API key (the user's to create) + one-time training
+compute. The drop-in path itself is verified: a `pool_balls.onnx` in the models
+dir is auto-selected over classical with zero code changes.
+
 ## Tier 3 — tracking (planned)
 
 BoT-SORT / OC-SORT with appearance re-ID + a physics-informed Kalman model

@@ -26,8 +26,10 @@ dependencies = [
 # pool/billiards-specific model is required; see docs/CV_ROADMAP.md.)
 onnx = ["onnxruntime>=1.17"]
 # Heavyweight ML ball detector via Ultralytics. Pulls in torch (~2 GB) — only
-# needed to run/convert .pt weights; prefer the `onnx` extra above.
-yolo = ["ultralytics>=8.1", "supervision>=0.18"]
+# needed to TRAIN/convert weights (see tools/train_pool_model.py); the app runs
+# the exported .onnx with the lightweight `onnx` extra. Includes the Roboflow SDK
+# for downloading the CC-BY Pool V2 dataset.
+yolo = ["ultralytics>=8.1", "supervision>=0.18", "roboflow>=1.1"]
 # Optional pose/body-fundamentals analysis (Phase 8).
 pose = ["mediapipe>=0.10"]
 dev = ["pytest>=8.0", "pyinstaller>=6.3", "ruff>=0.4", "onnxruntime>=1.17"]
