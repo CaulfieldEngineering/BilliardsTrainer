@@ -13,10 +13,12 @@ boundary.
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSlider,
     QSplitter,
     QStackedWidget,
     QVBoxLayout,
@@ -45,12 +47,18 @@ class LivePage(QWidget):
     detection_toggled = Signal(bool)          # auto-detection on/off
     retry_requested = Signal()                # re-open the camera after an error
     open_settings_requested = Signal()        # jump to Settings → Camera
+    video_play_pause = Signal(bool)           # paused?
+    video_stop_requested = Signal()
+    video_step = Signal(int)                  # ±frames
+    video_seek = Signal(int)                  # absolute frame index
+    video_speed = Signal(float)               # playback multiplier
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self._settings = settings
         self._running = False
         self._detect_on = False
+        self._video_fps = 30.0
         self._drill_key = ""
         self._drill_name = ""
         self._pick_mode = False
@@ -84,6 +92,7 @@ class LivePage(QWidget):
         self._persp_stack.addWidget(self._persp)
         self._persp_stack.addWidget(self._camera_error_panel())
         persp_card.add(self._persp_stack)
+        persp_card.add(self._transport_bar())   # video play/seek/step strip
         splitter.addWidget(persp_card)
 
         splitter.addWidget(self._stats_rail())
@@ -214,6 +223,72 @@ class LivePage(QWidget):
         col.addLayout(row)
         col.addStretch(1)
         return panel
+
+    def _transport_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("Card")
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(10, 6, 10, 6)
+        lay.setSpacing(6)
+        self._play_btn = self._tool_btn("play", "Play / pause")
+        self._play_btn.setCheckable(True)
+        self._play_btn.clicked.connect(self._toggle_play)
+        stop_btn = self._tool_btn("stop", "Stop (back to first frame)")
+        stop_btn.clicked.connect(self.video_stop_requested.emit)
+        back_btn = QPushButton("◀|")
+        back_btn.setObjectName("Ghost")
+        back_btn.setToolTip("Step back one frame")
+        back_btn.setCursor(Qt.PointingHandCursor)
+        back_btn.clicked.connect(lambda: self.video_step.emit(-1))
+        fwd_btn = QPushButton("|▶")
+        fwd_btn.setObjectName("Ghost")
+        fwd_btn.setToolTip("Step forward one frame")
+        fwd_btn.setCursor(Qt.PointingHandCursor)
+        fwd_btn.clicked.connect(lambda: self.video_step.emit(1))
+        for w in (self._play_btn, stop_btn, back_btn, fwd_btn):
+            lay.addWidget(w)
+        self._seek = QSlider(Qt.Horizontal)
+        self._seek.setRange(0, 0)
+        self._seek.sliderMoved.connect(self.video_seek.emit)
+        lay.addWidget(self._seek, 1)
+        self._time_lbl = QLabel("0:00 / 0:00")
+        self._time_lbl.setObjectName("Faint")
+        lay.addWidget(self._time_lbl)
+        self._speed_combo = QComboBox()
+        self._speed_combo.addItems(["0.25×", "0.5×", "1×", "2×", "4×"])
+        self._speed_combo.setCurrentText("1×")
+        self._speed_combo.activated.connect(
+            lambda _i: self.video_speed.emit(float(self._speed_combo.currentText().rstrip("×"))))
+        lay.addWidget(self._speed_combo)
+        self._transport = bar
+        bar.setVisible(False)   # only shown for video-file sources
+        return bar
+
+    def _toggle_play(self) -> None:
+        paused = self._play_btn.isChecked()
+        self._play_btn.setIcon(icon("play" if paused else "pause", PALETTE.text_dim))
+        self.video_play_pause.emit(paused)
+
+    def _fmt_t(self, frames: int) -> str:
+        s = frames / max(1.0, self._video_fps)
+        return f"{int(s // 60)}:{int(s % 60):02d}"
+
+    def set_video_mode(self, is_video: bool, total: int, fps: float) -> None:
+        self._video_fps = fps or 30.0
+        self._transport.setVisible(is_video)
+        if is_video:
+            self._seek.setRange(0, max(0, total - 1))
+            self._time_lbl.setText(f"0:00 / {self._fmt_t(total)}")
+
+    def update_video_state(self, pos: int, total: int, playing: bool) -> None:
+        self._seek.blockSignals(True)
+        if self._seek.maximum() != max(0, total - 1):
+            self._seek.setRange(0, max(0, total - 1))
+        self._seek.setValue(pos)
+        self._seek.blockSignals(False)
+        self._time_lbl.setText(f"{self._fmt_t(pos)} / {self._fmt_t(total)}")
+        self._play_btn.setChecked(not playing)
+        self._play_btn.setIcon(icon("play" if not playing else "pause", PALETTE.text_dim))
 
     def _toggle_detection(self) -> None:
         on = self._detect_btn.isChecked()

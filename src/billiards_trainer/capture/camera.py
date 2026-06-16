@@ -71,6 +71,8 @@ class CameraSource(FrameSource):
 
 
 class VideoSource(FrameSource):
+    is_video = True  # supports seek/scrub/step (transport controls)
+
     def __init__(self, path: str):
         self.name = Path(path).name
         self._path = path
@@ -94,6 +96,18 @@ class VideoSource(FrameSource):
     def fps(self) -> float:
         f = self._cap.get(cv2.CAP_PROP_FPS)
         return f if f and f > 1 else 30.0
+
+    @property
+    def frame_count(self) -> int:
+        return int(self._cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+
+    def position(self) -> int:
+        return int(self._cap.get(cv2.CAP_PROP_POS_FRAMES) or 0)
+
+    def seek(self, frame_idx: int) -> None:
+        n = self.frame_count
+        idx = max(0, min(frame_idx, n - 1) if n else frame_idx)
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, float(idx))
 
 
 class ImageSource(FrameSource):

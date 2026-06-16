@@ -66,6 +66,8 @@ class PipelineController(QObject):
     capture_progress = Signal(str)      # analysis-capture status text
     capture_saved = Signal(str)         # path to a finished analysis-capture zip
     failure_flagged = Signal(str)       # path to a staged debug bundle
+    source_is_video = Signal(bool, int, float)  # (seekable video?, frame_count, fps)
+    video_state = Signal(int, int, bool)  # (current frame, total frames, playing)
 
     def __init__(self, settings: Settings, repository: Repository):
         super().__init__()
@@ -91,6 +93,11 @@ class PipelineController(QObject):
         # App default: open the camera and PREVIEW it, with auto-detection off.
         self._detection_enabled = False
         self._capture: dict | None = None  # active analysis-capture context
+        # video transport state (only meaningful for a video-file source)
+        self._video_paused = False
+        self._speed = 1.0
+        self._base_interval = 33
+        self._video_pos = 0
 
     # ------------------------------------------------------------------ #
     @Slot()
@@ -154,13 +161,21 @@ class PipelineController(QObject):
         self._src_fps = float(getattr(self._source, "fps", 30.0)) or 30.0
         self._replay = deque(maxlen=int(max(30, min(self._src_fps, 30) * 5)))
         interval = max(8, int(1000.0 / max(1.0, min(self._src_fps, 60.0))))
+        self._base_interval = interval
+        self._video_paused = False
+        self._speed = 1.0
+        self._video_pos = 0
         if self._timer is None:
             self.on_started()
         self._timer.start(interval)
         self.status_changed.emit("running")
         self.detection_changed.emit(self._detection_enabled)
-        log.info("Started: source=%s mode=%s detect=%s", source_spec, mode,
-                 self._detection_enabled)
+        # tell the UI whether to show video transport controls
+        is_vid = bool(getattr(self._source, "is_video", False))
+        self.source_is_video.emit(is_vid, getattr(self._source, "frame_count", 0) if is_vid else 0,
+                                  self._src_fps)
+        log.info("Started: source=%s mode=%s detect=%s video=%s", source_spec, mode,
+                 self._detection_enabled, is_vid)
 
     @Slot()
     def stop(self) -> None:
@@ -430,7 +445,10 @@ class PipelineController(QObject):
     def _tick(self) -> None:
         if not self._running or self._source is None or self._pipeline is None:
             return
-        t_wall0 = time.perf_counter()
+        # A paused video freezes on the current frame (detection stays on it); we
+        # just stop advancing. Step/seek re-run detection on the chosen frame.
+        if self._video_paused and getattr(self._source, "is_video", False):
+            return
         frame = self._source.read()
         if frame is None:
             # Tolerate transient empty reads from a live camera; only give up
@@ -444,8 +462,16 @@ class PipelineController(QObject):
                 self.error.emit("Source ended.")
             self.stop()
             return
+        self._run_frame(frame)
+
+    def _run_frame(self, frame: np.ndarray) -> None:
+        """Process one frame through the pipeline and emit results. Shared by the
+        live tick and the video transport (step/seek/stop)."""
+        t_wall0 = time.perf_counter()
         self._miss_count = 0
         self._last_frame = frame
+        if getattr(self._source, "is_video", False):
+            self._video_pos = max(0, self._source.position() - 1)
 
         # analysis capture writes the RAW (unannotated) frame for training data
         if self._capture is not None:
@@ -490,6 +516,60 @@ class PipelineController(QObject):
             clock_enabled=self._clock.enabled, clock_warning=self._clock.is_warning(t),
             deviated=res.deviated, tracks=res.tracks,
         ))
+        if getattr(self._source, "is_video", False):
+            self.video_state.emit(self._video_pos, self._source.frame_count,
+                                  not self._video_paused)
+
+    # ------------------------------------------------------------------ #
+    # Video transport (only act on a seekable video source)
+    # ------------------------------------------------------------------ #
+    def _is_video(self) -> bool:
+        return self._source is not None and getattr(self._source, "is_video", False)
+
+    @Slot(bool)
+    def set_video_paused(self, paused: bool) -> None:
+        self._video_paused = paused
+        if self._is_video():
+            self.video_state.emit(self._video_pos, self._source.frame_count, not paused)
+
+    @Slot()
+    def video_stop(self) -> None:
+        """Pause and return to the first frame."""
+        if not self._is_video():
+            return
+        self._video_paused = True
+        self._source.seek(0)
+        f = self._source.read()
+        if f is not None:
+            self._run_frame(f)
+
+    @Slot(int)
+    def video_seek(self, frame_idx: int) -> None:
+        if not self._is_video():
+            return
+        self._source.seek(int(frame_idx))
+        f = self._source.read()
+        if f is not None:
+            self._run_frame(f)
+
+    @Slot(int)
+    def video_step(self, delta: int) -> None:
+        """Step one (or delta) frames while staying paused — for frame-by-frame
+        detector debugging. Re-runs detection on the new frame."""
+        if not self._is_video():
+            return
+        self._video_paused = True
+        target = max(0, self._video_pos + int(delta))
+        self._source.seek(target)
+        f = self._source.read()
+        if f is not None:
+            self._run_frame(f)
+
+    @Slot(float)
+    def set_playback_speed(self, mult: float) -> None:
+        self._speed = max(0.1, float(mult))
+        if self._timer is not None:
+            self._timer.start(max(4, int(self._base_interval / self._speed)))
 
     @staticmethod
     def _small(frame: np.ndarray, max_w: int = 480) -> np.ndarray:
