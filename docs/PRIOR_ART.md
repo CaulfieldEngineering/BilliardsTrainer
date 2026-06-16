@@ -17,6 +17,30 @@ auto-update are genuinely differentiated — not duplicated effort.
 
 ---
 
+## ⭐ Architectural pivot (per Joe) — detect on the RAW frame, not the rectified view
+
+**This supersedes the implicit assumption in much of the analysis below.**
+Detection should run on the **RAW camera frame** (oblique, side-low angle), NOT the
+rectified bird's-eye image. Rectification resamples/interpolates pixels — it *loses*
+information — so the raw frame is the higher-information source. The bird's-eye
+schematic becomes **visualization-only**: ball centres detected in raw camera-space
+are projected *through* the homography into the top-down view for display/animation.
+
+Implications:
+- **Datasets must match Joe's actual camera angle** — side-low / oblique /
+  wall-mounted corner-of-room — not top-down. Top-down datasets are demoted (see the
+  revised ranking in `docs/datasets-catalog.md`).
+- The classical detector **and** any future YOLO model run on **raw frames**.
+- **Joe's 40-min `testVideo` already IS this angle** — it is the right ground truth.
+  The eval harness already scores in **raw-frame coordinates** (GT is raw; detections
+  are projected back via `Hinv`), so the harness is correctly oriented for this pivot.
+  The thing Phase 1 changes is *where the detector runs* — today it runs on the
+  rectified image; it should run on the raw frame.
+- **Pool V2 was wrong-domain in BOTH dimensions** — close-up single-ball photos AND
+  not the angle.
+
+The Phase 1 plan at the end of this doc is built around this pivot.
+
 ## At-a-glance comparison
 
 | Repo | Camera / calibration | Ball detection | Tracking | Shot / make-miss logic | License | Maturity |
@@ -433,3 +457,53 @@ A broader sweep (`gh search` across all 10 query strings + `--topic billiards/po
 > CueDetat's felt-mask-prior + local-Hough detector against our eval clips, and
 > evaluate the downloadable CueDetat/8ball/AISnooker models with the harness.
 > Both are detection changes for a later phase.
+
+---
+
+# Phase 1 plan (provisional) — built around the raw-frame pivot
+
+**Anchor decision (Joe):** detect on the **raw oblique camera frame**; the rectified
+bird's-eye is **display-only** (project detected ball centres through the homography
+into the schematic). Rationale + implications in the "⭐ Architectural pivot" callout
+near the top of this doc. Everything below follows from it.
+
+**1. Data — match the angle, not the top-down.**
+- Primary fine-tune sets (already downloaded, **oblique, CC BY 4.0**):
+  `pool-billiard-nwmsh` (angled blue pool — closest to Joe) + `billiard-pool-wpb3z`.
+- Volume / pretraining: `snooker-pocket-and-ball-detection` (17k, labels pockets too)
+  — expect a snooker→pool domain shift to fine-tune away.
+- Pursue **pix2pockets** (CC BY 4.0, various-angle "in the wild", YOLOv5-on-raw,
+  AP50 91.2) via https://pix2pockets.compute.dtu.dk/.
+- Best ground truth remains **Joe's own `testVideo`** + future Capture-for-analysis
+  clips — his exact angle/felt/room. Demote top-down + close-up sets.
+
+**2. Detector — three tracks, evaluate before adopting (all run on the RAW frame).**
+- (a) **Evaluate downloadable pretrained models** with the harness first — cheapest
+  path to a number: CueDetat's ONNX/TFLite ball+pocket models (0.99 mAP50 reported),
+  AISnooker's ball/cue/pocket TFJS, lakpahana/8ball + Rainbowman0 `.pt` (→ONNX).
+  They detect on raw camera frames already. (AGPL-via-Ultralytics: fine offline.)
+- (b) **Classical, no-train win:** CueDetat's **felt-mask-prior → local-Hough**
+  (close the felt mask, subtract, keep ball-sized blobs, run Hough only in each blob
+  crop) — uses the felt we already auto-estimate as a prior, on the raw frame.
+  Possibly swap HoughCircles for **SimpleBlobDetector** (snooker-ball-tracker).
+- (c) **Fine-tune YOLOv8n** on the oblique datasets above → export **ONNX** for our
+  existing no-torch `OnnxYoloDetector`. Optionally ensemble (b)+(c).
+
+**3. Calibration stays — but its role changes.** The homography is still needed for
+(i) the display schematic and (ii) the felt-mask prior, but **detection accuracy no
+longer depends on warp interpolation quality**. Consider auto-corner finding
+(AutoBilliards' Hough-line-intersection) and/or **YOLO-table-structure → homography +
+pockets** (8ball, CueDetat) so we also get pocket geometry our make/miss lacks.
+
+**4. Tracking + make/miss.** ByteTrack (free via Ultralytics if we go that route, or
+our own) on raw-frame detections; adopt snooker-ball-tracker's **3-snapshot,
+cue-motion-gated, pot-by-count** state machine; add pocket geometry from (3).
+
+**5. Eval is already pivot-ready.** The harness scores in **raw-frame coords** (GT is
+raw; detections projected back via `Hinv`), so a raw-frame detector drops straight in
+and is measured against the same baseline (recall 2.6% today). Expand GT on the
+oblique datasets + more of Joe's clips. Every Phase-1 change must beat the baseline on
+these — number, not vibe.
+
+> Which of tracks (a)/(b)/(c) leads is Joe's call. (a) is the fastest to a real number
+> on his footage and is the recommended first step.

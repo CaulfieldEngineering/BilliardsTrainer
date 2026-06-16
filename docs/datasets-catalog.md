@@ -14,6 +14,37 @@ ball-sized boxes per image (a real table has 6–16 balls). A dataset with ~1 hu
 box/image is close-up crops or whole-table boxes — useless for training a
 ball detector for Joe's wide camera.
 
+## ⭐ Re-ranked by CAMERA ANGLE (per the architectural pivot)
+
+Detection will run on the **raw oblique camera frame**, not a rectified top-down
+(see `docs/PRIOR_ART.md` → "Architectural pivot"). So the key axis is no longer
+"is it wide-view?" but **"does the camera angle match Joe's side-low oblique
+setup?"** Re-classifying the verified datasets by angle (eyeballed from samples):
+
+| angle class | datasets | for us |
+|---|---|---|
+| **Oblique / side-low (MATCH Joe)** | `pool-billiard-nwmsh` (blue pool, angled — best match), `billiard-pool-wpb3z` (low-angle pool) | **primary fine-tune targets** |
+| **Elevated broadcast oblique** | `snooker-pocket-and-ball-detection` (17k, snooker jib/BEV mix) | strong volume; snooker domain gap + partly top-down |
+| **Top-down (DEMOTED)** | `8-ball-pool-fmk6g` | low priority — wrong angle, also tiny |
+| **Close-up / mixed (low value)** | `pool-ball-detection` (zoomed racks), `billiards-ai`, `pool_v2` | skip for the angle-matched detector |
+| **Academic, various-angle "in the wild"** | **pix2pockets** (below) | closest-in-spirit; spans BEV→oblique |
+
+Good news from the pivot: our two best verified pool datasets
+(`pool-billiard-nwmsh`, `billiard-pool-wpb3z`) are **already oblique-angle** — the
+pivot *confirms* them and demotes the top-down/close-up sets.
+
+### pix2pockets (academic, arXiv 2504.12045) — strong new lead
+
+"Shot Suggestions in 8-Ball Pool from a Single Image **in the Wild**" (DTU, 2025).
+**195 images from 8-ball championship videos (BEV cameras + camera jibs → bird's-eye
+to oblique angles, in the wild)**, 5,748 **segmentation masks**, balls + table dots.
+Method: **YOLOv5 finetuned on the raw image** (AP50 **91.2**; ball-location error
+0.4 cm) — i.e. detection on the raw frame, matching our pivot. **License CC BY 4.0.**
+Release intended via the project site **https://pix2pockets.compute.dtu.dk/**
+(no direct GitHub/Zenodo URL in the paper — visit the site to fetch data/code).
+Worth pursuing: it's the most on-pivot academic asset (raw-frame, various-angle,
+permissive, with a method + numbers).
+
 ## Downloaded + verified
 
 | dataset (slug) | imgs | boxes/img | median box | ball-sized | classes | verdict |
