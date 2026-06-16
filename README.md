@@ -206,6 +206,55 @@ See [`docs/CV_ROADMAP.md`](docs/CV_ROADMAP.md) for the full model situation.
 
 ---
 
+## Detector experiments (Phase 1)
+
+A self-healing framework for trying *many* detectors against the eval set and
+ranking them — so "better" is always a number, never a vibe. All variants detect
+on the **raw oblique frame** (the bird's-eye is display-only).
+
+**Add a new detector = one file.** Drop `src/billiards_trainer/detector_strategies/<name>.py`:
+
+```python
+from . import DetectorStrategy
+from ..vision.types import Detection
+
+class MyStrategy(DetectorStrategy):
+    name = "my_strategy"
+    description = "what it does"
+    def detect(self, frame_bgr, calib):     # raw BGR frame + table Calibration|None
+        # ... return detections in RAW pixel coords; never raise on a normal frame
+        return [Detection(x, y, radius, bgr, cls, score)]
+
+STRATEGIES = [MyStrategy()]                 # auto-discovered
+```
+
+These modules are **additive** — none is wired into the shipped pipeline, so the
+default detector is unchanged. Drop a YOLO `.onnx` in `_eval/models/` and it
+auto-registers as an `onnx_<name>` variant with no code at all.
+
+**Run the experiments** (local — needs the gitignored `_eval/clips` + `_eval/labels`):
+
+```powershell
+python tools/eval_experiments.py                      # all variants
+python tools/eval_experiments.py --only felt_mask_hough,simple_blob
+```
+
+Each variant runs in its **own subprocess with a timeout** — a crash, hang, or OOM
+in one is captured and marked FAILED in the report; it never blocks the others.
+Output lands in `docs/eval/experiments/<timestamp>/`:
+- `comparison.md` — ranked table (precision/recall/F1/ID-acc/calib/FPS/status) with
+  **CANDIDATE** (beats the Phase-0 baseline F1) / **RECOMMENDED** (beats it by >50%)
+  self-evaluation, plus an `idle_02` recall spotlight.
+- `visual.html` — every variant's detections side-by-side on the same frames.
+- `variants/<name>/result.json` — raw per-variant metrics.
+
+**CI vs local:** experiments are **local-only** — they need the large gitignored
+clips/models and (for some variants) ONNX/torch. CI runs the lighter detector
+*regression* eval (`.github/workflows/eval.yml`) on the committed synthetic clip;
+it does not run the experiment matrix.
+
+---
+
 ## Project layout
 
 ```
