@@ -20,11 +20,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Optional ML ball detector. Pulls in torch (~2 GB) — power-user install only.
+# ONNX ball detector — runs a YOLO .onnx model with NO torch (~15 MB runtime).
+# This is the lightweight path: drop a pool-trained .onnx in the models dir and
+# the app uses it. (Generic COCO weights do NOT detect top-down pool balls — a
+# pool/billiards-specific model is required; see docs/CV_ROADMAP.md.)
+onnx = ["onnxruntime>=1.17"]
+# Heavyweight ML ball detector via Ultralytics. Pulls in torch (~2 GB) — only
+# needed to run/convert .pt weights; prefer the `onnx` extra above.
 yolo = ["ultralytics>=8.1", "supervision>=0.18"]
 # Optional pose/body-fundamentals analysis (Phase 8).
 pose = ["mediapipe>=0.10"]
-dev = ["pytest>=8.0", "pyinstaller>=6.3", "ruff>=0.4"]
+dev = ["pytest>=8.0", "pyinstaller>=6.3", "ruff>=0.4", "onnxruntime>=1.17"]
 
 [project.scripts]
 billiards-trainer = "billiards_trainer.app:main"

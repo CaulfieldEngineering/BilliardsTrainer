@@ -68,6 +68,20 @@ class Repository:
          "frames for training. v0.2.15: fine-tune YOLO on captured frames "
          "(scripts/label_session.py) and make it the default backend when weights "
          "are present; classical becomes the fallback."),
+        (150, "Off-the-shelf detection: COCO doesn't work, fixed yellow/black "
+         "balls, faster dev loop",
+         "v0.2.15. (1) Off-the-shelf weights: searched + TESTED. Generic COCO "
+         "YOLO 'sports ball' detects ZERO top-down pool balls; Roboflow pool "
+         "models are API-key-gated; community .pt is unlicensed. No free model "
+         "works out of the box. Shipped OnnxYoloDetector (ONNX Runtime, no "
+         "torch) so a pool-specific .onnx dropped in models/ just works; "
+         "onnxruntime is an optional [onnx] extra, not bundled. (2) Balls were "
+         "yellow/black because the schematic used a fixed per-CLASS palette "
+         "(SOLID=yellow, EIGHT=black) and ignored the measured tr.bgr; now draws "
+         "the real measured colour + grey '?' when uncertain (ui."
+         "measured_ball_colors). (3) Faster iteration: run_dev.ps1, "
+         "eval_detection --video, feature flags (allow_without_model), README "
+         "dev-loop docs, stop local PyInstaller pre-builds (CI builds anyway)."),
     ]
 
     def _seed_devnote(self) -> None:

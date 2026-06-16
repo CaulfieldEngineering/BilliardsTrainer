@@ -162,6 +162,11 @@ class DetectionSettings:
     # classical it culls all but the cleanest non-felt blobs.
     render_floor: float = 0.85
     manual_confirm: bool = False      # auto-detect SUGGESTS; user commits make/miss
+    # Feature flag: normally the Detection toggle is locked off until a pool model
+    # is present (no fake detections). Turn this on to experiment with the
+    # classical detector on a real feed without a model. Behaviour change, no
+    # rebuild — flip it in Settings and it applies live.
+    allow_without_model: bool = False
     # Multi-modal evidence fusion: combine motion energy + optical-flow activity +
     # background-subtraction foreground into one weighted "activity" score, so a
     # single noisy signal (e.g. a flickering highlight) can't trip a shot on its
@@ -198,6 +203,10 @@ class UiSettings:
     debug_overlay: bool = False  # draw raw detections + shot-state diagnostics
     schematic_birdseye: bool = True  # clean rendered overhead vs warped camera
     mirror_preview: bool = False
+    # Render balls in their MEASURED mean colour (a blue ball looks blue), with a
+    # neutral grey "?" when the class is uncertain — instead of a fixed per-class
+    # palette that made every solid look yellow and every dark blob look black.
+    measured_ball_colors: bool = True
 
 
 @dataclass

@@ -193,7 +193,9 @@ class MainWindow(QMainWindow):
         """Auto-detection is only offered when a YOLO model is present — otherwise
         we hold the line on reliability with manual mode + a banner."""
         from ..vision.balls import yolo_weights_available
-        available = yolo_weights_available() or self._settings.balls.backend == "yolo"
+        available = (yolo_weights_available()
+                     or self._settings.balls.backend == "yolo"
+                     or self._settings.detection.allow_without_model)
         self._live.set_detection_available(available)
 
     def _on_capture_saved(self, path: str) -> None:

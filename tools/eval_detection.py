@@ -20,8 +20,6 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-import cv2  # noqa: E402
-
 from billiards_trainer.capture.camera import DemoSource  # noqa: E402
 from billiards_trainer.config import Settings  # noqa: E402
 from billiards_trainer.vision.pipeline import Pipeline  # noqa: E402
@@ -104,7 +102,46 @@ def eval_demo(settings: Settings) -> dict:
     return {"demo_makes": makes, "moving_sig": sig}
 
 
+def eval_video(path: str, settings: Settings) -> dict:
+    """Run the full detection pipeline over a RECORDED clip (no camera needed).
+
+    This is the fast inner loop for detection work: record once (or use a
+    Capture-for-analysis zip's frames / any mp4), then iterate the detector
+    against the fixture instead of standing at the table."""
+    from billiards_trainer.capture.camera import open_source
+    s = Settings.from_dict(settings.to_dict())
+    src = open_source(path)
+    if hasattr(src, "opened") and not src.opened:
+        print(f"  could not open {path}")
+        return {}
+    pipe = Pipeline(s, source=path)
+    pipe.detect_enabled = True
+    n = int(getattr(src, "frame_count", 0)) or 600
+    balls, makes, frames = [], 0, 0
+    for i in range(min(n, 1800)):
+        frame = src.read()
+        if frame is None:
+            break
+        res = pipe.process(frame, t=i / FPS)
+        frames += 1
+        balls.append(res.n_balls)
+        if res.shot_event and res.shot_event.outcome.value == "make":
+            makes += 1
+    src.release()
+    return {"frames": frames, "calibrated": pipe.calib.is_calibrated,
+            "mean_balls": float(np.mean(balls)) if balls else 0.0,
+            "max_balls": int(np.max(balls)) if balls else 0, "makes": makes}
+
+
 def main() -> int:
+    if "--video" in sys.argv:
+        path = sys.argv[sys.argv.index("--video") + 1]
+        print(f"=== Detection eval on recorded clip: {path} ===")
+        r = eval_video(path, Settings())
+        print(f"  frames={r.get('frames')} calibrated={r.get('calibrated')} "
+              f"mean_balls={r.get('mean_balls', 0):.1f} max_balls={r.get('max_balls')} "
+              f"makes={r.get('makes')}")
+        return 0
     seconds = float(sys.argv[1]) if len(sys.argv) > 1 else 60.0
     print(f"=== Detection eval ({seconds:.0f}s noisy-idle flicker + demo) ===")
     for label, fusion in [("BASELINE motion-only", False), ("FUSED (bgsub+flow)", True)]:

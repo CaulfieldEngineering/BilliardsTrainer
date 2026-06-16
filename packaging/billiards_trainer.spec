@@ -39,6 +39,11 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         "torch", "torchvision", "ultralytics", "mediapipe",
+        # onnxruntime is a dev/test dep used to validate the ONNX backend, but it
+        # is NOT bundled yet: there is no working off-the-shelf pool model to
+        # justify the +size and the known onnxruntime PyInstaller DLL pitfalls.
+        # The lazy import in OnnxYoloDetector degrades to classical when absent.
+        "onnxruntime",
         "matplotlib", "tkinter", "PySide6.QtWebEngineCore",
         "PySide6.Qt3DCore", "PySide6.QtCharts", "PySide6.QtDataVisualization",
     ],

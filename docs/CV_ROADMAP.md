@@ -63,17 +63,32 @@ real camera.** So v0.2.14 stops pretending:
 - **Capture for analysis**: Settings → *Capture 60s for analysis* zips raw
   frames (+ calibration meta) — the training data for the YOLO pivot below.
 
-## Tier 2 — YOLO (active, v0.2.15)
+## Tier 2 — the off-the-shelf model search (v0.2.15) — what's actually out there
 
-Classical CV can't *semantically* tell a ball from a ball-shaped artifact — YOLO
-can. Plan: re-check Roboflow Universe for permissively-licensed pool-ball weights
-(CC-BY-NC is fine for Joe's personal, non-distributed use); if none, use
-COCO-pretrained YOLO's "sports ball" class as a sized-correctly stopgap, and
-fine-tune YOLO-nano on the **Capture-for-analysis** zips (auto-label with the
-classical+bgsub detector via `scripts/label_session.py`, hand-correct, train →
-`models/joe_table.pt`). YOLO becomes the **default backend when weights are
-present** (`backend = auto`); classical is the fallback. Then run **YOLO +
-classical as an ensemble** (agreement = high confidence).
+Goal: AI detection **with no training data from the user**. We searched + tested.
+The honest result:
+
+| Option | Verdict |
+|---|---|
+| **COCO YOLOv8 "sports ball" (class 32)** | **Does NOT work.** Tested `yolov8n.onnx` on a real rectified table + live frame: **0** sports-ball detections (it's trained on natural-scene sports balls, not top-down billiards). Dead end as a detector — even though it's the only zero-auth, clearly-licensed `.onnx`. |
+| **Roboflow Universe pool/snooker models** (some have per-colour classes!) | Weights are **API-key-gated** — no anonymous download; raw weights need a paid plan. Can't bundle/auto-fetch. |
+| **Community `.pt` on GitHub** (e.g. white/colored/cue) | Directly downloadable but **no license** (all-rights-reserved) and `.pt` only (needs torch to run/convert). |
+
+**Conclusion:** there is no free, off-the-shelf model that detects top-down pool
+out of the box. So v0.2.15 ships the **infrastructure**, not a false headline:
+
+- **`OnnxYoloDetector`** — runs a YOLO `.onnx` via ONNX Runtime, **no torch**
+  (~15 MB vs ~2 GB). Decode is numpy + OpenCV NMS. COCO models auto-filter to
+  class 32; pool-specific models keep all classes. Drop a `.onnx` in `models/`
+  and it's used automatically (`backend = auto`); classical stays the fallback.
+- onnxruntime is a `[onnx]` extra, **not bundled** in the `.exe` yet (no working
+  model justifies the size + the PyInstaller DLL pitfalls). The lazy import
+  degrades to classical when absent.
+
+**Path to a real pool model** (when someone will accept a project's license /
+produce data): export a Roboflow snooker model to ONNX once
+(`ultralytics … export format=onnx`) and drop it in `models/`, or fine-tune
+YOLO-nano on **Capture-for-analysis** zips. No app change needed — it just works.
 
 ## Tier 3 — tracking (planned)
 

@@ -208,6 +208,104 @@ class YoloBallDetector(BallDetector):
         return _dedupe(out, 4)
 
 
+class OnnxYoloDetector(BallDetector):
+    """YOLO inference via ONNX Runtime — the lightweight AI backend (no torch).
+
+    Runs a YOLOv8/v5-style ``.onnx`` model on the rectified bird's-eye view.
+    Output is decoded with numpy + OpenCV NMS (no framework). If the model has
+    the 80 COCO classes we keep only class 32 ("sports ball"); a pool-specific
+    model (few classes) keeps everything and treats each box as a ball. Colour /
+    cue / eight is still derived from the crop via ``classify_ball`` so the
+    overhead can render real ball colours.
+
+    Raises at construction if onnxruntime is missing so the factory can fall back.
+    """
+
+    def __init__(self, weights_path, balls: BallSettings, felt: FeltSettings,
+                 conf: float = 0.25, iou: float = 0.45):
+        try:
+            import onnxruntime as ort
+        except ImportError as exc:  # pragma: no cover - optional dep
+            raise RuntimeError("onnxruntime not installed; install the [onnx] extra") from exc
+        self.balls = balls
+        self.felt = felt
+        self._conf = conf
+        self._iou = iou
+        self._sess = ort.InferenceSession(str(weights_path),
+                                          providers=["CPUExecutionProvider"])
+        inp = self._sess.get_inputs()[0]
+        self._input_name = inp.name
+        # static square input (e.g. 640); fall back to 640 if dynamic
+        sz = inp.shape[2] if isinstance(inp.shape[2], int) else 640
+        self._size = int(sz) if sz and sz > 0 else 640
+        log.info("ONNX detector ready: %s (input %d)", weights_path, self._size)
+
+    def _letterbox(self, img):
+        n = self._size
+        h, w = img.shape[:2]
+        r = min(n / h, n / w)
+        nh, nw = int(round(h * r)), int(round(w * r))
+        resized = cv2.resize(img, (nw, nh))
+        canvas = np.full((n, n, 3), 114, np.uint8)
+        canvas[:nh, :nw] = resized
+        return canvas, r
+
+    def detect(self, rect_bgr, rect_mask, table: TableModel) -> list[Detection]:
+        if rect_bgr is None or rect_bgr.size == 0:
+            return []
+        lb, ratio = self._letterbox(rect_bgr)
+        blob = cv2.cvtColor(lb, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        blob = blob.transpose(2, 0, 1)[None]
+        out = self._sess.run(None, {self._input_name: blob})[0]
+        out = np.squeeze(out, 0)
+        if out.shape[0] < out.shape[1]:   # [84, 8400] -> [8400, 84]
+            out = out.T
+        boxes_xywh = out[:, :4]
+        scores_all = out[:, 4:]
+        n_classes = scores_all.shape[1]
+        class_id = scores_all.argmax(1)
+        conf = scores_all.max(1)
+        keep = conf >= self._conf
+        if n_classes >= 80:               # COCO model -> keep only "sports ball"
+            keep &= class_id == 32
+        idx = np.where(keep)[0]
+        if idx.size == 0:
+            return []
+        short = max(table.short_side, 1.0)
+        min_r = self.balls.min_radius_frac * short * 0.6
+        max_r = self.balls.max_radius_frac * short * 1.6
+        rects, confs = [], []
+        for i in idx:
+            cx, cy, w, h = boxes_xywh[i]
+            x = (cx - w / 2) / ratio
+            y = (cy - h / 2) / ratio
+            rects.append([float(x), float(y), float(w / ratio), float(h / ratio)])
+            confs.append(float(conf[i]))
+        keep_nms = cv2.dnn.NMSBoxes(rects, confs, self._conf, self._iou)
+        if len(keep_nms) == 0:
+            return []
+        H, W = rect_bgr.shape[:2]
+        out_dets: list[Detection] = []
+        for k in np.array(keep_nms).flatten():
+            x, y, w, h = rects[int(k)]
+            ccx, ccy = x + w / 2, y + h / 2
+            r = (w + h) / 4.0
+            if not (min_r <= r <= max_r):
+                continue
+            if not table.on_table(ccx, ccy, margin=-r * 0.2):
+                continue
+            _, pdist = table.nearest_pocket(ccx, ccy)
+            if pdist < table.pocket_radius:
+                continue
+            x0, y0 = max(0, int(ccx - r)), max(0, int(ccy - r))
+            x1, y1 = min(W, int(ccx + r) + 1), min(H, int(ccy + r) + 1)
+            patch = rect_bgr[y0:y1, x0:x1]
+            cls, bgr = classify_ball(patch) if patch.size else (BallClass.UNKNOWN, (200, 200, 200))
+            out_dets.append(Detection(x=ccx, y=ccy, radius=r, bgr=bgr, cls=cls,
+                                      score=float(confs[int(k)])))
+        return _dedupe(out_dets, int(min_r * 1.2) if min_r > 0 else 4)
+
+
 def _dedupe(dets: list[Detection], min_dist: float) -> list[Detection]:
     """Greedy non-max suppression by centre distance (keep higher score)."""
     dets = sorted(dets, key=lambda d: d.score, reverse=True)
@@ -240,19 +338,25 @@ def _fetch_weights(url: str, dest) -> bool:
         return False
 
 
-_WEIGHT_NAMES = ("pool_balls.pt", "billiards.pt", "best.pt", "joe_table.pt", "yolov8n.pt")
+# ONNX weights are preferred (no torch); .pt needs Ultralytics. A pool/billiards
+# -specific model is required — generic COCO weights do not detect top-down balls.
+_ONNX_NAMES = ("pool_balls.onnx", "billiards.onnx", "joe_table.onnx", "best.onnx")
+_PT_NAMES = ("pool_balls.pt", "billiards.pt", "best.pt", "joe_table.pt")
 
 
 def find_yolo_weights(models_dir=None):
-    """Return the path to bundled/downloaded YOLO weights, or None.
+    """Return the path to a usable ball-detection model (``.onnx`` preferred over
+    ``.pt``), or None.
 
     This is the single source of truth for "can we do AI detection?" — the UI
     uses it to decide whether to offer the auto-detection toggle or fall back to
-    manual mode with a banner.
+    manual mode with a banner. Note: weights must be a *pool-specific* model;
+    generic COCO weights are intentionally not auto-fetched (they don't detect
+    top-down pool balls — verified).
     """
     from ..config import MODELS_DIR
     mdir = models_dir or MODELS_DIR
-    for name in _WEIGHT_NAMES:
+    for name in (*_ONNX_NAMES, *_PT_NAMES):
         cand = mdir / name
         if cand.exists():
             return cand
@@ -266,26 +370,33 @@ def yolo_weights_available(models_dir=None) -> bool:
 def make_detector(balls: BallSettings, felt: FeltSettings, models_dir=None) -> BallDetector:
     """Build the best available detector.
 
-    YOLO is preferred whenever weights are on disk (or fetchable) AND Ultralytics
-    is importable — a fine-tuned net beats classical CV on a real overhead camera.
-    Classical (Hough + colour) is the fallback when there's no model or the deps
-    are missing. ``backend == 'classical'`` forces classical regardless.
+    A pool-trained net beats classical CV on a real overhead camera, so a model
+    on disk is preferred: ``.onnx`` via ONNX Runtime (no torch), else ``.pt`` via
+    Ultralytics. Classical (Hough + colour) is the fallback when there's no model
+    or the deps are missing. ``backend == 'classical'`` forces classical.
     """
     if balls.backend != "classical":
         from ..config import MODELS_DIR
         mdir = models_dir or MODELS_DIR
         weights = find_yolo_weights(mdir)
-        # auto-fetch from a configured URL if nothing is on disk
-        if weights is None and getattr(balls, "yolo_weights_url", ""):
-            target = mdir / "pool_balls.pt"
-            if _fetch_weights(balls.yolo_weights_url, target):
+        # Optional: fetch a user-configured pool model (blank by default — we do
+        # NOT auto-fetch generic COCO weights, which don't detect pool balls).
+        url = getattr(balls, "yolo_weights_url", "")
+        if weights is None and url:
+            ext = ".onnx" if url.lower().endswith(".onnx") else ".pt"
+            target = mdir / f"pool_balls{ext}"
+            if _fetch_weights(url, target):
                 weights = target
         if weights is not None:
             try:
-                log.info("Using YOLO ball detector: %s", weights)
+                if weights.suffix.lower() == ".onnx":
+                    log.info("Using ONNX ball detector: %s", weights)
+                    return OnnxYoloDetector(weights, balls, felt,
+                                            conf=getattr(balls, "yolo_conf", 0.25))
+                log.info("Using YOLO (torch) ball detector: %s", weights)
                 return YoloBallDetector(weights, conf=getattr(balls, "yolo_conf", 0.25))
-            except RuntimeError as exc:
-                log.warning("YOLO unavailable (%s); falling back to classical", exc)
+            except Exception as exc:  # noqa: BLE001 - bad/corrupt model => degrade
+                log.warning("AI detector unavailable (%s); falling back to classical", exc)
         else:
-            log.warning("No YOLO weights in %s and no fetch URL; using classical", mdir)
+            log.info("No pool model in %s; using classical detector", mdir)
     return ClassicalBallDetector(balls, felt)

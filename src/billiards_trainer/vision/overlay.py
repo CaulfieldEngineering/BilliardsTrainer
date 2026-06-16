@@ -19,6 +19,30 @@ _CLS_COLOR = {
     BallClass.UNKNOWN: (200, 200, 200),
 }
 
+_UNCERTAIN_GREY = (150, 150, 150)
+
+
+def ball_color(tr, measured: bool = True) -> tuple[tuple[int, int, int], bool]:
+    """Return (BGR, uncertain) for a tracked ball.
+
+    With ``measured`` on (default) a ball is drawn in its *measured* mean colour
+    so it actually looks like itself — a blue ball blue, a red ball red. The cue
+    and 8 are forced to their canonical white/black (those classes are reliable),
+    and an UNKNOWN class is drawn neutral grey + a "?" rather than a confident,
+    wrong colour. With ``measured`` off we fall back to the fixed per-class
+    palette (the old behaviour, kept behind a flag).
+    """
+    if not measured:
+        return _CLS_COLOR.get(tr.cls, _UNCERTAIN_GREY), False
+    if tr.cls == BallClass.CUE:
+        return (255, 255, 255), False
+    if tr.cls == BallClass.EIGHT:
+        return (28, 28, 28), False
+    if tr.cls == BallClass.UNKNOWN:
+        return _UNCERTAIN_GREY, True
+    bgr = getattr(tr, "bgr", None) or _UNCERTAIN_GREY
+    return (int(bgr[0]), int(bgr[1]), int(bgr[2])), False
+
 
 def _accent_bgr(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")
@@ -30,7 +54,7 @@ def _accent_bgr(hex_color: str) -> tuple[int, int, int]:
 
 def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
                    show_traj: bool = True, show_ids: bool = True,
-                   accent: str = "#3DDC97") -> np.ndarray:
+                   accent: str = "#3DDC97", measured_colors: bool = True) -> np.ndarray:
     img = rect_bgr.copy()
     acc = _accent_bgr(accent)
 
@@ -46,7 +70,7 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
         cv2.circle(img, (int(dx), int(dy)), 2, (200, 200, 160), -1, cv2.LINE_AA)
 
     for tr in tracks:
-        color = _CLS_COLOR.get(tr.cls, (200, 200, 200))
+        color, _uncertain = ball_color(tr, measured_colors)
         c = (int(tr.x), int(tr.y))
         r = max(4, int(tr.radius))
         if show_traj and len(tr.history) > 1:
@@ -66,7 +90,8 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
 
 def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DDC97",
                      show_traj: bool = True, show_ids: bool = True,
-                     debug: bool = False, detections=None, diag=None) -> np.ndarray:
+                     debug: bool = False, detections=None, diag=None,
+                     measured_colors: bool = True) -> np.ndarray:
     """Render a clean, proportional top-down table from the game state — felt,
     rails, pockets, diamonds, and balls as circles — instead of the warped camera
     image. Ball positions are the rectified (already-proportional) coordinates."""
@@ -109,7 +134,7 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
 
     # balls
     for tr in tracks:
-        color = _CLS_COLOR.get(tr.cls, (200, 200, 200))
+        color, uncertain = ball_color(tr, measured_colors)
         c = (int(tr.x), int(tr.y))
         r = max(6, int(tr.radius))
         if show_traj and len(tr.history) > 1:
@@ -117,7 +142,14 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             cv2.polylines(img, [pts], False, acc, 1, cv2.LINE_AA)
         cv2.circle(img, c, r, color, -1, cv2.LINE_AA)
         cv2.circle(img, c, r, (20, 22, 26), 1, cv2.LINE_AA)
-        cv2.circle(img, (c[0] - r // 3, c[1] - r // 3), max(2, r // 4), (255, 255, 255), -1, cv2.LINE_AA)
+        if uncertain:
+            # don't fake a colour/sheen for something we can't classify — mark it
+            cv2.putText(img, "?", (c[0] - r // 2, c[1] + r // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, max(0.3, r / 18.0), (40, 40, 40), 1,
+                        cv2.LINE_AA)
+        else:
+            cv2.circle(img, (c[0] - r // 3, c[1] - r // 3), max(2, r // 4),
+                       (255, 255, 255), -1, cv2.LINE_AA)
         if tr.speed > 2.0:
             tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
             cv2.arrowedLine(img, c, tip, acc, 1, cv2.LINE_AA, tipLength=0.3)

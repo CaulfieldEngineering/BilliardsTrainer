@@ -215,11 +215,13 @@ class Pipeline:
                 calib.table, tracks, accent=ui.accent,
                 show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
                 debug=ui.debug_overlay, detections=detections, diag=res.diag,
+                measured_colors=ui.measured_ball_colors,
             )
         elif overlays:
             res.rect_bgr = draw_rectified(
                 rect, tracks, calib.table, show_traj=ui.show_trajectories,
                 show_ids=ui.show_ball_ids, accent=ui.accent,
+                measured_colors=ui.measured_ball_colors,
             )
         else:
             res.rect_bgr = rect

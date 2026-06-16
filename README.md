@@ -108,22 +108,45 @@ actual install folder) to the clipboard.
   and, if you set up cloud backup, synced to Supabase. See
   [`docs/SUPABASE.md`](docs/SUPABASE.md) — the app works fully without it.
 
-## Run from source
+## Run from source (the fast dev loop)
+
+Iterating on the frozen `.exe` is slow (build + publish + download). For day-to-day
+work, **run from source** — edits are testable in seconds:
 
 ```powershell
 py -3.12 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements-dev.txt
 pip install -e .
-python -m billiards_trainer        # launch the app
+python -m billiards_trainer        # launch the app (or: .\run_dev.ps1)
 pytest                              # run the test suite
 python tools/eval_table.py          # table-detection eval vs the reference capture
+python tools/eval_detection.py      # detection false-positive eval (synthetic, no camera)
+python tools/eval_detection.py --video clip.mp4   # iterate detection on a recorded clip
 ```
 
-Optional power-user backends:
+`.\run_dev.ps1` bootstraps the venv on first run, then just launches the app.
+
+**Iterate without the camera.** Detection work does *not* require standing at the
+table: `eval_detection.py` runs against the synthetic demo by default, and
+`--video <clip.mp4>` runs the full pipeline over any recording (e.g. a
+*Capture for analysis* zip's frames, or your own clip). Record once, iterate many
+times.
+
+**Behaviour is feature-flagged, not hard-coded.** Big behavioural switches —
+auto-detection on/off, real-measured vs. legacy ball colours, allow detection
+without a model — are toggles in **Settings** that apply live. No rebuild to
+change behaviour.
+
+> **Don't pre-build the `.exe` locally.** CI runs the exact same PyInstaller build
+> on every push to `main` and publishes the release — a local build just burns
+> 5-10 min duplicating it. Push and let CI build.
+
+Optional ball-detection backends:
 
 ```powershell
-pip install -e ".[yolo]"    # Ultralytics YOLO ball detector (pulls in torch, ~2 GB)
+pip install -e ".[onnx]"    # ONNX ball detector — runs a YOLO .onnx, no torch (~15 MB)
+pip install -e ".[yolo]"    # Ultralytics YOLO — only to run/convert .pt weights (~2 GB)
 pip install -e ".[pose]"    # MediaPipe pose / body-fundamentals analysis
 ```
 
@@ -152,15 +175,25 @@ Key design principle (a fix for the prototype's biggest cost): **calibrate the
 table once, lock the homography, then spend the whole per-frame budget on balls.**
 The CV pipeline runs on a dedicated worker thread, never the UI thread.
 
-### Ball detection: classical by default
+### Ball detection: manual-first, AI-ready
 
-Pre-trained YOLO has no pool-ball classes, and fine-tuning needs a labelled
-dataset, so the **default detector is classical** — Hough circles on the
-bird's-eye view, each validated as non-felt and colour-classified (cue / solid /
-stripe / 8-ball), with a dedicated white-blob pass for the cue ball. It needs no
-model and no torch, so the installer stays ~150 MB. The detector is **pluggable**:
-drop fine-tuned weights into the app's `models/` folder and switch the backend to
-`yolo` in Settings. See [`docs/BLOCKERS.md`](docs/BLOCKERS.md) for the upgrade path.
+On a real overhead camera, classical CV (Hough + colour) is only demo-grade —
+wrong colours/sizes, phantom blobs in pockets. And there is **no free
+off-the-shelf model that works**: generic COCO YOLO's "sports ball" class does
+not fire on top-down pool balls (verified), and the pool-specific community
+models are either API-key-gated or unlicensed. So the app is **manual-first**:
+
+- It opens into a **live camera preview** with auto-detection **off** — a clean
+  empty overhead and manual **+Make / −Miss**. No fake detections on screen.
+- Auto-detection is a toggle that unlocks when a **pool-specific model** is
+  present. Drop a YOLO **`.onnx`** into the app's `models/` folder (named e.g.
+  `pool_balls.onnx`) and the app runs it via **ONNX Runtime — no torch** (the
+  `OnnxYoloDetector`). A `.pt` works too if you install the `[yolo]` extra.
+- Balls render in their **real measured colour** (a blue ball looks blue), with a
+  grey **?** when the class is uncertain — never a confident wrong colour.
+
+See [`docs/CV_ROADMAP.md`](docs/CV_ROADMAP.md) for the model situation and the
+path to a pool-trained model.
 
 ---
 

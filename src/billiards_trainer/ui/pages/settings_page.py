@@ -300,6 +300,9 @@ class SettingsPage(QWidget):
         form.addRow("", self._manual_confirm)
         self._require_cue = QCheckBox("Require a cue ball to count a shot")
         form.addRow("", self._require_cue)
+        self._allow_without_model = QCheckBox("Allow auto-detection without a model "
+                                              "(experimental — uses classical CV)")
+        form.addRow("", self._allow_without_model)
 
         self._motion_active = QDoubleSpinBox()
         self._motion_active.setRange(0.05, 5.0)
@@ -357,6 +360,9 @@ class SettingsPage(QWidget):
         form.addRow("", self._show_traj)
         self._show_ids = QCheckBox("Show ball IDs")
         form.addRow("", self._show_ids)
+        self._measured_colors = QCheckBox("Draw balls in their real measured colour "
+                                          "(grey ? when unsure)")
+        form.addRow("", self._measured_colors)
         note = QLabel("Accent changes apply after Save.")
         note.setObjectName("Faint")
         form.addRow("", note)
@@ -462,6 +468,7 @@ class SettingsPage(QWidget):
         self._fusion.setChecked(s.detection.use_fusion)
         self._manual_confirm.setChecked(s.detection.manual_confirm)
         self._require_cue.setChecked(s.detection.require_cue)
+        self._allow_without_model.setChecked(s.detection.allow_without_model)
         self._motion_active.setValue(s.detection.motion_active)
         self._min_travel.setValue(int(s.detection.min_travel_px))
         self._warmup.setValue(int(s.detection.warmup_seconds))
@@ -477,6 +484,7 @@ class SettingsPage(QWidget):
         self._accent.setText(s.ui.accent)
         self._show_traj.setChecked(s.ui.show_trajectories)
         self._show_ids.setChecked(s.ui.show_ball_ids)
+        self._measured_colors.setChecked(s.ui.measured_ball_colors)
         self._auto_check.setChecked(s.updates.auto_check)
 
     def _save(self) -> None:
@@ -498,6 +506,7 @@ class SettingsPage(QWidget):
         s.detection.use_fusion = self._fusion.isChecked()
         s.detection.manual_confirm = self._manual_confirm.isChecked()
         s.detection.require_cue = self._require_cue.isChecked()
+        s.detection.allow_without_model = self._allow_without_model.isChecked()
         s.detection.motion_active = self._motion_active.value()
         s.detection.min_travel_px = float(self._min_travel.value())
         s.detection.warmup_seconds = float(self._warmup.value())
@@ -516,6 +525,7 @@ class SettingsPage(QWidget):
         s.ui.show_overlays = self._show_overlays.isChecked()
         s.ui.show_trajectories = self._show_traj.isChecked()
         s.ui.show_ball_ids = self._show_ids.isChecked()
+        s.ui.measured_ball_colors = self._measured_colors.isChecked()
         s.updates.auto_check = self._auto_check.isChecked()
         s.save()
         self.applied.emit()
