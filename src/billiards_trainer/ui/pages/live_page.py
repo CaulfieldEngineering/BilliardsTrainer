@@ -13,6 +13,7 @@ boundary.
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -45,6 +46,7 @@ class LivePage(QWidget):
     detection_toggled = Signal(bool)          # auto-detection on/off
     retry_requested = Signal()                # re-open the camera after an error
     open_settings_requested = Signal()        # jump to Settings → Camera
+    detector_strategy_changed = Signal(str)   # which live detector to use
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -117,6 +119,11 @@ class LivePage(QWidget):
         self._detect_btn.setToolTip("Turn AI ball/shot detection on or off")
         self._detect_btn.clicked.connect(self._toggle_detection)
         lay.addWidget(self._detect_btn)
+
+        # Which live detector runs when Detection is ON (Phase-1 winner default).
+        self._detector_combo = self._build_detector_combo()
+        lay.addWidget(QLabel("Detector:"))
+        lay.addWidget(self._detector_combo)
 
         self._demo_btn = QPushButton("  Try demo")
         self._demo_btn.setObjectName("Ghost")
@@ -218,6 +225,24 @@ class LivePage(QWidget):
         col.addLayout(row)
         col.addStretch(1)
         return panel
+
+    def _build_detector_combo(self) -> QComboBox:
+        combo = QComboBox()
+        combo.setToolTip("Live ball detector (runs on the raw camera frame)")
+        names = []
+        try:
+            from ...detector_strategies import discover
+            # 'classical_rectified' is the eval baseline; surface it as 'legacy'
+            names = [n for n in sorted(discover()) if n != "classical_rectified"]
+        except Exception:  # noqa: BLE001 - UI must build even if strategies don't import
+            names = ["simple_blob", "felt_mask_hough"]
+        names.append("legacy")
+        combo.addItems(names)
+        current = getattr(self._settings.balls, "live_strategy", "simple_blob")
+        if current in names:
+            combo.setCurrentText(current)
+        combo.currentTextChanged.connect(self.detector_strategy_changed.emit)
+        return combo
 
     def _toggle_detection(self) -> None:
         on = self._detect_btn.isChecked()

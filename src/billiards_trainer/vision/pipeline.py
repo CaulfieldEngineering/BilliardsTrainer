@@ -55,6 +55,7 @@ class Pipeline:
         self._preview_table: TableModel | None = None
         self.calib = CalibrationManager()
         self.detector = make_detector(settings.balls, settings.felt)
+        self._strategy = self._load_strategy()  # raw-frame detector (None = legacy)
         self.tracker = BallTracker()
         self.shots = ShotDetector(settings.detection, settings.balls)
         self._frame_idx = 0
@@ -70,11 +71,35 @@ class Pipeline:
         """Apply edited settings (e.g. new felt range / backend) and recalibrate."""
         self.settings = settings
         self.detector = make_detector(settings.balls, settings.felt)
+        self._strategy = self._load_strategy()
         self.tracker.reset()
         self.shots = ShotDetector(settings.detection, settings.balls)
         self.calib.clear()
         self._preview_table = None
         self._reset_motion()
+
+    def _load_strategy(self):
+        """Resolve the live detector strategy by name. 'legacy' (or any failure)
+        => None, which keeps the old classical-Hough-on-rectified path."""
+        name = getattr(self.settings.balls, "live_strategy", "simple_blob")
+        if not name or name == "legacy":
+            return None
+        try:
+            from ..detector_strategies import discover
+            strat = discover().get(name)
+            if strat is None:
+                log.warning("Live strategy '%s' not found; using legacy detector", name)
+            return strat
+        except Exception as exc:  # noqa: BLE001 - never let strategy loading break the app
+            log.warning("Could not load live strategy '%s' (%s); using legacy", name, exc)
+            return None
+
+    def set_strategy(self, name: str) -> None:
+        """Switch the live detector without clearing calibration."""
+        self.settings.balls.live_strategy = name
+        self._strategy = self._load_strategy()
+        self.tracker.reset()
+        log.info("Live detector strategy -> %s", name)
 
     def request_recalibration(self) -> None:
         self.calib.clear()
@@ -111,6 +136,22 @@ class Pipeline:
             res.rect_bgr = render_schematic(table, [], accent=self.settings.ui.accent,
                                             show_traj=False, show_ids=False, debug=False)
         return res
+
+    def _project_raw_to_rect(self, raw_dets, calib):
+        """Map RAW-frame detections into the rectified plane (via calib.H) so the
+        tracker + bird's-eye schematic (both rectified-space) consume them."""
+        if not raw_dets:
+            return []
+        from .rectify import project_points
+        pts = np.array([[d.x, d.y] for d in raw_dets], np.float64)
+        rect = project_points(pts, calib.H)
+        off = np.array([[d.x + max(d.radius, 1.0), d.y] for d in raw_dets], np.float64)
+        rect_off = project_points(off, calib.H)
+        out = []
+        for d, (rx, ry), (ox, oy) in zip(raw_dets, rect, rect_off, strict=False):
+            out.append(Detection(float(rx), float(ry), float(np.hypot(ox - rx, oy - ry)),
+                                 d.bgr, d.cls, d.score))
+        return out
 
     def _default_preview_table(self) -> TableModel:
         if self._preview_table is None:
@@ -150,7 +191,17 @@ class Pipeline:
             res.status = "calibrating"
             return res
 
-        detections = self.detector.detect(rect, calib.rect_mask, calib.table)
+        if self._strategy is not None:
+            # Phase-2 path: detect on the RAW frame, project results into the
+            # rectified plane so tracking + the bird's-eye schematic are unchanged.
+            try:
+                raw_dets = self._strategy.detect(frame, calib)
+            except Exception as exc:  # noqa: BLE001 - a bad frame must not kill the loop
+                log.debug("strategy %s failed on a frame: %s", self.settings.balls.live_strategy, exc)
+                raw_dets = []
+            detections = self._project_raw_to_rect(raw_dets, calib)
+        else:
+            detections = self.detector.detect(rect, calib.rect_mask, calib.table)
         # With auto-detection ON, demand the stricter render floor: better to draw
         # nothing than a low-confidence phantom. Falls back to the looser tracking
         # floor only if render_floor wasn't set (old settings files).

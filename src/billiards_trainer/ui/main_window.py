@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
     # pushes to the worker thread go through this.
     apply_settings_requested = Signal(object)
     start_source = Signal(str, str, str)  # source, mode, drill_key -> controller.start
+    set_strategy_requested = Signal(str)  # live detector strategy -> controller
 
     def __init__(self, settings: Settings):
         super().__init__()
@@ -135,6 +136,8 @@ class MainWindow(QMainWindow):
         self._live.start_requested.connect(self._controller.start, q)
         self._live.stop_requested.connect(self._controller.stop, q)
         self._live.detection_toggled.connect(self._controller.set_detection_enabled, q)
+        self._live.detector_strategy_changed.connect(self._on_strategy_changed)
+        self.set_strategy_requested.connect(self._controller.set_detector_strategy, q)
         self._live.retry_requested.connect(self._retry_camera)
         self._live.open_settings_requested.connect(lambda: self._go(3))
         self._live.recalibrate_requested.connect(self._controller.recalibrate, q)
@@ -198,6 +201,12 @@ class MainWindow(QMainWindow):
         table hasn't locked yet the status badge shows FINDING TABLE rather than
         silently disabling the control."""
         self._live.set_detection_available(True)
+
+    def _on_strategy_changed(self, name: str) -> None:
+        self._settings.balls.live_strategy = name
+        self._settings.save()
+        self.set_strategy_requested.emit(name)
+        self.statusBar().showMessage(f"Live detector → {name}", 4000)
 
     def _on_capture_saved(self, path: str) -> None:
         self.statusBar().showMessage(f"Analysis capture saved: {path}", 8000)

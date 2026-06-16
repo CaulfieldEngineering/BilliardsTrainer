@@ -119,6 +119,11 @@ class BallSettings:
     # auto = YOLO when weights are present, else classical. 'classical' forces
     # Hough+colour; 'yolo' forces the net (falling back if deps/weights missing).
     backend: str = "auto"  # auto | classical | yolo
+    # Live detector strategy (Phase 1 winner). Runs on the RAW frame; results are
+    # projected into the bird's-eye for display. 'legacy' = the old
+    # classical-Hough-on-rectified detector (kept for A/B). Any name from
+    # detector_strategies (simple_blob, felt_mask_hough, onnx_*, …) is valid.
+    live_strategy: str = "simple_blob"
     # Ball radius bounds as a fraction of the rectified short side (the playing
     # WIDTH). Regulation: a 2.25" ball on a 50"-wide bed => radius ≈ 0.0225·W.
     # The band is kept TIGHT around that real ratio so noise/shadows of the wrong

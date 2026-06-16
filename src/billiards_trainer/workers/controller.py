@@ -239,6 +239,14 @@ class PipelineController(QObject):
             self._pipeline.paused = paused
         self.status_changed.emit("paused" if paused else "running")
 
+    @Slot(str)
+    def set_detector_strategy(self, name: str) -> None:
+        """Switch the live detector (simple_blob / felt_mask_hough / onnx_* /
+        legacy) without dropping the table calibration."""
+        self._settings.balls.live_strategy = name
+        if self._pipeline:
+            self._pipeline.set_strategy(name)
+
     @Slot(bool)
     def set_detection_enabled(self, on: bool) -> None:
         """Turn auto ball/shot detection on or off. OFF = clean camera preview +

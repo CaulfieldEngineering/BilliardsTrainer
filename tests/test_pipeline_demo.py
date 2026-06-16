@@ -13,6 +13,11 @@ from billiards_trainer.vision.pipeline import Pipeline
 
 def test_demo_calibrates_and_detects_make():
     settings = Settings()
+    # This regression guards the vision->event (make/miss) chain on the synthetic
+    # demo, which was authored for the classical rectified detector. Pin it to the
+    # 'legacy' detector; the new raw-frame strategies (simple_blob default) are
+    # validated on real footage via the eval harness, not the synthetic make.
+    settings.balls.live_strategy = "legacy"
     settings.detection.warmup_seconds = 3.0   # > MOG2 bg warm-up so fusion's fg is ready
     settings.detection.cooldown_seconds = 0.5
     src = DemoSource()
