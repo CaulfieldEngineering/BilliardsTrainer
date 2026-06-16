@@ -176,40 +176,70 @@ class DownloadWorker(QObject):
         self.finished.emit(str(dest))
 
 
-# The swap batch: wait for us to exit, clean stale onefile temp dirs, copy the
-# new exe in, relaunch, and roll back to a backup if it doesn't confirm startup.
+# The swap batch: wait for us to exit, clean stale onefile temp dirs, swap in the
+# new exe, unblock it, relaunch, and roll back to a backup if it never confirms
+# startup. NOTE: uses ``ping`` for delays, NOT ``timeout`` — ``timeout`` needs an
+# interactive console and fails instantly when spawned from a process, which made
+# the sentinel-wait loop finish in milliseconds and triggered a false rollback
+# that killed the still-starting new exe (the "never opens the new" bug). Every
+# step is echoed to updater.log in the install dir for diagnosis.
 _SWAP_BAT = r"""@echo off
 setlocal enabledelayedexpansion
+set "LOG={log}"
+echo [start] %DATE% %TIME% waiting for pid {pid}> "%LOG%"
 :waitexit
 tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul
 if not errorlevel 1 (
-  timeout /t 1 /nobreak >nul
+  ping 127.0.0.1 -n 2 >nul
   goto waitexit
 )
+echo [%TIME%] old process exited>> "%LOG%"
 for /d %%D in ("%TEMP%\_MEI*") do rd /s /q "%%D" 2>nul
 copy /Y "{downloaded}" "{current}" >nul
-if errorlevel 1 goto rollback
-del /f /q "{flag}" 2>nul
+if errorlevel 1 (
+  echo [%TIME%] ERROR copy failed>> "%LOG%"
+  goto rollback
+)
+echo [%TIME%] copied new exe>> "%LOG%"
+del "{current}:Zone.Identifier" >nul 2>&1
+del /f /q "{flag}" >nul 2>&1
+echo [%TIME%] launching new exe>> "%LOG%"
 start "" "{current}"
 set /a n=0
 :waitok
 if exist "{flag}" goto success
 set /a n+=1
 if !n! geq {timeout} goto rollback
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 goto waitok
 :success
-del /f /q "{backup}" 2>nul
-del /f /q "{downloaded}" 2>nul
+echo [%TIME%] new exe confirmed (sentinel found)>> "%LOG%"
+del /f /q "{backup}" >nul 2>&1
+del /f /q "{downloaded}" >nul 2>&1
+del /f /q "{recovery}" >nul 2>&1
 goto done
 :rollback
+echo [%TIME%] new exe never confirmed -- rolling back>> "%LOG%"
 taskkill /F /IM "{exe_name}" >nul 2>&1
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 3 >nul
 if exist "{backup}" copy /Y "{backup}" "{current}" >nul
-echo failed > "{failflag}"
+echo failed> "{failflag}"
+(
+echo Billiards Trainer update could not start, so we restored your previous version.
+echo.
+echo If the app still does not open, in THIS folder:
+echo   1. Delete BilliardsTrainer.exe
+echo   2. Rename BilliardsTrainer.exe.bak  to  BilliardsTrainer.exe
+echo   3. Run it.
+echo.
+echo Or download a fresh copy: {releases}
+echo.
+echo Tip: add this folder to your antivirus exclusions to avoid update issues.
+)> "{recovery}"
 start "" "{current}"
 :done
-del "%~f0"
+echo [%TIME%] updater done>> "%LOG%"
+del "%~f0" >nul 2>&1
 """
 
 
@@ -244,15 +274,24 @@ def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
             subprocess.Popen([downloaded])
         return
 
+    from ..version import RELEASES_PAGE_URL
     from .recovery import LAUNCHED_OK, UPDATE_FAILED
 
     current = sys.executable
+    install_dir = Path(current).resolve().parent
     backup = str(Path(current).with_name(Path(current).name + ".bak"))
+    recovery = str(install_dir / "RECOVERY.txt")
+    swap_log = str(install_dir / "updater.log")
     try:
         shutil.copy2(current, backup)
     except OSError as exc:
         log.warning("Could not back up current exe (%s); proceeding without rollback", exc)
         backup = ""
+    # Strip the mark-of-the-web from the download so Windows doesn't block launch.
+    try:
+        Path(downloaded + ":Zone.Identifier").unlink(missing_ok=True)
+    except OSError:
+        pass
     for flag in (LAUNCHED_OK, UPDATE_FAILED):
         try:
             flag.unlink(missing_ok=True)
@@ -263,10 +302,20 @@ def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
     bat.write_text(_SWAP_BAT.format(
         pid=os.getpid(), downloaded=downloaded, current=current,
         backup=backup, exe_name=Path(current).name,
-        flag=str(LAUNCHED_OK), failflag=str(UPDATE_FAILED), timeout=25,
+        flag=str(LAUNCHED_OK), failflag=str(UPDATE_FAILED),
+        recovery=recovery, log=swap_log, releases=RELEASES_PAGE_URL, timeout=90,
     ), encoding="utf-8")
-    log.info("Launching update swap (backup=%s)", backup or "none")
-    subprocess.Popen(["cmd", "/c", str(bat)], creationflags=0x00000008)
+    log.info("Launching update swap: new=%s -> %s (backup=%s, log=%s)",
+             downloaded, current, backup or "none", swap_log)
+    # DETACHED so it survives our exit + NEW_PROCESS_GROUP, and crucially explicit
+    # DEVNULL std handles — without valid handles a detached cmd hangs on the very
+    # first redirected command. (Verified locally.)
+    subprocess.Popen(
+        ["cmd", "/c", str(bat)],
+        creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        close_fds=True,
+    )
 
 
 def run_in_thread(worker: QObject) -> QThread:

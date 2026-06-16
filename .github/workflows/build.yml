@@ -56,12 +56,14 @@ jobs:
         run: pyinstaller packaging/billiards_trainer.spec --noconfirm
 
       - name: Stage release artifacts
+        id: stage
         shell: pwsh
         run: |
           $v = "${{ steps.ver.outputs.version }}"
           Copy-Item dist/BilliardsTrainer.exe "dist/BilliardsTrainer-$v.exe"
           $hash = (Get-FileHash "dist/BilliardsTrainer-$v.exe" -Algorithm SHA256).Hash.ToLower()
           Write-Host "SHA256: $hash"
+          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           $url = "https://github.com/${{ github.repository }}/releases/download/v$v/BilliardsTrainer-$v.exe"
           python packaging/make_version_json.py --version $v --url $url --sha256 $hash --notes "Automated build of ${{ github.sha }}" --out dist/version.json
           Get-Content dist/version.json
@@ -80,6 +82,20 @@ jobs:
           tag_name: v${{ steps.ver.outputs.version }}
           name: Billiards Trainer v${{ steps.ver.outputs.version }}
           generate_release_notes: true
+          body: |
+            ## Billiards Trainer v${{ steps.ver.outputs.version }}
+
+            **Download:** `BilliardsTrainer-${{ steps.ver.outputs.version }}.exe`
+            **SHA256:** `${{ steps.stage.outputs.sha256 }}`
+
+            Verify your download (PowerShell):
+            ```powershell
+            (Get-FileHash .\BilliardsTrainer-${{ steps.ver.outputs.version }}.exe -Algorithm SHA256).Hash
+            ```
+
+            The in-app updater verifies this hash automatically. If a self-update
+            ever fails to relaunch, see `updater.log` / `RECOVERY.txt` next to the
+            exe, or just re-download from this page.
           files: |
             dist/BilliardsTrainer-*.exe
             dist/version.json
