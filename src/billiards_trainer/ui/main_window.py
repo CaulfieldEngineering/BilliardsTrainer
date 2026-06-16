@@ -61,7 +61,6 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._wire()
-        self._refresh_detection_availability()
         self._autostart_preview()
         self._maybe_check_updates()
 
@@ -136,8 +135,8 @@ class MainWindow(QMainWindow):
         self._live.start_requested.connect(self._controller.start, q)
         self._live.stop_requested.connect(self._controller.stop, q)
         self._live.detection_toggled.connect(self._controller.set_detection_enabled, q)
-        self._live.detector_strategy_changed.connect(self._on_strategy_changed)
         self.set_strategy_requested.connect(self._controller.set_detector_strategy, q)
+        self._settings_page.detector_changed.connect(self._on_strategy_changed)
         self._live.retry_requested.connect(self._retry_camera)
         self._live.open_settings_requested.connect(lambda: self._go(3))
         self._live.recalibrate_requested.connect(self._controller.recalibrate, q)
@@ -194,18 +193,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Retrying camera…", 3000)
         self.start_source.emit(source, self._settings.mode, "")
 
-    def _refresh_detection_availability(self) -> None:
-        """Detection is ALWAYS available now — the live detector (simple_blob by
-        default; classical/ONNX as alternatives) runs on the raw frame and needs
-        no model. So the toggle is clickable whenever a source is active; if the
-        table hasn't locked yet the status badge shows FINDING TABLE rather than
-        silently disabling the control."""
-        self._live.set_detection_available(True)
 
     def _on_strategy_changed(self, name: str) -> None:
         self._settings.balls.live_strategy = name
         self._settings.save()
-        self.set_strategy_requested.emit(name)
+        self.set_strategy_requested.emit(name)        # live switch, keeps calibration
+        self._live.set_detector_label(name)
         self.statusBar().showMessage(f"Live detector → {name}", 4000)
 
     def _on_capture_saved(self, path: str) -> None:
@@ -241,7 +234,7 @@ class MainWindow(QMainWindow):
     def _on_settings_applied(self) -> None:
         apply_theme(QApplication.instance(), self._settings.ui.accent)
         self._push_settings()
-        self._refresh_detection_availability()
+        self._live.set_detector_label(self._settings.balls.live_strategy)
         # If the camera source changed, re-open the preview on the new device.
         if (self._settings.source or "0") != self._started_source:
             self._started_source = self._settings.source or "0"

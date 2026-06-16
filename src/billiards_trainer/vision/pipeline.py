@@ -153,6 +153,17 @@ class Pipeline:
                                  d.bgr, d.cls, d.score))
         return out
 
+    def _draw_raw_dets(self, frame, dets):
+        """Draw detection circles straight onto the live (raw) frame — used when
+        there's no homography to project into the bird's-eye."""
+        from .overlay import ball_color
+        img = frame.copy()
+        for d in dets:
+            color, _uncertain = ball_color(d, self.settings.ui.measured_ball_colors)
+            c = (int(d.x), int(d.y))
+            cv2.circle(img, c, max(4, int(d.radius)), color, 2, cv2.LINE_AA)
+        return img
+
     def _default_preview_table(self) -> TableModel:
         if self._preview_table is None:
             pad = max(8, int(self.settings.rectify.pad_px))
@@ -176,9 +187,26 @@ class Pipeline:
 
         if not self.calib.is_calibrated:
             if not self._acquire_calibration(frame):
-                res.status = "calibrating"
-                if annotate:
+                # No table lock yet — but DON'T refuse to detect. Run the strategy
+                # on the raw frame and draw boxes directly on the live view; we just
+                # can't project to the bird's-eye without a homography.
+                if self._strategy is not None and annotate:
+                    try:
+                        raw_dets = self._strategy.detect(frame, None)
+                    except Exception:  # noqa: BLE001
+                        raw_dets = []
+                    res.detections = raw_dets
+                    res.n_balls = len(raw_dets)
+                    res.frame_bgr = self._draw_raw_dets(frame, raw_dets)
+                    res.status = "detecting_nolock"
+                    if self.settings.ui.schematic_birdseye:
+                        res.rect_bgr = render_schematic(
+                            self._default_preview_table(), [], accent=self.settings.ui.accent,
+                            show_traj=False, show_ids=False)
+                else:
+                    res.status = "calibrating"
                     res.frame_bgr = frame
+                self._last_ms = (time.perf_counter() - t_start) * 1000.0
                 return res
             self.detector = make_detector(self.settings.balls, self.calib.calib.felt)
 

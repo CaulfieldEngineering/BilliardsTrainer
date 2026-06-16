@@ -32,6 +32,7 @@ class SettingsPage(QWidget):
     feedback_requested = Signal()
     capture_requested = Signal()
     flag_failure_requested = Signal()
+    detector_changed = Signal(str)   # live detector strategy switched
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -265,9 +266,25 @@ class SettingsPage(QWidget):
 
     def _ball_card(self) -> Card:
         card, form = self._card("Ball detection")
+        # Live detector strategy (the thing that runs when Detection is ON).
+        # Default simple_blob (Phase-1 winner, no model needed). Switching here
+        # applies immediately and keeps calibration.
+        self._live_detector = QComboBox()
+        names = ["simple_blob", "felt_mask_hough"]
+        try:
+            from ...detector_strategies import discover
+            names = [n for n in sorted(discover()) if n != "classical_rectified"]
+        except Exception:  # noqa: BLE001 - settings must build even if strategies don't import
+            pass
+        names.append("legacy")
+        self._live_detector.addItems(names)
+        self._live_detector.activated.connect(
+            lambda _i: self.detector_changed.emit(self._live_detector.currentText()))
+        form.addRow("Live detector", self._live_detector)
+
         self._backend = QComboBox()
         self._backend.addItems(["auto", "classical", "yolo"])
-        form.addRow("Backend", self._backend)
+        form.addRow("AI backend (advanced)", self._backend)
         from ...config import MODELS_DIR
         note = QLabel("Auto uses an AI model when one is present, else classical. "
                       "Drop a pool-trained <b>pool_balls.onnx</b> into:<br>"
@@ -492,6 +509,7 @@ class SettingsPage(QWidget):
         self._auto_relock.setChecked(s.table.auto_relock)
         self._persist_calib.setChecked(s.table.persist_calibration)
         self._backend.setCurrentText(s.balls.backend)
+        self._live_detector.setCurrentText(getattr(s.balls, "live_strategy", "simple_blob"))
         self._param2.setValue(s.balls.detect_param2)
         self._yolo_url.setText(s.balls.yolo_weights_url)
         self._show_overlays.setChecked(s.ui.show_overlays)
@@ -531,6 +549,7 @@ class SettingsPage(QWidget):
         s.table.auto_relock = self._auto_relock.isChecked()
         s.table.persist_calibration = self._persist_calib.isChecked()
         s.balls.backend = self._backend.currentText()
+        s.balls.live_strategy = self._live_detector.currentText()
         s.balls.detect_param2 = self._param2.value()
         s.balls.yolo_weights_url = self._yolo_url.text().strip()
         s.detection.preset = self._preset.currentText()

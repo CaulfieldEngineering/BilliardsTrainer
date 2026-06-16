@@ -13,7 +13,6 @@ boundary.
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -46,14 +45,12 @@ class LivePage(QWidget):
     detection_toggled = Signal(bool)          # auto-detection on/off
     retry_requested = Signal()                # re-open the camera after an error
     open_settings_requested = Signal()        # jump to Settings → Camera
-    detector_strategy_changed = Signal(str)   # which live detector to use
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
         self._settings = settings
         self._running = False
         self._detect_on = False
-        self._detection_available = True
         self._drill_key = ""
         self._drill_name = ""
         self._pick_mode = False
@@ -65,7 +62,6 @@ class LivePage(QWidget):
         root.setContentsMargins(18, 16, 18, 16)
         root.setSpacing(14)
         root.addWidget(self._control_bar())
-        root.addWidget(self._banner())
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(8)
@@ -121,9 +117,10 @@ class LivePage(QWidget):
         lay.addWidget(self._detect_btn)
 
         # Which live detector runs when Detection is ON (Phase-1 winner default).
-        self._detector_combo = self._build_detector_combo()
-        lay.addWidget(QLabel("Detector:"))
-        lay.addWidget(self._detector_combo)
+        # Read-only label here; switch detectors in Settings → Ball detection.
+        self._detector_lbl = QLabel(f"Detector: {self._live_strategy_name()}")
+        self._detector_lbl.setObjectName("Muted")
+        lay.addWidget(self._detector_lbl)
 
         self._demo_btn = QPushButton("  Try demo")
         self._demo_btn.setObjectName("Ghost")
@@ -178,19 +175,11 @@ class LivePage(QWidget):
                                      PALETTE.warn if paused else PALETTE.text_dim))
         self.pause_toggled.emit(paused)
 
-    def _banner(self) -> QWidget:
-        self._banner_box = QFrame()
-        self._banner_box.setObjectName("Card")
-        bl = QHBoxLayout(self._banner_box)
-        bl.setContentsMargins(14, 8, 14, 8)
-        self._banner_lbl = QLabel(
-            "Auto-detection unavailable — using manual mode. Drop YOLO weights in "
-            "the models folder to enable AI detection.")
-        self._banner_lbl.setObjectName("Faint")
-        self._banner_lbl.setWordWrap(True)
-        bl.addWidget(self._banner_lbl, 1)
-        self._banner_box.setVisible(False)
-        return self._banner_box
+    def _live_strategy_name(self) -> str:
+        return getattr(self._settings.balls, "live_strategy", "simple_blob")
+
+    def set_detector_label(self, name: str) -> None:
+        self._detector_lbl.setText(f"Detector: {name}")
 
     def _camera_error_panel(self) -> QWidget:
         panel = QFrame()
@@ -226,29 +215,8 @@ class LivePage(QWidget):
         col.addStretch(1)
         return panel
 
-    def _build_detector_combo(self) -> QComboBox:
-        combo = QComboBox()
-        combo.setToolTip("Live ball detector (runs on the raw camera frame)")
-        names = []
-        try:
-            from ...detector_strategies import discover
-            # 'classical_rectified' is the eval baseline; surface it as 'legacy'
-            names = [n for n in sorted(discover()) if n != "classical_rectified"]
-        except Exception:  # noqa: BLE001 - UI must build even if strategies don't import
-            names = ["simple_blob", "felt_mask_hough"]
-        names.append("legacy")
-        combo.addItems(names)
-        current = getattr(self._settings.balls, "live_strategy", "simple_blob")
-        if current in names:
-            combo.setCurrentText(current)
-        combo.currentTextChanged.connect(self.detector_strategy_changed.emit)
-        return combo
-
     def _toggle_detection(self) -> None:
         on = self._detect_btn.isChecked()
-        if on and not self._detection_available:
-            self._detect_btn.setChecked(False)
-            return
         self._set_detect_ui(on)
         self.detection_toggled.emit(on)
 
@@ -261,18 +229,6 @@ class LivePage(QWidget):
         # restyle after objectName change
         self._detect_btn.style().unpolish(self._detect_btn)
         self._detect_btn.style().polish(self._detect_btn)
-
-    def set_detection_available(self, available: bool) -> None:
-        """Enable/disable the auto-detection toggle. When no model is present we
-        hold the line on reliability: detection stays off and a banner explains."""
-        self._detection_available = available
-        self._detect_btn.setEnabled(available)
-        self._banner_box.setVisible(not available)
-        if not available and self._detect_on:
-            # force detection off everywhere (e.g. switched from demo to a real
-            # camera that has no model) — never leave classical running on a feed
-            self._set_detect_ui(False)
-            self.detection_toggled.emit(False)
 
     def show_camera_error(self, msg: str) -> None:
         self._cam_err_lbl.setText(msg)
@@ -367,8 +323,8 @@ class LivePage(QWidget):
         rail.layout().addWidget(self._replay_btn)
 
         hint = QLabel("Your camera previews automatically. Score with +Make / "
-                      "−Miss. Turn on Detection (needs YOLO weights) for automatic "
-                      "shot counting; use Pick felt if the table read looks off.")
+                      "−Miss, or flip Detection: ON for automatic ball detection "
+                      "(no setup needed); use Pick felt if the table read looks off.")
         hint.setObjectName("Faint")
         hint.setWordWrap(True)
         rail.layout().addWidget(hint)
@@ -449,6 +405,8 @@ class LivePage(QWidget):
             return  # keep the "tap the cloth" prompt
         if packet.status == "preview":
             self._status_badge.set_text_color("PREVIEW", PALETTE.text_dim)
+        elif packet.status == "detecting_nolock":
+            self._status_badge.set_text_color("DETECTING (NO TABLE LOCK)", PALETTE.warn)
         elif packet.deviated:
             self._status_badge.set_text_color("RELOCKING TABLE", PALETTE.warn)
         elif packet.status == "calibrating":
