@@ -192,13 +192,12 @@ class MainWindow(QMainWindow):
         self.start_source.emit(source, self._settings.mode, "")
 
     def _refresh_detection_availability(self) -> None:
-        """Auto-detection is only offered when a YOLO model is present — otherwise
-        we hold the line on reliability with manual mode + a banner."""
-        from ..vision.balls import yolo_weights_available
-        available = (yolo_weights_available()
-                     or self._settings.balls.backend == "yolo"
-                     or self._settings.detection.allow_without_model)
-        self._live.set_detection_available(available)
+        """Detection is ALWAYS available now — the live detector (simple_blob by
+        default; classical/ONNX as alternatives) runs on the raw frame and needs
+        no model. So the toggle is clickable whenever a source is active; if the
+        table hasn't locked yet the status badge shows FINDING TABLE rather than
+        silently disabling the control."""
+        self._live.set_detection_available(True)
 
     def _on_capture_saved(self, path: str) -> None:
         self.statusBar().showMessage(f"Analysis capture saved: {path}", 8000)
