@@ -28,13 +28,18 @@ def test_window_builds(app):
 
     settings = Settings()
     settings.updates.auto_check = False
+    settings.source = "demo"  # autostart previews a hardware-free source in CI
     apply_theme(app, settings.ui.accent)
     win = MainWindow(settings)
     app.processEvents()
     # four nav destinations
     assert win._stack.count() == 4
+    # auto-start previews immediately (no Start click); detection defaults off
+    assert win._started_source == "demo"
+    assert win._live._detect_on is False
     win.close()
     app.processEvents()
+    win._thread.wait(3000)  # ensure the worker thread is fully torn down
 
 
 def test_theme_stylesheet_nonempty(app):

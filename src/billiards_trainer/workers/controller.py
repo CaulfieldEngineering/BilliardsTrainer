@@ -25,6 +25,7 @@ from ..config import EXPORTS_DIR, SHOTLOG_PATH, Settings
 from ..db.repository import Repository
 from ..events.shot_detector import ShotEvent
 from ..game.shot_clock import ShotClock
+from ..version import __version__
 from ..vision.felt import felt_from_point
 from ..vision.pipeline import Pipeline
 
@@ -61,6 +62,9 @@ class PipelineController(QObject):
     replay_saved = Signal(str)          # path to a saved replay clip
     shot_suggested = Signal(object)     # ShotEvent — manual-confirm mode (not recorded)
     recording_changed = Signal(bool)    # recording on/off
+    detection_changed = Signal(bool)    # auto-detection on/off
+    capture_progress = Signal(str)      # analysis-capture status text
+    capture_saved = Signal(str)         # path to a finished analysis-capture zip
 
     def __init__(self, settings: Settings, repository: Repository):
         super().__init__()
@@ -83,6 +87,9 @@ class PipelineController(QObject):
         self._replay: deque = deque(maxlen=150)
         self._recorder = None
         self._recording_path = ""
+        # App default: open the camera and PREVIEW it, with auto-detection off.
+        self._detection_enabled = False
+        self._capture: dict | None = None  # active analysis-capture context
 
     # ------------------------------------------------------------------ #
     @Slot()
@@ -126,6 +133,8 @@ class PipelineController(QObject):
             return
 
         self._pipeline = Pipeline(self._settings, source=source_spec)
+        # Honour the current auto-detection state — launch defaults to preview.
+        self._pipeline.detect_enabled = self._detection_enabled
         self._clock = ShotClock(self._settings.shot_clock)
         self._mode = mode
         from ..game.drills import get_drill
@@ -148,12 +157,16 @@ class PipelineController(QObject):
             self.on_started()
         self._timer.start(interval)
         self.status_changed.emit("running")
-        log.info("Started: source=%s mode=%s", source_spec, mode)
+        self.detection_changed.emit(self._detection_enabled)
+        log.info("Started: source=%s mode=%s detect=%s", source_spec, mode,
+                 self._detection_enabled)
 
     @Slot()
     def stop(self) -> None:
         if self._timer:
             self._timer.stop()
+        if self._capture is not None:
+            self._finalize_capture()  # save whatever we captured before stopping
         if self._running and self._session_id is not None:
             self._repo.end_session(self._session_id)
             self.stats_updated.emit(self._repo.global_summary())
@@ -225,6 +238,21 @@ class PipelineController(QObject):
             self._pipeline.paused = paused
         self.status_changed.emit("paused" if paused else "running")
 
+    @Slot(bool)
+    def set_detection_enabled(self, on: bool) -> None:
+        """Turn auto ball/shot detection on or off. OFF = clean camera preview +
+        manual scoring (the launch default); ON = full CV pipeline."""
+        self._detection_enabled = on
+        if self._pipeline:
+            self._pipeline.detect_enabled = on
+            if not on:
+                # drop any in-flight tracks/shot state so nothing lingers on the
+                # overhead when we fall back to the empty-table preview
+                self._pipeline.tracker.reset()
+                self._pipeline.shots.reset()
+        self.detection_changed.emit(on)
+        log.info("Auto-detection %s", "ON" if on else "OFF")
+
     @Slot()
     def reset_counters(self) -> None:
         """Start a fresh session so the make/miss counters reset to zero."""
@@ -262,6 +290,88 @@ class PipelineController(QObject):
             if self._recording_path:
                 self.replay_saved.emit(self._recording_path)
 
+    @Slot()
+    def start_analysis_capture(self, seconds: float = 60.0) -> None:
+        """Record raw camera frames (+ a metadata sidecar) to a zip for offline
+        YOLO training. Captures the UNANNOTATED feed so the frames are usable as
+        real training images. Bounded in time and frame count to keep the zip
+        sane; sampled every other frame (~15 fps)."""
+        if self._capture is not None:
+            self.capture_progress.emit("Already capturing…")
+            return
+        if not self._running or self._source is None:
+            self.error.emit("Start the camera before capturing a session.")
+            return
+        EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        cap_dir = EXPORTS_DIR / f"capture-{stamp}"
+        (cap_dir / "frames").mkdir(parents=True, exist_ok=True)
+        self._capture = {
+            "dir": cap_dir, "stamp": stamp, "saved": 0, "seen": 0,
+            "stride": 2, "max_frames": 900,
+            "deadline": time.perf_counter() + max(5.0, seconds),
+            "started_iso": datetime.now(timezone.utc).isoformat(),
+        }
+        self.capture_progress.emit("Capturing 0 frames…")
+        log.info("Analysis capture started -> %s", cap_dir)
+
+    def _write_capture(self, frame: np.ndarray) -> None:
+        cap = self._capture
+        if cap is None:
+            return
+        cap["seen"] += 1
+        done = (time.perf_counter() >= cap["deadline"]
+                or cap["saved"] >= cap["max_frames"])
+        if not done and cap["seen"] % cap["stride"] == 0:
+            small = self._small(frame, max_w=720)
+            path = cap["dir"] / "frames" / f"f{cap['saved']:05d}.jpg"
+            try:
+                cv2.imwrite(str(path), small, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+                cap["saved"] += 1
+                if cap["saved"] % 30 == 0:
+                    self.capture_progress.emit(f"Capturing {cap['saved']} frames…")
+            except Exception:  # noqa: BLE001
+                pass
+        if done:
+            self._finalize_capture()
+
+    def _finalize_capture(self) -> None:
+        import shutil
+        import zipfile
+        from pathlib import Path
+        cap = self._capture
+        self._capture = None
+        if cap is None:
+            return
+        calib = None
+        if self._pipeline and self._pipeline.calib.is_calibrated:
+            c = self._pipeline.calib.calib
+            calib = {"corners": np.asarray(c.corners).tolist(),
+                     "dst_size": list(c.dst_size)}
+        meta = {
+            "app_version": __version__, "started_iso": cap["started_iso"],
+            "source": self._settings.source, "source_name": self._settings.source_name,
+            "src_fps": self._src_fps, "stride": cap["stride"],
+            "frame_count": cap["saved"], "calibration": calib,
+            "note": "Raw camera frames for YOLO fine-tuning (labelling + training "
+                    "tooling ships in v0.2.15).",
+        }
+        cap_dir: Path = cap["dir"]
+        try:
+            (cap_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+            zip_path = EXPORTS_DIR / f"capture-{cap['stamp']}.zip"
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for p in sorted(cap_dir.rglob("*")):
+                    if p.is_file():
+                        zf.write(p, p.relative_to(cap_dir))
+            shutil.rmtree(cap_dir, ignore_errors=True)
+        except OSError as exc:
+            self.error.emit(f"Capture failed to save: {exc}")
+            return
+        log.info("Analysis capture saved: %s (%d frames)", zip_path, cap["saved"])
+        self.capture_progress.emit(f"Saved {cap['saved']} frames")
+        self.capture_saved.emit(str(zip_path))
+
     @property
     def session_id(self) -> int | None:
         return self._session_id
@@ -289,6 +399,10 @@ class PipelineController(QObject):
             return
         self._miss_count = 0
         self._last_frame = frame
+
+        # analysis capture writes the RAW (unannotated) frame for training data
+        if self._capture is not None:
+            self._write_capture(frame)
 
         t = time.perf_counter() - self._t0
         try:

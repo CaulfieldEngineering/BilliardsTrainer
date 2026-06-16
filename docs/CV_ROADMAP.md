@@ -45,15 +45,35 @@ Conservative / Balanced / Aggressive).
 > activity/start rate (UI flicker + a noise source that could cascade on real
 > footage).
 
-## Tier 2 — YOLO (planned, v0.2.13+)
+## Reality check — classical CV is demo-grade (v0.2.14)
+
+Live test on Joe's real overhead camera: classical detection was unusable —
+wrong ball colours/sizes, a tiny phantom cue, jittering IDs, blobs floating in
+the pockets. **No amount of HSV/Hough tuning fixes this class of problem on a
+real camera.** So v0.2.14 stops pretending:
+
+- **Manual mode is the default.** The app opens straight into a live camera
+  *preview* with auto-detection **OFF** — a clean empty overhead + manual
+  +Make/−Miss. The Detection toggle is only enabled when a YOLO model is
+  present; otherwise a banner says so. Holding the line: *show nothing rather
+  than something wrong.*
+- **When detection IS on**, three hard filters cull garbage: full pocket-region
+  masking (no in-pocket blobs), a strict regulation ball-size band (radius
+  ≈ 0.0225·W, ±~50%), and a 0.85 render/track floor.
+- **Capture for analysis**: Settings → *Capture 60s for analysis* zips raw
+  frames (+ calibration meta) — the training data for the YOLO pivot below.
+
+## Tier 2 — YOLO (active, v0.2.15)
 
 Classical CV can't *semantically* tell a ball from a ball-shaped artifact — YOLO
-can. Plan: re-check Roboflow Universe for permissively-licensed pool-ball weights;
-if none, bootstrap-label frames from Joe's **Record-session** clips with the
-classical+bgsub detector and fine-tune YOLO-nano, iterating. Auto-fetch weights
-on first use when Backend = yolo. Then run **YOLO + classical as an ensemble**
-(agreement = high confidence). The Recording mode + shot log are the data
-pipeline that makes this possible.
+can. Plan: re-check Roboflow Universe for permissively-licensed pool-ball weights
+(CC-BY-NC is fine for Joe's personal, non-distributed use); if none, use
+COCO-pretrained YOLO's "sports ball" class as a sized-correctly stopgap, and
+fine-tune YOLO-nano on the **Capture-for-analysis** zips (auto-label with the
+classical+bgsub detector via `scripts/label_session.py`, hand-correct, train →
+`models/joe_table.pt`). YOLO becomes the **default backend when weights are
+present** (`backend = auto`); classical is the fallback. Then run **YOLO +
+classical as an ensemble** (agreement = high confidence).
 
 ## Tier 3 — tracking (planned)
 

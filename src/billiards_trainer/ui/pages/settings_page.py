@@ -30,6 +30,7 @@ class SettingsPage(QWidget):
     applied = Signal()
     check_updates_requested = Signal()
     feedback_requested = Signal()
+    capture_requested = Signal()
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -123,15 +124,14 @@ class SettingsPage(QWidget):
         cw.setLayout(crow)
         form.addRow("Camera", cw)
 
+        # The live Sandbox view is the camera preview now (it's always on), so a
+        # separate "Test preview" modal is redundant — picking a camera here shows
+        # up immediately on the Sandbox tab.
         brow = QHBoxLayout()
-        self._preview_btn = QPushButton("Test preview")
-        self._preview_btn.setCursor(Qt.PointingHandCursor)
-        self._preview_btn.clicked.connect(self._test_preview)
         file_btn = QPushButton("Use a file…")
         file_btn.setObjectName("Ghost")
         file_btn.setCursor(Qt.PointingHandCursor)
         file_btn.clicked.connect(self._choose_file)
-        brow.addWidget(self._preview_btn)
         brow.addWidget(file_btn)
         brow.addStretch(1)
         bw = QWidget()
@@ -146,12 +146,33 @@ class SettingsPage(QWidget):
         self._mirror = QCheckBox("Mirror preview horizontally")
         form.addRow("", self._mirror)
 
+        # Training-data capture: records ~60 s of the raw camera feed to a zip we
+        # can fine-tune YOLO on (the path to real AI detection on Joe's table).
+        self._capture_btn = QPushButton("  Capture 60s for analysis")
+        self._capture_btn.setObjectName("Ghost")
+        self._capture_btn.setCursor(Qt.PointingHandCursor)
+        self._capture_btn.setToolTip("Save 60 seconds of raw frames to a zip for "
+                                     "AI-detection training")
+        self._capture_btn.clicked.connect(self._on_capture_clicked)
+        form.addRow("", self._capture_btn)
+        self._capture_status = QLabel("")
+        self._capture_status.setObjectName("Faint")
+        self._capture_status.setWordWrap(True)
+        form.addRow("", self._capture_status)
+
         self._cam_names: dict[str, str] = {}
         self._populate_cameras()
         # Auto-save the camera the moment it's picked — no Save click needed, so
-        # the dropdown is actually wired to what Start opens.
+        # the dropdown is actually wired to what the live preview opens.
         self._source_combo.currentIndexChanged.connect(self._on_source_changed)
         return card
+
+    def _on_capture_clicked(self) -> None:
+        self._capture_status.setText("Capturing… keep the camera pointed at the table.")
+        self.capture_requested.emit()
+
+    def set_capture_status(self, text: str) -> None:
+        self._capture_status.setText(text)
 
     def _on_source_changed(self) -> None:
         if not self._loaded:
@@ -202,14 +223,6 @@ class SettingsPage(QWidget):
             self._source_combo.addItem(f"\U0001F4C4 {path.split('/')[-1]}", path)
             self._select_source_data(path)
 
-    def _test_preview(self) -> None:
-        spec = self._source_combo.currentData()
-        if spec is None or not str(spec).isdigit():
-            self._source_hint.setText("Test preview is for cameras. Demo/files run on Start.")
-            return
-        from ..dialogs.camera_preview import CameraPreviewDialog
-        CameraPreviewDialog(int(spec), self._cam_names.get(spec, ""), self).exec()
-
     def _felt_card(self) -> Card:
         card, form = self._card("Table & felt")
         self._table_size = QComboBox()
@@ -251,10 +264,11 @@ class SettingsPage(QWidget):
     def _ball_card(self) -> Card:
         card, form = self._card("Ball detection")
         self._backend = QComboBox()
-        self._backend.addItems(["classical", "yolo"])
+        self._backend.addItems(["auto", "classical", "yolo"])
         form.addRow("Backend", self._backend)
-        note = QLabel("Classical (Hough + colour) runs everywhere with no model. "
-                      "YOLO needs the optional [yolo] extra + weights.")
+        note = QLabel("Auto uses YOLO when weights are present, else classical. "
+                      "Classical (Hough + colour) runs everywhere with no model. "
+                      "YOLO needs the optional [yolo] extra + weights in models/.")
         note.setObjectName("Faint")
         note.setWordWrap(True)
         form.addRow("", note)

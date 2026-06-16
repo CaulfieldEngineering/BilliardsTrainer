@@ -116,9 +116,16 @@ class TableSettings:
 
 @dataclass
 class BallSettings:
-    backend: str = "classical"  # classical | yolo
-    min_radius_frac: float = 0.018  # ball radius bounds as frac of rectified short side
-    max_radius_frac: float = 0.060
+    # auto = YOLO when weights are present, else classical. 'classical' forces
+    # Hough+colour; 'yolo' forces the net (falling back if deps/weights missing).
+    backend: str = "auto"  # auto | classical | yolo
+    # Ball radius bounds as a fraction of the rectified short side (the playing
+    # WIDTH). Regulation: a 2.25" ball on a 50"-wide bed => radius ≈ 0.0225·W.
+    # The band is kept TIGHT around that real ratio so noise/shadows of the wrong
+    # size are rejected outright — real pool balls are all one diameter, so a
+    # detector finding "balls" of wildly varying sizes is finding artefacts.
+    min_radius_frac: float = 0.016  # ~0.71× regulation — smallest plausible ball
+    max_radius_frac: float = 0.034  # ~1.5× regulation — rejects oversized blobs
     detect_param2: int = 18         # Hough accumulator threshold (lower => more circles)
     cue_speed_strike: float = 14.0  # px/frame on rectified view that counts as a strike
     stop_speed: float = 1.2         # px/frame below which a ball is "stopped"
@@ -148,6 +155,12 @@ class DetectionSettings:
     pocket_frames: int = 12           # consecutive frames in a pocket to count a pot
     require_cue: bool = True          # no cue ball identified => no shot detection
     confidence_floor: float = 0.45    # drop ball detections below this score
+    # Render/track floor: when auto-detection is ON, a detection must clear THIS
+    # (much stricter) score to be drawn or tracked. The rule is "show nothing
+    # rather than something wrong" — a wrong-coloured, wrong-sized phantom is
+    # worse than a blank table. For YOLO this is a calibrated probability; for
+    # classical it culls all but the cleanest non-felt blobs.
+    render_floor: float = 0.85
     manual_confirm: bool = False      # auto-detect SUGGESTS; user commits make/miss
     # Multi-modal evidence fusion: combine motion energy + optical-flow activity +
     # background-subtraction foreground into one weighted "activity" score, so a

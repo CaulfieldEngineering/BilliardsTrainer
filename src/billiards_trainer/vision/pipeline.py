@@ -47,6 +47,12 @@ class Pipeline:
         self.settings = settings
         self.source = source
         self.paused = False
+        # Auto-detection master switch. The *engine* defaults to detecting (so the
+        # demo/tests exercise the full chain), but the app drives a live camera
+        # PREVIEW with this OFF by default — a clean empty table + manual scoring,
+        # never a wrong-coloured phantom. Flipped by the Sandbox Detection toggle.
+        self.detect_enabled = True
+        self._preview_table: TableModel | None = None
         self.calib = CalibrationManager()
         self.detector = make_detector(settings.balls, settings.felt)
         self.tracker = BallTracker()
@@ -67,6 +73,7 @@ class Pipeline:
         self.tracker.reset()
         self.shots = ShotDetector(settings.detection, settings.balls)
         self.calib.clear()
+        self._preview_table = None
         self._reset_motion()
 
     def request_recalibration(self) -> None:
@@ -83,11 +90,48 @@ class Pipeline:
         self._prev_small = None
 
     # ------------------------------------------------------------------ #
+    def _preview_result(self, frame: np.ndarray, res: PipelineResult) -> PipelineResult:
+        """Camera-preview mode (auto-detection OFF): show the raw live feed and a
+        clean, empty proportional table overhead — no ball/shot detection at all,
+        so there are zero phantom detections to mis-render. Manual +Make/-Miss
+        drive scoring in this mode."""
+        res.status = "preview"
+        res.frame_bgr = frame
+        res.shot_state = "preview"
+        res.n_balls = 0
+        # Use the real locked table if a prior detection pass found one; otherwise
+        # a default regulation-proportioned rectangle so the overhead still reads
+        # as a pool table.
+        if self.calib.is_calibrated:
+            table = self.calib.calib.table
+        else:
+            table = self._default_preview_table()
+        res.table = table
+        if self.settings.ui.schematic_birdseye:
+            res.rect_bgr = render_schematic(table, [], accent=self.settings.ui.accent,
+                                            show_traj=False, show_ids=False, debug=False)
+        return res
+
+    def _default_preview_table(self) -> TableModel:
+        if self._preview_table is None:
+            pad = max(8, int(self.settings.rectify.pad_px))
+            aspect = max(1.2, float(self.settings.rectify.aspect))  # long:short
+            short = 360
+            size = (short + 2 * pad, int(short * aspect) + 2 * pad)  # (w, h) portrait
+            self._preview_table = TableModel.from_rect(
+                size, pad, self.settings.table.pocket_radius_frac)
+        return self._preview_table
+
+    # ------------------------------------------------------------------ #
     def process(self, frame: np.ndarray, t: float,
                 annotate: bool = True) -> PipelineResult:
         t_start = time.perf_counter()
         self._frame_idx += 1
         res = PipelineResult(frame_bgr=frame)
+
+        if not self.detect_enabled:
+            self._last_ms = (time.perf_counter() - t_start) * 1000.0
+            return self._preview_result(frame, res)
 
         if not self.calib.is_calibrated:
             if not self._acquire_calibration(frame):
@@ -107,8 +151,11 @@ class Pipeline:
             return res
 
         detections = self.detector.detect(rect, calib.rect_mask, calib.table)
-        # confidence floor — drop weak (noisy) detections before tracking
-        floor = self.settings.detection.confidence_floor
+        # With auto-detection ON, demand the stricter render floor: better to draw
+        # nothing than a low-confidence phantom. Falls back to the looser tracking
+        # floor only if render_floor wasn't set (old settings files).
+        det = self.settings.detection
+        floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
         detections = [d for d in detections if d.score >= floor]
         tracks = self.tracker.update(detections, calib.table.short_side)
         res.tracks = tracks

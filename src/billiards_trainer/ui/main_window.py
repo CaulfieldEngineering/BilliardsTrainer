@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
     # boundary (unlike QMetaObject.invokeMethod + Q_ARG(object)), so settings
     # pushes to the worker thread go through this.
     apply_settings_requested = Signal(object)
+    start_source = Signal(str, str, str)  # source, mode, drill_key -> controller.start
 
     def __init__(self, settings: Settings):
         super().__init__()
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
 
         self._update_forced = False
         self._pending_feedback_replay: int | None = None
+        self._started_source: str | None = None
 
         from ..sync.supabase import SyncManager, make_sync_thread
         self._sync = SyncManager(self._repo)
@@ -58,6 +60,8 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._wire()
+        self._refresh_detection_availability()
+        self._autostart_preview()
         self._maybe_check_updates()
 
     # ------------------------------------------------------------------ #
@@ -127,8 +131,12 @@ class MainWindow(QMainWindow):
     def _wire(self) -> None:
         q = Qt.QueuedConnection
         # UI intent -> controller (queued, runs on the worker thread)
+        self.start_source.connect(self._controller.start, q)
         self._live.start_requested.connect(self._controller.start, q)
         self._live.stop_requested.connect(self._controller.stop, q)
+        self._live.detection_toggled.connect(self._controller.set_detection_enabled, q)
+        self._live.retry_requested.connect(self._retry_camera)
+        self._live.open_settings_requested.connect(lambda: self._go(3))
         self._live.recalibrate_requested.connect(self._controller.recalibrate, q)
         self._live.pick_felt_requested.connect(self._controller.pick_felt, q)
         self._live.save_replay_requested.connect(self._controller.save_replay, q)
@@ -146,27 +154,64 @@ class MainWindow(QMainWindow):
         self._controller.shot_recorded.connect(self._live.on_shot)
         self._controller.shot_suggested.connect(self._live.on_suggestion)
         self._controller.recording_changed.connect(self._live.on_recording)
+        self._controller.detection_changed.connect(self._live.set_detection)
         self._controller.status_changed.connect(self._live.on_status)
         self._controller.status_changed.connect(self._on_status)
         self._controller.clock_event.connect(self._on_clock_event)
         self._controller.error.connect(self._on_error)
         self._controller.settings_changed.connect(self._on_settings_changed)
         self._controller.replay_saved.connect(self._on_replay_saved)
+        self._controller.capture_progress.connect(
+            lambda m: self.statusBar().showMessage(f"Capture: {m}", 4000))
+        self._controller.capture_saved.connect(self._on_capture_saved)
 
         # settings + drills
         self._settings_page.applied.connect(self._on_settings_applied)
         self._settings_page.check_updates_requested.connect(self._check_for_updates_forced)
         self._settings_page.feedback_requested.connect(self._open_feedback)
+        self._settings_page.capture_requested.connect(
+            self._controller.start_analysis_capture, q)
         self._drills.drill_chosen.connect(self._on_drill_chosen)
         self._sync.status.connect(lambda msg: self.statusBar().showMessage(f"Sync: {msg}", 4000))
 
+    # ------------------------------------------------------------------ #
+    def _autostart_preview(self) -> None:
+        """Open the saved camera and start previewing immediately — no Start click.
+        Detection stays off (preview); the user opts in via the toggle."""
+        source = self._settings.source or "0"
+        self._started_source = source
+        log.info("Auto-starting camera preview (source=%s)", source)
+        self.start_source.emit(source, self._settings.mode, "")
+
+    def _retry_camera(self) -> None:
+        source = self._settings.source or "0"
+        self._started_source = source
+        self.statusBar().showMessage("Retrying camera…", 3000)
+        self.start_source.emit(source, self._settings.mode, "")
+
+    def _refresh_detection_availability(self) -> None:
+        """Auto-detection is only offered when a YOLO model is present — otherwise
+        we hold the line on reliability with manual mode + a banner."""
+        from ..vision.balls import yolo_weights_available
+        available = yolo_weights_available() or self._settings.balls.backend == "yolo"
+        self._live.set_detection_available(available)
+
+    def _on_capture_saved(self, path: str) -> None:
+        self.statusBar().showMessage(f"Analysis capture saved: {path}", 8000)
+        self._settings_page.set_capture_status(f"Saved: {path}")
+
     def _on_status(self, status: str) -> None:
-        self.statusBar().showMessage({"running": "Live — analysing",
+        self.statusBar().showMessage({"running": "Live — camera preview",
                                       "stopped": "Stopped"}.get(status, status))
+
+    _CAMERA_ERR_HINTS = ("camera", "open source", "couldn't open", "didn't open",
+                         "delivering frames", "in use")
 
     def _on_error(self, msg: str) -> None:
         self.statusBar().showMessage(msg, 8000)
         log.warning("controller error: %s", msg)
+        if any(h in msg.lower() for h in self._CAMERA_ERR_HINTS):
+            self._live.show_camera_error(msg)
 
     def _on_clock_event(self, edge: str) -> None:
         if not self._settings.shot_clock.audio:
@@ -180,6 +225,11 @@ class MainWindow(QMainWindow):
     def _on_settings_applied(self) -> None:
         apply_theme(QApplication.instance(), self._settings.ui.accent)
         self._push_settings()
+        self._refresh_detection_availability()
+        # If the camera source changed, re-open the preview on the new device.
+        if (self._settings.source or "0") != self._started_source:
+            self._started_source = self._settings.source or "0"
+            self.start_source.emit(self._started_source, self._settings.mode, "")
         self.statusBar().showMessage("Settings saved", 4000)
 
     def _on_overlays_toggled(self, on: bool) -> None:

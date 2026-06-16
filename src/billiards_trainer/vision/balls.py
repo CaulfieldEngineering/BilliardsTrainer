@@ -120,11 +120,12 @@ class ClassicalBallDetector(BallDetector):
             # must sit on the playing surface, away from the rail band
             if not table.on_table(cx, cy, margin=-r * 0.2):
                 continue
-            # reject the dark pocket holes themselves, but keep a small radius so a
-            # ball *entering* a pocket is still tracked right up to the lip (the
-            # shot detector needs that to register the pot)
+            # Mask out the whole pocket region: the dark hole + its surround read
+            # as a ball-sized dark blob, which is exactly the "balls floating in
+            # the pockets" artefact. A ball that has reached a pocket has been
+            # potted, so there is nothing real to detect there.
             pocket, pdist = table.nearest_pocket(cx, cy)
-            if pdist < table.pocket_radius * 0.5:
+            if pdist < table.pocket_radius:
                 continue
             x0, y0 = max(0, cx - r), max(0, cy - r)
             x1, y1 = min(w, cx + r + 1), min(h, cy + r + 1)
@@ -171,7 +172,7 @@ class ClassicalBallDetector(BallDetector):
             if not table.on_table(cx, cy, margin=-r * 0.2):
                 continue
             _, pdist = table.nearest_pocket(cx, cy)
-            if pdist < table.pocket_radius * 0.85:
+            if pdist < table.pocket_radius:
                 continue
             out.append(Detection(x=float(cx), y=float(cy), radius=float(r),
                                   bgr=(245, 245, 245), cls=BallClass.CUE, score=0.95))
@@ -239,17 +240,41 @@ def _fetch_weights(url: str, dest) -> bool:
         return False
 
 
+_WEIGHT_NAMES = ("pool_balls.pt", "billiards.pt", "best.pt", "joe_table.pt", "yolov8n.pt")
+
+
+def find_yolo_weights(models_dir=None):
+    """Return the path to bundled/downloaded YOLO weights, or None.
+
+    This is the single source of truth for "can we do AI detection?" — the UI
+    uses it to decide whether to offer the auto-detection toggle or fall back to
+    manual mode with a banner.
+    """
+    from ..config import MODELS_DIR
+    mdir = models_dir or MODELS_DIR
+    for name in _WEIGHT_NAMES:
+        cand = mdir / name
+        if cand.exists():
+            return cand
+    return None
+
+
+def yolo_weights_available(models_dir=None) -> bool:
+    return find_yolo_weights(models_dir) is not None
+
+
 def make_detector(balls: BallSettings, felt: FeltSettings, models_dir=None) -> BallDetector:
-    """Build the configured detector, falling back to classical on any problem."""
-    if balls.backend == "yolo":
+    """Build the best available detector.
+
+    YOLO is preferred whenever weights are on disk (or fetchable) AND Ultralytics
+    is importable — a fine-tuned net beats classical CV on a real overhead camera.
+    Classical (Hough + colour) is the fallback when there's no model or the deps
+    are missing. ``backend == 'classical'`` forces classical regardless.
+    """
+    if balls.backend != "classical":
         from ..config import MODELS_DIR
         mdir = models_dir or MODELS_DIR
-        weights = None
-        for name in ("pool_balls.pt", "billiards.pt", "best.pt", "yolov8n.pt"):
-            cand = mdir / name
-            if cand.exists():
-                weights = cand
-                break
+        weights = find_yolo_weights(mdir)
         # auto-fetch from a configured URL if nothing is on disk
         if weights is None and getattr(balls, "yolo_weights_url", ""):
             target = mdir / "pool_balls.pt"

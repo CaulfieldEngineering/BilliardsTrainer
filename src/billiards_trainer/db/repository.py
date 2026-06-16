@@ -55,6 +55,19 @@ class Repository:
          "ball travel + pocket approach/vanish, warm-up/cool-down, confidence "
          "floor) plus a clean rendered schematic overhead. Classical detection "
          "remains demo-grade; YOLO weights in models/ are the accuracy upgrade."),
+        (149, "Classical CV ball detection unusable on real-world camera — "
+         "pivot to YOLO with manual mode as graceful default",
+         "v0.2.13 live test on Joe's real table: classical detection rendered "
+         "balls in wrong colours/sizes, a tiny phantom cue, jittering IDs, and "
+         "blobs floating in the pockets. No amount of HSV/Hough tuning fixes this "
+         "class of problem on a real overhead camera. v0.2.14 holds the line on "
+         "reliability: the app opens straight into a live camera PREVIEW with "
+         "auto-detection OFF (clean empty overhead + manual +Make/-Miss), a strict "
+         "ball-size band + full pocket-region masking + a 0.85 render floor when "
+         "detection is on, and a 'Capture 60s for analysis' button that zips raw "
+         "frames for training. v0.2.15: fine-tune YOLO on captured frames "
+         "(scripts/label_session.py) and make it the default backend when weights "
+         "are present; classical becomes the fallback."),
     ]
 
     def _seed_devnote(self) -> None:
