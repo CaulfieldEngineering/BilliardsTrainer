@@ -178,22 +178,32 @@ class DownloadWorker(QObject):
 
 # The swap batch: wait for us to exit, clean stale onefile temp dirs, swap in the
 # new exe, unblock it, relaunch, and roll back to a backup if it never confirms
-# startup. NOTE: uses ``ping`` for delays, NOT ``timeout`` — ``timeout`` needs an
-# interactive console and fails instantly when spawned from a process, which made
-# the sentinel-wait loop finish in milliseconds and triggered a false rollback
-# that killed the still-starting new exe (the "never opens the new" bug). Every
-# step is echoed to updater.log in the install dir for diagnosis.
+# startup.
+#
+# CRITICAL spawn note: this MUST be launched with CREATE_NO_WINDOW, *not*
+# DETACHED_PROCESS. A detached process has no console, so the piped
+# ``tasklist | find "<pid>"`` poll spawns a brand-new console window whose `find`
+# never inherits the pipe and instead blocks reading the (empty) console stdin
+# forever — leaving the user staring at a stuck ``find "<pid>"`` cmd window while
+# the new app never launches. CREATE_NO_WINDOW gives a hidden console with normal
+# handle inheritance: no window, the pipe works. (uses ``ping`` for delays, never
+# ``timeout`` which needs an interactive console.) Both wait loops are HARD-bounded
+# so the updater can never hang; on failure it restores the backup, writes
+# update-failed.log to the app-data dir, and opens recovery instructions in Notepad.
 _SWAP_BAT = r"""@echo off
 setlocal enabledelayedexpansion
 set "LOG={log}"
 echo [start] %DATE% %TIME% waiting for pid {pid}> "%LOG%"
+set /a w=0
 :waitexit
-tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul
-if not errorlevel 1 (
-  ping 127.0.0.1 -n 2 >nul
-  goto waitexit
-)
-echo [%TIME%] old process exited>> "%LOG%"
+tasklist /FI "PID eq {pid}" /NH 2>nul | find "{pid}" >nul
+if errorlevel 1 goto exited
+set /a w+=1
+if !w! geq 30 ( echo [%TIME%] WARN pid {pid} still present after ~30s; proceeding>> "%LOG%" & goto exited )
+ping 127.0.0.1 -n 2 >nul
+goto waitexit
+:exited
+echo [%TIME%] old process gone>> "%LOG%"
 for /d %%D in ("%TEMP%\_MEI*") do rd /s /q "%%D" 2>nul
 copy /Y "{downloaded}" "{current}" >nul
 if errorlevel 1 (
@@ -217,26 +227,26 @@ echo [%TIME%] new exe confirmed (sentinel found)>> "%LOG%"
 del /f /q "{backup}" >nul 2>&1
 del /f /q "{downloaded}" >nul 2>&1
 del /f /q "{recovery}" >nul 2>&1
+del /f /q "{failflag}" >nul 2>&1
 goto done
 :rollback
 echo [%TIME%] new exe never confirmed -- rolling back>> "%LOG%"
+echo failed> "{failflag}"
+copy /Y "%LOG%" "{appfaillog}" >nul 2>&1
 taskkill /F /IM "{exe_name}" >nul 2>&1
 ping 127.0.0.1 -n 3 >nul
 if exist "{backup}" copy /Y "{backup}" "{current}" >nul
-echo failed> "{failflag}"
-(
-echo Billiards Trainer update could not start, so we restored your previous version.
-echo.
-echo If the app still does not open, in THIS folder:
-echo   1. Delete BilliardsTrainer.exe
-echo   2. Rename BilliardsTrainer.exe.bak  to  BilliardsTrainer.exe
-echo   3. Run it.
-echo.
-echo Or download a fresh copy: {releases}
-echo.
-echo Tip: add this folder to your antivirus exclusions to avoid update issues.
-)> "{recovery}"
+echo Billiards Trainer update could not start, so your previous version was restored.> "{recovery}"
+echo.>> "{recovery}"
+echo If the app still does not open, in the install folder:>> "{recovery}"
+echo   1. Delete BilliardsTrainer.exe>> "{recovery}"
+echo   2. Rename BilliardsTrainer.exe.bak to BilliardsTrainer.exe>> "{recovery}"
+echo   3. Run it.>> "{recovery}"
+echo.>> "{recovery}"
+echo Or download a fresh copy: {releases}>> "{recovery}"
+echo Tip: add the install folder to your antivirus exclusions.>> "{recovery}"
 start "" "{current}"
+start "" notepad "{recovery}"
 :done
 echo [%TIME%] updater done>> "%LOG%"
 del "%~f0" >nul 2>&1
@@ -274,6 +284,7 @@ def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
             subprocess.Popen([downloaded])
         return
 
+    from ..config import APP_DIR
     from ..version import RELEASES_PAGE_URL
     from .recovery import LAUNCHED_OK, UPDATE_FAILED
 
@@ -282,6 +293,14 @@ def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
     backup = str(Path(current).with_name(Path(current).name + ".bak"))
     recovery = str(install_dir / "RECOVERY.txt")
     swap_log = str(install_dir / "updater.log")
+    # Human-readable failure log in %LOCALAPPDATA%\BilliardsTrainer — a known,
+    # writable location to diagnose a failed update even if the install dir is
+    # read-only / AV-locked.
+    try:
+        APP_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    app_fail_log = str(APP_DIR / "update-failed.log")
     try:
         shutil.copy2(current, backup)
     except OSError as exc:
@@ -303,16 +322,20 @@ def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
         pid=os.getpid(), downloaded=downloaded, current=current,
         backup=backup, exe_name=Path(current).name,
         flag=str(LAUNCHED_OK), failflag=str(UPDATE_FAILED),
-        recovery=recovery, log=swap_log, releases=RELEASES_PAGE_URL, timeout=90,
+        recovery=recovery, log=swap_log, appfaillog=app_fail_log,
+        releases=RELEASES_PAGE_URL, timeout=60,
     ), encoding="utf-8")
     log.info("Launching update swap: new=%s -> %s (backup=%s, log=%s)",
              downloaded, current, backup or "none", swap_log)
-    # DETACHED so it survives our exit + NEW_PROCESS_GROUP, and crucially explicit
-    # DEVNULL std handles — without valid handles a detached cmd hangs on the very
-    # first redirected command. (Verified locally.)
+    # CREATE_NO_WINDOW (NOT DETACHED_PROCESS): a detached cmd has no console, so its
+    # piped ``tasklist | find`` poll spawns a visible console whose `find` blocks on
+    # console stdin forever — the stuck ``find "<pid>"`` window bug. CREATE_NO_WINDOW
+    # gives a hidden console with normal handle inheritance: no window, the pipe
+    # works, and the Popen child still outlives us. NEW_PROCESS_GROUP detaches it
+    # from our Ctrl-C group; explicit DEVNULL std handles keep redirects sane.
     subprocess.Popen(
         ["cmd", "/c", str(bat)],
-        creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+        creationflags=0x08000000 | 0x00000200,  # CREATE_NO_WINDOW | NEW_PROCESS_GROUP
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         close_fds=True,
     )
