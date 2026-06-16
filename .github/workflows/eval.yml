@@ -1,0 +1,85 @@
+name: Detection Eval
+
+# Runs the detection eval harness on a small committed synthetic clip on every
+# push/PR, guards against accidental detector regressions, and publishes the
+# HTML visual-diff report as an artifact. The FULL eval (Joe's real 40-min
+# footage) is gitignored and run locally / via the manual workflow_dispatch.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/billiards_trainer/vision/**"
+      - "src/billiards_trainer/events/**"
+      - "src/billiards_trainer/config.py"
+      - "tools/eval_*.py"
+      - "tests/fixtures/eval/**"
+      - ".github/workflows/eval.yml"
+  pull_request:
+    paths:
+      - "src/billiards_trainer/vision/**"
+      - "src/billiards_trainer/events/**"
+      - "src/billiards_trainer/config.py"
+      - "tools/eval_*.py"
+      - "tests/fixtures/eval/**"
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "Reseed the CI eval baseline from this run"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write   # to post the eval summary as a PR comment
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Run eval harness (committed synthetic clip)
+        run: |
+          python tools/eval_harness.py \
+            --clips tests/fixtures/eval --labels tests/fixtures/eval \
+            --out _ci_eval/report --timestamp ci --stride 2
+      - name: Regression check + summary
+        run: |
+          python tools/eval_ci_check.py --metrics _ci_eval/report/metrics.json \
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.update_baseline) && '--update' || '' }}
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: _ci_eval/report
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '### Detection Eval\nReport uploaded as the `eval-report` artifact.';
+            try {
+              const m = JSON.parse(fs.readFileSync('_ci_eval/report/metrics.json','utf8'));
+              const a = m.aggregate || {};
+              body = `### Detection Eval (synthetic CI clip)\n\n`
+                + `| metric | value |\n|---|---|\n`
+                + `| calibration rate | ${(a.calib_rate*100).toFixed(0)}% |\n`
+                + `| total detections | ${a.total_dets} |\n`
+                + `| shots | ${a.shots} |\n`
+                + `| frames | ${a.frames} |\n\n`
+                + `Full HTML visual-diff report → **eval-report** artifact on this run.`;
+            } catch (e) {}
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body });

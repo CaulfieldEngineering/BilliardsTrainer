@@ -171,6 +171,8 @@ class MainWindow(QMainWindow):
         self._settings_page.feedback_requested.connect(self._open_feedback)
         self._settings_page.capture_requested.connect(
             self._controller.start_analysis_capture, q)
+        self._settings_page.flag_failure_requested.connect(self._controller.flag_failure, q)
+        self._controller.failure_flagged.connect(self._on_failure_flagged)
         self._drills.drill_chosen.connect(self._on_drill_chosen)
         self._sync.status.connect(lambda msg: self.statusBar().showMessage(f"Sync: {msg}", 4000))
 
@@ -201,6 +203,10 @@ class MainWindow(QMainWindow):
     def _on_capture_saved(self, path: str) -> None:
         self.statusBar().showMessage(f"Analysis capture saved: {path}", 8000)
         self._settings_page.set_capture_status(f"Saved: {path}")
+
+    def _on_failure_flagged(self, path: str) -> None:
+        self.statusBar().showMessage(f"Failure flagged + staged: {path}", 8000)
+        self._settings_page.set_debug_status(f"Flagged → {path}")
 
     def _on_status(self, status: str) -> None:
         self.statusBar().showMessage({"running": "Live — camera preview",

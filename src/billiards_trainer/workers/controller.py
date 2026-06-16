@@ -65,6 +65,7 @@ class PipelineController(QObject):
     detection_changed = Signal(bool)    # auto-detection on/off
     capture_progress = Signal(str)      # analysis-capture status text
     capture_saved = Signal(str)         # path to a finished analysis-capture zip
+    failure_flagged = Signal(str)       # path to a staged debug bundle
 
     def __init__(self, settings: Settings, repository: Repository):
         super().__init__()
@@ -371,6 +372,44 @@ class PipelineController(QObject):
         log.info("Analysis capture saved: %s (%d frames)", zip_path, cap["saved"])
         self.capture_progress.emit(f"Saved {cap['saved']} frames")
         self.capture_saved.emit(str(zip_path))
+
+    @Slot()
+    def flag_failure(self) -> None:
+        """Save the recent preview buffer + detector state to a zip and stage it
+        for the dev machine (Settings -> Debug -> "Save clip + flag as failure").
+        Captures what the detector just saw so failures can be reproduced offline."""
+        frames = list(self._replay)
+        if not frames:
+            self.error.emit("Nothing to flag yet — let the camera run for a few seconds.")
+            return
+        import zipfile
+
+        from .. import debug_upload
+        EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        zpath = EXPORTS_DIR / f"failure-{stamp}.zip"
+        meta = {
+            "kind": "detection-failure", "flagged_iso": datetime.now(timezone.utc).isoformat(),
+            "app_version": __version__, "source": self._settings.source,
+            "source_name": self._settings.source_name,
+            "detection_enabled": self._detection_enabled,
+            "backend": self._settings.balls.backend, "frame_count": len(frames),
+            "last_diag": getattr(self._pipeline, "_last_ms", None),
+            "note": "Recent annotated preview buffer captured for offline debugging.",
+        }
+        try:
+            with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as zf:
+                for i, fr in enumerate(frames):
+                    ok, buf = cv2.imencode(".jpg", fr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                    if ok:
+                        zf.writestr(f"frames/f{i:04d}.jpg", buf.tobytes())
+                zf.writestr("meta.json", json.dumps(meta, indent=2))
+            dst = debug_upload.stage_bundle(zpath)
+        except OSError as exc:
+            self.error.emit(f"Couldn't save failure bundle: {exc}")
+            return
+        log.info("Flagged failure bundle: %s (staged -> %s)", zpath, dst)
+        self.failure_flagged.emit(str(dst))
 
     @property
     def session_id(self) -> int | None:

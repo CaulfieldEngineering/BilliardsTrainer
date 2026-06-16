@@ -77,3 +77,19 @@ Desktop.ini
 .DS_Store
 
 _local_models/
+
+# Read-only reference clones for prior-art research (never committed)
+_refs/
+
+# Phase 0 eval: large source video + generated eval artifacts (never committed)
+testVideo.*
+testPhoto.*
+/_eval/
+docs/eval/*/
+
+# Secrets — never commit (Roboflow key etc.)
+.env
+.env.local
+.env.*
+
+_ci_eval/

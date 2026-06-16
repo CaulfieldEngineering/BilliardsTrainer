@@ -31,6 +31,7 @@ class SettingsPage(QWidget):
     check_updates_requested = Signal()
     feedback_requested = Signal()
     capture_requested = Signal()
+    flag_failure_requested = Signal()
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -86,6 +87,7 @@ class SettingsPage(QWidget):
         grid.addWidget(self._appearance_card(), 2, 1)
         grid.addWidget(self._detection_card(), 3, 0)
         grid.addWidget(self._feedback_card(), 3, 1)
+        grid.addWidget(self._debug_card(), 4, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -400,6 +402,29 @@ class SettingsPage(QWidget):
         av.setWordWrap(True)
         form.addRow("", av)
         return card
+
+    def _debug_card(self) -> Card:
+        card, form = self._card("Debug")
+        msg = QLabel("Caught the detector getting it wrong? Save the last few "
+                     "seconds + detector output to a zip and flag it as a failure. "
+                     "The bundle is staged locally for analysis (synced to the dev "
+                     "machine / eval harness).")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
+        flag = QPushButton("  Save clip + flag as failure")
+        flag.setObjectName("Danger")
+        flag.setCursor(Qt.PointingHandCursor)
+        flag.clicked.connect(self.flag_failure_requested.emit)
+        form.addRow("", flag)
+        self._debug_status = QLabel("")
+        self._debug_status.setObjectName("Faint")
+        self._debug_status.setWordWrap(True)
+        form.addRow("", self._debug_status)
+        return card
+
+    def set_debug_status(self, text: str) -> None:
+        self._debug_status.setText(text)
 
     def _feedback_card(self) -> Card:
         card, form = self._card("Feedback & backup")
