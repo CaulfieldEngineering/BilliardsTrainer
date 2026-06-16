@@ -13,6 +13,7 @@ are unit-tested; the Qt threading wrapper is a thin shell over them.
 
 import logging
 import re
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -176,6 +177,31 @@ class DownloadWorker(QObject):
         self.finished.emit(str(dest))
 
 
+# Windows process-creation flags for the detached swap. CREATE_NO_WINDOW gives a
+# HIDDEN console (inherited by the batch's tasklist/find/ping children, so none of
+# them pop a window); CREATE_NEW_PROCESS_GROUP keeps our Ctrl-C out of it. We do
+# NOT use DETACHED_PROCESS — a console-less cmd is exactly what made the PID-poll's
+# piped `find` open a visible window and block forever.
+_CREATE_NO_WINDOW = 0x08000000
+_CREATE_NEW_PROCESS_GROUP = 0x00000200
+SWAP_CREATIONFLAGS = _CREATE_NO_WINDOW | _CREATE_NEW_PROCESS_GROUP
+
+
+def _show_messagebox(title: str, text: str) -> None:
+    """Best-effort native message box, no Qt needed (safe as the app exits).
+
+    Windows-only; silently no-ops elsewhere or if the call fails — the fallback
+    must never itself raise."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND
+        ctypes.windll.user32.MessageBoxW(0, text, title, 0x00000030 | 0x00010000)
+    except Exception:  # noqa: BLE001 - a failed dialog must not mask the real error
+        pass
+
+
 # The swap batch: wait for us to exit, clean stale onefile temp dirs, swap in the
 # new exe, unblock it, relaunch, and roll back to a backup if it never confirms
 # startup.
@@ -333,12 +359,29 @@ def install_and_relaunch(downloaded: str, expected_sha: str = "") -> None:
     # gives a hidden console with normal handle inheritance: no window, the pipe
     # works, and the Popen child still outlives us. NEW_PROCESS_GROUP detaches it
     # from our Ctrl-C group; explicit DEVNULL std handles keep redirects sane.
-    subprocess.Popen(
-        ["cmd", "/c", str(bat)],
-        creationflags=0x08000000 | 0x00000200,  # CREATE_NO_WINDOW | NEW_PROCESS_GROUP
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        close_fds=True,
-    )
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", str(bat)],
+            creationflags=SWAP_CREATIONFLAGS,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+    except OSError as exc:
+        # We couldn't even start the swap. Don't strand the user with no app and no
+        # message: record it and pop a native dialog pointing at the installer.
+        log.error("Could not launch update swap: %s", exc)
+        try:
+            Path(app_fail_log).write_text(
+                f"The update could not be started: {exc}\n\n"
+                f"Please re-run the installer from {RELEASES_PAGE_URL}\n",
+                encoding="utf-8")
+        except OSError:
+            pass
+        _show_messagebox(
+            "Billiards Trainer — update",
+            "The update could not be started, so your current version is unchanged.\n\n"
+            f"Please download and run the latest installer from:\n{RELEASES_PAGE_URL}")
+        raise
 
 
 def run_in_thread(worker: QObject) -> QThread:

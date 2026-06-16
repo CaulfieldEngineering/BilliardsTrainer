@@ -56,3 +56,48 @@ def test_check_logs_decision(monkeypatch, caplog):
     with caplog.at_level(logging.INFO, logger="updater"):
         updater.check_for_update("0.1.5")
     assert any("OFFER UPDATE" in r.message for r in caplog.records)
+
+
+# --------------------------------------------------------------------------- #
+# Self-update spawn safety (regression for the stuck/respawning CMD window)
+# --------------------------------------------------------------------------- #
+def test_swap_creationflags_are_no_window_not_detached():
+    """INVARIANT: the swap is spawned hidden (CREATE_NO_WINDOW) and never with
+    DETACHED_PROCESS, which is what made the PID-poll's piped `find` open a
+    visible console and block/respawn forever."""
+    assert updater.SWAP_CREATIONFLAGS & 0x08000000, "CREATE_NO_WINDOW must be set"
+    assert not (updater.SWAP_CREATIONFLAGS & 0x00000008), "DETACHED_PROCESS must NOT be set"
+
+
+def test_install_and_relaunch_spawns_hidden_with_devnull(monkeypatch, tmp_path):
+    """The detached swap process must be launched with CREATE_NO_WINDOW and all
+    three std handles set to DEVNULL — no console window can ever appear."""
+    import subprocess as sp
+    import sys as _sys
+
+    # Pretend we're a frozen Windows exe so the real swap path runs.
+    monkeypatch.setattr(_sys, "platform", "win32", raising=False)
+    monkeypatch.setattr(_sys, "frozen", True, raising=False)
+    exe = tmp_path / "BilliardsTrainer.exe"
+    exe.write_bytes(b"OLD")
+    monkeypatch.setattr(_sys, "executable", str(exe))
+    downloaded = tmp_path / "new.exe"
+    downloaded.write_bytes(b"NEW")
+
+    captured = {}
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(sp, "Popen", fake_popen)
+
+    updater.install_and_relaunch(str(downloaded))
+
+    kw = captured["kwargs"]
+    assert kw["creationflags"] & 0x08000000, "CREATE_NO_WINDOW must be set"
+    assert not (kw["creationflags"] & 0x00000008), "DETACHED_PROCESS must NOT be set"
+    assert kw["stdin"] is sp.DEVNULL
+    assert kw["stdout"] is sp.DEVNULL
+    assert kw["stderr"] is sp.DEVNULL
