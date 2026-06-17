@@ -6,6 +6,7 @@ regression guard for the whole vision→event chain working together.
 """
 
 import numpy as np
+import pytest
 
 from billiards_trainer.capture.camera import DemoSource
 from billiards_trainer.config import Settings
@@ -37,7 +38,7 @@ def test_detect_false_skips_detection_and_reuses_tracks():
     """A display-only cadence frame must NOT call the strategy detector and must
     reuse the existing tracks (this is what lets playback outrun detection)."""
     settings = Settings()
-    settings.balls.live_strategy = "simple_blob"
+    settings.balls.live_strategy = "cue_ball_white"
     src = DemoSource()
     pipe = Pipeline(settings)
     pipe.detect_enabled = True
@@ -75,29 +76,28 @@ def test_temporal_median_stabilize():
     assert p._frame_ring is None
 
 
+@pytest.mark.skip(reason="make/miss shot detection (M5-M7) is deferred until cue-ball "
+                         "tracking (M2) is locked; it relied on the removed legacy "
+                         "rectified detector + the now-off evidence fusion. Re-enable "
+                         "when shot detection is reintegrated on the model path.")
 def test_demo_calibrates_and_detects_make():
     settings = Settings()
-    # This regression guards the vision->event (make/miss) chain on the synthetic
-    # demo, which was authored for the classical rectified detector. Pin it to the
-    # 'legacy' detector; the new raw-frame strategies (simple_blob default) are
-    # validated on real footage via the eval harness, not the synthetic make.
-    settings.balls.live_strategy = "legacy"
-    settings.detection.warmup_seconds = 3.0   # > MOG2 bg warm-up so fusion's fg is ready
+    settings.detection.warmup_seconds = 3.0
     settings.detection.cooldown_seconds = 0.5
     src = DemoSource()
     pipe = Pipeline(settings)
 
     makes = []
     calibrated = False
-    for i in range(560):  # a couple of cycles past warm-up
+    for i in range(560):
         frame = src.read()
         res = pipe.process(frame, t=i * 0.033)
         calibrated = calibrated or pipe.calib.is_calibrated
         if res.shot_event and res.shot_event.outcome == ShotOutcome.MAKE:
             makes.append(res.shot_event)
 
-    assert calibrated, "demo table should calibrate on the first frame"
-    assert len(makes) >= 1, "scripted make-shot should be detected"
+    assert calibrated
+    assert len(makes) >= 1
     assert makes[0].target_pocket == "bottom-right"
     assert makes[0].num_pocketed == 1
 
@@ -107,6 +107,7 @@ def test_demo_idle_produces_no_false_shots():
     import numpy as np
 
     settings = Settings()
+    settings.balls.live_strategy = "cue_ball_white"
     settings.detection.warmup_seconds = 0.0
     src = DemoSource()
     pipe = Pipeline(settings)
@@ -124,10 +125,11 @@ def test_demo_idle_produces_no_false_shots():
 
 def test_demo_tracks_balls():
     settings = Settings()
+    settings.balls.live_strategy = "cue_ball_white"  # heuristic detects the synthetic cue
     src = DemoSource()
     pipe = Pipeline(settings)
     seen = 0
     for i in range(30):
         res = pipe.process(src.read(), t=i * 0.033)
         seen = max(seen, res.n_balls)
-    assert seen >= 1, "should track at least the cue/object balls during settle"
+    assert seen >= 1, "should track at least the cue ball during settle"

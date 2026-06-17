@@ -151,6 +151,7 @@ class MainWindow(QMainWindow):
         self._live.pick_felt_requested.connect(self._controller.pick_felt, q)
         self._live.save_replay_requested.connect(self._controller.save_replay, q)
         self._live.overlays_toggled.connect(self._on_overlays_toggled)
+        self._live.tuning_changed.connect(self._on_tuning_changed)
         self._live.pause_toggled.connect(self._controller.set_paused, q)
         self._live.reset_requested.connect(self._controller.reset_counters, q)
         self._live.manual_shot.connect(self._controller.record_manual_shot, q)
@@ -255,6 +256,21 @@ class MainWindow(QMainWindow):
         self._settings.save()
         self.statusBar().showMessage(
             f"Detection overlays {'on' if on else 'off'}", 3000)
+
+    def _on_tuning_changed(self) -> None:
+        """A live-tuning control on the main window changed. The control already
+        mutated the SHARED settings object in place, so the pipeline applies it on
+        the next frame — no reconfigure / recalibration. We only persist to disk,
+        debounced so dragging a slider doesn't thrash the file."""
+        timer = getattr(self, "_tuning_save_timer", None)
+        if timer is None:
+            from PySide6.QtCore import QTimer
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(500)
+            timer.timeout.connect(self._settings.save)
+            self._tuning_save_timer = timer
+        timer.start()
 
     def _on_settings_changed(self, settings) -> None:
         # came from an in-view tweak on the worker thread (e.g. felt pick)

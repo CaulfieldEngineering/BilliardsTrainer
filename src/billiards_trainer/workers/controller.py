@@ -90,8 +90,11 @@ class PipelineController(QObject):
         self._replay: deque = deque(maxlen=150)
         self._recorder = None
         self._recording_path = ""
-        # App default: open the camera and PREVIEW it, with auto-detection off.
-        self._detection_enabled = False
+        # App default: detection ON. The trained YOLO model is reliable, so the
+        # old "preview-only, show nothing rather than something wrong" default
+        # (which existed because classical CV was untrustworthy) no longer applies
+        # — the user wants to USE the tracker, not opt into it every launch.
+        self._detection_enabled = True
         self._capture: dict | None = None  # active analysis-capture context
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False

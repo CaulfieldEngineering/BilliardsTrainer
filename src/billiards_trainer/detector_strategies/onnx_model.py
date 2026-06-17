@@ -10,14 +10,17 @@ onnxruntime is imported lazily — if it's missing the strategy raises at detect
 time and the harness self-heals (marks the variant FAILED), never blocking others.
 """
 
+import logging
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from ..config import MODELS_DIR as USER_MODELS_DIR
-from ..vision.types import Detection
+from ..vision.types import BallClass, Detection
 from . import DetectorStrategy, ball_radius_raw, classify_crop, table_polygon_mask
+
+log = logging.getLogger("detector.onnx")
 
 ROOT = Path(__file__).resolve().parents[3]
 # Dev models live in _eval/models (gitignored); the SHIPPED app reads the per-user
@@ -41,8 +44,20 @@ class OnnxModelStrategy(DetectorStrategy):
     def _session(self):
         if self._sess is None:
             import onnxruntime as ort
-            self._sess = ort.InferenceSession(str(self._path),
-                                              providers=["CPUExecutionProvider"])
+            # GPU first, CPU last. DirectML (Dml) is the pragmatic Windows GPU path
+            # (any DX12 GPU, no CUDA toolkit); CUDA is tried too for non-Windows /
+            # onnxruntime-gpu installs. Filter to what's actually available so an
+            # unavailable provider never raises — and LOG the one chosen, so a
+            # silent CPU fallback (the real-time killer) is visible.
+            avail = set(ort.get_available_providers())
+            preferred = ["DmlExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
+            providers = [p for p in preferred if p in avail] or ["CPUExecutionProvider"]
+            self._sess = ort.InferenceSession(str(self._path), providers=providers)
+            active = self._sess.get_providers()
+            log.info("ONNX detector %s on %s", self._path.name, active[0] if active else "?")
+            if active and active[0] == "CPUExecutionProvider":
+                log.warning("ONNX running on CPU — real-time will be slow; install "
+                            "onnxruntime-directml (Windows) or onnxruntime-gpu for GPU.")
             self._inp = self._sess.get_inputs()[0]
             s = self._inp.shape[2]
             self._size = int(s) if isinstance(s, int) and s > 0 else 640
@@ -96,7 +111,41 @@ class OnnxModelStrategy(DetectorStrategy):
                 continue
             cls, bgr = classify_crop(frame_bgr, ccx, ccy, rr)
             out_dets.append(Detection(ccx, ccy, rr, bgr, cls, float(confs[int(k)])))
+        self._tag_single_cue(frame_bgr, out_dets)
         return out_dets
+
+    def _tag_single_cue(self, frame_bgr, dets):
+        """Force exactly ONE cue ball = the whitest detected ball. The trained
+        model finds every ball reliably; identifying WHICH is the cue is an
+        appearance call, and the cue is the uniquely pure-white ball. This is far
+        more robust than the per-crop classical classifier, which mislabels white
+        balls under tinted lighting. (M2: cue-ball-first.)"""
+        if not dets:
+            return
+        hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+        h, w = frame_bgr.shape[:2]
+        best_i, best_score = -1, 1e9
+        whiteness = []
+        for i, d in enumerate(dets):
+            x0, y0 = max(0, int(d.x - d.radius)), max(0, int(d.y - d.radius))
+            x1, y1 = min(w, int(d.x + d.radius) + 1), min(h, int(d.y + d.radius) + 1)
+            patch = hsv[y0:y1, x0:x1]
+            if patch.size == 0:
+                whiteness.append((255.0, 0.0))
+                continue
+            mean_s = float(patch[:, :, 1].mean())
+            mean_v = float(patch[:, :, 2].mean())
+            whiteness.append((mean_s, mean_v))
+            # whitest = lowest saturation, and bright enough to actually be white
+            if mean_v > 140 and mean_s < best_score:
+                best_score, best_i = mean_s, i
+        for i, d in enumerate(dets):
+            if i == best_i:
+                d.cls = BallClass.CUE
+                d.bgr = (245, 245, 245)
+            elif d.cls == BallClass.CUE:
+                # a second "cue" from the per-crop classifier — demote it
+                d.cls = BallClass.SOLID
 
 
 def _build():

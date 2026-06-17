@@ -3,6 +3,13 @@
 Not a backlog of committed work — a place to capture things deliberately
 deferred so they aren't lost. Nothing here is in progress.
 
+## Feature requests (from Joe)
+
+- **Transport: jump back 5 seconds.** Add a "« 5s" button to the video transport
+  bar (next to the step ◀|/|▶ buttons in `live_page._transport_bar`) that seeks
+  `current_frame − round(5 × fps)`. Reuse the existing `video_seek` signal →
+  `controller.video_seek`. *(Requested 2026-06-16; not started.)*
+
 ## Infra
 
 ### Dev/test machine sync mechanism  *(flagged, not implemented)*
