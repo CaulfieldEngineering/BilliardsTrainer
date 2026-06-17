@@ -11,6 +11,8 @@ renders controller signals; the main window wires the two across the thread
 boundary.
 """
 
+import logging
+
 import cv2
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -38,6 +40,8 @@ from ..theme import PALETTE
 from ..widgets.common import Badge, Card, SegmentedControl, StatCard
 from ..widgets.shot_clock_widget import ShotClockWidget
 from ..widgets.video_view import VideoView
+
+log = logging.getLogger("ui.live")
 
 
 class _SeekSlider(QSlider):
@@ -85,7 +89,7 @@ class LivePage(QWidget):
     video_speed = Signal(float)               # playback multiplier
     tuning_changed = Signal()                 # a live-tuning control changed (settings mutated in place)
     label_mode_toggled = Signal(bool)         # Training Mode on/off
-    save_training_frame_requested = Signal(list)  # [(number, cx, cy, w, h) normalised]
+    save_training_frame_requested = Signal(object)  # [(number, cx, cy, w, h) normalised] (object marshals cleanly cross-thread)
     train_balls_requested = Signal()          # fine-tune on collected data
 
     def __init__(self, settings: Settings, parent=None):
@@ -699,14 +703,22 @@ class LivePage(QWidget):
             self._status_badge.set_text_color("TRAINING — label the balls", PALETTE.info)
 
     def _ingest_label_frame(self, packet) -> None:
-        self._last_persp = packet.perspective
-        h, w = packet.perspective.shape[:2]
-        self._frame_wh = (w, h)
-        self._label_balls = [[int(getattr(d, "number", -1)), float(d.x), float(d.y),
-                              float(d.radius)] for d in (packet.raw_dets or [])]
-        self._label_sel = -1
-        self._redraw_label()
-        self._update_label_buttons()
+        try:
+            self._last_persp = packet.perspective
+            h, w = packet.perspective.shape[:2]
+            self._frame_wh = (w, h)
+            balls = []
+            for d in (packet.raw_dets or []):
+                x, y, r = float(d.x), float(d.y), float(d.radius)
+                if not (np.isfinite(x) and np.isfinite(y) and np.isfinite(r)):
+                    continue
+                balls.append([int(getattr(d, "number", -1)), x, y, r])
+            self._label_balls = balls
+            self._label_sel = -1
+            self._redraw_label()
+            self._update_label_buttons()
+        except Exception:  # noqa: BLE001 - a bad frame must never crash the app
+            log.exception("training: ingest frame failed")
 
     def _default_label_r(self) -> float:
         rs = [b[3] for b in self._label_balls if b[3] > 0]
@@ -749,16 +761,19 @@ class LivePage(QWidget):
         frame = getattr(self, "_last_persp", None)
         if frame is None:
             return
-        img = frame.copy()
-        for i, (num, x, y, r) in enumerate(self._label_balls):
-            c = (int(x), int(y))
-            sel = i == self._label_sel
-            col = (0, 255, 255) if sel else (60, 220, 60)
-            cv2.circle(img, c, max(4, int(r)), col, 3 if sel else 2, cv2.LINE_AA)
-            lbl = "C" if num == 0 else (str(num) if num > 0 else "?")
-            cv2.putText(img, lbl, (c[0] - 9, c[1] - int(r) - 6),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
-        self._persp.set_frame(img)
+        try:
+            img = np.ascontiguousarray(frame.copy())
+            for i, (num, x, y, r) in enumerate(self._label_balls):
+                c = (int(x), int(y))
+                sel = i == self._label_sel
+                col = (0, 255, 255) if sel else (60, 220, 60)
+                cv2.circle(img, c, max(4, int(r)), col, 3 if sel else 2, cv2.LINE_AA)
+                lbl = "C" if num == 0 else (str(num) if num > 0 else "?")
+                cv2.putText(img, lbl, (c[0] - 9, c[1] - int(r) - 6),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
+            self._persp.set_frame(img)
+        except Exception:  # noqa: BLE001 - drawing must never crash the app
+            log.exception("training: redraw failed")
 
     def _save_label_frame(self) -> None:
         w, h = self._frame_wh

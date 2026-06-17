@@ -292,20 +292,24 @@ class PipelineController(QObject):
         labelling overlay) + raw detections with guessed numbers in each packet."""
         self._label_mode = bool(on)
 
-    @Slot(list)
-    def save_training_frame(self, balls: list) -> None:
+    @Slot(object)
+    def save_training_frame(self, balls) -> None:
         """Persist the current RAW frame + corrected boxes (list of
         (number, cx, cy, w, h), normalised) to the ball-ID training store."""
         if self._last_frame is None or not balls:
             return
-        from ..config import APP_DIR
-        from ..train.store import LabeledBall, TrainingStore
-        store = TrainingStore(APP_DIR / "training" / "ballid")
-        labeled = [LabeledBall(int(n), float(cx), float(cy), float(w), float(h))
-                   for (n, cx, cy, w, h) in balls]
-        saved = store.add_frame(self._last_frame, labeled)
-        self.capture_progress.emit(f"Saved {saved} labelled balls "
-                                   f"({store.count()} frames collected)")
+        try:
+            from ..config import APP_DIR
+            from ..train.store import LabeledBall, TrainingStore
+            store = TrainingStore(APP_DIR / "training" / "ballid")
+            labeled = [LabeledBall(int(n), float(cx), float(cy), float(w), float(h))
+                       for (n, cx, cy, w, h) in balls]
+            saved = store.add_frame(self._last_frame, labeled)
+            self.capture_progress.emit(f"Saved {saved} labelled balls "
+                                       f"({store.count()} frames collected)")
+        except Exception as exc:  # noqa: BLE001 - never crash the worker on a save
+            log.exception("save_training_frame failed")
+            self.error.emit(f"Couldn't save training frame: {exc}")
 
     @Slot()
     def reset_counters(self) -> None:

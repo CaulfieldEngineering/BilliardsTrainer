@@ -23,8 +23,33 @@ def _setup_logging() -> None:
     )
 
 
+def _install_excepthook() -> None:
+    """Log unhandled exceptions instead of letting them crash silently.
+
+    A bare Python exception raised inside a Qt slot can otherwise terminate the
+    app with no trace (PySide6 may treat it as fatal). Routing it through the log
+    gives us a traceback to act on; we keep the app alive so one bad frame/click
+    doesn't kill the session."""
+    log = logging.getLogger("excepthook")
+
+    def hook(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        log.error("UNHANDLED EXCEPTION", exc_info=(exc_type, exc, tb))
+
+    sys.excepthook = hook
+    try:  # also catch exceptions raised inside Qt threads (PySide6 6.5+)
+        import threading
+        threading.excepthook = lambda a: log.error(
+            "UNHANDLED THREAD EXCEPTION", exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def main() -> int:
     _setup_logging()
+    _install_excepthook()
     log = logging.getLogger("app")
     log.info("Starting %s %s", APP_NAME, __version__)
 
