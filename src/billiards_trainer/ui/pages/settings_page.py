@@ -291,13 +291,14 @@ class SettingsPage(QWidget):
         self._backend.addItems(["auto", "classical", "yolo"])
         form.addRow("AI backend (advanced)", self._backend)
         from ...config import MODELS_DIR
-        note = QLabel("Auto uses an AI model when one is present, else classical. "
-                      "Drop a pool-trained <b>pool_balls.onnx</b> into:<br>"
+        note = QLabel("Drop any pool-trained <b>.onnx</b> model into:<br>"
                       f"<code>{MODELS_DIR}</code><br>"
-                      "and it runs locally (ONNX, no torch). To build one from the "
-                      "CC-BY Roboflow Pool V2 dataset, run "
-                      "<code>tools/train_pool_model.py</code> (needs a free Roboflow "
-                      "key). Generic COCO weights do not detect top-down pool.")
+                      "and it appears in <b>Live detector</b> as <code>onnx_&lt;name&gt;</code> "
+                      "to A/B against the classical detectors — runs locally (ONNX, no "
+                      "torch). Export the YOLO11 ball model with "
+                      "<code>tools/export_pool_coach_onnx.py</code>, or train one from the "
+                      "CC-BY Roboflow Pool V2 set via <code>tools/train_pool_model.py</code>. "
+                      "Generic COCO weights do not detect top-down pool.")
         note.setObjectName("Faint")
         note.setWordWrap(True)
         note.setTextInteractionFlags(Qt.TextSelectableByMouse)

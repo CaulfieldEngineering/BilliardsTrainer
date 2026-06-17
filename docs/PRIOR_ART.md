@@ -544,7 +544,7 @@ below):
 
 | Window (start frame) | dets/frame (min/med/max) | unique IDs | ID persistence | CPU fps |
 |---|---|---|---|---|
-| Rack, ~0 | 10 / 10 / 10 | 10 | all 10 lasted 150/150 frames | 4.2 |
+| Rack, ~1800 | 10 / 10 / 10 | 10 | all 10 lasted 150/150 frames | 4.2 |
 | Mid-game, ~28900 | 3 / 4 / 4 | 4 | 3 of 4 lasted 100/100 (one did not) | 6.1 |
 | Late-game, ~50600 | 3 / 3 / 3 | 3 | all 3 lasted 100/100 | 6.8 |
 
@@ -612,12 +612,30 @@ calibration. Two shapes:
 - **(B) ONNX-export (`yolo export format=onnx`) + our existing no-torch `onnxruntime` path.**
   Cleaner runtime, no torch in-process. **Caveats up front:** (i) ONNX export removes the torch
   *runtime* but **not** the AGPL obligation on the weights — still needs license clearance;
-  (ii) ByteTrack lives in the Ultralytics/torch stack, so a no-torch path means **re-implementing
-  tracking** ourselves (we have a tracker already). Unverified — proposed, not yet built.
+  (ii) ByteTrack lives in the Ultralytics/torch stack, so a no-torch path means tracking is **our
+  tracker** (which we have), not ByteTrack.
+
+## UPDATE — path (B) is now WIRED for A/B (Joe favoured this)
+We took path (B). The YOLO11 model is now selectable in **Settings → Live detector** as
+`onnx_pool_yolo11`, alongside the classical detectors, so they can be A/B'd live.
+- Exported `best_weights.pt → ONNX` (36 MB, `tools/export_pool_coach_onnx.py`), ran it through
+  our existing no-torch `onnx_model` strategy, and **verified our decode reproduces the torch
+  model** on the same frames: rack frame 1800 **10 (ours) vs 10 (torch)**, mid 4 vs 4, late 3 vs
+  3. (Fixed our letterbox to centre-pad like Ultralytics — top-left padding had silently dropped
+  the small clustered rack balls.)
+- `onnxruntime` is now bundled into the frozen build (spec `collect_all`, ~20 MB, CPU, no torch);
+  the strategy imports it lazily so the app is unaffected if a user never picks the ONNX model.
+- **Model delivery (AGPL-aware):** we do NOT ship the weights. Drop a `.onnx` into the models dir
+  (`%LOCALAPPDATA%\BilliardsTrainer\models`) — it auto-appears as `onnx_<name>`. Regenerate via
+  `tools/export_pool_coach_onnx.py`. Whether to host/bundle the exported model in a release is a
+  licensing call for Joe (AGPL — fine if the app's source stays available).
+- Our tracker (adaptive EMA + keep-alive) sits on top, so YOLO11 detections get the same stable
+  IDs + cue-ball logic as the classical strategies. Identity (cue/solid/stripe) is still ours.
 
 ## Reproduce / what we did NOT test
 - Run: `_external/pool_coach/.venv/Scripts/python tools/eval_pool_coach.py testVideo.MP4 <start_frame>`
-  (conf 0.25; windows at frames ~0 / ~28900 / ~50600; ultralytics 8.4.69, torch 2.12 CPU).
+  (conf 0.25; windows at frames ~1800 / ~28900 / ~50600; ultralytics 8.4.69, torch 2.12 CPU).
 - NOT tested: accuracy vs ground truth (no trustworthy GT); GPU fps; motion-blur on a real
-  break (the hardest + most M3-relevant case); the ONNX-export path (B); 8ball-pool-detection
-  re-run under the isolated env; dataset/license provenance audit.
+  break (the hardest + most M3-relevant case); the frozen build with onnxruntime bundled (CI
+  will verify); 8ball-pool-detection re-run under the isolated env; dataset/license provenance
+  audit. (The ONNX-export path B is now wired + parity-verified from source — see UPDATE above.)

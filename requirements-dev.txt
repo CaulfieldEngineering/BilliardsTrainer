@@ -4,3 +4,6 @@
 pytest>=8.0
 pyinstaller>=6.3
 ruff>=0.4
+# Bundled into the frozen build (via spec collect_all) for the optional YOLO11
+# (.onnx) A/B detector. No torch — onnxruntime runs the exported model in-process.
+onnxruntime>=1.17

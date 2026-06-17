@@ -161,6 +161,9 @@ def discover(params: dict | None = None) -> dict:
 # the helpers above are defined (otherwise a partial-init circular import). These
 # explicit imports (a) make PyInstaller bundle the modules and (b) make discover()
 # work identically in frozen and source builds.
-from . import classical, cue_ball_white, felt_mask_hough, simple_blob  # noqa: E402
+from . import classical, cue_ball_white, felt_mask_hough, onnx_model, simple_blob  # noqa: E402
 
-_CORE_MODULES = (classical, cue_ball_white, felt_mask_hough, simple_blob)
+# onnx_model is core so the frozen build can offer a YOLO11 (or any .onnx) detector
+# for A/B when the user has a model in their models dir. It imports onnxruntime
+# lazily, so including it is safe even when onnxruntime/model are absent.
+_CORE_MODULES = (classical, cue_ball_white, felt_mask_hough, onnx_model, simple_blob)

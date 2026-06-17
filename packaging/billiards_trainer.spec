@@ -10,6 +10,8 @@ ball detector without them. Run from the repo root:
 
 import os
 
+from PyInstaller.utils.hooks import collect_all
+
 block_cipher = None
 
 # SPECPATH is injected by PyInstaller and is the directory containing this spec
@@ -17,15 +19,26 @@ block_cipher = None
 # regardless of the current working directory.
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
+# onnxruntime ships native DLLs that PyInstaller's modulegraph misses — collect_all
+# grabs its binaries/data/submodules so the optional YOLO11 (.onnx) detector works
+# in the frozen build. It's imported lazily by the onnx_model strategy, so the app
+# still launches fine if a user never selects an ONNX model. (CPU build, ~20 MB.)
+try:
+    _ort_datas, _ort_bins, _ort_hidden = collect_all("onnxruntime")
+except Exception:  # onnxruntime not installed in this build env -> ship without it
+    _ort_datas, _ort_bins, _ort_hidden = [], [], []
+
 a = Analysis(
     [os.path.join(ROOT, "packaging", "launch.py")],
     pathex=[os.path.join(ROOT, "src")],
-    binaries=[],
+    binaries=list(_ort_bins),
     datas=([(os.path.join(ROOT, "packaging", "app.ico"), ".")]
-           if os.path.exists(os.path.join(ROOT, "packaging", "app.ico")) else []),
+           if os.path.exists(os.path.join(ROOT, "packaging", "app.ico")) else [])
+          + list(_ort_datas),
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",
         "billiards_trainer",
+        "billiards_trainer.detector_strategies.onnx_model",
         # Detector strategies are imported via the package's static core + dynamic
         # discovery; name them explicitly so the frozen bundle always contains the
         # live detector (simple_blob) and friends. Without this the Settings "Live
@@ -43,16 +56,14 @@ a = Analysis(
         "comtypes.stream",
         # ensure HTTPS verification works in the frozen build (update check)
         "certifi",
+        *_ort_hidden,
     ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[
+        # torch/ultralytics stay OUT (huge + opencv DLL conflict). The YOLO11 path
+        # ships via ONNX + onnxruntime instead (bundled above via collect_all).
         "torch", "torchvision", "ultralytics", "mediapipe",
-        # onnxruntime is a dev/test dep used to validate the ONNX backend, but it
-        # is NOT bundled yet: there is no working off-the-shelf pool model to
-        # justify the +size and the known onnxruntime PyInstaller DLL pitfalls.
-        # The lazy import in OnnxYoloDetector degrades to classical when absent.
-        "onnxruntime",
         "matplotlib", "tkinter", "PySide6.QtWebEngineCore",
         "PySide6.Qt3DCore", "PySide6.QtCharts", "PySide6.QtDataVisualization",
     ],
