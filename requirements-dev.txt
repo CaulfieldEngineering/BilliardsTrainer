@@ -4,6 +4,9 @@
 pytest>=8.0
 pyinstaller>=6.3
 ruff>=0.4
-# Bundled into the frozen build (via spec collect_all) for the optional YOLO11
-# (.onnx) A/B detector. No torch — onnxruntime runs the exported model in-process.
-onnxruntime>=1.17
+# Bundled into the frozen build (via spec collect_all). The trained YOLO (.onnx)
+# detector is the DEFAULT, so the build needs the GPU runtime: onnxruntime-directml
+# on Windows (DirectX 12 — any GPU, no CUDA toolkit), CPU elsewhere. No torch.
+# Without DirectML the frozen app runs the model on CPU (~17fps, not real-time).
+onnxruntime-directml>=1.17; sys_platform == "win32"
+onnxruntime>=1.17; sys_platform != "win32"

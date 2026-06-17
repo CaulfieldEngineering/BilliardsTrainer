@@ -13,6 +13,7 @@ boundary.
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QHBoxLayout,
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...config import Settings
+from ...vision.types import BallClass
 from ..icons import icon
 from ..theme import PALETTE
 from ..widgets.common import Badge, Card, SegmentedControl, StatCard
@@ -78,6 +80,7 @@ class LivePage(QWidget):
     video_step = Signal(int)                  # ±frames
     video_seek = Signal(int)                  # absolute frame index
     video_speed = Signal(float)               # playback multiplier
+    tuning_changed = Signal()                 # a live-tuning control changed (settings mutated in place)
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -408,8 +411,13 @@ class LivePage(QWidget):
 
     def _stats_rail(self) -> QWidget:
         rail = Card(padding=16, spacing=14)
-        rail.setMinimumWidth(280)
-        rail.setMaximumWidth(380)
+        rail.setMinimumWidth(300)
+        rail.setMaximumWidth(400)
+
+        # Live tuning panel up top — adjust while watching the clip (instant, no
+        # recalibration). The score readout below stays for manual +Make/-Miss.
+        rail.layout().addWidget(self._tuning_section())
+        rail.layout().addWidget(self._hsep())
 
         # The headline: makes vs misses, big.
         mm = QHBoxLayout()
@@ -500,6 +508,110 @@ class LivePage(QWidget):
         return box, val
 
     # ------------------------------------------------------------------ #
+    # Live tuning panel  (mutates the shared Settings in place → the pipeline
+    # picks changes up on the very next frame, no recalibration)
+    # ------------------------------------------------------------------ #
+    def _hsep(self) -> QFrame:
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFixedHeight(1)
+        line.setStyleSheet(f"background:{PALETTE.text_faint};border:none;")
+        return line
+
+    def _tuning_section(self) -> QWidget:
+        col = QVBoxLayout()
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(8)
+        cap = QLabel("TUNING — adjust while watching")
+        cap.setObjectName("StatLabel")
+        col.addWidget(cap)
+
+        # Live cue-ball status (updated every frame from the tracker output).
+        self._cue_status = QLabel("○  CUE: —")
+        self._cue_status.setStyleSheet("font-size: 17px; font-weight: 800;")
+        col.addWidget(self._cue_status)
+        self._cue_sub = QLabel("detection off")
+        self._cue_sub.setObjectName("Faint")
+        self._cue_sub.setWordWrap(True)
+        col.addWidget(self._cue_sub)
+
+        # Detector min-confidence: lower → finds more (recovers a faint cue),
+        # higher → stricter (drops false blobs). Applies live.
+        col.addWidget(self._conf_row())
+
+        # Display toggles — pure render flags, instant.
+        for label, attr in (
+            ("Show ball IDs", "show_ball_ids"),
+            ("Show trajectories", "show_trajectories"),
+            ("Uniform ball size", "normalize_ball_size"),
+            ("Clean schematic bird's-eye", "schematic_birdseye"),
+            ("Show overlays", "show_overlays"),
+        ):
+            col.addWidget(self._ui_toggle(label, attr))
+
+        w = QWidget()
+        w.setLayout(col)
+        return w
+
+    def _conf_row(self) -> QWidget:
+        row = QVBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(2)
+        head = QHBoxLayout()
+        lbl = QLabel("Detector min-confidence")
+        lbl.setObjectName("Muted")
+        self._conf_val = QLabel(f"{self._settings.detection.confidence_floor:.2f}")
+        self._conf_val.setObjectName("Faint")
+        head.addWidget(lbl)
+        head.addStretch(1)
+        head.addWidget(self._conf_val)
+        row.addLayout(head)
+        sld = QSlider(Qt.Horizontal)
+        sld.setRange(10, 90)
+        sld.setValue(int(round(self._settings.detection.confidence_floor * 100)))
+        sld.valueChanged.connect(self._on_conf_changed)
+        row.addWidget(sld)
+        w = QWidget()
+        w.setLayout(row)
+        return w
+
+    def _ui_toggle(self, label: str, attr: str) -> QCheckBox:
+        cb = QCheckBox(label)
+        cb.setCursor(Qt.PointingHandCursor)
+        cb.setChecked(bool(getattr(self._settings.ui, attr)))
+        cb.toggled.connect(lambda on, a=attr: self._on_ui_toggle(a, on))
+        return cb
+
+    def _on_conf_changed(self, v: int) -> None:
+        self._settings.detection.confidence_floor = v / 100.0
+        self._conf_val.setText(f"{v / 100.0:.2f}")
+        self.tuning_changed.emit()
+
+    def _on_ui_toggle(self, attr: str, on: bool) -> None:
+        setattr(self._settings.ui, attr, on)
+        self.tuning_changed.emit()
+
+    def _update_cue_status(self, packet) -> None:
+        if not self._detect_on:
+            self._cue_status.setText("○  CUE: —")
+            self._cue_status.setStyleSheet("font-size:17px;font-weight:800;color:%s;"
+                                           % PALETTE.text_faint)
+            self._cue_sub.setText("detection off — flip Detection: ON")
+            return
+        cue = next((t for t in (packet.tracks or []) if t.cls == BallClass.CUE), None)
+        if cue is not None:
+            self._cue_status.setText("●  CUE: TRACKED")
+            self._cue_status.setStyleSheet("font-size:17px;font-weight:800;color:%s;"
+                                           % PALETTE.success)
+            self._cue_sub.setText(f"id #{cue.id} · ({cue.x:.0f}, {cue.y:.0f}) · "
+                                  f"{packet.n_balls} balls · {packet.fps:.0f} fps")
+        else:
+            self._cue_status.setText("○  CUE: searching…")
+            self._cue_status.setStyleSheet("font-size:17px;font-weight:800;color:%s;"
+                                           % PALETTE.warn)
+            self._cue_sub.setText(f"{packet.n_balls} balls · {packet.fps:.0f} fps")
+
+    # ------------------------------------------------------------------ #
     # Intent
     # ------------------------------------------------------------------ #
     def set_drill(self, drill_key: str, drill_name: str) -> None:
@@ -549,6 +661,7 @@ class LivePage(QWidget):
             self._bird.set_frame(packet.birdseye)
         self._fps_lbl.setText(f"{packet.fps:.0f} fps")
         self._balls_lbl.setText(f"{packet.n_balls} balls")
+        self._update_cue_status(packet)
         self._clock_holder.setVisible(packet.clock_enabled)
         if packet.clock_enabled:
             self._clock.update_clock(packet.clock_remaining,

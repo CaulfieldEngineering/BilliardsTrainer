@@ -122,11 +122,11 @@ class BallSettings:
     # auto = YOLO when weights are present, else classical. 'classical' forces
     # Hough+colour; 'yolo' forces the net (falling back if deps/weights missing).
     backend: str = "auto"  # auto | classical | yolo
-    # Live detector strategy (Phase 1 winner). Runs on the RAW frame; results are
-    # projected into the bird's-eye for display. 'legacy' = the old
-    # classical-Hough-on-rectified detector (kept for A/B). Any name from
-    # detector_strategies (simple_blob, felt_mask_hough, onnx_*, …) is valid.
-    live_strategy: str = "simple_blob"
+    # Live detector. 'auto' (default) picks the best available: a trained YOLO
+    # .onnx model in the models dir if present (the reliable path), else the
+    # cue-ball heuristic. Runs on the RAW frame; results project into the
+    # bird's-eye for display. Specific names (onnx_*, cue_ball_white, …) force one.
+    live_strategy: str = "auto"
     # Temporal median preprocessing: run detection on the per-pixel median of the
     # last few raw frames. A perfectly still scene becomes pixel-identical frame to
     # frame, which kills the sensor-noise jitter that makes blob size pump and balls
@@ -197,7 +197,11 @@ class DetectionSettings:
     # background-subtraction foreground into one weighted "activity" score, so a
     # single noisy signal (e.g. a flickering highlight) can't trip a shot on its
     # own. Weights/threshold are tunable; presets set sensible bundles.
-    use_fusion: bool = True
+    # DEFERRED: off by default — shot detection (M5+) is gated until cue-ball
+    # tracking (M2) is solid, and the Farneback flow + MOG2 it needs are the
+    # heaviest ops in the per-frame loop. Off = the real-time budget goes to the
+    # detector. Re-enable once shot detection is back on the roadmap.
+    use_fusion: bool = False
     # Measured on real ball motion vs a flickering specular highlight:
     #   fg: 0.74 vs 0.013  (50x separation — the strong discriminator)
     #   flow: 1.9 vs 10.5  (HIGHER for flicker — misleading, so weighted ~0)
@@ -340,6 +344,16 @@ def _migrate_settings(s: "Settings") -> bool:
             s.balls.live_strategy = "simple_blob"
             changed = True
         s.balls.detector_migration = 1
+        changed = True
+    # Migration 2: the classical blob detectors are demoted in favour of the
+    # trained model. Move anyone still on an old blob default onto 'auto', which
+    # resolves to the YOLO model when present. A deliberate non-default choice
+    # (e.g. an explicit onnx_* name) is left alone.
+    if s.balls.detector_migration < 2:
+        if s.balls.live_strategy in ("simple_blob", "felt_mask_hough", "classical"):
+            log.info("settings migration: live_strategy '%s' -> 'auto'", s.balls.live_strategy)
+            s.balls.live_strategy = "auto"
+        s.balls.detector_migration = 2
         changed = True
     return changed
 

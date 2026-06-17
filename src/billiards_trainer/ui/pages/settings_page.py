@@ -8,7 +8,6 @@ from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
@@ -16,7 +15,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
-    QSlider,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -97,17 +95,18 @@ class SettingsPage(QWidget):
         grid.setSpacing(16)
         grid.setContentsMargins(0, 0, 8, 0)
 
-        # Updates card sits in the top row so the button is visible without
-        # scrolling; the header button covers every other case.
+        # User-facing settings only. Live tuning (detector sensitivity, overlay
+        # toggles) lives on the Sandbox panel; shot-detection gates are deferred
+        # until cue-ball tracking is locked; dev/internal config (weights URL,
+        # backend, detector strictness, felt HSV) is no longer surfaced.
         grid.addWidget(self._source_card(), 0, 0)
         grid.addWidget(self._updates_card(), 0, 1)
-        grid.addWidget(self._felt_card(), 1, 0)
-        grid.addWidget(self._ball_card(), 1, 1)
+        grid.addWidget(self._table_card(), 1, 0)
+        grid.addWidget(self._model_card(), 1, 1)
         grid.addWidget(self._clock_card(), 2, 0)
         grid.addWidget(self._appearance_card(), 2, 1)
-        grid.addWidget(self._detection_card(), 3, 0)
-        grid.addWidget(self._feedback_card(), 3, 1)
-        grid.addWidget(self._debug_card(), 4, 0)
+        grid.addWidget(self._feedback_card(), 3, 0)
+        grid.addWidget(self._debug_card(), 3, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -245,59 +244,34 @@ class SettingsPage(QWidget):
             self._source_combo.addItem(f"\U0001F4C4 {path.split('/')[-1]}", path)
             self._select_source_data(path)
 
-    def _felt_card(self) -> Card:
-        card, form = self._card("Table & felt")
+    def _table_card(self) -> Card:
+        card, form = self._card("Table")
         self._table_size = QComboBox()
         self._table_size.addItems(["9ft", "8ft", "7ft"])
         form.addRow("Table size", self._table_size)
-
-        self._sensitivity = QSlider(Qt.Horizontal)
-        self._sensitivity.setRange(0, 100)
-        self._sens_label = QLabel("82")
-        sens_row = QHBoxLayout()
-        sens_row.addWidget(self._sensitivity, 1)
-        sens_row.addWidget(self._sens_label)
-        self._sensitivity.valueChanged.connect(lambda v: self._sens_label.setText(str(v)))
-        sw = QWidget()
-        sw.setLayout(sens_row)
-        form.addRow("Felt sensitivity", sw)
-
-        self._h_min = self._spin(0, 180)
-        self._h_max = self._spin(0, 180)
-        hue_row = QHBoxLayout()
-        hue_row.addWidget(QLabel("min"))
-        hue_row.addWidget(self._h_min)
-        hue_row.addWidget(QLabel("max"))
-        hue_row.addWidget(self._h_max)
-        hw = QWidget()
-        hw.setLayout(hue_row)
-        form.addRow("Felt hue range", hw)
         self._auto_relock = QCheckBox("Auto re-lock if the table shifts")
         form.addRow("", self._auto_relock)
         self._persist_calib = QCheckBox("Remember calibration between launches")
         form.addRow("", self._persist_calib)
-        tip = QLabel("Tip: on the Sandbox tab, click 'Pick felt' then tap the "
-                     "cloth to seed these from your real table.")
+        tip = QLabel("The table is found automatically. If the read looks off, use "
+                     "'Pick felt' on the Sandbox tab (tap the cloth) or "
+                     "'Recalibrate'.")
         tip.setObjectName("Faint")
         tip.setWordWrap(True)
         form.addRow("", tip)
         return card
 
-    def _ball_card(self) -> Card:
-        card, form = self._card("Ball detection")
-        # Live detector strategy (the thing that runs when Detection is ON).
-        # Default simple_blob (Phase-1 winner, no model needed). Switching here
-        # applies immediately and keeps calibration.
-        self._live_detector = QComboBox()
-        self._populate_live_detectors()
-        self._live_detector.activated.connect(
-            lambda _i: self.detector_changed.emit(self._live_detector.currentText()))
-        form.addRow("Live detector", self._live_detector)
+    def _model_card(self) -> Card:
+        card, form = self._card("AI detection")
+        msg = QLabel("Ball tracking uses a trained model that runs locally on your "
+                     "GPU. It's selected automatically — there's nothing to configure.")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
 
-        # One-click fetch of the hosted YOLO11 ball model so it becomes an A/B
-        # option in the dropdown (model is downloaded into the user models dir, not
-        # bundled — keeps the base download small + AGPL model out of the binary).
-        self._dl_yolo_btn = QPushButton("  Download YOLO11 ball model")
+        # One-click "get the detector" — the only model action a user needs. The
+        # model is auto-selected once present; if it's missing this fetches it.
+        self._dl_yolo_btn = QPushButton("  Download ball-detection model")
         self._dl_yolo_btn.setObjectName("Ghost")
         self._dl_yolo_btn.setCursor(Qt.PointingHandCursor)
         self._dl_yolo_btn.clicked.connect(self._download_yolo11)
@@ -305,65 +279,22 @@ class SettingsPage(QWidget):
         self._dl_status.setObjectName("Faint")
         self._dl_status.setWordWrap(True)
         self._refresh_yolo_button()
-        form.addRow("YOLO11 (A/B)", self._dl_yolo_btn)
+        form.addRow("", self._dl_yolo_btn)
         form.addRow("", self._dl_status)
-
-        self._backend = QComboBox()
-        self._backend.addItems(["auto", "classical", "yolo"])
-        form.addRow("AI backend (advanced)", self._backend)
-        from ...config import MODELS_DIR
-        note = QLabel("Drop any pool-trained <b>.onnx</b> model into:<br>"
-                      f"<code>{MODELS_DIR}</code><br>"
-                      "and it appears in <b>Live detector</b> as <code>onnx_&lt;name&gt;</code> "
-                      "to A/B against the classical detectors — runs locally (ONNX, no "
-                      "torch). Export the YOLO11 ball model with "
-                      "<code>tools/export_pool_coach_onnx.py</code>, or train one from the "
-                      "CC-BY Roboflow Pool V2 set via <code>tools/train_pool_model.py</code>. "
-                      "Generic COCO weights do not detect top-down pool.")
-        note.setObjectName("Faint")
-        note.setWordWrap(True)
-        note.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        form.addRow("", note)
-        self._param2 = self._spin(5, 60)
-        form.addRow("Detector strictness", self._param2)
-        self._yolo_url = QLineEdit()
-        self._yolo_url.setPlaceholderText("https://…/pool_balls.pt (auto-fetched)")
-        form.addRow("YOLO weights URL", self._yolo_url)
         return card
-
-    # ------------------------------------------------------------------ #
-    def _populate_live_detectors(self, select: str | None = None) -> None:
-        """(Re)fill the Live-detector combo from discovery + a frozen-safe floor."""
-        names: list[str] = []
-        try:
-            from ...detector_strategies import discover
-            names = sorted(n for n in discover() if n != "classical_rectified")
-        except Exception:  # noqa: BLE001 - settings must build even if strategies don't import
-            pass
-        if "simple_blob" not in names:  # frozen-safe floor (never collapse to legacy-only)
-            names = ["simple_blob", "felt_mask_hough"]
-        names.append("legacy")
-        cur = select or self._live_detector.currentText()
-        self._live_detector.blockSignals(True)
-        self._live_detector.clear()
-        self._live_detector.addItems(names)
-        if cur in names:
-            self._live_detector.setCurrentText(cur)
-        self._live_detector.blockSignals(False)
 
     def _refresh_yolo_button(self) -> None:
         from ...detector_strategies import model_fetch
         if model_fetch.is_present("pool_yolo11"):
             self._dl_yolo_btn.setEnabled(False)
-            self._dl_yolo_btn.setText("  YOLO11 model installed")
-            self._dl_status.setText("Pick <code>onnx_pool_yolo11</code> in Live detector to A/B.")
+            self._dl_yolo_btn.setText("  Model installed ✓")
+            self._dl_status.setText("The ball-detection model is installed and in use.")
         else:
             self._dl_yolo_btn.setEnabled(True)
-            self._dl_yolo_btn.setText("  Download YOLO11 ball model")
+            self._dl_yolo_btn.setText("  Download ball-detection model")
             self._dl_status.setText(
-                "Fetches a YOLO11 ball detector (~38 MB, runs locally via ONNX, no torch) "
-                "into your models folder so it becomes a Live-detector option. "
-                "Model is AGPL-3.0 (Ultralytics/pool_coach).")
+                "Fetches the ball-detection model (~38 MB, runs locally on your GPU). "
+                "Needed once; it's selected automatically afterwards.")
 
     def _download_yolo11(self) -> None:
         self._dl_yolo_btn.setEnabled(False)
@@ -382,68 +313,11 @@ class SettingsPage(QWidget):
 
     def _on_yolo_downloaded(self, strategy: str) -> None:
         self._refresh_yolo_button()
-        self._populate_live_detectors(select=strategy)   # show + select it
-        self._dl_status.setText(f"Installed. Selected <code>{strategy}</code> — Save to apply.")
+        self._dl_status.setText("Installed — the model is now selected automatically.")
 
     def _on_yolo_failed(self, msg: str) -> None:
         self._dl_yolo_btn.setEnabled(True)
         self._dl_status.setText(f"Download failed: {msg}. Check your connection and retry.")
-
-    def _detection_card(self) -> Card:
-        card, form = self._card("Detection")
-        banner = QLabel("⚠ Shot detection uses on-device CV and is still being "
-                        "tuned — it can miscount on a noisy feed. Tune the gates "
-                        "below, use Confirm-manually, or drop YOLO weights in the "
-                        "models folder + set Backend = yolo for a big accuracy jump.")
-        banner.setObjectName("Faint")
-        banner.setWordWrap(True)
-        form.addRow("", banner)
-
-        self._preset = QComboBox()
-        self._preset.addItems(["conservative", "balanced", "aggressive"])
-        self._preset.activated.connect(self._on_preset_changed)
-        form.addRow("Preset", self._preset)
-        self._fusion = QCheckBox("Multi-modal evidence fusion (bg-subtraction + optical flow)")
-        form.addRow("", self._fusion)
-
-        self._manual_confirm = QCheckBox("Confirm shots manually (auto-detect only suggests)")
-        form.addRow("", self._manual_confirm)
-        self._require_cue = QCheckBox("Require a cue ball to count a shot")
-        form.addRow("", self._require_cue)
-        self._allow_without_model = QCheckBox("Allow auto-detection without a model "
-                                              "(experimental — uses classical CV)")
-        form.addRow("", self._allow_without_model)
-
-        self._motion_active = QDoubleSpinBox()
-        self._motion_active.setRange(0.05, 5.0)
-        self._motion_active.setSingleStep(0.05)
-        form.addRow("Motion sensitivity", self._motion_active)
-        self._min_travel = self._spin(20, 600)
-        form.addRow("Min ball travel (px)", self._min_travel)
-        self._warmup = self._spin(0, 30)
-        form.addRow("Warm-up (s)", self._warmup)
-        self._cooldown = self._spin(0, 30)
-        form.addRow("Cool-down between shots (s)", self._cooldown)
-        self._pocket_frames = self._spin(2, 60)
-        form.addRow("Pocket dwell (frames)", self._pocket_frames)
-
-        self._debug_overlay = QCheckBox("Show debug overlay (raw blobs + shot state)")
-        form.addRow("", self._debug_overlay)
-        self._schematic = QCheckBox("Clean schematic overhead view (vs warped camera)")
-        form.addRow("", self._schematic)
-        return card
-
-    def _on_preset_changed(self, _index: int) -> None:
-        from ...config import apply_detection_preset
-        apply_detection_preset(self._s.detection, self._preset.currentText())
-        # reflect the preset's gate values in the widgets
-        d = self._s.detection
-        self._require_cue.setChecked(d.require_cue)
-        self._motion_active.setValue(d.motion_active)
-        self._min_travel.setValue(int(d.min_travel_px))
-        self._warmup.setValue(int(d.warmup_seconds))
-        self._cooldown.setValue(int(d.cooldown_seconds))
-        self._pocket_frames.setValue(d.pocket_frames)
 
     def _clock_card(self) -> Card:
         card, form = self._card("Shot clock")
@@ -587,29 +461,9 @@ class SettingsPage(QWidget):
         self._select_source(s.source, s.source_name)
         self._mirror.setChecked(s.ui.mirror_preview)
         self._table_size.setCurrentText(s.table.size)
-        self._sensitivity.setValue(s.felt.sensitivity)
-        self._sens_label.setText(str(s.felt.sensitivity))
-        self._h_min.setValue(s.felt.h_min)
-        self._h_max.setValue(s.felt.h_max)
         self._auto_relock.setChecked(s.table.auto_relock)
         self._persist_calib.setChecked(s.table.persist_calibration)
-        self._backend.setCurrentText(s.balls.backend)
-        self._live_detector.setCurrentText(getattr(s.balls, "live_strategy", "simple_blob"))
-        self._param2.setValue(s.balls.detect_param2)
-        self._yolo_url.setText(s.balls.yolo_weights_url)
         self._show_overlays.setChecked(s.ui.show_overlays)
-        self._preset.setCurrentText(s.detection.preset)
-        self._fusion.setChecked(s.detection.use_fusion)
-        self._manual_confirm.setChecked(s.detection.manual_confirm)
-        self._require_cue.setChecked(s.detection.require_cue)
-        self._allow_without_model.setChecked(s.detection.allow_without_model)
-        self._motion_active.setValue(s.detection.motion_active)
-        self._min_travel.setValue(int(s.detection.min_travel_px))
-        self._warmup.setValue(int(s.detection.warmup_seconds))
-        self._cooldown.setValue(int(s.detection.cooldown_seconds))
-        self._pocket_frames.setValue(s.detection.pocket_frames)
-        self._debug_overlay.setChecked(s.ui.debug_overlay)
-        self._schematic.setChecked(s.ui.schematic_birdseye)
         self._clock_enabled.setChecked(s.shot_clock.enabled)
         self._clock_seconds.setValue(s.shot_clock.seconds)
         self._clock_warn.setValue(s.shot_clock.warn_seconds)
@@ -628,27 +482,8 @@ class SettingsPage(QWidget):
         s.source_name = self._cam_names.get(spec, "") if spec.isdigit() else ""
         s.ui.mirror_preview = self._mirror.isChecked()
         s.table.size = self._table_size.currentText()
-        s.felt.sensitivity = self._sensitivity.value()
-        s.felt.h_min = self._h_min.value()
-        s.felt.h_max = self._h_max.value()
         s.table.auto_relock = self._auto_relock.isChecked()
         s.table.persist_calibration = self._persist_calib.isChecked()
-        s.balls.backend = self._backend.currentText()
-        s.balls.live_strategy = self._live_detector.currentText()
-        s.balls.detect_param2 = self._param2.value()
-        s.balls.yolo_weights_url = self._yolo_url.text().strip()
-        s.detection.preset = self._preset.currentText()
-        s.detection.use_fusion = self._fusion.isChecked()
-        s.detection.manual_confirm = self._manual_confirm.isChecked()
-        s.detection.require_cue = self._require_cue.isChecked()
-        s.detection.allow_without_model = self._allow_without_model.isChecked()
-        s.detection.motion_active = self._motion_active.value()
-        s.detection.min_travel_px = float(self._min_travel.value())
-        s.detection.warmup_seconds = float(self._warmup.value())
-        s.detection.cooldown_seconds = float(self._cooldown.value())
-        s.detection.pocket_frames = self._pocket_frames.value()
-        s.ui.debug_overlay = self._debug_overlay.isChecked()
-        s.ui.schematic_birdseye = self._schematic.isChecked()
         s.shot_clock.enabled = self._clock_enabled.isChecked()
         s.shot_clock.seconds = self._clock_seconds.value()
         s.shot_clock.warn_seconds = self._clock_warn.value()

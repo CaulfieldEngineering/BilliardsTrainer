@@ -69,9 +69,14 @@ class CalibrationManager:
         if not felt.has_corners:
             log.info("Calibration failed: no felt corners")
             return False
+        # refine=False: the base homography (clean felt corners -> forced 2:1
+        # rectangle) is stable and correct. The Hough-line "square-up" refinement
+        # fires intermittently and, on a bad frame, skews the rectangle
+        # non-uniformly (fat far rail, egg-shaped balls, pockets off their marks).
+        # Fewer moving parts = a deterministic, undistorted bird's-eye. (review: calib-5)
         rect = rectify_tabletop(frame, felt.mask, felt.corners,
                                 pad_px=settings.rectify.pad_px,
-                                aspect=settings.rectify.aspect, refine=True)
+                                aspect=settings.rectify.aspect, refine=False)
         if not rect.ok:
             log.info("Calibration failed: rectification not ok")
             return False

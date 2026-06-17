@@ -160,14 +160,17 @@ def discover(params: dict | None = None) -> dict:
     return out
 
 
-# Static imports of the core strategies MUST come last: each strategy module does
+# Static imports of the core detectors MUST come last: each module does
 # ``from . import <helpers>`` from THIS package, so it can only be imported after
 # the helpers above are defined (otherwise a partial-init circular import). These
 # explicit imports (a) make PyInstaller bundle the modules and (b) make discover()
 # work identically in frozen and source builds.
-from . import classical, cue_ball_white, felt_mask_hough, onnx_model, simple_blob  # noqa: E402
+#
+# Two detectors now: the trained YOLO model (onnx_model — the default/primary) and
+# the cue-ball white heuristic (cue_ball_white — the no-model fallback). The old
+# classical blob "strategy zoo" (classical/simple_blob/felt_mask_hough) and the
+# torch-based ultralytics_pt were removed: a trained model beats them all and they
+# only added the "which detector?" confusion.
+from . import cue_ball_white, onnx_model  # noqa: E402
 
-# onnx_model is core so the frozen build can offer a YOLO11 (or any .onnx) detector
-# for A/B when the user has a model in their models dir. It imports onnxruntime
-# lazily, so including it is safe even when onnxruntime/model are absent.
-_CORE_MODULES = (classical, cue_ball_white, felt_mask_hough, onnx_model, simple_blob)
+_CORE_MODULES = (cue_ball_white, onnx_model)

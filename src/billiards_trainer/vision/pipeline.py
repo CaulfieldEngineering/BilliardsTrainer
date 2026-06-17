@@ -17,7 +17,6 @@ import numpy as np
 from ..config import CALIBRATION_PATH, Settings
 from ..events.shot_detector import ShotDetector, ShotEvent
 from .background import BackgroundModel, downscale, flow_activity
-from .balls import make_detector
 from .calibration import CalibrationManager
 from .geometry import TableModel, expected_ball_radius_px
 from .overlay import draw_perspective, draw_rectified, render_schematic
@@ -73,8 +72,7 @@ class Pipeline:
         self.detect_enabled = True
         self._preview_table: TableModel | None = None
         self.calib = CalibrationManager()
-        self.detector = make_detector(settings.balls, settings.felt)
-        self._strategy = self._load_strategy()  # raw-frame detector (None = legacy)
+        self._strategy = self._load_strategy()  # the single raw-frame detector
         self.tracker = BallTracker()
         self.shots = ShotDetector(settings.detection, settings.balls)
         self._frame_idx = 0
@@ -88,9 +86,8 @@ class Pipeline:
         self._frame_ring: deque | None = None  # temporal-median buffer
 
     def reconfigure(self, settings: Settings) -> None:
-        """Apply edited settings (e.g. new felt range / backend) and recalibrate."""
+        """Apply edited settings (e.g. new felt range / detector) and recalibrate."""
         self.settings = settings
-        self.detector = make_detector(settings.balls, settings.felt)
         self._strategy = self._load_strategy()
         self.tracker.reset()
         self.shots = ShotDetector(settings.detection, settings.balls)
@@ -99,20 +96,48 @@ class Pipeline:
         self._reset_motion()
 
     def _load_strategy(self):
-        """Resolve the live detector strategy by name. 'legacy' (or any failure)
-        => None, which keeps the old classical-Hough-on-rectified path."""
-        name = getattr(self.settings.balls, "live_strategy", "simple_blob")
-        if not name or name == "legacy":
-            return None
+        """Resolve the live detector. 'auto' (default) picks the best available —
+        a trained YOLO model if one is in the models dir, else the cue-ball
+        heuristic. An explicit name forces one. There is ONE detection path now;
+        the old classical-Hough-on-rectified 'legacy' detector has been removed."""
+        name = getattr(self.settings.balls, "live_strategy", "auto")
+        if name == "legacy":
+            name = "auto"  # legacy detector removed — resolve to the best available
         try:
             from ..detector_strategies import discover
-            strat = discover().get(name)
-            if strat is None:
-                log.warning("Live strategy '%s' not found; using legacy detector", name)
-            return strat
+            strategies = discover()
+            if name and name != "auto":
+                strat = strategies.get(name)
+                if strat is not None:
+                    return strat
+                log.warning("Live strategy '%s' not found; falling back to auto", name)
+            return self._resolve_auto(strategies)
         except Exception as exc:  # noqa: BLE001 - never let strategy loading break the app
             log.warning("Could not load live strategy '%s' (%s); using legacy", name, exc)
             return None
+
+    @staticmethod
+    def _resolve_auto(strategies: dict):
+        """Pick the best detector: the best trained pool/ball YOLO model first,
+        then the cue-ball heuristic, then any blob. Models are SCORED by name so a
+        purpose-built pool model wins over a generic 'ball' model and a 'pocket'
+        model is never chosen as the ball detector."""
+        def score(name: str) -> int:
+            if "pocket" in name:
+                return -1  # a pocket detector is not a ball detector
+            return (3 if "pool" in name else 0) + (2 if "yolo" in name else 0) + \
+                   (1 if "ball" in name else 0)
+        onnx = [(score(n), n, s) for n, s in strategies.items() if n.startswith("onnx_")]
+        onnx = [t for t in onnx if t[0] >= 0]
+        if onnx:
+            onnx.sort(key=lambda t: t[0], reverse=True)
+            _, n, s = onnx[0]
+            log.info("auto detector -> %s (trained model)", n)
+            return s
+        if "cue_ball_white" in strategies:
+            log.info("auto detector -> cue_ball_white (no model found)")
+            return strategies["cue_ball_white"]
+        return next(iter(strategies.values()), None)
 
     def set_strategy(self, name: str) -> None:
         """Switch the live detector without clearing calibration."""
@@ -231,10 +256,14 @@ class Pipeline:
             return self._preview_result(frame, res)
 
         # Noise-suppressed frame fed to the raw-frame strategy (display/projection
-        # still use the original `frame`). Only built on detection frames — the
-        # median is the costliest stage, so skipping it on display-only frames is
-        # most of the cadence win.
-        det_frame = self._stabilize(frame) if detect else frame
+        # still use the original `frame`). The temporal median is a classical-blob
+        # noise crutch — a trained model is robust to sensor noise and is only
+        # smeared by blending past frames — so skip it for model-based detectors
+        # (and on display-only frames, where the median is the costliest skip).
+        if not detect or getattr(self._strategy, "model_based", False):
+            det_frame = frame
+        else:
+            det_frame = self._stabilize(frame)
 
         if not self.calib.is_calibrated:
             if not self._acquire_calibration(frame):
@@ -259,7 +288,6 @@ class Pipeline:
                     res.frame_bgr = frame
                 self._last_ms = (time.perf_counter() - t_start) * 1000.0
                 return res
-            self.detector = make_detector(self.settings.balls, self.calib.calib.felt)
 
         calib = self.calib.calib
         res.corners = calib.corners
@@ -275,35 +303,31 @@ class Pipeline:
             tracks = self.tracker.tracks
             detections = []
         else:
+            # Detect on the RAW frame, project results into the rectified plane so
+            # tracking + the bird's-eye schematic consume rectified-space points.
             if self._strategy is not None:
-                # Phase-2 path: detect on the RAW frame, project results into the
-                # rectified plane so tracking + the bird's-eye schematic are unchanged.
                 try:
                     raw_dets = self._strategy.detect(det_frame, calib)
                 except Exception as exc:  # noqa: BLE001 - a bad frame must not kill the loop
-                    log.debug("strategy %s failed on a frame: %s",
-                              self.settings.balls.live_strategy, exc)
+                    log.debug("detector failed on a frame: %s", exc)
                     raw_dets = []
                 detections = self._project_raw_to_rect(raw_dets, calib)
-                # Physical-size prior (classical strategy path only — the rectified
-                # plane has uniform ball size): reject blobs whose radius is far from
-                # the known ball radius — kills pocket-shadow "balls" (too big) and
-                # speckle (too small). Skipped for model-based detectors (YOLO/ONNX),
-                # which already validate balls with high confidence; the legacy
-                # detector has its own Hough size band.
-                exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
-                tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
-                if exp_r > 2.0 and tol > 0 and not getattr(self._strategy, "model_based", False):
-                    lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
-                    detections = [d for d in detections if lo <= d.radius <= hi]
+                # Physical-size prior: reject blobs whose radius is far from the
+                # known ball radius (pocket-shadow "balls" too big, speckle too
+                # small). Skipped for model-based detectors, which already validate
+                # ball-ness with high confidence.
+                if not getattr(self._strategy, "model_based", False):
+                    exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
+                    tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
+                    if exp_r > 2.0 and tol > 0:
+                        lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
+                        detections = [d for d in detections if lo <= d.radius <= hi]
             else:
-                detections = self.detector.detect(rect, calib.rect_mask, calib.table)
-            # Confidence floor. Classical detectors get the stricter render_floor
-            # (better to draw nothing than a low-confidence phantom). Model-based
-            # detectors (YOLO/ONNX) are well-calibrated and already thresholded in
-            # the strategy, so applying the high render_floor (0.85) would wrongly
-            # cull real balls the model reports at 0.83–0.84 — use the looser
-            # tracking floor for them.
+                detections = []
+            # Confidence floor. A trained model is well-calibrated and already
+            # thresholded in the strategy, so apply only the base confidence_floor.
+            # A heuristic (non-model) detector gets the stricter render_floor —
+            # "draw nothing rather than a wrong phantom".
             det = self.settings.detection
             if getattr(self._strategy, "model_based", False):
                 floor = det.confidence_floor
@@ -329,14 +353,19 @@ class Pipeline:
         self._prev_gray = roi
 
         # extra modalities for evidence fusion: background-subtraction foreground
-        # area + coherent optical-flow activity (both on a downscaled ROI)
-        small = downscale(roi)
-        fg = self._bg.update(small)
-        # optical flow is the costliest + least-weighted signal — every 2nd frame
-        if self._frame_idx % 2 == 0:
-            self._last_flow = flow_activity(self._prev_small, small)
-        self._prev_small = small
-        evidence = {"motion": motion, "flow": self._last_flow * 100.0, "fg": fg * 100.0}
+        # area + coherent optical-flow activity (both on a downscaled ROI). These
+        # (MOG2 + Farneback) are the heaviest per-frame ops and feed ONLY shot
+        # detection, so they run only when fusion is enabled — off by default
+        # while cue-ball tracking (M2) is the focus, freeing the real-time budget.
+        evidence = {"motion": motion}
+        if self.settings.detection.use_fusion:
+            small = downscale(roi)
+            fg = self._bg.update(small)
+            # optical flow is the costliest + least-weighted signal — every 2nd frame
+            if self._frame_idx % 2 == 0:
+                self._last_flow = flow_activity(self._prev_small, small)
+            self._prev_small = small
+            evidence = {"motion": motion, "flow": self._last_flow * 100.0, "fg": fg * 100.0}
 
         if self.paused:
             # keep showing video + tracking, but never count shots while paused

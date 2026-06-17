@@ -79,7 +79,8 @@ def test_tracker_handles_off_frame_detection():
     tr.update([Detection(-40, -40, 10, cls=BallClass.SOLID)], 400)
     out = tr.update([Detection(-40, -40, 10, cls=BallClass.SOLID)], 400)
     assert isinstance(out, list)
-    # then it vanishes — tracker simply ages it out without error
-    for _ in range(20):
+    # then it vanishes — tracker ages it out without error once the keep-alive
+    # budget (max_misses, raised to survive ~1s occlusion) is exceeded.
+    for _ in range(tr.max_misses + 2):
         tr.update([], 400)
     assert tr.tracks == []

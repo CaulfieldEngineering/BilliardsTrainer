@@ -46,7 +46,7 @@ class _Internal:
 
 
 class BallTracker:
-    def __init__(self, max_dist_frac: float = 0.08, max_misses: int = 12,
+    def __init__(self, max_dist_frac: float = 0.08, max_misses: int = 30,
                  min_hits: int = 2, vel_alpha: float = 0.6,
                  pos_alpha_slow: float = 0.15, pos_alpha_fast: float = 0.85,
                  speed_lo: float = 3.0, speed_hi: float = 8.0):
