@@ -110,6 +110,31 @@ def test_live_tuning_panel_present(app):
     assert hasattr(page, "_conf_val")
 
 
+def test_ball_trainer_dialog_and_store(app, tmp_path):
+    """The in-app Ball-ID trainer constructs, and its labelled-data store does a
+    save/read round-trip in the YOLO format the fine-tune consumes."""
+    import numpy as np
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.train.store import LabeledBall, TrainingStore
+    from billiards_trainer.ui.dialogs.ball_trainer_dialog import BallTrainerDialog
+
+    s = Settings()
+    s.source = ""  # no clip auto-loaded
+    dlg = BallTrainerDialog(s)
+    assert dlg._store is not None
+
+    store = TrainingStore(tmp_path / "ballid")
+    img = np.zeros((480, 640, 3), np.uint8)
+    n = store.add_frame(img, [LabeledBall(0, 0.5, 0.5, 0.1, 0.1),   # cue
+                              LabeledBall(9, 0.3, 0.3, 0.1, 0.1),   # 9-ball
+                              LabeledBall(-1, 0.1, 0.1, 0.1, 0.1)])  # 'not a ball' dropped
+    assert n == 2
+    assert store.count() == 1
+    assert store.class_counts() == {0: 1, 9: 1}
+    assert store.write_data_yaml().exists()
+
+
 def test_try_demo_button_removed(app):
     from billiards_trainer.config import Settings
     from billiards_trainer.ui.pages.live_page import LivePage

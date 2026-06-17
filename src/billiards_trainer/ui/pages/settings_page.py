@@ -50,6 +50,7 @@ class SettingsPage(QWidget):
     capture_requested = Signal()
     flag_failure_requested = Signal()
     detector_changed = Signal(str)   # live detector strategy switched
+    train_balls_requested = Signal()  # open the in-app Ball ID Trainer
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -281,6 +282,22 @@ class SettingsPage(QWidget):
         self._refresh_yolo_button()
         form.addRow("", self._dl_yolo_btn)
         form.addRow("", self._dl_status)
+
+        # Active-learning: teach the model THIS table's ball numbers/colours. The
+        # generic model can't tell adjacent colours apart on a specific felt, so a
+        # quick correct-the-guesses pass + fine-tune adapts it. Redo if the camera
+        # moves.
+        train_btn = QPushButton("  Train ball IDs on my table…")
+        train_btn.setObjectName("Ghost")
+        train_btn.setCursor(Qt.PointingHandCursor)
+        train_btn.clicked.connect(self.train_balls_requested.emit)
+        form.addRow("", train_btn)
+        note = QLabel("Teach the model your exact balls: it guesses each number, you "
+                      "correct the wrong ones, then fine-tune. Improves number/colour "
+                      "accuracy for your table; redo if your camera angle changes.")
+        note.setObjectName("Faint")
+        note.setWordWrap(True)
+        form.addRow("", note)
         return card
 
     def _refresh_yolo_button(self) -> None:

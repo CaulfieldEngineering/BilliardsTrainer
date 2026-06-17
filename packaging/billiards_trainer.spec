@@ -47,6 +47,11 @@ a = Analysis(
         # heuristic fallback.
         "billiards_trainer.detector_strategies",
         "billiards_trainer.detector_strategies.cue_ball_white",
+        # in-app Ball-ID trainer (lazily imported from the settings page) + its
+        # data store — name them so the frozen bundle includes them.
+        "billiards_trainer.train",
+        "billiards_trainer.train.store",
+        "billiards_trainer.ui.dialogs.ball_trainer_dialog",
         # friendly camera names on Windows (DirectShow via comtypes)
         "pygrabber",
         "pygrabber.dshow_graph",

@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
         self._settings_page.feedback_requested.connect(self._open_feedback)
         self._settings_page.capture_requested.connect(
             self._controller.start_analysis_capture, q)
+        self._settings_page.train_balls_requested.connect(self._open_ball_trainer)
         self._settings_page.flag_failure_requested.connect(self._controller.flag_failure, q)
         self._controller.failure_flagged.connect(self._on_failure_flagged)
         self._drills.drill_chosen.connect(self._on_drill_chosen)
@@ -367,6 +368,12 @@ class MainWindow(QMainWindow):
         maybe_prompt_update(info, self)
 
     # ------------------------------------------------------------------ #
+    def _open_ball_trainer(self) -> None:
+        from .dialogs.ball_trainer_dialog import BallTrainerDialog
+        dlg = BallTrainerDialog(self._settings, self)
+        dlg.strategy_retrained.connect(self._on_strategy_changed)
+        dlg.exec()
+
     def _open_feedback(self) -> None:
         from .dialogs.feedback_dialog import FeedbackDialog
         dlg = FeedbackDialog(self._repo, self)
