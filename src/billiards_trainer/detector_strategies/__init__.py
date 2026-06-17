@@ -28,6 +28,10 @@ log = logging.getLogger("detector_strategies")
 class DetectorStrategy:
     name = "base"
     description = ""
+    # Model-based detectors (YOLO/ONNX) already validate "this is a ball" with high
+    # confidence, so the pipeline's physical-size prior — which exists to reject
+    # classical blob noise (pocket shadows etc.) — should NOT cull them.
+    model_based = False
 
     def detect(self, frame_bgr: np.ndarray, calib) -> list[Detection]:
         """frame_bgr: RAW camera frame. calib: Calibration | None. Returns raw-px

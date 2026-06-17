@@ -27,6 +27,8 @@ MODEL_DIRS = [ROOT / "_eval" / "models", USER_MODELS_DIR]
 
 
 class OnnxModelStrategy(DetectorStrategy):
+    model_based = True  # trained detector — skip the classical size prior
+
     def __init__(self, model_path: Path, conf: float = 0.25, iou: float = 0.45):
         self._path = Path(model_path)
         self.name = f"onnx_{self._path.stem}"

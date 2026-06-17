@@ -285,22 +285,30 @@ class Pipeline:
                               self.settings.balls.live_strategy, exc)
                     raw_dets = []
                 detections = self._project_raw_to_rect(raw_dets, calib)
-                # Physical-size prior (strategy path only — the rectified plane has
-                # uniform ball size): reject blobs whose radius is far from the known
-                # ball radius — kills pocket-shadow "balls" (too big) and speckle
-                # (too small). The legacy detector has its own Hough size band.
+                # Physical-size prior (classical strategy path only — the rectified
+                # plane has uniform ball size): reject blobs whose radius is far from
+                # the known ball radius — kills pocket-shadow "balls" (too big) and
+                # speckle (too small). Skipped for model-based detectors (YOLO/ONNX),
+                # which already validate balls with high confidence; the legacy
+                # detector has its own Hough size band.
                 exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
                 tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
-                if exp_r > 2.0 and tol > 0:
+                if exp_r > 2.0 and tol > 0 and not getattr(self._strategy, "model_based", False):
                     lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
                     detections = [d for d in detections if lo <= d.radius <= hi]
             else:
                 detections = self.detector.detect(rect, calib.rect_mask, calib.table)
-            # With auto-detection ON, demand the stricter render floor: better to
-            # draw nothing than a low-confidence phantom. Falls back to the looser
-            # tracking floor only if render_floor wasn't set (old settings files).
+            # Confidence floor. Classical detectors get the stricter render_floor
+            # (better to draw nothing than a low-confidence phantom). Model-based
+            # detectors (YOLO/ONNX) are well-calibrated and already thresholded in
+            # the strategy, so applying the high render_floor (0.85) would wrongly
+            # cull real balls the model reports at 0.83–0.84 — use the looser
+            # tracking floor for them.
             det = self.settings.detection
-            floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
+            if getattr(self._strategy, "model_based", False):
+                floor = det.confidence_floor
+            else:
+                floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
             detections = [d for d in detections if d.score >= floor]
             tracks = self.tracker.update(detections, calib.table.short_side)
         res.tracks = tracks
