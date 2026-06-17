@@ -507,3 +507,117 @@ these — number, not vibe.
 
 > Which of tracks (a)/(b)/(c) leads is Joe's call. (a) is the fastest to a real number
 > on his footage and is the recommended first step.
+
+---
+
+---
+
+# Pool_coach: what we saw when we ran it on Joe's footage (judge for yourself)
+
+> Context: Joe rightly called out that our earlier "YOLO didn't win" framing was
+> overconfident — our eval F1 is bounded by **our** integration quality and **our**
+> (weak, hand-labelled) ground truth, neither independently validated. He pointed at
+> [github.com/fearlessit/pool_coach](https://github.com/fearlessit/pool_coach). So we
+> stopped arguing from our numbers and **ran their model on `testVideo.MP4` directly.**
+> Everything below is **count + ID-persistence + visual** evidence over a few sampled
+> windows of one video. We did **not** measure accuracy against ground truth (we have no
+> trustworthy GT). It is not a winner declaration — it's evidence for Joe to judge.
+
+## What it is
+- **YOLO11 detection model**, single class `{0: 'ball'}`. pool_coach **commits its own
+  weights** (`model/best_weights.pt`, ~55 MB, git-tracked in their repo) — unlike the
+  survey repos above whose weights are gitignored. Trained on the Roboflow Universe
+  **"only_balls v3"** set (6085 images, exported Dec 2024). We have **not** audited that
+  set's camera angles, table variety, labelling quality, or per-image license, so we
+  cannot say its training data resembles Joe's oblique view — only that it happened to
+  generalise to it here.
+- It detects *balls*, not cue/solid/stripe — class identity would still be ours to add
+  (colour logic on stable positions).
+- **ByteTrack** for IDs, via Ultralytics' built-in `model.track(persist=True)`.
+- Ran in an **isolated venv** (`_external/pool_coach/.venv`, ultralytics 8.4.69 + torch
+  2.12 **CPU**, no CUDA), so it never touches our `opencv-headless` pin. (gitignored.)
+
+## What we observed
+Headless `model.track(persist=True, conf=0.25)` over sampled windows of `testVideo.MP4`
+(72,262 frames, 40 min, 30 fps) — reproduce via `tools/eval_pool_coach.py` (frame ranges
+below):
+
+| Window (start frame) | dets/frame (min/med/max) | unique IDs | ID persistence | CPU fps |
+|---|---|---|---|---|
+| Rack, ~0 | 10 / 10 / 10 | 10 | all 10 lasted 150/150 frames | 4.2 |
+| Mid-game, ~28900 | 3 / 4 / 4 | 4 | 3 of 4 lasted 100/100 (one did not) | 6.1 |
+| Late-game, ~50600 | 3 / 3 / 3 | 3 | all 3 lasted 100/100 | 6.8 |
+
+![rack](poolcoach/rack_cluster.jpg)
+![active play](poolcoach/active_play.jpg)
+
+Reading the evidence honestly:
+- **Rack window:** all **10 balls boxed every frame**, conf 0.83–0.89, one box per ball
+  visually, 10 stable IDs across all 150 frames. Strong — but it's a **static set rack**,
+  the easy case.
+- **Mid/late windows:** only 3–4 detections. This is **plausibly correct** (most balls
+  potted, few left on the table) — but we have **no ground-truth ball count**, so we
+  cannot tell "detected every ball present" from "missed some." One mid-game track also
+  dropped (3 of 4 persisted), so it is **not** flicker-free everywhere.
+- **IDs are stable WITHIN each steady-state window (100–150 frames).** This does **not**
+  contradict our earlier finding (above) that pool_coach's shipped `shot.json` had ~66
+  IDs for ~10 balls across a full shot: across a break/occlusions ByteTrack re-IDs freely.
+  Per-ball identity over a whole rack is **still unproven** and not something we'd rely on.
+- **Cluster:** on the static rack it produced one box+ID per ball — strongly suggesting it
+  separates a cluster (the deferred-to-M3 "racked balls" problem). **But that was a static
+  rack, not the motion-blur of a real break**, which is exactly where M3 bites and which we
+  did **not** test. Treat "solves M3" as provisional.
+- **Active-play frame:** with a player mid-shot, only the 4 table balls were boxed — **on
+  that one frame**, no false positives on the player, cue, or stool. One frame is not a
+  false-positive rate, but it didn't fire on clutter the way a brightness-based detector can.
+
+## What it does that our classical pipeline does not (on this evidence)
+- Separates the (static) rack cluster into individual balls.
+- Per-frame detection count + within-window ID persistence with no per-table hand-tuning,
+  on the windows sampled.
+- Did not fire on the player/cue/stool on the sampled active-play frame.
+
+## Costs / risks
+1. **CPU speed ~4–7 fps** vs our ~40 fps. Not like-for-like: pool_coach runs a full YOLO11
+   forward pass + ByteTrack; our classical pipeline does far cheaper work (and, per our 2.6%
+   baseline, detects far less). So this is "neural vs classical," not a clean speed win.
+   **GPU fps is unmeasured** (no CUDA here) — a GPU would likely help but we cannot quote a
+   number or confirm it hits realtime, and a CUDA torch build is larger and adds driver deps
+   on Joe's machine.
+2. **Single class only** — no cue/solid/stripe. Identity stays ours (on stable positions).
+3. **Dependency weight:** ultralytics+torch ~2 GB installed. Bundling it into the onefile
+   blows the download from ~150 MB to ~2 GB and reintroduces the torch↔opencv DLL conflict.
+4. **License:** Ultralytics YOLO11 weights are **AGPL-3.0**. Redistributing `best_weights.pt`
+   (or an ONNX export of it — export changes the runtime, **not** the license) needs clearance.
+
+## Honest accounting: were our prior dismissals warranted?
+- **CueDetat ONNX (F1 11.8%, 5 fps — from our Phase-1 eval run, docs/eval/experiments.md):**
+  *warranted as a finding about that specific model*. It does **not** generalise to "YOLO
+  doesn't work" — pool_coach's model is far better on Joe's table here.
+- **8ball-pool-detection (dismissed on a torch/cv2 `WinError 5` install conflict):** that was
+  a **measurement/environment artifact, not a model verdict.** The isolated-venv recipe ran
+  pool_coach cleanly, which **strongly suggests** it would also sidestep 8ball's conflict —
+  but we have **not** actually re-run 8ball under it. That's the obvious next step, not a
+  completed result.
+- **Our eval F1 (2.6% recall baseline):** measures *our* integration + *our* GT. pool_coach's
+  detections *look* far better than that baseline would predict — but we never scored
+  pool_coach on our harness, so that's a visual impression, not a measured number.
+
+## Could we adopt it? Proposal (for Joe to green-light)
+Detection = YOLO; identity (cue/solid/stripe) = our colour logic; display + pockets = our
+calibration. Two shapes:
+- **(A) Sidecar subprocess (recommended first):** a `pool_coach_yolo11` strategy shelling out
+  to the isolated venv (frame in / boxes out). Keeps our deps clean, optional (degrades to
+  simple_blob if absent), GPU-or-CPU. Slow on CPU but correct — enough to validate end-to-end.
+- **(B) ONNX-export (`yolo export format=onnx`) + our existing no-torch `onnxruntime` path.**
+  Cleaner runtime, no torch in-process. **Caveats up front:** (i) ONNX export removes the torch
+  *runtime* but **not** the AGPL obligation on the weights — still needs license clearance;
+  (ii) ByteTrack lives in the Ultralytics/torch stack, so a no-torch path means **re-implementing
+  tracking** ourselves (we have a tracker already). Unverified — proposed, not yet built.
+
+## Reproduce / what we did NOT test
+- Run: `_external/pool_coach/.venv/Scripts/python tools/eval_pool_coach.py testVideo.MP4 <start_frame>`
+  (conf 0.25; windows at frames ~0 / ~28900 / ~50600; ultralytics 8.4.69, torch 2.12 CPU).
+- NOT tested: accuracy vs ground truth (no trustworthy GT); GPU fps; motion-blur on a real
+  break (the hardest + most M3-relevant case); the ONNX-export path (B); 8ball-pool-detection
+  re-run under the isolated env; dataset/license provenance audit.
