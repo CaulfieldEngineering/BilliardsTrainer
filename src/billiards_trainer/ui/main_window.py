@@ -106,8 +106,11 @@ class MainWindow(QMainWindow):
         self._nav_group = QButtonGroup(self)
         self._nav_group.setExclusive(True)
         self._nav_items = []
+        # nav index -> stacked-page index ('Training' reuses the Sandbox page +
+        # flips its Training Mode, so labelling happens on the same video/transport)
+        self._nav_to_stack = {0: 0, 1: 0, 2: 1, 3: 2, 4: 3}
         for idx, (ic, label) in enumerate([
-            ("activity", "Sandbox"), ("target", "Drills"),
+            ("activity", "Sandbox"), ("crosshair", "Training"), ("target", "Drills"),
             ("stats", "Stats"), ("settings", "Settings"),
         ]):
             btn = nav_button(ic, label)
@@ -123,8 +126,10 @@ class MainWindow(QMainWindow):
         lay.addWidget(ver)
         return rail
 
-    def _go(self, index: int) -> None:
-        self._stack.setCurrentIndex(index)
+    def _go(self, nav_index: int) -> None:
+        stack_i = self._nav_to_stack.get(nav_index, 0)
+        self._stack.setCurrentIndex(stack_i)
+        self._live.set_training(nav_index == 1)   # 'Training' nav = label mode on
         if self._stack.currentWidget() is self._stats:
             self._stats.refresh()
 
@@ -153,6 +158,10 @@ class MainWindow(QMainWindow):
         self._live.save_replay_requested.connect(self._controller.save_replay, q)
         self._live.overlays_toggled.connect(self._on_overlays_toggled)
         self._live.tuning_changed.connect(self._on_tuning_changed)
+        # Training Mode (label/correct ball numbers on the playback)
+        self._live.label_mode_toggled.connect(self._controller.set_label_mode, q)
+        self._live.save_training_frame_requested.connect(self._controller.save_training_frame, q)
+        self._live.train_balls_requested.connect(self._train_ball_ids)
         self._live.pause_toggled.connect(self._controller.set_paused, q)
         self._live.reset_requested.connect(self._controller.reset_counters, q)
         self._live.manual_shot.connect(self._controller.record_manual_shot, q)
@@ -175,6 +184,7 @@ class MainWindow(QMainWindow):
         self._controller.replay_saved.connect(self._on_replay_saved)
         self._controller.capture_progress.connect(
             lambda m: self.statusBar().showMessage(f"Capture: {m}", 4000))
+        self._controller.capture_progress.connect(self._live.set_training_count)
         self._controller.capture_saved.connect(self._on_capture_saved)
 
         # settings + drills
@@ -373,6 +383,53 @@ class MainWindow(QMainWindow):
         dlg = BallTrainerDialog(self._settings, self)
         dlg.strategy_retrained.connect(self._on_strategy_changed)
         dlg.exec()
+
+    def _find_train_python(self) -> str:
+        """A python with torch+ultralytics (the shipped app is torch-free)."""
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[2].parent
+        for c in (root / "_refs" / "pool_coach" / ".venv" / "Scripts" / "python.exe",
+                  root / ".trainvenv" / "Scripts" / "python.exe"):
+            if c.exists():
+                return str(c)
+        return ""
+
+    def _train_ball_ids(self) -> None:
+        """Fine-tune on the labelled store (Training Mode) in a torch env, then
+        switch the app to the table-trained model."""
+        from pathlib import Path
+
+        from ..config import APP_DIR, MODELS_DIR
+        from ..train import TrainingStore
+        store = TrainingStore(APP_DIR / "training" / "ballid")
+        if store.count() < 5:
+            self.statusBar().showMessage("Label at least ~5 frames in Training Mode "
+                                         "before training.", 6000)
+            return
+        py = self._find_train_python()
+        data = str(store.write_data_yaml())
+        out = str(MODELS_DIR / "pool_ballid.onnx")
+        if not py:
+            self.statusBar().showMessage("No torch env found for training. Run once: "
+                                         f"python tools/finetune_ballid.py --data {data} "
+                                         f"--out {out}", 15000)
+            return
+        from .dialogs.ball_trainer_dialog import _TrainWorker
+        self.statusBar().showMessage("Training on your labelled balls… (runs in the "
+                                     "background, a few minutes)", 0)
+        self._ball_train = _TrainWorker(py, data, out)
+        self._ball_train.done.connect(self._on_balls_trained)
+        self._ball_train.start()
+
+    def _on_balls_trained(self, ok: bool, log: str) -> None:
+        if ok:
+            self._settings.balls.live_strategy = "onnx_pool_ballid"
+            self._settings.save()
+            self.set_strategy_requested.emit("onnx_pool_ballid")
+            self.statusBar().showMessage("Trained ✓ — now using your table's ball-ID "
+                                         "model.", 8000)
+        else:
+            self.statusBar().showMessage(f"Training failed: {log[-200:]}", 12000)
 
     def _open_feedback(self) -> None:
         from .dialogs.feedback_dialog import FeedbackDialog

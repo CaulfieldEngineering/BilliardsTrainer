@@ -110,6 +110,50 @@ def test_live_tuning_panel_present(app):
     assert hasattr(page, "_conf_val")
 
 
+def test_training_mode_label_correct_add_save(app):
+    """Sidebar Training Mode: enter it, the model's guesses become editable on the
+    frame, correcting a number + adding a missed ball flows to a save payload."""
+    import types
+
+    import numpy as np
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.main_window import MainWindow
+    from billiards_trainer.ui.theme import apply_theme
+    from billiards_trainer.vision.types import BallClass, Detection
+
+    s = Settings()
+    s.source = ""
+    apply_theme(app, s.ui.accent)
+    win = MainWindow(s)
+    lp = win._live
+    win._go(1)  # 'Training' nav
+    assert lp._training
+
+    frame = np.zeros((480, 640, 3), np.uint8)
+    raw = [Detection(100, 100, 12, (200, 200, 200), BallClass.SOLID, 0.9, number=2),
+           Detection(300, 200, 12, (245, 245, 245), BallClass.CUE, 0.9, number=0)]
+    pkt = types.SimpleNamespace(perspective=frame, birdseye=None, fps=30, n_balls=2,
+                                tracks=[], raw_dets=raw, status="tracking", deviated=False,
+                                shot_state="settled", clock_enabled=False)
+    lp.on_frame(pkt)
+    assert len(lp._label_balls) == 2
+
+    lp._on_label_click(100 / 640, 100 / 480)   # select the mis-id'd ball
+    lp._assign_label(10)                         # correct 2 -> 10
+    lp._on_label_click(0.8, 0.8)                 # empty spot -> add a missed ball
+    lp._assign_label(7)
+    boxes = []
+    lp.save_training_frame_requested.connect(lambda b: boxes.extend(b))
+    lp._save_label_frame()
+    assert sorted(b[0] for b in boxes) == [0, 7, 10]
+    win._go(0)
+    assert not lp._training
+    win.close()
+    app.processEvents()
+    win._thread.wait(3000)   # tear the worker thread down (or the process exits dirty)
+
+
 def test_ball_trainer_dialog_and_store(app, tmp_path):
     """The in-app Ball-ID trainer constructs, and its labelled-data store does a
     save/read round-trip in the YOLO format the fine-tune consumes."""

@@ -49,6 +49,7 @@ class FramePacket:
     clock_warning: bool = False
     deviated: bool = False
     tracks: list = field(default_factory=list)
+    raw_dets: list = field(default_factory=list)   # camera-coord dets + guessed numbers (labelling)
 
 
 class PipelineController(QObject):
@@ -95,6 +96,10 @@ class PipelineController(QObject):
         # (which existed because classical CV was untrustworthy) no longer applies
         # — the user wants to USE the tracker, not opt into it every launch.
         self._detection_enabled = True
+        # Training mode: when on, the camera view is sent UN-annotated (so the live
+        # page can draw the labelling overlay) and raw detections + guessed numbers
+        # ride along in the packet for correcting.
+        self._label_mode = False
         self._capture: dict | None = None  # active analysis-capture context
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
@@ -280,6 +285,27 @@ class PipelineController(QObject):
                 self._pipeline.shots.reset()
         self.detection_changed.emit(on)
         log.info("Auto-detection %s", "ON" if on else "OFF")
+
+    @Slot(bool)
+    def set_label_mode(self, on: bool) -> None:
+        """Training mode: send the raw camera frame (so the UI can draw the
+        labelling overlay) + raw detections with guessed numbers in each packet."""
+        self._label_mode = bool(on)
+
+    @Slot(list)
+    def save_training_frame(self, balls: list) -> None:
+        """Persist the current RAW frame + corrected boxes (list of
+        (number, cx, cy, w, h), normalised) to the ball-ID training store."""
+        if self._last_frame is None or not balls:
+            return
+        from ..config import APP_DIR
+        from ..train.store import LabeledBall, TrainingStore
+        store = TrainingStore(APP_DIR / "training" / "ballid")
+        labeled = [LabeledBall(int(n), float(cx), float(cy), float(w), float(h))
+                   for (n, cx, cy, w, h) in balls]
+        saved = store.add_frame(self._last_frame, labeled)
+        self.capture_progress.emit(f"Saved {saved} labelled balls "
+                                   f"({store.count()} frames collected)")
 
     @Slot()
     def reset_counters(self) -> None:
@@ -489,7 +515,7 @@ class PipelineController(QObject):
 
         t = time.perf_counter() - self._t0
         try:
-            res = self._pipeline.process(frame, t, detect=detect)
+            res = self._pipeline.process(frame, t, annotate=not self._label_mode, detect=detect)
         except Exception as exc:  # noqa: BLE001 - never let one bad frame kill the loop
             log.exception("pipeline error")
             self.error.emit(f"Pipeline error: {exc}")
@@ -524,7 +550,7 @@ class PipelineController(QObject):
             fps=self._fps, n_balls=res.n_balls, shot_state=res.shot_state,
             clock_remaining=self._clock.remaining(t),
             clock_enabled=self._clock.enabled, clock_warning=self._clock.is_warning(t),
-            deviated=res.deviated, tracks=res.tracks,
+            deviated=res.deviated, tracks=res.tracks, raw_dets=res.raw_dets,
         ))
         if getattr(self._source, "is_video", False):
             self.video_state.emit(self._video_pos, self._source.frame_count,

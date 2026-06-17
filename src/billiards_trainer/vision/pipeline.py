@@ -51,6 +51,7 @@ class PipelineResult:
     rect_bgr: np.ndarray | None = None
     tracks: list[Track] = field(default_factory=list)
     detections: list[Detection] = field(default_factory=list)
+    raw_dets: list[Detection] = field(default_factory=list)  # camera-coord dets + guessed numbers (labelling)
     table: TableModel | None = None
     corners: np.ndarray | None = None
     shot_event: ShotEvent | None = None
@@ -311,6 +312,7 @@ class Pipeline:
                 except Exception as exc:  # noqa: BLE001 - a bad frame must not kill the loop
                     log.debug("detector failed on a frame: %s", exc)
                     raw_dets = []
+                res.raw_dets = list(raw_dets)   # camera-coord, for the in-app labeller
                 detections = self._project_raw_to_rect(raw_dets, calib)
                 # Physical-size prior: reject blobs whose radius is far from the
                 # known ball radius (pocket-shadow "balls" too big, speckle too

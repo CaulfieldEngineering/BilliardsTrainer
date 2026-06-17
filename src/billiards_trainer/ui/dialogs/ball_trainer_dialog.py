@@ -15,7 +15,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSlider,
     QVBoxLayout,
-    QWidget,
 )
 
 from ...config import APP_DIR, MODELS_DIR, Settings
@@ -194,6 +194,13 @@ class BallTrainerDialog(QDialog):
         for b in self._num_btns.values():
             b.setEnabled(self._sel >= 0)
 
+    def _default_radius(self) -> float:
+        rs = [max(d.w, d.h) / 2.0 for d in self._dets if d.w > 0]
+        if rs:
+            return float(np.median(rs))
+        w = self._frame.shape[1] if self._frame is not None else 640
+        return max(8.0, w * 0.012)
+
     def _on_click(self, ev) -> None:
         if self._frame is None or self._scale <= 0:
             return
@@ -205,8 +212,16 @@ class BallTrainerDialog(QDialog):
             if dd < bd:
                 bd, best = dd, i
         if best >= 0 and bd < (60 / max(self._scale, 1e-6)) ** 2:
-            self._sel = best
-            self._render()
+            self._sel = best                      # clicked a ball -> select it
+        else:
+            # clicked empty felt -> ADD a missed ball (false negative). It starts
+            # unlabelled ('?'); tap a number to set it. This is how you teach the
+            # model the balls it didn't find.
+            r = self._default_radius()
+            self._dets.append(LabeledBall(number=-1, cx=float(x), cy=float(y),
+                                          w=2 * r, h=2 * r))
+            self._sel = len(self._dets) - 1
+        self._render()
 
     def _assign(self, num: int) -> None:
         if 0 <= self._sel < len(self._dets):

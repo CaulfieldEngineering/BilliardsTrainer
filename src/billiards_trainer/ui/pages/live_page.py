@@ -11,11 +11,14 @@ renders controller signals; the main window wires the two across the thread
 boundary.
 """
 
+import cv2
+import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -81,6 +84,9 @@ class LivePage(QWidget):
     video_seek = Signal(int)                  # absolute frame index
     video_speed = Signal(float)               # playback multiplier
     tuning_changed = Signal()                 # a live-tuning control changed (settings mutated in place)
+    label_mode_toggled = Signal(bool)         # Training Mode on/off
+    save_training_frame_requested = Signal(list)  # [(number, cx, cy, w, h) normalised]
+    train_balls_requested = Signal()          # fine-tune on collected data
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -95,6 +101,12 @@ class LivePage(QWidget):
         self._user_is_seeking = False
         self._was_playing = False
         self._pending_seek: int | None = None
+        # Training Mode state: editable balls for the CURRENT frame, each
+        # [number, x, y, r] in camera px; -1 number = unlabelled/not-a-ball.
+        self._training = False
+        self._label_balls: list[list] = []
+        self._label_sel = -1
+        self._frame_wh = (1, 1)
         self._build()
 
     # ------------------------------------------------------------------ #
@@ -128,11 +140,17 @@ class LivePage(QWidget):
         persp_card.add(self._transport_bar())   # video play/seek/step strip
         splitter.addWidget(persp_card)
 
-        splitter.addWidget(self._stats_rail())
+        # Right rail swaps between the normal tuning/score rail and the Training
+        # rail (number pad + save/train), so Training Mode reuses this same video +
+        # transport — you scrub the playback and label in place.
+        self._rail_stack = QStackedWidget()
+        self._rail_stack.addWidget(self._stats_rail())      # 0 = normal
+        self._rail_stack.addWidget(self._training_rail())   # 1 = training
+        splitter.addWidget(self._rail_stack)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 4)
         splitter.setStretchFactor(2, 0)
-        splitter.setSizes([400, 540, 320])
+        splitter.setSizes([400, 540, 340])
         root.addWidget(splitter, 1)
 
     def _caption(self, text: str) -> QLabel:
@@ -614,6 +632,149 @@ class LivePage(QWidget):
             self._cue_sub.setText(f"{packet.n_balls} balls · {packet.fps:.0f} fps")
 
     # ------------------------------------------------------------------ #
+    # Training Mode — label/correct ball numbers on the playback video
+    # ------------------------------------------------------------------ #
+    def _training_rail(self) -> QWidget:
+        rail = Card(padding=16, spacing=10)
+        rail.setMinimumWidth(320)
+        rail.setMaximumWidth(440)
+        cap = QLabel("TRAINING MODE")
+        cap.setObjectName("StatLabel")
+        rail.add(cap)
+        hint = QLabel("Scrub/pause the video to a clear frame. Click a ball, then "
+                      "tap its correct number. Click an empty spot to ADD a missed "
+                      "ball. Save good frames, then Train.")
+        hint.setObjectName("Faint")
+        hint.setWordWrap(True)
+        rail.add(hint)
+        self._label_status = QLabel("Click a ball on the camera view to select it.")
+        self._label_status.setObjectName("Muted")
+        self._label_status.setWordWrap(True)
+        rail.add(self._label_status)
+
+        pad = QGridLayout()
+        pad.setSpacing(5)
+        self._label_btns = {}
+        items = [("Cue", 0)] + [(str(i), i) for i in range(1, 16)] + [("Not a ball", -1)]
+        for idx, (txt, num) in enumerate(items):
+            b = QPushButton(txt)
+            b.setEnabled(False)
+            b.setCursor(Qt.PointingHandCursor)
+            b.clicked.connect(lambda _=False, n=num: self._assign_label(n))
+            self._label_btns[num] = b
+            pad.addWidget(b, idx // 4, idx % 4)
+        pw = QWidget()
+        pw.setLayout(pad)
+        rail.add(pw)
+
+        save = QPushButton("＋ Save this frame")
+        save.setObjectName("Accent")
+        save.setCursor(Qt.PointingHandCursor)
+        save.clicked.connect(self._save_label_frame)
+        rail.add(save)
+        self._label_count = QLabel("0 frames collected")
+        self._label_count.setObjectName("Faint")
+        rail.add(self._label_count)
+        rail.add(self._hsep())
+        train = QPushButton("Train model on collected data")
+        train.setCursor(Qt.PointingHandCursor)
+        train.clicked.connect(self.train_balls_requested.emit)
+        rail.add(train)
+        tnote = QLabel("Training fine-tunes the model on what you've labelled and "
+                       "switches the app to it. Re-train if your camera moves.")
+        tnote.setObjectName("Faint")
+        tnote.setWordWrap(True)
+        rail.add(tnote)
+        rail.layout().addStretch(1)
+        return rail
+
+    def set_training(self, on: bool) -> None:
+        """Enter/leave Training Mode: swap the right rail and make the camera view
+        clickable for labelling. Reuses the normal video + transport."""
+        self._training = on
+        self._rail_stack.setCurrentIndex(1 if on else 0)
+        self._persp.set_pickable(on or self._pick_mode)
+        self.label_mode_toggled.emit(on)
+        if on:
+            self._status_badge.set_text_color("TRAINING — label the balls", PALETTE.info)
+
+    def _ingest_label_frame(self, packet) -> None:
+        self._last_persp = packet.perspective
+        h, w = packet.perspective.shape[:2]
+        self._frame_wh = (w, h)
+        self._label_balls = [[int(getattr(d, "number", -1)), float(d.x), float(d.y),
+                              float(d.radius)] for d in (packet.raw_dets or [])]
+        self._label_sel = -1
+        self._redraw_label()
+        self._update_label_buttons()
+
+    def _default_label_r(self) -> float:
+        rs = [b[3] for b in self._label_balls if b[3] > 0]
+        return float(np.median(rs)) if rs else max(8.0, self._frame_wh[0] * 0.012)
+
+    def _on_label_click(self, xf: float, yf: float) -> None:
+        w, h = self._frame_wh
+        x, y = xf * w, yf * h
+        best, bd = -1, 1e18
+        for i, b in enumerate(self._label_balls):
+            dd = (b[1] - x) ** 2 + (b[2] - y) ** 2
+            if dd < bd:
+                bd, best = dd, i
+        if best >= 0 and bd < (0.03 * max(w, h)) ** 2:
+            self._label_sel = best
+            self._label_status.setText("Tap the correct number for the selected ball.")
+        else:
+            self._label_balls.append([-1, x, y, self._default_label_r()])
+            self._label_sel = len(self._label_balls) - 1
+            self._label_status.setText("Added a ball — tap its number (or 'Not a ball' to remove).")
+        self._update_label_buttons()
+        self._redraw_label()
+
+    def _assign_label(self, num: int) -> None:
+        if 0 <= self._label_sel < len(self._label_balls):
+            if num < 0:
+                self._label_balls.pop(self._label_sel)   # 'not a ball' -> remove
+            else:
+                self._label_balls[self._label_sel][0] = num
+            self._label_sel = -1
+            self._update_label_buttons()
+            self._redraw_label()
+
+    def _update_label_buttons(self) -> None:
+        on = 0 <= self._label_sel < len(self._label_balls)
+        for b in self._label_btns.values():
+            b.setEnabled(on)
+
+    def _redraw_label(self) -> None:
+        frame = getattr(self, "_last_persp", None)
+        if frame is None:
+            return
+        img = frame.copy()
+        for i, (num, x, y, r) in enumerate(self._label_balls):
+            c = (int(x), int(y))
+            sel = i == self._label_sel
+            col = (0, 255, 255) if sel else (60, 220, 60)
+            cv2.circle(img, c, max(4, int(r)), col, 3 if sel else 2, cv2.LINE_AA)
+            lbl = "C" if num == 0 else (str(num) if num > 0 else "?")
+            cv2.putText(img, lbl, (c[0] - 9, c[1] - int(r) - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
+        self._persp.set_frame(img)
+
+    def _save_label_frame(self) -> None:
+        w, h = self._frame_wh
+        boxes = [(num, x / w, y / h, 2 * r / w, 2 * r / h)
+                 for (num, x, y, r) in self._label_balls if num >= 0]
+        if not boxes:
+            self._label_status.setText("Label at least one ball before saving.")
+            return
+        self.save_training_frame_requested.emit(boxes)
+        self._label_status.setText(f"Saved {len(boxes)} balls. Scrub to another frame and keep going.")
+
+    def set_training_count(self, text: str) -> None:
+        if hasattr(self, "_label_count"):
+            self._label_count.setText(text)
+
+    # ------------------------------------------------------------------ #
     # Intent
     # ------------------------------------------------------------------ #
     def set_drill(self, drill_key: str, drill_name: str) -> None:
@@ -634,6 +795,8 @@ class LivePage(QWidget):
         if self._pick_mode:
             self.pick_felt_requested.emit(xf, yf)
             self._toggle_pick()  # one-shot
+        elif self._training:
+            self._on_label_click(xf, yf)
 
     def _toggle_overlays(self) -> None:
         new = not self._settings.ui.show_overlays
@@ -658,7 +821,10 @@ class LivePage(QWidget):
     def on_frame(self, packet) -> None:
         if packet.perspective is not None:
             self._clear_camera_error()  # a frame means the camera is alive
-            self._persp.set_frame(packet.perspective)
+            if self._training:
+                self._ingest_label_frame(packet)   # draw the labelling overlay
+            else:
+                self._persp.set_frame(packet.perspective)
         if packet.birdseye is not None:
             self._bird.set_frame(packet.birdseye)
         self._fps_lbl.setText(f"{packet.fps:.0f} fps")
