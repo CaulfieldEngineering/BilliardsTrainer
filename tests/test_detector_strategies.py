@@ -55,6 +55,28 @@ def test_cue_ball_white_detects_cue_on_synthetic_table():
     assert 8 < cue.radius < 20
 
 
+def test_cue_ball_white_rejects_stripes_and_is_single_instance():
+    """REGRESSION: a striped ball (white body + saturated colour band) must not be
+    read as the cue, and exactly one cue is returned (no 'two cue balls at once')."""
+    import cv2
+    import numpy as np
+
+    from billiards_trainer.detector_strategies import discover
+
+    img = np.full((360, 640, 3), (110, 90, 40), np.uint8)
+    cv2.circle(img, (160, 180), 14, (245, 245, 245), -1, cv2.LINE_AA)   # cue (pure white)
+    cv2.circle(img, (420, 180), 14, (248, 248, 248), -1, cv2.LINE_AA)   # striped ball body
+    band = np.zeros_like(img)
+    cv2.rectangle(band, (406, 173), (434, 187), (40, 40, 210), -1)      # red stripe (BGR)
+    m = np.zeros(img.shape[:2], np.uint8)
+    cv2.circle(m, (420, 180), 14, 255, -1)
+    img[(m > 0) & (band[:, :, 2] > 0)] = (40, 40, 210)
+
+    dets = discover()["cue_ball_white"].detect(img, None)
+    assert len(dets) == 1, "single-instance: exactly one cue ball"
+    assert abs(dets[0].x - 160) < 12, "must pick the pure-white cue, not the stripe"
+
+
 @pytest.mark.skipif(not FIXTURE.exists(), reason="demo fixture missing")
 def test_nodep_strategies_run_on_raw_frame():
     from billiards_trainer.config import Settings
