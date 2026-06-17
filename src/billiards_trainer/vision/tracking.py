@@ -112,7 +112,13 @@ class BallTracker:
         t.vy = self.vel_alpha * meas_vy + (1 - self.vel_alpha) * t.vy
         t.x = self.pos_alpha * d.x + (1 - self.pos_alpha) * t.x
         t.y = self.pos_alpha * d.y + (1 - self.pos_alpha) * t.y
-        t.radius = 0.7 * t.radius + 0.3 * d.radius
+        # Radius: once a track is established, reject wild size jumps (sensor-noise
+        # outliers) and smooth slowly, so a held ball stops "pumping" in size.
+        if t.confirmed and t.radius > 0 and abs(d.radius - t.radius) > 0.35 * t.radius:
+            pass  # keep the stable estimate; this frame's size is an outlier
+        else:
+            a = 0.2 if t.confirmed else 0.5
+            t.radius = a * d.radius + (1 - a) * t.radius
         t.bgr = d.bgr
         t.cls_hist.append(d.cls)
         t.pos_hist.append((t.x, t.y))

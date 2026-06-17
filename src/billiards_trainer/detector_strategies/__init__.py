@@ -161,6 +161,6 @@ def discover(params: dict | None = None) -> dict:
 # the helpers above are defined (otherwise a partial-init circular import). These
 # explicit imports (a) make PyInstaller bundle the modules and (b) make discover()
 # work identically in frozen and source builds.
-from . import classical, felt_mask_hough, simple_blob  # noqa: E402
+from . import classical, cue_ball_white, felt_mask_hough, simple_blob  # noqa: E402
 
-_CORE_MODULES = (classical, felt_mask_hough, simple_blob)
+_CORE_MODULES = (classical, cue_ball_white, felt_mask_hough, simple_blob)

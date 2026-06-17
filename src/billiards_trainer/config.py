@@ -127,6 +127,12 @@ class BallSettings:
     # classical-Hough-on-rectified detector (kept for A/B). Any name from
     # detector_strategies (simple_blob, felt_mask_hough, onnx_*, …) is valid.
     live_strategy: str = "simple_blob"
+    # Temporal median preprocessing: run detection on the per-pixel median of the
+    # last few raw frames. A perfectly still scene becomes pixel-identical frame to
+    # frame, which kills the sensor-noise jitter that makes blob size pump and balls
+    # flicker in/out of the area filter. ~1-frame lag on motion (negligible).
+    temporal_median: bool = True
+    temporal_median_frames: int = 3
     # One-time migration marker. Bumped by Settings.load() after it moves users off
     # 'legacy' — which used to be the ONLY selectable detector in shipped builds
     # (frozen strategy discovery was broken). 0 = not yet migrated.

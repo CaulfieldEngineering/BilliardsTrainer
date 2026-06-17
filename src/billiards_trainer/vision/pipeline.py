@@ -8,6 +8,7 @@ touch Qt or the DB — those are wired in the controller, keeping this testable.
 
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 
 import cv2
@@ -66,6 +67,7 @@ class Pipeline:
         self._prev_small = None
         self._last_flow = 0.0
         self._last_ms = 0.0
+        self._frame_ring: deque | None = None  # temporal-median buffer
 
     def reconfigure(self, settings: Settings) -> None:
         """Apply edited settings (e.g. new felt range / backend) and recalibrate."""
@@ -137,6 +139,27 @@ class Pipeline:
                                             show_traj=False, show_ids=False, debug=False)
         return res
 
+    def _stabilize(self, frame: np.ndarray) -> np.ndarray:
+        """Per-pixel median of the last few frames, to suppress sensor noise
+        before detection (settings.balls.temporal_median). A still scene becomes
+        pixel-identical frame to frame, so blob sizes stop pumping and balls stop
+        flickering in/out of the area filter. Returns the frame unchanged when
+        disabled or until the buffer fills."""
+        if not getattr(self.settings.balls, "temporal_median", True):
+            self._frame_ring = None
+            return frame
+        n = max(2, int(getattr(self.settings.balls, "temporal_median_frames", 3)))
+        ring = self._frame_ring
+        if ring is None or ring.maxlen != n:
+            ring = deque(maxlen=n)
+            self._frame_ring = ring
+        if ring and ring[-1].shape != frame.shape:  # source/calibration changed
+            ring.clear()
+        ring.append(frame)
+        if len(ring) < n:
+            return frame
+        return np.median(np.stack(ring, axis=0), axis=0).astype(np.uint8)
+
     def _project_raw_to_rect(self, raw_dets, calib):
         """Map RAW-frame detections into the rectified plane (via calib.H) so the
         tracker + bird's-eye schematic (both rectified-space) consume them."""
@@ -185,6 +208,10 @@ class Pipeline:
             self._last_ms = (time.perf_counter() - t_start) * 1000.0
             return self._preview_result(frame, res)
 
+        # Noise-suppressed frame fed to the raw-frame strategy (display/projection
+        # still use the original `frame`). Advances the median ring every frame.
+        det_frame = self._stabilize(frame)
+
         if not self.calib.is_calibrated:
             if not self._acquire_calibration(frame):
                 # No table lock yet — but DON'T refuse to detect. Run the strategy
@@ -192,7 +219,7 @@ class Pipeline:
                 # can't project to the bird's-eye without a homography.
                 if self._strategy is not None and annotate:
                     try:
-                        raw_dets = self._strategy.detect(frame, None)
+                        raw_dets = self._strategy.detect(det_frame, None)
                     except Exception:  # noqa: BLE001
                         raw_dets = []
                     res.detections = raw_dets
@@ -223,7 +250,7 @@ class Pipeline:
             # Phase-2 path: detect on the RAW frame, project results into the
             # rectified plane so tracking + the bird's-eye schematic are unchanged.
             try:
-                raw_dets = self._strategy.detect(frame, calib)
+                raw_dets = self._strategy.detect(det_frame, calib)
             except Exception as exc:  # noqa: BLE001 - a bad frame must not kill the loop
                 log.debug("strategy %s failed on a frame: %s", self.settings.balls.live_strategy, exc)
                 raw_dets = []
