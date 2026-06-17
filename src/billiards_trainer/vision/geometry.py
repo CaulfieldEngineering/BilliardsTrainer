@@ -20,6 +20,21 @@ POCKET_LEFT = "left-side"
 POCKET_RIGHT = "right-side"
 POCKET_ORDER = (POCKET_TL, POCKET_TR, POCKET_RIGHT, POCKET_BR, POCKET_BL, POCKET_LEFT)
 
+# Physical pool dimensions (inches). A regulation ball is 2.25" diameter on every
+# table; only the bed size changes. The playing-area SHORT side (width) is half the
+# nominal table length. We use these to render every ball at its KNOWN size in the
+# bird's-eye instead of whatever wobbly radius the detector returned per-frame.
+BALL_DIAMETER_IN = 2.25
+_TABLE_WIDTH_IN = {"9ft": 50.0, "8ft": 44.0, "7ft": 39.0, "10ft": 56.0}
+
+
+def expected_ball_radius_px(table: "TableModel", table_size: str = "9ft") -> float:
+    """The ball's known physical radius expressed in rectified pixels, from the
+    table's short-side (width) pixel span and the real bed width for ``table_size``.
+    Same ratio the detector's radius band is built around (~0.0225·short)."""
+    width_in = _TABLE_WIDTH_IN.get(table_size, 50.0)
+    return float(table.short_side) * (BALL_DIAMETER_IN / 2.0) / width_in
+
 
 @dataclass(frozen=True)
 class Pocket:

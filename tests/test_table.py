@@ -15,6 +15,47 @@ def _rmse(a, b):
     return float(np.sqrt(np.mean(np.sum((a - b) ** 2, axis=1))))
 
 
+def test_expected_ball_radius_scales_with_bed_size():
+    """The known ball radius (2.25in ball) in rectified px scales with table size:
+    a smaller bed packs the same ball into proportionally more pixels."""
+    from billiards_trainer.vision.geometry import TableModel, expected_ball_radius_px
+
+    # short side = play width; build a table whose short side is 400 px
+    table = TableModel.from_rect((400 + 40, 800 + 40), pad=20)
+    assert abs(table.short_side - 400.0) < 1.0
+    r9 = expected_ball_radius_px(table, "9ft")   # 50in bed
+    r7 = expected_ball_radius_px(table, "7ft")   # 39in bed -> bigger px ball
+    assert abs(r9 - 400.0 * 1.125 / 50.0) < 0.01
+    assert r7 > r9
+    # unknown size falls back to 9ft, never crashes
+    assert expected_ball_radius_px(table, "bogus") == r9
+
+
+def test_render_schematic_fixed_radius_overrides_track_radius():
+    """fixed_radius makes every ball the same drawn size regardless of the
+    tracker's per-ball radius (the bird's-eye size-normalization)."""
+    from billiards_trainer.vision.geometry import TableModel
+    from billiards_trainer.vision.overlay import render_schematic
+    from billiards_trainer.vision.types import BallClass, Track
+
+    table = TableModel.from_rect((300, 560), pad=20)
+    cx = table.x0 + 40
+    small = Track(id=1, x=cx, y=120, radius=3.0, cls=BallClass.CUE, bgr=(240, 240, 240))
+    big = Track(id=2, x=cx, y=300, radius=18.0, cls=BallClass.CUE, bgr=(240, 240, 240))
+
+    def white_span(img, y):
+        row = img[int(y)]
+        mask = (row[:, 0] > 180) & (row[:, 1] > 180) & (row[:, 2] > 180)
+        return int(mask.sum())
+
+    img = render_schematic(table, [small, big], fixed_radius=10.0, show_ids=False)
+    # both balls drawn at radius 10 -> similar horizontal white span at their centers
+    assert abs(white_span(img, 120) - white_span(img, 300)) <= 4
+    # without fixed_radius the spans differ (3 vs 18)
+    img2 = render_schematic(table, [small, big], show_ids=False)
+    assert white_span(img2, 300) > white_span(img2, 120) + 6
+
+
 def test_felt_detects_corners(table_frame):
     res = detect_felt(table_frame, FeltSettings())
     assert res.ok

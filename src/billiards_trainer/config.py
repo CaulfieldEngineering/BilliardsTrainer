@@ -144,6 +144,14 @@ class BallSettings:
     # detector finding "balls" of wildly varying sizes is finding artefacts.
     min_radius_frac: float = 0.016  # ~0.71× regulation — smallest plausible ball
     max_radius_frac: float = 0.034  # ~1.5× regulation — rejects oversized blobs
+    # Physical-size prior tolerance (fraction): a rectified detection whose radius
+    # differs from the known ball radius by more than this is rejected (pocket
+    # shadows too big, speckle too small). 0 disables. Default is generous (0.55)
+    # because the blob detector systematically UNDER-reports radius vs the geometric
+    # ideal (~7.5px measured vs ~11px geometric on a 9ft bed), so a tight band would
+    # kill real balls. Tighten in the tuning sandbox once detector radius is
+    # calibrated. (Rendering uses the true geometric size regardless.)
+    size_prior_tol: float = 0.55
     detect_param2: int = 18         # Hough accumulator threshold (lower => more circles)
     cue_speed_strike: float = 14.0  # px/frame on rectified view that counts as a strike
     stop_speed: float = 1.2         # px/frame below which a ball is "stopped"
@@ -225,6 +233,13 @@ class UiSettings:
     # neutral grey "?" when the class is uncertain — instead of a fixed per-class
     # palette that made every solid look yellow and every dark blob look black.
     measured_ball_colors: bool = True
+    # Draw every ball on the bird's-eye at its KNOWN physical radius (2.25" ball on
+    # the configured bed) instead of the detector's per-frame radius — kills the
+    # "balls are all different sizes on the overhead" wobble. The detector still
+    # provides position; rendering owns the size.
+    normalize_ball_size: bool = True
+    # Debug: show the detector's RAW radius instead of the normalized one.
+    show_raw_detection_size: bool = False
 
 
 @dataclass

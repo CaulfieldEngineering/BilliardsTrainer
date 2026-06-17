@@ -54,7 +54,8 @@ def _accent_bgr(hex_color: str) -> tuple[int, int, int]:
 
 def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
                    show_traj: bool = True, show_ids: bool = True,
-                   accent: str = "#3DDC97", measured_colors: bool = True) -> np.ndarray:
+                   accent: str = "#3DDC97", measured_colors: bool = True,
+                   fixed_radius: float | None = None) -> np.ndarray:
     img = rect_bgr.copy()
     acc = _accent_bgr(accent)
 
@@ -72,7 +73,7 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
     for tr in tracks:
         color, _uncertain = ball_color(tr, measured_colors)
         c = (int(tr.x), int(tr.y))
-        r = max(4, int(tr.radius))
+        r = max(4, int(fixed_radius if fixed_radius else tr.radius))
         if show_traj and len(tr.history) > 1:
             pts = np.array(tr.history, np.int32).reshape(-1, 1, 2)
             cv2.polylines(img, [pts], False, acc, 1, cv2.LINE_AA)
@@ -91,7 +92,8 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
 def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DDC97",
                      show_traj: bool = True, show_ids: bool = True,
                      debug: bool = False, detections=None, diag=None,
-                     measured_colors: bool = True) -> np.ndarray:
+                     measured_colors: bool = True,
+                     fixed_radius: float | None = None) -> np.ndarray:
     """Render a clean, proportional top-down table from the game state — felt,
     rails, pockets, diamonds, and balls as circles — instead of the warped camera
     image. Ball positions are the rectified (already-proportional) coordinates."""
@@ -132,11 +134,12 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             cv2.putText(img, f"{d.score:.2f}", (int(d.x) + 4, int(d.y) - 6),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 180, 255), 1, cv2.LINE_AA)
 
-    # balls
+    # balls — drawn at the KNOWN physical radius when fixed_radius is given, so the
+    # overhead shows uniform regulation balls instead of the detector's per-frame wobble
     for tr in tracks:
         color, uncertain = ball_color(tr, measured_colors)
         c = (int(tr.x), int(tr.y))
-        r = max(6, int(tr.radius))
+        r = max(6, int(fixed_radius if fixed_radius else tr.radius))
         if show_traj and len(tr.history) > 1:
             pts = np.array(tr.history, np.int32).reshape(-1, 1, 2)
             cv2.polylines(img, [pts], False, acc, 1, cv2.LINE_AA)

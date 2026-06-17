@@ -19,7 +19,7 @@ from ..events.shot_detector import ShotDetector, ShotEvent
 from .background import BackgroundModel, downscale, flow_activity
 from .balls import make_detector
 from .calibration import CalibrationManager
-from .geometry import TableModel
+from .geometry import TableModel, expected_ball_radius_px
 from .overlay import draw_perspective, draw_rectified, render_schematic
 from .tracking import BallTracker
 from .types import Detection, Track
@@ -285,6 +285,15 @@ class Pipeline:
                               self.settings.balls.live_strategy, exc)
                     raw_dets = []
                 detections = self._project_raw_to_rect(raw_dets, calib)
+                # Physical-size prior (strategy path only — the rectified plane has
+                # uniform ball size): reject blobs whose radius is far from the known
+                # ball radius — kills pocket-shadow "balls" (too big) and speckle
+                # (too small). The legacy detector has its own Hough size band.
+                exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
+                tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
+                if exp_r > 2.0 and tol > 0:
+                    lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
+                    detections = [d for d in detections if lo <= d.radius <= hi]
             else:
                 detections = self.detector.detect(rect, calib.rect_mask, calib.table)
             # With auto-detection ON, demand the stricter render floor: better to
@@ -344,6 +353,10 @@ class Pipeline:
 
         ui = self.settings.ui
         overlays = annotate and ui.show_overlays
+        # Draw every ball at its known physical radius (unless the raw-size debug
+        # toggle is on) so the overhead shows uniform regulation balls.
+        norm_r = (expected_ball_radius_px(calib.table, self.settings.table.size)
+                  if (ui.normalize_ball_size and not ui.show_raw_detection_size) else None)
         # Bird's-eye: a clean rendered schematic (proportional) by default, rather
         # than the warped/clipped camera image.
         if annotate and ui.schematic_birdseye:
@@ -351,13 +364,13 @@ class Pipeline:
                 calib.table, tracks, accent=ui.accent,
                 show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
                 debug=ui.debug_overlay, detections=detections, diag=res.diag,
-                measured_colors=ui.measured_ball_colors,
+                measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
             )
         elif overlays:
             res.rect_bgr = draw_rectified(
                 rect, tracks, calib.table, show_traj=ui.show_trajectories,
                 show_ids=ui.show_ball_ids, accent=ui.accent,
-                measured_colors=ui.measured_ball_colors,
+                measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
             )
         else:
             res.rect_bgr = rect
