@@ -111,23 +111,19 @@ def test_live_tuning_panel_present(app):
 
 
 def test_training_mode_label_correct_add_save(app):
-    """Sidebar Training Mode: enter it, the model's guesses become editable on the
-    frame, correcting a number + adding a missed ball flows to a save payload."""
+    """Training Mode labelling: the model's guesses become editable on the frame,
+    correcting a number + adding a missed ball flows to a save payload. Tested on a
+    bare LivePage (no worker threads) so the offscreen suite exits clean."""
     import types
 
     import numpy as np
 
     from billiards_trainer.config import Settings
-    from billiards_trainer.ui.main_window import MainWindow
-    from billiards_trainer.ui.theme import apply_theme
+    from billiards_trainer.ui.pages.live_page import LivePage
     from billiards_trainer.vision.types import BallClass, Detection
 
-    s = Settings()
-    s.source = ""
-    apply_theme(app, s.ui.accent)
-    win = MainWindow(s)
-    lp = win._live
-    win._go(1)  # 'Training' nav
+    lp = LivePage(Settings())
+    lp.set_training(True)
     assert lp._training
 
     frame = np.zeros((480, 640, 3), np.uint8)
@@ -147,11 +143,8 @@ def test_training_mode_label_correct_add_save(app):
     lp.save_training_frame_requested.connect(lambda b: boxes.extend(b))
     lp._save_label_frame()
     assert sorted(b[0] for b in boxes) == [0, 7, 10]
-    win._go(0)
+    lp.set_training(False)
     assert not lp._training
-    win.close()
-    app.processEvents()
-    win._thread.wait(3000)   # tear the worker thread down (or the process exits dirty)
 
 
 def test_ball_trainer_dialog_and_store(app, tmp_path):
