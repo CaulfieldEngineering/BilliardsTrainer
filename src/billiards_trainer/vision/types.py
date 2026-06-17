@@ -65,6 +65,7 @@ class Detection:
     bgr: tuple[int, int, int] = (200, 200, 200)
     cls: BallClass = BallClass.UNKNOWN
     score: float = 1.0
+    number: int = -1   # 0 = cue, 1..15 ball number, -1 = unknown
 
     @property
     def xy(self) -> tuple[float, float]:
@@ -82,6 +83,7 @@ class Track:
     vx: float = 0.0
     vy: float = 0.0
     cls: BallClass = BallClass.UNKNOWN
+    number: int = -1           # 0 = cue, 1..15 ball number, -1 = unknown
     bgr: tuple[int, int, int] = (200, 200, 200)
     age: int = 0               # total frames seen
     hits: int = 0              # frames matched to a detection

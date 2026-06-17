@@ -540,10 +540,12 @@ class LivePage(QWidget):
         col.addWidget(self._conf_row())
 
         # Display toggles — pure render flags, instant.
+        # 'Uniform ball size' is always on (Joe never wants per-frame detector
+        # radius wobble), so it's not exposed as a toggle.
+        self._settings.ui.normalize_ball_size = True
         for label, attr in (
-            ("Show ball IDs", "show_ball_ids"),
+            ("Show ball numbers", "show_ball_ids"),
             ("Show trajectories", "show_trajectories"),
-            ("Uniform ball size", "normalize_ball_size"),
             ("Clean schematic bird's-eye", "schematic_birdseye"),
             ("Show overlays", "show_overlays"),
         ):

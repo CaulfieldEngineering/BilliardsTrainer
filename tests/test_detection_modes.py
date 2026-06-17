@@ -112,8 +112,11 @@ def test_onnx_decode_maps_boxes_to_rect_coords():
 
     frame = np.full((640, 640, 3), (70, 120, 60), np.uint8)  # square => ratio 1.0
     dets = det.detect(frame, None)  # calib None => full-frame table mask
-    assert len(dets) == 1
-    d = dets[0]
+    # The full-frame box must decode to (320,320). (The mock returns the same raw
+    # output for the far-rail tiling scan too, so tolerate that extra phantom box —
+    # a real model returns its own; here we just validate the decode math.)
+    assert dets
+    d = min(dets, key=lambda b: (b.x - 320) ** 2 + (b.y - 320) ** 2)
     assert abs(d.x - 320) < 3 and abs(d.y - 320) < 3
     assert abs(d.radius - 20) < 4
     assert d.score > 0.8

@@ -17,8 +17,9 @@ import cv2
 import numpy as np
 
 from ..config import MODELS_DIR as USER_MODELS_DIR
+from ..vision.balls import classify_pool_ball
 from ..vision.types import BallClass, Detection
-from . import DetectorStrategy, ball_radius_raw, classify_crop, table_polygon_mask
+from . import DetectorStrategy, ball_radius_raw, table_polygon_mask
 
 log = logging.getLogger("detector.onnx")
 
@@ -63,17 +64,21 @@ class OnnxModelStrategy(DetectorStrategy):
             self._size = int(s) if isinstance(s, int) and s > 0 else 640
         return self._sess
 
-    def detect(self, frame_bgr, calib):
+    def _infer(self, image, ox: int = 0, oy: int = 0):
+        """Run the model on one image and return [(cx, cy, r, conf)] in FULL-frame
+        coords (add the image's (ox, oy) offset)."""
         sess = self._session()
         n = self._size
-        h, w = frame_bgr.shape[:2]
-        # CENTERED letterbox (matches Ultralytics) — padding the image top-left
-        # instead shifts small/clustered objects and tanks recall on a rack.
+        h, w = image.shape[:2]
+        if h < 8 or w < 8:
+            return []
+        # CENTERED letterbox (matches Ultralytics) — padding top-left shifts
+        # small/clustered objects and tanks recall on a rack.
         ratio = min(n / h, n / w)
         nh, nw = int(round(h * ratio)), int(round(w * ratio))
         dw, dh = (n - nw) // 2, (n - nh) // 2
         canvas = np.full((n, n, 3), 114, np.uint8)
-        canvas[dh:dh + nh, dw:dw + nw] = cv2.resize(frame_bgr, (nw, nh))
+        canvas[dh:dh + nh, dw:dw + nw] = cv2.resize(image, (nw, nh))
         blob = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
         blob = blob.transpose(2, 0, 1)[None]
         out = np.squeeze(sess.run(None, {self._inp.name: blob})[0], 0)
@@ -88,64 +93,103 @@ class OnnxModelStrategy(DetectorStrategy):
         idx = np.where(keep)[0]
         if idx.size == 0:
             return []
-        rects, confs, cls_ids = [], [], []
+        rects, confs = [], []
         for i in idx:
             cx, cy, bw, bh = boxes[i]
             rects.append([float((cx - bw / 2 - dw) / ratio), float((cy - bh / 2 - dh) / ratio),
                           float(bw / ratio), float(bh / ratio)])
             confs.append(float(conf[i]))
-            cls_ids.append(int(cid[i]))
         keep_nms = cv2.dnn.NMSBoxes(rects, confs, self._conf, self._iou)
-        if len(keep_nms) == 0:
+        res = []
+        for k in np.array(keep_nms).flatten():
+            x, y, bw, bh = rects[int(k)]
+            res.append((x + bw / 2 + ox, y + bh / 2 + oy, (bw + bh) / 4.0, confs[int(k)]))
+        return res
+
+    @staticmethod
+    def _merge_boxes(boxes):
+        """Dedupe near-coincident boxes (the same ball seen by the full + far-rail
+        scans), keeping the higher-confidence one."""
+        kept = []
+        for b in sorted(boxes, key=lambda t: t[3], reverse=True):
+            mind = 0.7 * max(b[2], 8.0)
+            if all((b[0] - k[0]) ** 2 + (b[1] - k[1]) ** 2 > mind * mind for k in kept):
+                kept.append(b)
+        return kept
+
+    def detect(self, frame_bgr, calib):
+        h, w = frame_bgr.shape[:2]
+        boxes = self._infer(frame_bgr)
+        # Far-rail recall: the far cushion is foreshortened, so balls there are tiny
+        # after the 640 downscale and often missed. Re-scan the top ~60% of the
+        # frame (where the far rail sits) upscaled, then merge — recovers small far
+        # balls without changing the model.
+        th = int(h * 0.60)
+        if th > 64:
+            boxes = self._merge_boxes(boxes + self._infer(frame_bgr[0:th, 0:w]))
+        if not boxes:
             return []
         table = table_polygon_mask(frame_bgr.shape, calib)
         rmax = ball_radius_raw(calib, frame_bgr.shape) * 4.0
         out_dets = []
-        for k in np.array(keep_nms).flatten():
-            x, y, bw, bh = rects[int(k)]
-            ccx, ccy, rr = x + bw / 2, y + bh / 2, (bw + bh) / 4.0
+        for ccx, ccy, rr, cf in boxes:
             if rr > rmax * 1.5 or rr < 2:
                 continue
             ix, iy = int(np.clip(ccx, 0, w - 1)), int(np.clip(ccy, 0, h - 1))
             if table[iy, ix] == 0:            # drop clearly off-table detections
                 continue
-            cls, bgr = classify_crop(frame_bgr, ccx, ccy, rr)
-            out_dets.append(Detection(ccx, ccy, rr, bgr, cls, float(confs[int(k)])))
-        self._tag_single_cue(frame_bgr, out_dets)
+            crop = frame_bgr[max(0, int(ccy - rr)):int(ccy + rr) + 1,
+                             max(0, int(ccx - rr)):int(ccx + rr) + 1]
+            cls, number, bgr = classify_pool_ball(crop)
+            out_dets.append(Detection(ccx, ccy, rr, bgr, cls, float(cf), number=number))
+        self._enforce_single_cue(frame_bgr, out_dets)
         return out_dets
 
-    def _tag_single_cue(self, frame_bgr, dets):
-        """Force exactly ONE cue ball = the whitest detected ball. The trained
-        model finds every ball reliably; identifying WHICH is the cue is an
-        appearance call, and the cue is the uniquely pure-white ball. This is far
-        more robust than the per-crop classical classifier, which mislabels white
-        balls under tinted lighting. (M2: cue-ball-first.)"""
+    def _enforce_single_cue(self, frame_bgr, dets):
+        """Exactly ONE cue ball, robustly.
+
+        classify_pool_ball separates the cue from the 9-ball (white + yellow stripe)
+        by coloured-fraction. Here we make the count exactly one:
+          - >1 cue (rare, glare) -> keep the least-saturated (truest white);
+          - 0 cues but a clearly white-ish ball exists -> PROMOTE the whitest, so a
+            marginal-appearance frame (blur/shadow) doesn't lose the cue. The 9-ball
+            (yellow band => higher saturation) loses to the true cue, so this keeps
+            the cue/9 distinction while restoring high cue recall.
+        If no ball is white-ish, leave no cue (it's genuinely occluded — the tracker
+        keep-alive holds the real cue track)."""
         if not dets:
             return
         hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
         h, w = frame_bgr.shape[:2]
-        best_i, best_score = -1, 1e9
-        whiteness = []
-        for i, d in enumerate(dets):
+
+        def stats(d):
             x0, y0 = max(0, int(d.x - d.radius)), max(0, int(d.y - d.radius))
             x1, y1 = min(w, int(d.x + d.radius) + 1), min(h, int(d.y + d.radius) + 1)
-            patch = hsv[y0:y1, x0:x1]
-            if patch.size == 0:
-                whiteness.append((255.0, 0.0))
-                continue
-            mean_s = float(patch[:, :, 1].mean())
-            mean_v = float(patch[:, :, 2].mean())
-            whiteness.append((mean_s, mean_v))
-            # whitest = lowest saturation, and bright enough to actually be white
-            if mean_v > 140 and mean_s < best_score:
-                best_score, best_i = mean_s, i
-        for i, d in enumerate(dets):
-            if i == best_i:
-                d.cls = BallClass.CUE
-                d.bgr = (245, 245, 245)
-            elif d.cls == BallClass.CUE:
-                # a second "cue" from the per-crop classifier — demote it
-                d.cls = BallClass.SOLID
+            p = hsv[y0:y1, x0:x1]
+            if p.size == 0:
+                return 255.0, 0.0
+            return float(p[:, :, 1].mean()), float(p[:, :, 2].mean())
+
+        cues = [d for d in dets if d.cls == BallClass.CUE]
+        if len(cues) == 1:
+            return
+        if len(cues) > 1:
+            cues.sort(key=lambda d: stats(d)[0])      # whitest (lowest S) first
+            for d in cues[1:]:
+                d.cls, d.number, d.bgr = BallClass.SOLID, -1, (190, 190, 190)
+            return
+        # zero cues -> the cue is the whitest (least-saturated) ball on the table,
+        # so promote it. Loose gate (just "bright and not strongly coloured") so a
+        # dim/motion-blurred cue during a shot is still caught — matching the old
+        # always-find-the-cue robustness. The 9-ball's yellow band keeps its mean
+        # saturation above a true cue, so the cue still wins when both are present.
+        best, best_s = None, 1e9
+        for d in dets:
+            ms, mv = stats(d)
+            if mv > 105 and ms < 130 and ms < best_s:
+                best_s, best = ms, d
+        if best is not None:
+            best.cls, best.number, best.bgr = BallClass.CUE, 0, (245, 245, 245)
 
 
 def _build():

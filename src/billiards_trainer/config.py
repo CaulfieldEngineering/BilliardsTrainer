@@ -112,7 +112,11 @@ class RectifySettings:
 class TableSettings:
     size: str = "9ft"           # 9ft | 8ft | 7ft (display/scale only)
     pocket_radius_frac: float = 0.045  # pocket capture radius as frac of short side
-    nose_inset_frac: float = 0.0       # playable-area inset from felt edge
+    # The detected felt spans the cloth (bed + rail tops). The real PLAYING area
+    # (cushion-nose to cushion-nose) is inset by the rail-top width — automatically,
+    # so the overhead/playing area excludes the rails. ~0.055 of the short side is a
+    # typical rail-top proportion; refine per-table later if needed.
+    nose_inset_frac: float = 0.055
     auto_relock: bool = True           # re-detect automatically if the table shifts
     persist_calibration: bool = True   # save/reuse the locked table across launches
 

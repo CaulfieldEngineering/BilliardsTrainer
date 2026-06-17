@@ -50,29 +50,22 @@ class Pocket:
 
 @dataclass
 class TableModel:
-    """Playing-surface rectangle + pockets in rectified pixels."""
+    """Playing-surface rectangle + pockets in rectified pixels.
+
+    The detected felt spans the cloth — the bed PLUS the rail tops the cloth wraps
+    over. The PLAYING area (cushion-nose to cushion-nose) is smaller: ``x0..y1`` is
+    that inset playing rectangle, while ``width``/``height`` are the full cloth
+    image. ``from_rect`` computes the inset from ``nose_inset_frac``."""
 
     width: int                 # full rectified image width
     height: int                # full rectified image height
-    pad: int                   # padding between image edge and playing surface
+    pad: int                   # padding between image edge and the cloth
     pockets: list[Pocket]
     pocket_radius: float
-
-    @property
-    def x0(self) -> float:
-        return float(self.pad)
-
-    @property
-    def y0(self) -> float:
-        return float(self.pad)
-
-    @property
-    def x1(self) -> float:
-        return float(self.width - self.pad)
-
-    @property
-    def y1(self) -> float:
-        return float(self.height - self.pad)
+    x0: float = 0.0            # playing area (cushion-nose) rectangle
+    y0: float = 0.0
+    x1: float = 0.0
+    y1: float = 0.0
 
     @property
     def play_w(self) -> float:
@@ -89,10 +82,16 @@ class TableModel:
     # ------------------------------------------------------------------ #
     @classmethod
     def from_rect(cls, dst_size: tuple[int, int], pad: int,
-                  pocket_radius_frac: float = 0.045) -> "TableModel":
+                  pocket_radius_frac: float = 0.045,
+                  nose_inset_frac: float = 0.0) -> "TableModel":
         w, h = dst_size
-        x0, y0 = float(pad), float(pad)
-        x1, y1 = float(w - pad), float(h - pad)
+        # cloth extent (what felt detection found)
+        cx0, cy0 = float(pad), float(pad)
+        cx1, cy1 = float(w - pad), float(h - pad)
+        # playing area = cloth inset by the rail-top width (cushion noses)
+        inset = max(0.0, nose_inset_frac) * min(cx1 - cx0, cy1 - cy0)
+        x0, y0 = cx0 + inset, cy0 + inset
+        x1, y1 = cx1 - inset, cy1 - inset
         cy = (y0 + y1) / 2.0
         pockets = [
             Pocket(POCKET_TL, x0, y0),
@@ -104,7 +103,8 @@ class TableModel:
         ]
         short = min(x1 - x0, y1 - y0)
         return cls(width=w, height=h, pad=pad, pockets=pockets,
-                   pocket_radius=short * pocket_radius_frac)
+                   pocket_radius=short * pocket_radius_frac,
+                   x0=x0, y0=y0, x1=x1, y1=y1)
 
     # ------------------------------------------------------------------ #
     def nearest_pocket(self, x: float, y: float) -> tuple[Pocket, float]:

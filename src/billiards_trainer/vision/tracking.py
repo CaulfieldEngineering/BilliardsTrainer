@@ -30,7 +30,10 @@ class _Internal:
     misses: int = 0
     confirmed: bool = False
     bgr: tuple = (200, 200, 200)
+    still_count: int = 0       # consecutive ~stationary frames
+    settled: bool = False      # confirmed AND has been still a while (a resting ball)
     cls_hist: deque = field(default_factory=lambda: deque(maxlen=15))
+    num_hist: deque = field(default_factory=lambda: deque(maxlen=31))
     pos_hist: deque = field(default_factory=lambda: deque(maxlen=64))
 
     def predict(self) -> None:
@@ -40,16 +43,39 @@ class _Internal:
 
     @property
     def cls(self) -> BallClass:
+        # Identity follows the (stickier) number vote so a few bad frames during a
+        # shot — motion blur misreading the cue — don't flip its class. Falls back
+        # to the class-history vote until a number is established.
+        n = self.number
+        if n == 0:
+            return BallClass.CUE
+        if n == 8:
+            return BallClass.EIGHT
+        if 1 <= n <= 7:
+            return BallClass.SOLID
+        if 9 <= n <= 15:
+            return BallClass.STRIPE
         if not self.cls_hist:
             return BallClass.UNKNOWN
         return Counter(self.cls_hist).most_common(1)[0][0]
+
+    @property
+    def number(self) -> int:
+        # majority vote over recent frames, ignoring 'unknown' (-1) reads so a few
+        # bad frames don't erase a confident identity.
+        votes = [n for n in self.num_hist if n is not None and n >= 0]
+        if not votes:
+            return -1
+        return Counter(votes).most_common(1)[0][0]
 
 
 class BallTracker:
     def __init__(self, max_dist_frac: float = 0.08, max_misses: int = 30,
                  min_hits: int = 2, vel_alpha: float = 0.6,
-                 pos_alpha_slow: float = 0.15, pos_alpha_fast: float = 0.85,
-                 speed_lo: float = 3.0, speed_hi: float = 8.0):
+                 pos_alpha_slow: float = 0.15, pos_alpha_fast: float = 0.92,
+                 speed_lo: float = 3.0, speed_hi: float = 6.0,
+                 still_speed_frac: float = 0.009, still_frames: int = 6,
+                 lock_dist_frac: float = 0.012, occluded_budget: int = 1800):
         self.max_dist_frac = max_dist_frac
         self.max_misses = max_misses
         self.min_hits = min_hits
@@ -62,6 +88,19 @@ class BallTracker:
         self.pos_alpha_fast = pos_alpha_fast
         self.speed_lo = speed_lo
         self.speed_hi = speed_hi
+        # Stationary handling. A ball moving slower than still_speed (as a fraction
+        # of the table short side) for still_frames becomes "settled". A settled
+        # ball's position is LOCKED — detections within lock_dist of it don't move
+        # it — which kills the few-pixel shimmer on resting balls. And a settled
+        # ball that then vanishes from detection is treated as OCCLUDED (a hand/cue
+        # over it), not gone: it survives occluded_budget frames instead of the
+        # short max_misses, so it stops flickering in and out. A ball that vanishes
+        # while MOVING is treated as pocketed/removed and ages out fast.
+        self.still_speed_frac = still_speed_frac
+        self.still_frames = still_frames
+        self.lock_dist_frac = lock_dist_frac
+        self.occluded_budget = occluded_budget
+        self._short_side = 400.0
         self._tracks: list[_Internal] = []
         self._next_id = 1
 
@@ -71,19 +110,24 @@ class BallTracker:
 
     # ------------------------------------------------------------------ #
     def update(self, detections: list[Detection], short_side: float) -> list[Track]:
+        self._short_side = max(1.0, short_side)
         gate = max(8.0, self.max_dist_frac * short_side)
 
         for t in self._tracks:
             t.predict()
 
         unmatched_dets = set(range(len(detections)))
-        # Build all (track, det) pairs within the gate, then assign greedily.
+        # Build all (track, det) pairs within the gate, then assign greedily. The
+        # gate WIDENS with a track's speed so a hard-struck ball — which jumps far
+        # in one frame — can still match its detection instead of being left behind.
         pairs = []
         for ti, t in enumerate(self._tracks):
+            t_speed = (t.vx * t.vx + t.vy * t.vy) ** 0.5
+            t_gate = max(gate, 3.0 * t_speed)
             for di in unmatched_dets:
                 d = detections[di]
                 dist = np.hypot(t.x - d.x, t.y - d.y)
-                if dist <= gate:
+                if dist <= t_gate:
                     pairs.append((dist, ti, di))
         pairs.sort(key=lambda p: p[0])
 
@@ -92,6 +136,21 @@ class BallTracker:
         for _dist, ti, di in pairs:
             if ti in matched_tracks or di in matched_dets:
                 continue
+            matched_tracks.add(ti)
+            matched_dets.add(di)
+            self._apply_match(self._tracks[ti], detections[di])
+
+        # Single-cue rebind: there is exactly ONE cue ball, so if its track went
+        # unmatched (a hard strike jumped it past the gate, or motion blur dropped a
+        # couple of frames) but a cue detection exists, bind them regardless of
+        # distance — the cue FOLLOWS the strike instead of lagging or spawning a new
+        # id a few feet away. (Joe's #1: the cue must track fast hits.)
+        cue_ti = [ti for ti, t in enumerate(self._tracks)
+                  if ti not in matched_tracks and t.confirmed and t.cls == BallClass.CUE]
+        cue_di = [di for di in range(len(detections))
+                  if di not in matched_dets and detections[di].cls == BallClass.CUE]
+        if len(cue_ti) == 1 and len(cue_di) == 1:
+            ti, di = cue_ti[0], cue_di[0]
             matched_tracks.add(ti)
             matched_dets.add(di)
             self._apply_match(self._tracks[ti], detections[di])
@@ -111,7 +170,31 @@ class BallTracker:
                 continue
             self._spawn(d)
 
-        self._tracks = [t for t in self._tracks if t.misses <= self.max_misses]
+        # Merge duplicates: two tracks closer than a ball-diameter are physically
+        # the SAME ball — a fast direction change (rail bounce / recoil) briefly
+        # overshot the old track and spawned a ghost beside it. Keep the one matched
+        # this frame (it sits on the real detection); drop the stale coaster. This
+        # kills the "two cue balls / duplicate ball" artefact on bounces.
+        if len(self._tracks) > 1:
+            merge_dist = 0.035 * self._short_side
+            order = sorted(range(len(self._tracks)),
+                           key=lambda i: (self._tracks[i].misses == 0, self._tracks[i].hits),
+                           reverse=True)
+            keep_idx: list[int] = []
+            for i in order:
+                ti = self._tracks[i]
+                if any(np.hypot(self._tracks[j].x - ti.x, self._tracks[j].y - ti.y) < merge_dist
+                       for j in keep_idx):
+                    continue
+                keep_idx.append(i)
+            self._tracks = [self._tracks[i] for i in keep_idx]
+
+        # Velocity-aware keep-alive: a ball that vanished while SETTLED (resting) is
+        # almost certainly occluded (a hand/cue over it) — keep it for a long budget
+        # so it doesn't flicker. A ball that vanished while MOVING was pocketed or
+        # picked up — let it age out fast.
+        self._tracks = [t for t in self._tracks
+                        if t.misses <= (self.occluded_budget if t.settled else self.max_misses)]
         return self._public()
 
     def _apply_match(self, t: _Internal, d: Detection) -> None:
@@ -124,12 +207,30 @@ class BallTracker:
             # a ~still ball shouldn't carry velocity, or predict() injects jitter
             t.vx *= 0.25
             t.vy *= 0.25
-        # adaptive position alpha: follow fast motion, smooth slow motion
-        frac = (spd - self.speed_lo) / max(1e-6, self.speed_hi - self.speed_lo)
-        frac = max(0.0, min(1.0, frac))
-        pos_a = self.pos_alpha_slow + (self.pos_alpha_fast - self.pos_alpha_slow) * frac
-        t.x = pos_a * d.x + (1 - pos_a) * t.x
-        t.y = pos_a * d.y + (1 - pos_a) * t.y
+        # Stillness bookkeeping: count consecutive ~stationary frames; once a
+        # confirmed ball has held still long enough it is "settled".
+        still_speed = self.still_speed_frac * self._short_side
+        if spd < still_speed:
+            t.still_count += 1
+        else:
+            t.still_count = 0
+        t.settled = t.confirmed and t.still_count >= self.still_frames
+        # Position update. A SETTLED ball is LOCKED: a detection within lock_dist
+        # of it does NOT move it, so resting balls stop shimmering by a few pixels.
+        # Once a detection lands beyond lock_dist the ball has really moved — unlock
+        # and follow it.
+        lock_dist = max(2.0, self.lock_dist_frac * self._short_side)
+        if t.settled and spd <= lock_dist:
+            pass  # frozen — kills sub-pixel-to-few-pixel jitter on a resting ball
+        else:
+            if spd > lock_dist:
+                t.settled = False
+                t.still_count = 0
+            frac = (spd - self.speed_lo) / max(1e-6, self.speed_hi - self.speed_lo)
+            frac = max(0.0, min(1.0, frac))
+            pos_a = self.pos_alpha_slow + (self.pos_alpha_fast - self.pos_alpha_slow) * frac
+            t.x = pos_a * d.x + (1 - pos_a) * t.x
+            t.y = pos_a * d.y + (1 - pos_a) * t.y
         # Radius: once a track is established, reject wild size jumps (sensor-noise
         # outliers) and smooth slowly, so a held ball stops "pumping" in size.
         if t.confirmed and t.radius > 0 and abs(d.radius - t.radius) > 0.35 * t.radius:
@@ -139,6 +240,7 @@ class BallTracker:
             t.radius = a * d.radius + (1 - a) * t.radius
         t.bgr = d.bgr
         t.cls_hist.append(d.cls)
+        t.num_hist.append(d.number)
         t.pos_hist.append((t.x, t.y))
         t.hits += 1
         t.misses = 0
@@ -148,6 +250,7 @@ class BallTracker:
     def _spawn(self, d: Detection) -> None:
         t = _Internal(id=self._next_id, x=d.x, y=d.y, radius=d.radius, bgr=d.bgr)
         t.cls_hist.append(d.cls)
+        t.num_hist.append(d.number)
         t.pos_hist.append((d.x, d.y))
         t.hits = 1
         self._next_id += 1
@@ -160,8 +263,8 @@ class BallTracker:
                 continue
             tr = Track(
                 id=t.id, x=t.x, y=t.y, radius=t.radius, vx=t.vx, vy=t.vy,
-                cls=t.cls, bgr=t.bgr, age=t.age, hits=t.hits, misses=t.misses,
-                active=(t.misses == 0), history=list(t.pos_hist),
+                cls=t.cls, number=t.number, bgr=t.bgr, age=t.age, hits=t.hits,
+                misses=t.misses, active=(t.misses == 0), history=list(t.pos_hist),
             )
             out.append(tr)
         return out

@@ -216,7 +216,7 @@ class Pipeline:
         out = []
         for d, (rx, ry), (ox, oy) in zip(raw_dets, rect, rect_off, strict=False):
             out.append(Detection(float(rx), float(ry), float(np.hypot(ox - rx, oy - ry)),
-                                 d.bgr, d.cls, d.score))
+                                 d.bgr, d.cls, d.score, number=d.number))
         return out
 
     def _draw_raw_dets(self, frame, dets):
@@ -429,7 +429,7 @@ class Pipeline:
         if (not self._tried_load and self.settings.table.persist_calibration
                 and self.source):
             self._tried_load = True
-            if self.calib.try_load(CALIBRATION_PATH, self.source, frame.shape):
+            if self.calib.try_load(CALIBRATION_PATH, self.source, frame.shape, self.settings):
                 return True
         if not self.calib.calibrate(frame, self.settings):
             return False

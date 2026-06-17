@@ -22,6 +22,32 @@ _CLS_COLOR = {
 _UNCERTAIN_GREY = (150, 150, 150)
 
 
+def _ball_label(tr) -> str:
+    """The ball's identity label: 'C' for the cue, '1'..'15' for a numbered ball,
+    '' when unknown."""
+    n = getattr(tr, "number", -1)
+    if n == 0:
+        return "C"
+    if n and n > 0:
+        return str(n)
+    return ""
+
+
+def _contrast_text(bgr) -> tuple[int, int, int]:
+    """Black or white text, whichever reads on the given fill colour."""
+    b, g, r = bgr
+    lum = 0.114 * b + 0.587 * g + 0.299 * r
+    return (20, 20, 20) if lum > 140 else (245, 245, 245)
+
+
+def _draw_centered(img, text, c, fill_bgr, r) -> None:
+    scale = max(0.32, r / 20.0)
+    col = _contrast_text(fill_bgr)
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+    cv2.putText(img, text, (c[0] - tw // 2, c[1] + th // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, scale, col, 1, cv2.LINE_AA)
+
+
 def ball_color(tr, measured: bool = True) -> tuple[tuple[int, int, int], bool]:
     """Return (BGR, uncertain) for a tracked ball.
 
@@ -84,7 +110,8 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
             tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
             cv2.arrowedLine(img, c, tip, acc, 1, cv2.LINE_AA, tipLength=0.3)
         if show_ids:
-            cv2.putText(img, str(tr.id), (c[0] + r + 2, c[1] - r),
+            label = _ball_label(tr) or str(tr.id)
+            cv2.putText(img, label, (c[0] + r + 2, c[1] - r),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, cv2.LINE_AA)
     return img
 
@@ -144,21 +171,29 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             pts = np.array(tr.history, np.int32).reshape(-1, 1, 2)
             cv2.polylines(img, [pts], False, acc, 1, cv2.LINE_AA)
         cv2.circle(img, c, r, color, -1, cv2.LINE_AA)
+        # Stripe: a white equatorial band over the base colour, so 9..15 read as
+        # stripes at a glance (the base colour still identifies the number).
+        if tr.cls == BallClass.STRIPE:
+            band = max(2, int(r * 0.55))
+            cv2.rectangle(img, (c[0] - r, c[1] - band // 2), (c[0] + r, c[1] + band // 2),
+                          (245, 245, 245), -1, cv2.LINE_AA)
+            cv2.circle(img, c, r, color, 2, cv2.LINE_AA)  # restore rim
         cv2.circle(img, c, r, (20, 22, 26), 1, cv2.LINE_AA)
-        if uncertain:
-            # don't fake a colour/sheen for something we can't classify — mark it
+        label = _ball_label(tr)
+        if uncertain and not label:
             cv2.putText(img, "?", (c[0] - r // 2, c[1] + r // 2),
                         cv2.FONT_HERSHEY_SIMPLEX, max(0.3, r / 18.0), (40, 40, 40), 1,
                         cv2.LINE_AA)
-        else:
+        elif show_ids and label:
+            # the ball NUMBER, centred on the ball (white-band centre for stripes)
+            _draw_centered(img, label, c,
+                           (245, 245, 245) if tr.cls == BallClass.STRIPE else color, r)
+        elif not uncertain:
             cv2.circle(img, (c[0] - r // 3, c[1] - r // 3), max(2, r // 4),
                        (255, 255, 255), -1, cv2.LINE_AA)
         if tr.speed > 2.0:
             tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
             cv2.arrowedLine(img, c, tip, acc, 1, cv2.LINE_AA, tipLength=0.3)
-        if show_ids:
-            cv2.putText(img, str(tr.id), (c[0] + r + 2, c[1] - r),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (235, 235, 235), 1, cv2.LINE_AA)
 
     if debug and diag:
         line1 = (f"state={diag.get('state')} cue={diag.get('cue')} "

@@ -39,11 +39,20 @@ class Calibration:
 
 
 class CalibrationManager:
-    def __init__(self, deviation_px: float = 18.0, deviation_frames: int = 8):
+    def __init__(self, deviation_px: float = 30.0, deviation_frames: int = 12,
+                 settle_px: float = 12.0, corner_ema: float = 0.06):
         self.calib: Calibration | None = None
         self.deviated: bool = False
-        self._deviation_px = deviation_px
-        self._deviation_frames = deviation_frames
+        # The table/camera don't move during play, so the lock is sticky and
+        # SELF-CORRECTING rather than twitchy: a re-detect that closely agrees eases
+        # the locked corners toward it (averages out detection noise, fixes tiny
+        # initial-lock error); a poor/absent re-detect (a hand/cue/person over a
+        # corner) is ignored, never lost; only a LARGE, SUSTAINED disagreement —
+        # the table genuinely moved — flags a relock.
+        self._deviation_px = deviation_px        # px RMSE that counts as "moved"
+        self._deviation_frames = deviation_frames  # consecutive checks before relock
+        self._settle_px = settle_px              # RMSE under which we average-in
+        self._corner_ema = corner_ema            # how fast locked corners ease over
         self._consecutive = 0
 
     @property
@@ -81,7 +90,8 @@ class CalibrationManager:
             log.info("Calibration failed: rectification not ok")
             return False
         table = TableModel.from_rect(rect.dst_size, settings.rectify.pad_px,
-                                     settings.table.pocket_radius_frac)
+                                     settings.table.pocket_radius_frac,
+                                     nose_inset_frac=settings.table.nose_inset_frac)
         self.calib = Calibration(
             corners=felt.corners, H=rect.H, Hinv=rect.Hinv,
             dst_size=rect.dst_size, table=table, rect_mask=rect.rectified_mask,
@@ -100,23 +110,60 @@ class CalibrationManager:
                                    flags=cv2.INTER_LINEAR)
 
     def check_deviation(self, frame: np.ndarray, settings: Settings) -> float:
-        """Re-detect felt corners and compare to the locked ones. Updates the
-        ``deviated`` flag using a consecutive-frame debounce. Returns RMSE px."""
+        """Watchdog: re-detect felt corners and reconcile with the locked ones.
+
+        The table/camera don't move during play, so this is conservative and
+        self-correcting, not twitchy:
+          - a poor/absent re-detect (a hand/cue/person over a corner) is IGNORED —
+            it's not evidence the table moved, so the lock is never lost to it;
+          - a close re-detect eases the locked corners toward it (averages out
+            detection noise, fixes tiny initial-lock error) — no jumps;
+          - only a LARGE, SUSTAINED disagreement flags ``deviated`` for a relock.
+        Returns RMSE px (0.0 when the re-detect was unusable)."""
         if self.calib is None:
             return 0.0
         felt = detect_felt(frame, self.calib.felt)
-        if not felt.has_corners:
+        # Occlusion guard: no/weak felt this frame => something's over the table.
+        # Keep the lock, don't count it, don't average garbage in.
+        if not felt.has_corners or felt.area_ratio < 0.04:
+            self._consecutive = max(0, self._consecutive - 1)
             return 0.0
         rmse = float(np.sqrt(np.mean(np.sum((felt.corners - self.calib.corners) ** 2, axis=1))))
-        if rmse > self._deviation_px:
+        if rmse <= self._settle_px:
+            # agrees with the lock -> gently average the corners toward it
+            self._consecutive = 0
+            self.deviated = False
+            self._ema_corners(felt.corners, settings)
+        elif rmse > self._deviation_px:
             self._consecutive += 1
         else:
-            self._consecutive = 0
+            # moderate disagreement (likely partial occlusion) -> decay, don't trip
+            self._consecutive = max(0, self._consecutive - 1)
         if self._consecutive >= self._deviation_frames:
             if not self.deviated:
-                log.info("Calibration deviated: RMSE %.1f px", rmse)
+                log.info("Calibration deviated (table moved?): RMSE %.1f px", rmse)
             self.deviated = True
         return rmse
+
+    def _ema_corners(self, detected: np.ndarray, settings: Settings) -> None:
+        """Ease the locked corners toward a trusted re-detection and recompute the
+        homography. Slow (corner_ema) so the lock is stable; the dst rectangle is
+        unchanged, so the table model/size stay put."""
+        try:
+            old = np.asarray(self.calib.corners, np.float32)
+            new = ((1.0 - self._corner_ema) * old
+                   + self._corner_ema * np.asarray(detected, np.float32)).astype(np.float32)
+            w, h = self.calib.dst_size
+            p = float(settings.rectify.pad_px)
+            dst_quad = np.array([[p, p], [w - 1 - p, p],
+                                 [w - 1 - p, h - 1 - p], [p, h - 1 - p]], np.float32)
+            H = cv2.getPerspectiveTransform(new, dst_quad)
+            Hinv = np.linalg.inv(H)
+        except (cv2.error, np.linalg.LinAlgError):
+            return
+        self.calib.corners = new
+        self.calib.H = H
+        self.calib.Hinv = Hinv
 
     def clear(self) -> None:
         self.calib = None
@@ -147,7 +194,8 @@ class CalibrationManager:
         except OSError as exc:
             log.warning("Could not save calibration: %s", exc)
 
-    def try_load(self, path: Path, source: str, frame_shape: tuple) -> bool:
+    def try_load(self, path: Path, source: str, frame_shape: tuple,
+                 settings: Settings | None = None) -> bool:
         """Restore a saved calibration if it matches this source + resolution."""
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -161,7 +209,9 @@ class CalibrationManager:
             dst_size = tuple(data["dst_size"])
             felt_keys = {f.name for f in fields(FeltSettings)}
             felt = FeltSettings(**{k: v for k, v in data["felt"].items() if k in felt_keys})
-            table = TableModel.from_rect(dst_size, data["pad"], data["pocket_frac"])
+            inset = settings.table.nose_inset_frac if settings is not None else 0.0
+            table = TableModel.from_rect(dst_size, data["pad"], data["pocket_frac"],
+                                         nose_inset_frac=inset)
             self.calib = Calibration(
                 corners=np.array(data["corners"], dtype=np.float32),
                 H=np.array(data["H"], dtype=np.float64),
