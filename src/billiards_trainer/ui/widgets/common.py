@@ -120,6 +120,7 @@ class SegmentedControl(QWidget):
             padding: 7px 16px; color: {p.text_dim}; font-weight: 600; }}
         QPushButton#SegItem:hover {{ color: {p.text}; }}
         QPushButton#SegItem:checked {{ background: {p.surface_hi}; color: {p.text}; }}
+        QPushButton#SegItem:disabled {{ color: {p.text_dim}; }}
         """
 
     def _on_click(self, key: str) -> None:
@@ -132,8 +133,22 @@ class SegmentedControl(QWidget):
         return ""
 
     def set_current(self, key: str) -> None:
-        if key in self._buttons:
+        if key in self._buttons and self._buttons[key].isEnabled():
             self._buttons[key].setChecked(True)
+
+    def disable_option(self, key: str, tooltip: str = "") -> None:
+        """Grey out + make a segment un-clickable (a not-yet-shipped mode). A '·'
+        is appended to the label since Qt won't reliably show tooltips on disabled
+        widgets across platforms."""
+        btn = self._buttons.get(key)
+        if not btn:
+            return
+        btn.setChecked(False)
+        btn.setEnabled(False)
+        if tooltip:
+            btn.setToolTip(tooltip)
+        if not btn.text().rstrip().endswith("·"):
+            btn.setText(f"{btn.text()} ·")
 
 
 class EmptyState(QWidget):

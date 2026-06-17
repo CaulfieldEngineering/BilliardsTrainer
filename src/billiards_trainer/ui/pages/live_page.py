@@ -11,7 +11,7 @@ renders controller signals; the main window wires the two across the thread
 boundary.
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QSlider,
     QSplitter,
     QStackedWidget,
+    QStyle,
+    QStyleOptionSlider,
     QVBoxLayout,
     QWidget,
 )
@@ -31,6 +33,30 @@ from ..theme import PALETTE
 from ..widgets.common import Badge, Card, SegmentedControl, StatCard
 from ..widgets.shot_clock_widget import ShotClockWidget
 from ..widgets.video_view import VideoView
+
+
+class _SeekSlider(QSlider):
+    """Horizontal slider that JUMPS to the clicked position on the groove.
+
+    Qt's default is to page-step toward a track click (so a click near the end
+    nudges a few frames instead of seeking there). We map the click straight to a
+    value, then defer to the base class so dragging from there still works and the
+    normal sliderPressed/sliderReleased signals still fire.
+    """
+
+    def mousePressEvent(self, ev):  # noqa: N802 - Qt override
+        if ev.button() == Qt.LeftButton and self.maximum() > self.minimum():
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+            handle = self.style().subControlRect(
+                QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self)
+            pos = ev.position().toPoint() if hasattr(ev, "position") else ev.pos()
+            if not handle.contains(pos):  # clicked the groove, not the thumb
+                val = QStyle.sliderValueFromPosition(
+                    self.minimum(), self.maximum(), pos.x(), self.width())
+                self.setValue(val)
+                self.sliderMoved.emit(val)
+        super().mousePressEvent(ev)
 
 
 class LivePage(QWidget):
@@ -62,6 +88,10 @@ class LivePage(QWidget):
         self._drill_key = ""
         self._drill_name = ""
         self._pick_mode = False
+        # transport scrub state
+        self._user_is_seeking = False
+        self._was_playing = False
+        self._pending_seek: int | None = None
         self._build()
 
     # ------------------------------------------------------------------ #
@@ -131,16 +161,18 @@ class LivePage(QWidget):
         self._detector_lbl.setObjectName("Muted")
         lay.addWidget(self._detector_lbl)
 
-        self._demo_btn = QPushButton("  Try demo")
-        self._demo_btn.setObjectName("Ghost")
-        self._demo_btn.setCursor(Qt.PointingHandCursor)
-        self._demo_btn.setIcon(icon("zap", PALETTE.text_dim))
-        self._demo_btn.clicked.connect(self._start_demo)
-        lay.addWidget(self._demo_btn)
-
+        # 'Try demo' removed — the synthetic demo source didn't reflect real
+        # detection and confused the surface. Demo is still reachable via
+        # Settings → Camera → "Demo simulation" for engineering use.
         self._mode = SegmentedControl(
             [("free_play", "Sandbox"), ("practice", "Practice"), ("drill", "Drill")],
             current=self._settings.mode)
+        # Practice/Drill are deferred until detection milestones M1–M6 land
+        # (see docs/ROADMAP.md): disable so the surface only offers what works.
+        self._mode.disable_option("practice", "Coming soon — see roadmap")
+        self._mode.disable_option("drill", "Coming soon — see roadmap")
+        if self._mode.current() == "":  # saved mode was a now-disabled one
+            self._mode.set_current("free_play")
         lay.addWidget(self._mode)
 
         lay.addStretch(1)
@@ -247,9 +279,20 @@ class LivePage(QWidget):
         fwd_btn.clicked.connect(lambda: self.video_step.emit(1))
         for w in (self._play_btn, stop_btn, back_btn, fwd_btn):
             lay.addWidget(w)
-        self._seek = QSlider(Qt.Horizontal)
+        self._seek = _SeekSlider(Qt.Horizontal)
         self._seek.setRange(0, 0)
-        self._seek.sliderMoved.connect(self.video_seek.emit)
+        self._seek.setSingleStep(1)
+        self._seek.sliderPressed.connect(self._on_seek_pressed)
+        self._seek.sliderMoved.connect(self._on_seek_moved)
+        self._seek.sliderReleased.connect(self._on_seek_released)
+        # Debounce the live scrub: each seek decodes + (maybe) detects, so firing
+        # on every mouse-move (60+/s) backs the worker up and frames arrive out of
+        # order — the "rewinds frame-by-frame" feel. Cap it at ~12/s; the exact
+        # final frame is seeked on release.
+        self._seek_debounce = QTimer(self)
+        self._seek_debounce.setSingleShot(True)
+        self._seek_debounce.setInterval(80)
+        self._seek_debounce.timeout.connect(self._emit_pending_seek)
         lay.addWidget(self._seek, 1)
         self._time_lbl = QLabel("0:00 / 0:00")
         self._time_lbl.setObjectName("Faint")
@@ -269,6 +312,44 @@ class LivePage(QWidget):
         self._play_btn.setIcon(icon("play" if paused else "pause", PALETTE.text_dim))
         self.video_play_pause.emit(paused)
 
+    # --- seek-bar scrubbing -------------------------------------------------- #
+    def _on_seek_pressed(self) -> None:
+        """Drag started: stop the playback tick from fighting the thumb. If the
+        video was playing we pause for the duration of the scrub and resume on
+        release; either way update_video_state stops moving the thumb."""
+        self._user_is_seeking = True
+        self._was_playing = not self._play_btn.isChecked()  # checked == paused
+        if self._was_playing:
+            self.video_play_pause.emit(True)
+            self._play_btn.setChecked(True)
+            self._play_btn.setIcon(icon("play", PALETTE.text_dim))
+
+    def _on_seek_moved(self, value: int) -> None:
+        """Live preview while dragging — debounced so we don't flood the worker."""
+        self._pending_seek = int(value)
+        total = self._seek.maximum() + 1
+        self._time_lbl.setText(f"{self._fmt_t(value)} / {self._fmt_t(total)}")
+        if not self._seek_debounce.isActive():
+            self._seek_debounce.start()
+
+    def _emit_pending_seek(self) -> None:
+        if self._pending_seek is not None:
+            self.video_seek.emit(self._pending_seek)
+
+    def _on_seek_released(self) -> None:
+        """Drag ended: seek the exact final frame, then resume playback if we
+        paused for the scrub."""
+        self._seek_debounce.stop()
+        if self._pending_seek is not None:
+            self.video_seek.emit(self._pending_seek)
+            self._pending_seek = None
+        self._user_is_seeking = False
+        if self._was_playing:
+            self.video_play_pause.emit(False)
+            self._was_playing = False
+            self._play_btn.setChecked(False)
+            self._play_btn.setIcon(icon("pause", PALETTE.text_dim))
+
     def _fmt_t(self, frames: int) -> str:
         s = frames / max(1.0, self._video_fps)
         return f"{int(s // 60)}:{int(s % 60):02d}"
@@ -281,14 +362,17 @@ class LivePage(QWidget):
             self._time_lbl.setText(f"0:00 / {self._fmt_t(total)}")
 
     def update_video_state(self, pos: int, total: int, playing: bool) -> None:
-        self._seek.blockSignals(True)
+        # Never move the thumb out from under the user mid-drag (the old "thumb
+        # keeps pushing forward" bug). The range can still be (re)synced.
         if self._seek.maximum() != max(0, total - 1):
             self._seek.setRange(0, max(0, total - 1))
-        self._seek.setValue(pos)
-        self._seek.blockSignals(False)
-        self._time_lbl.setText(f"{self._fmt_t(pos)} / {self._fmt_t(total)}")
-        self._play_btn.setChecked(not playing)
-        self._play_btn.setIcon(icon("play" if not playing else "pause", PALETTE.text_dim))
+        if not self._user_is_seeking:
+            self._seek.blockSignals(True)
+            self._seek.setValue(pos)
+            self._seek.blockSignals(False)
+            self._time_lbl.setText(f"{self._fmt_t(pos)} / {self._fmt_t(total)}")
+            self._play_btn.setChecked(not playing)
+            self._play_btn.setIcon(icon("play" if not playing else "pause", PALETTE.text_dim))
 
     def _toggle_detection(self) -> None:
         on = self._detect_btn.isChecked()
@@ -423,12 +507,6 @@ class LivePage(QWidget):
         self._drill_name = drill_name
         self._mode.set_current("drill")
         self._drill_lbl.setText(f"Drill: {drill_name}" if drill_name else "")
-
-    def _start_demo(self) -> None:
-        # the synthetic table is clean, so the demo showcases detection ON
-        self._set_detect_ui(True)
-        self.detection_toggled.emit(True)
-        self.start_requested.emit("demo", self._mode.current(), "")
 
     def _toggle_pick(self) -> None:
         self._pick_mode = not self._pick_mode

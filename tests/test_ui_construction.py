@@ -117,6 +117,43 @@ def test_live_detector_dropdown_frozen_safe(app, monkeypatch):
     assert "simple_blob" in items, f"FROZEN dropdown missing simple_blob: {items}"
 
 
+def test_try_demo_button_removed(app):
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.live_page import LivePage
+
+    page = LivePage(Settings())
+    assert not hasattr(page, "_demo_btn")
+    assert not hasattr(page, "_start_demo")
+
+
+def test_practice_and_drill_modes_disabled(app):
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.live_page import LivePage
+
+    page = LivePage(Settings())
+    assert page._mode._buttons["free_play"].isEnabled()
+    assert not page._mode._buttons["practice"].isEnabled()
+    assert not page._mode._buttons["drill"].isEnabled()
+    assert page._mode.current() == "free_play"  # always lands on the working mode
+
+
+def test_seek_guard_keeps_thumb_under_cursor_during_drag(app):
+    """REGRESSION: while the user drags the seek thumb, a playback tick must NOT
+    yank it back to the playback position (the 'thumb keeps pushing forward' bug)."""
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.live_page import LivePage
+
+    page = LivePage(Settings())
+    page.set_video_mode(True, 100, 30.0)
+    page._seek.setValue(80)
+    page._on_seek_pressed()          # user grabs the thumb at frame 80
+    assert page._user_is_seeking
+    page.update_video_state(5, 100, True)   # a tick says "we're at frame 5"
+    assert page._seek.value() == 80         # thumb stays where the user put it
+    page._on_seek_released()
+    assert not page._user_is_seeking
+
+
 def test_camera_dropdown_autosaves_without_save_click(app, tmp_path, monkeypatch):
     """The P0 fix: picking a camera in the dropdown must persist immediately —
     no Save click needed — so Start opens the selected camera."""
