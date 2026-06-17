@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 
 from ..config import MODELS_DIR as USER_MODELS_DIR
-from ..vision.balls import classify_pool_ball
+from ..vision.balls import classify_pool_ball, number_to_class, pool_ball_bgr
 from ..vision.types import BallClass, Detection
 from . import DetectorStrategy, ball_radius_raw, table_polygon_mask
 
@@ -65,8 +65,8 @@ class OnnxModelStrategy(DetectorStrategy):
         return self._sess
 
     def _infer(self, image, ox: int = 0, oy: int = 0):
-        """Run the model on one image and return [(cx, cy, r, conf)] in FULL-frame
-        coords (add the image's (ox, oy) offset)."""
+        """Run the model on one image and return [(cx, cy, r, conf, cls_id)] in
+        FULL-frame coords (add the image's (ox, oy) offset)."""
         sess = self._session()
         n = self._size
         h, w = image.shape[:2]
@@ -86,6 +86,7 @@ class OnnxModelStrategy(DetectorStrategy):
             out = out.T                       # [N, 4+nc]
         boxes, scores = out[:, :4], out[:, 4:]
         nc = scores.shape[1]
+        self._nc = nc
         cid, conf = scores.argmax(1), scores.max(1)
         keep = conf >= self._conf
         if nc >= 80:
@@ -93,17 +94,19 @@ class OnnxModelStrategy(DetectorStrategy):
         idx = np.where(keep)[0]
         if idx.size == 0:
             return []
-        rects, confs = [], []
+        rects, confs, cls_ids = [], [], []
         for i in idx:
             cx, cy, bw, bh = boxes[i]
             rects.append([float((cx - bw / 2 - dw) / ratio), float((cy - bh / 2 - dh) / ratio),
                           float(bw / ratio), float(bh / ratio)])
             confs.append(float(conf[i]))
+            cls_ids.append(int(cid[i]))
         keep_nms = cv2.dnn.NMSBoxes(rects, confs, self._conf, self._iou)
         res = []
         for k in np.array(keep_nms).flatten():
             x, y, bw, bh = rects[int(k)]
-            res.append((x + bw / 2 + ox, y + bh / 2 + oy, (bw + bh) / 4.0, confs[int(k)]))
+            res.append((x + bw / 2 + ox, y + bh / 2 + oy, (bw + bh) / 4.0,
+                        confs[int(k)], cls_ids[int(k)]))
         return res
 
     @staticmethod
@@ -131,19 +134,46 @@ class OnnxModelStrategy(DetectorStrategy):
             return []
         table = table_polygon_mask(frame_bgr.shape, calib)
         rmax = ball_radius_raw(calib, frame_bgr.shape) * 4.0
+        # A 16-class model is the trained cue+1..15 detector — its class IS the ball
+        # number, so trust it directly (no colour heuristic). Anything else (the
+        # single-class ball model, or COCO) gets the appearance classifier.
+        numbered = getattr(self, "_nc", 0) == 16
         out_dets = []
-        for ccx, ccy, rr, cf in boxes:
+        for ccx, ccy, rr, cf, cid in boxes:
             if rr > rmax * 1.5 or rr < 2:
                 continue
             ix, iy = int(np.clip(ccx, 0, w - 1)), int(np.clip(ccy, 0, h - 1))
             if table[iy, ix] == 0:            # drop clearly off-table detections
                 continue
-            crop = frame_bgr[max(0, int(ccy - rr)):int(ccy + rr) + 1,
-                             max(0, int(ccx - rr)):int(ccx + rr) + 1]
-            cls, number, bgr = classify_pool_ball(crop)
+            if numbered:
+                number = int(cid)             # class index == ball number (0=cue)
+                cls, bgr = number_to_class(number), pool_ball_bgr(number)
+            else:
+                crop = frame_bgr[max(0, int(ccy - rr)):int(ccy + rr) + 1,
+                                 max(0, int(ccx - rr)):int(ccx + rr) + 1]
+                cls, number, bgr = classify_pool_ball(crop)
             out_dets.append(Detection(ccx, ccy, rr, bgr, cls, float(cf), number=number))
-        self._enforce_single_cue(frame_bgr, out_dets)
+        if numbered:
+            self._enforce_unique_numbers(out_dets)
+        else:
+            self._enforce_single_cue(frame_bgr, out_dets)
         return out_dets
+
+    @staticmethod
+    def _enforce_unique_numbers(dets):
+        """There is exactly one of each ball, so keep only the highest-confidence
+        detection per number; demote duplicates to unknown (kept on the table as a
+        grey '?', not dropped, so a real ball isn't lost to a misread)."""
+        best: dict[int, object] = {}
+        for d in dets:
+            if d.number < 0:
+                continue
+            cur = best.get(d.number)
+            if cur is None or d.score > cur.score:
+                best[d.number] = d
+        for d in dets:
+            if d.number >= 0 and best.get(d.number) is not d:
+                d.number, d.cls, d.bgr = -1, BallClass.UNKNOWN, (190, 190, 190)
 
     def _enforce_single_cue(self, frame_bgr, dets):
         """Exactly ONE cue ball, robustly.

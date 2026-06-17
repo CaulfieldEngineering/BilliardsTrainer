@@ -86,6 +86,19 @@ def pool_ball_bgr(number: int) -> tuple[int, int, int]:
     return _SOLID_BGR.get(base, (200, 200, 200))
 
 
+def number_to_class(number: int) -> BallClass:
+    """Map a ball number to its class. 0=cue, 8=eight, 1..7=solid, 9..15=stripe."""
+    if number == 0:
+        return BallClass.CUE
+    if number == 8:
+        return BallClass.EIGHT
+    if 1 <= number <= 7:
+        return BallClass.SOLID
+    if 9 <= number <= 15:
+        return BallClass.STRIPE
+    return BallClass.UNKNOWN
+
+
 def _hue_to_base(hue: float, val: float) -> int:
     if hue <= 10.0 or hue >= 168.0:          # red family (wraps)
         return 7 if val < 110 else 3         # darker => maroon(7), else red(3)
