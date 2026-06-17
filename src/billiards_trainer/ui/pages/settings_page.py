@@ -4,7 +4,7 @@ Grouped into Source, Table & Felt, Ball detection, Shot clock, Appearance, and
 Updates. Emits ``applied`` so the main window can re-theme / restart capture.
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -24,6 +24,25 @@ from PySide6.QtWidgets import (
 
 from ...config import Settings
 from ..widgets.common import Card, section_header
+
+
+class _ModelDownloadWorker(QObject):
+    """Downloads a fetchable detector model off the UI thread."""
+    progress = Signal(float)
+    done = Signal(str)       # strategy name now available
+    failed = Signal(str)
+
+    def __init__(self, key: str):
+        super().__init__()
+        self._key = key
+
+    def run(self) -> None:
+        try:
+            from ...detector_strategies import model_fetch
+            model_fetch.fetch_model(self._key, progress=self.progress.emit)
+            self.done.emit(model_fetch.FETCHABLE[self._key]["strategy"])
+        except Exception as exc:  # noqa: BLE001 - surface any failure to the user
+            self.failed.emit(str(exc))
 
 
 class SettingsPage(QWidget):
@@ -270,22 +289,24 @@ class SettingsPage(QWidget):
         # Default simple_blob (Phase-1 winner, no model needed). Switching here
         # applies immediately and keeps calibration.
         self._live_detector = QComboBox()
-        names: list[str] = []
-        try:
-            from ...detector_strategies import discover
-            names = sorted(n for n in discover() if n != "classical_rectified")
-        except Exception:  # noqa: BLE001 - settings must build even if strategies don't import
-            pass
-        # Frozen-safe floor: simple_blob is the shipped default and must always be
-        # selectable even if discovery somehow returns nothing (the bug that left
-        # only 'legacy' in the dropdown for every shipped build).
-        if "simple_blob" not in names:
-            names = ["simple_blob", "felt_mask_hough"]
-        names.append("legacy")
-        self._live_detector.addItems(names)
+        self._populate_live_detectors()
         self._live_detector.activated.connect(
             lambda _i: self.detector_changed.emit(self._live_detector.currentText()))
         form.addRow("Live detector", self._live_detector)
+
+        # One-click fetch of the hosted YOLO11 ball model so it becomes an A/B
+        # option in the dropdown (model is downloaded into the user models dir, not
+        # bundled — keeps the base download small + AGPL model out of the binary).
+        self._dl_yolo_btn = QPushButton("  Download YOLO11 ball model")
+        self._dl_yolo_btn.setObjectName("Ghost")
+        self._dl_yolo_btn.setCursor(Qt.PointingHandCursor)
+        self._dl_yolo_btn.clicked.connect(self._download_yolo11)
+        self._dl_status = QLabel("")
+        self._dl_status.setObjectName("Faint")
+        self._dl_status.setWordWrap(True)
+        self._refresh_yolo_button()
+        form.addRow("YOLO11 (A/B)", self._dl_yolo_btn)
+        form.addRow("", self._dl_status)
 
         self._backend = QComboBox()
         self._backend.addItems(["auto", "classical", "yolo"])
@@ -309,6 +330,64 @@ class SettingsPage(QWidget):
         self._yolo_url.setPlaceholderText("https://…/pool_balls.pt (auto-fetched)")
         form.addRow("YOLO weights URL", self._yolo_url)
         return card
+
+    # ------------------------------------------------------------------ #
+    def _populate_live_detectors(self, select: str | None = None) -> None:
+        """(Re)fill the Live-detector combo from discovery + a frozen-safe floor."""
+        names: list[str] = []
+        try:
+            from ...detector_strategies import discover
+            names = sorted(n for n in discover() if n != "classical_rectified")
+        except Exception:  # noqa: BLE001 - settings must build even if strategies don't import
+            pass
+        if "simple_blob" not in names:  # frozen-safe floor (never collapse to legacy-only)
+            names = ["simple_blob", "felt_mask_hough"]
+        names.append("legacy")
+        cur = select or self._live_detector.currentText()
+        self._live_detector.blockSignals(True)
+        self._live_detector.clear()
+        self._live_detector.addItems(names)
+        if cur in names:
+            self._live_detector.setCurrentText(cur)
+        self._live_detector.blockSignals(False)
+
+    def _refresh_yolo_button(self) -> None:
+        from ...detector_strategies import model_fetch
+        if model_fetch.is_present("pool_yolo11"):
+            self._dl_yolo_btn.setEnabled(False)
+            self._dl_yolo_btn.setText("  YOLO11 model installed")
+            self._dl_status.setText("Pick <code>onnx_pool_yolo11</code> in Live detector to A/B.")
+        else:
+            self._dl_yolo_btn.setEnabled(True)
+            self._dl_yolo_btn.setText("  Download YOLO11 ball model")
+            self._dl_status.setText(
+                "Fetches a YOLO11 ball detector (~38 MB, runs locally via ONNX, no torch) "
+                "into your models folder so it becomes a Live-detector option. "
+                "Model is AGPL-3.0 (Ultralytics/pool_coach).")
+
+    def _download_yolo11(self) -> None:
+        self._dl_yolo_btn.setEnabled(False)
+        self._dl_status.setText("Downloading… 0%")
+        self._dl_thread = QThread(self)
+        self._dl_worker = _ModelDownloadWorker("pool_yolo11")
+        self._dl_worker.moveToThread(self._dl_thread)
+        self._dl_thread.started.connect(self._dl_worker.run)
+        self._dl_worker.progress.connect(
+            lambda f: self._dl_status.setText(f"Downloading… {int(f * 100)}%"))
+        self._dl_worker.done.connect(self._on_yolo_downloaded)
+        self._dl_worker.failed.connect(self._on_yolo_failed)
+        for sig in (self._dl_worker.done, self._dl_worker.failed):
+            sig.connect(self._dl_thread.quit)
+        self._dl_thread.start()
+
+    def _on_yolo_downloaded(self, strategy: str) -> None:
+        self._refresh_yolo_button()
+        self._populate_live_detectors(select=strategy)   # show + select it
+        self._dl_status.setText(f"Installed. Selected <code>{strategy}</code> — Save to apply.")
+
+    def _on_yolo_failed(self, msg: str) -> None:
+        self._dl_yolo_btn.setEnabled(True)
+        self._dl_status.setText(f"Download failed: {msg}. Check your connection and retry.")
 
     def _detection_card(self) -> Card:
         card, form = self._card("Detection")
