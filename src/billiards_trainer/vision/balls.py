@@ -134,8 +134,10 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None
     # pushes colored_frac well past this, so it lands as a stripe, not a 2nd cue.)
     if colored_frac < 0.10 and white_frac > 0.40:
         return BallClass.CUE, 0, (245, 245, 245)
-    # 8-BALL: mostly dark with little colour.
-    if dark_frac > 0.45 and colored_frac < 0.30:
+    # 8-BALL: mostly dark AND near-colourless. The maroon 7 is also dark but carries
+    # a real red — so it must have little colour to read as the 8, else it falls
+    # through to the hue path and lands as maroon (7). (8 vs 7 is a known hard pair.)
+    if dark_frac > 0.5 and colored_frac < 0.15:
         return BallClass.EIGHT, 8, _SOLID_BGR[8]
     if colored_frac < 0.05:
         return BallClass.UNKNOWN, -1, (190, 190, 190)
@@ -147,7 +149,10 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None
         base = 7 if float(np.median(cvv)) < 110 else 3
     else:
         base = _hue_to_base(float(np.median(ch)), float(np.median(cvv)))
-    is_stripe = white_frac > 0.22 and base != 8
+    # Stripe (9..15) vs solid (1..7): a stripe's white band is a LARGE fraction of
+    # the ball; a solid's glare is a small spot. Bias toward solid (raise the bar)
+    # so glare doesn't turn the 1 into a 9. (solid/stripe is a known hard pair.)
+    is_stripe = white_frac > 0.30 and base != 8
     number = base + 8 if is_stripe else base
     cls = BallClass.STRIPE if is_stripe else BallClass.SOLID
     return cls, number, pool_ball_bgr(number)

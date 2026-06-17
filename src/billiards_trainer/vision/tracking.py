@@ -32,8 +32,9 @@ class _Internal:
     bgr: tuple = (200, 200, 200)
     still_count: int = 0       # consecutive ~stationary frames
     settled: bool = False      # confirmed AND has been still a while (a resting ball)
+    committed_number: int = -1  # hysteresis: the held identity (resists flicker)
     cls_hist: deque = field(default_factory=lambda: deque(maxlen=15))
-    num_hist: deque = field(default_factory=lambda: deque(maxlen=31))
+    num_hist: deque = field(default_factory=lambda: deque(maxlen=45))
     pos_hist: deque = field(default_factory=lambda: deque(maxlen=64))
 
     def predict(self) -> None:
@@ -61,12 +62,23 @@ class _Internal:
 
     @property
     def number(self) -> int:
-        # majority vote over recent frames, ignoring 'unknown' (-1) reads so a few
-        # bad frames don't erase a confident identity.
+        # The HELD identity, with hysteresis (updated in _apply_match). Resists the
+        # frame-to-frame flicker (1->3->5) that pure per-frame voting shows when a
+        # ball's measured colour wanders across hue boundaries.
+        return self.committed_number
+
+    def _commit_number(self) -> None:
+        """Update the held identity: adopt the windowed-vote winner only when it
+        clearly dominates the current one, so identity is sticky, not twitchy."""
         votes = [n for n in self.num_hist if n is not None and n >= 0]
         if not votes:
-            return -1
-        return Counter(votes).most_common(1)[0][0]
+            return
+        cnt = Counter(votes)
+        top, topn = cnt.most_common(1)[0]
+        if self.committed_number < 0 or top == self.committed_number:
+            self.committed_number = top
+        elif topn >= cnt.get(self.committed_number, 0) + 5:
+            self.committed_number = top   # challenger clearly won — switch
 
 
 class BallTracker:
@@ -124,6 +136,13 @@ class BallTracker:
         for ti, t in enumerate(self._tracks):
             t_speed = (t.vx * t.vx + t.vy * t.vy) ** 0.5
             t_gate = max(gate, 3.0 * t_speed)
+            # A resting (settled) ball can only move by being STRUCK, and a hard hit
+            # jumps it far in one frame — so give settled tracks an expanded strike
+            # gate. This keeps a struck object ball ON its track (then it coasts on
+            # its velocity into the pocket) instead of the track being lost and the
+            # ball vanishing off the overhead. (greedy closest-first limits mismatch)
+            if t.settled:
+                t_gate = max(t_gate, 0.18 * self._short_side)
             for di in unmatched_dets:
                 d = detections[di]
                 dist = np.hypot(t.x - d.x, t.y - d.y)
@@ -241,6 +260,7 @@ class BallTracker:
         t.bgr = d.bgr
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
+        t._commit_number()
         t.pos_hist.append((t.x, t.y))
         t.hits += 1
         t.misses = 0
@@ -251,6 +271,7 @@ class BallTracker:
         t = _Internal(id=self._next_id, x=d.x, y=d.y, radius=d.radius, bgr=d.bgr)
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
+        t.committed_number = d.number
         t.pos_hist.append((d.x, d.y))
         t.hits = 1
         self._next_id += 1
