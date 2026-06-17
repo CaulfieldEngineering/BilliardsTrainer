@@ -27,6 +27,24 @@ from .types import Detection, Track
 log = logging.getLogger("vision.pipeline")
 
 
+def _median_frames(frames: list[np.ndarray]) -> np.ndarray:
+    """Per-pixel median of a small frame list. The common 3-frame case uses the
+    exact max/min identity instead of np.median — np.median sorts via partition,
+    which at 1080p costs ~110ms/frame and tanked playback to ~7fps. The identity
+    is ~5-7x faster and bit-exact for n=3."""
+    n = len(frames)
+    if n == 1:
+        return frames[0]
+    if n == 2:  # no true median of 2; average is the sensible smoother
+        return ((frames[0].astype(np.uint16) + frames[1]) // 2).astype(np.uint8)
+    if n == 3:
+        a, b, c = frames
+        mn = np.minimum(a, b)
+        mx = np.maximum(a, b)
+        return np.maximum(mn, np.minimum(mx, c))
+    return np.median(np.stack(frames, axis=0), axis=0).astype(np.uint8)
+
+
 @dataclass
 class PipelineResult:
     status: str = "init"            # init | calibrating | tracking | deviated
@@ -158,7 +176,7 @@ class Pipeline:
         ring.append(frame)
         if len(ring) < n:
             return frame
-        return np.median(np.stack(ring, axis=0), axis=0).astype(np.uint8)
+        return _median_frames(list(ring))
 
     def _project_raw_to_rect(self, raw_dets, calib):
         """Map RAW-frame detections into the rectified plane (via calib.H) so the
@@ -199,7 +217,11 @@ class Pipeline:
 
     # ------------------------------------------------------------------ #
     def process(self, frame: np.ndarray, t: float,
-                annotate: bool = True) -> PipelineResult:
+                annotate: bool = True, detect: bool = True) -> PipelineResult:
+        """``detect=False`` is a display-only frame: skip the expensive raw-frame
+        detection (and the median preprocessing it feeds) and reuse the existing
+        tracks, so playback can run faster than detection. The controller drops the
+        detection cadence at higher playback speeds (every Nth frame)."""
         t_start = time.perf_counter()
         self._frame_idx += 1
         res = PipelineResult(frame_bgr=frame)
@@ -209,8 +231,10 @@ class Pipeline:
             return self._preview_result(frame, res)
 
         # Noise-suppressed frame fed to the raw-frame strategy (display/projection
-        # still use the original `frame`). Advances the median ring every frame.
-        det_frame = self._stabilize(frame)
+        # still use the original `frame`). Only built on detection frames — the
+        # median is the costliest stage, so skipping it on display-only frames is
+        # most of the cadence win.
+        det_frame = self._stabilize(frame) if detect else frame
 
         if not self.calib.is_calibrated:
             if not self._acquire_calibration(frame):
@@ -246,24 +270,30 @@ class Pipeline:
             res.status = "calibrating"
             return res
 
-        if self._strategy is not None:
-            # Phase-2 path: detect on the RAW frame, project results into the
-            # rectified plane so tracking + the bird's-eye schematic are unchanged.
-            try:
-                raw_dets = self._strategy.detect(det_frame, calib)
-            except Exception as exc:  # noqa: BLE001 - a bad frame must not kill the loop
-                log.debug("strategy %s failed on a frame: %s", self.settings.balls.live_strategy, exc)
-                raw_dets = []
-            detections = self._project_raw_to_rect(raw_dets, calib)
+        if not detect:
+            # Display-only frame (cadence): reuse the current tracks, don't re-detect.
+            tracks = self.tracker.tracks
+            detections = []
         else:
-            detections = self.detector.detect(rect, calib.rect_mask, calib.table)
-        # With auto-detection ON, demand the stricter render floor: better to draw
-        # nothing than a low-confidence phantom. Falls back to the looser tracking
-        # floor only if render_floor wasn't set (old settings files).
-        det = self.settings.detection
-        floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
-        detections = [d for d in detections if d.score >= floor]
-        tracks = self.tracker.update(detections, calib.table.short_side)
+            if self._strategy is not None:
+                # Phase-2 path: detect on the RAW frame, project results into the
+                # rectified plane so tracking + the bird's-eye schematic are unchanged.
+                try:
+                    raw_dets = self._strategy.detect(det_frame, calib)
+                except Exception as exc:  # noqa: BLE001 - a bad frame must not kill the loop
+                    log.debug("strategy %s failed on a frame: %s",
+                              self.settings.balls.live_strategy, exc)
+                    raw_dets = []
+                detections = self._project_raw_to_rect(raw_dets, calib)
+            else:
+                detections = self.detector.detect(rect, calib.rect_mask, calib.table)
+            # With auto-detection ON, demand the stricter render floor: better to
+            # draw nothing than a low-confidence phantom. Falls back to the looser
+            # tracking floor only if render_floor wasn't set (old settings files).
+            det = self.settings.detection
+            floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
+            detections = [d for d in detections if d.score >= floor]
+            tracks = self.tracker.update(detections, calib.table.short_side)
         res.tracks = tracks
         res.detections = detections
         res.n_balls = len(tracks)

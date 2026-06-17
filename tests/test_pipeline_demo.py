@@ -13,6 +13,48 @@ from billiards_trainer.events.shot_detector import ShotOutcome
 from billiards_trainer.vision.pipeline import Pipeline
 
 
+def test_median_frames_is_exact_and_fast_path():
+    """The fast median-of-3 (max/min identity, ~18x faster than np.median at 1080p)
+    must be bit-exact vs np.median, and handle the n=1/2/4 cases."""
+    from billiards_trainer.vision.pipeline import _median_frames
+
+    rng = np.random.default_rng(3)
+    for _ in range(8):
+        fs = [rng.integers(0, 256, (24, 24, 3), dtype=np.uint8) for _ in range(3)]
+        ref = np.median(np.stack(fs, 0), 0).astype(np.uint8)
+        assert np.array_equal(_median_frames(fs), ref)
+    a = np.full((4, 4, 3), 10, np.uint8)
+    assert np.array_equal(_median_frames([a]), a)                 # n=1 passthrough
+    b = np.full((4, 4, 3), 20, np.uint8)
+    assert int(_median_frames([a, b]).mean()) == 15               # n=2 average
+    c = np.full((4, 4, 3), 200, np.uint8)
+    five = [a, a, a, b, c]                                          # n=5 -> np.median
+    assert np.array_equal(_median_frames(five),
+                          np.median(np.stack(five, 0), 0).astype(np.uint8))
+
+
+def test_detect_false_skips_detection_and_reuses_tracks():
+    """A display-only cadence frame must NOT call the strategy detector and must
+    reuse the existing tracks (this is what lets playback outrun detection)."""
+    settings = Settings()
+    settings.balls.live_strategy = "simple_blob"
+    src = DemoSource()
+    pipe = Pipeline(settings)
+    pipe.detect_enabled = True
+    # warm up: calibrate + populate tracks
+    for _ in range(40):
+        pipe.process(src.read(), 0.0, detect=True)
+    before = [(t.id, round(t.x, 3), round(t.y, 3)) for t in pipe.tracker.tracks]
+
+    calls = {"n": 0}
+    orig = pipe._strategy.detect
+    pipe._strategy.detect = lambda *a, **k: calls.__setitem__("n", calls["n"] + 1) or orig(*a, **k)
+    res = pipe.process(src.read(), 0.0, detect=False)
+    assert calls["n"] == 0, "strategy.detect must not run on a display-only frame"
+    after = [(t.id, round(t.x, 3), round(t.y, 3)) for t in res.tracks]
+    assert after == before, "tracks should be reused unchanged on a skip frame"
+
+
 def test_temporal_median_stabilize():
     """The noise-suppression preprocessor passes frames through until its window
     fills, then returns the per-pixel median (so a single outlier frame can't

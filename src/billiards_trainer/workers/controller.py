@@ -96,6 +96,7 @@ class PipelineController(QObject):
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
         self._speed = 1.0
+        self._play_tick = 0  # playback frame counter for detection cadence
         self._base_interval = 33
         self._video_pos = 0
 
@@ -462,9 +463,15 @@ class PipelineController(QObject):
                 self.error.emit("Source ended.")
             self.stop()
             return
-        self._run_frame(frame)
+        # Detection cadence: a fast video at 2x/4x can't run detection on every
+        # frame, so display every frame but only DETECT every Nth (stride == round
+        # of playback speed). Step/seek/stop call _run_frame directly with detect
+        # forced on, so a paused/landed frame is always fully analysed.
+        self._play_tick += 1
+        stride = max(1, round(self._speed)) if getattr(self._source, "is_video", False) else 1
+        self._run_frame(frame, detect=(self._play_tick % stride == 0))
 
-    def _run_frame(self, frame: np.ndarray) -> None:
+    def _run_frame(self, frame: np.ndarray, detect: bool = True) -> None:
         """Process one frame through the pipeline and emit results. Shared by the
         live tick and the video transport (step/seek/stop)."""
         t_wall0 = time.perf_counter()
@@ -479,7 +486,7 @@ class PipelineController(QObject):
 
         t = time.perf_counter() - self._t0
         try:
-            res = self._pipeline.process(frame, t)
+            res = self._pipeline.process(frame, t, detect=detect)
         except Exception as exc:  # noqa: BLE001 - never let one bad frame kill the loop
             log.exception("pipeline error")
             self.error.emit(f"Pipeline error: {exc}")
