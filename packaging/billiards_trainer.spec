@@ -20,9 +20,10 @@ block_cipher = None
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 # onnxruntime ships native DLLs that PyInstaller's modulegraph misses — collect_all
-# grabs its binaries/data/submodules so the optional YOLO11 (.onnx) detector works
-# in the frozen build. It's imported lazily by the onnx_model strategy, so the app
-# still launches fine if a user never selects an ONNX model. (CPU build, ~20 MB.)
+# grabs its binaries/data/submodules so the trained YOLO (.onnx) detector — the
+# DEFAULT — runs in the frozen build. On Windows this is onnxruntime-directml, so
+# collect_all also pulls the DirectML provider DLLs for GPU inference. Imported
+# lazily by onnx_model, so the app still launches if onnxruntime is somehow absent.
 try:
     _ort_datas, _ort_bins, _ort_hidden = collect_all("onnxruntime")
 except Exception:  # onnxruntime not installed in this build env -> ship without it
@@ -39,15 +40,13 @@ a = Analysis(
         "sqlalchemy.dialects.sqlite",
         "billiards_trainer",
         "billiards_trainer.detector_strategies.onnx_model",
-        # Detector strategies are imported via the package's static core + dynamic
-        # discovery; name them explicitly so the frozen bundle always contains the
-        # live detector (simple_blob) and friends. Without this the Settings "Live
-        # detector" dropdown and the live pipeline silently collapse to 'legacy'.
+        # Detectors are imported via the package's static core + dynamic discovery;
+        # name them explicitly so the frozen bundle always contains them. Without
+        # this, frozen discovery (iter_modules finds nothing on disk) would have no
+        # detector at all. There are two now: the trained ONNX model + the cue-ball
+        # heuristic fallback.
         "billiards_trainer.detector_strategies",
-        "billiards_trainer.detector_strategies.simple_blob",
         "billiards_trainer.detector_strategies.cue_ball_white",
-        "billiards_trainer.detector_strategies.felt_mask_hough",
-        "billiards_trainer.detector_strategies.classical",
         # friendly camera names on Windows (DirectShow via comtypes)
         "pygrabber",
         "pygrabber.dshow_graph",

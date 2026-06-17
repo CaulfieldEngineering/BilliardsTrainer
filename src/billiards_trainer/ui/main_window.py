@@ -62,6 +62,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._wire()
         self._autostart_preview()
+        self._maybe_autofetch_model()
         self._maybe_check_updates()
 
     # ------------------------------------------------------------------ #
@@ -201,6 +202,45 @@ class MainWindow(QMainWindow):
         self._started_source = source
         self.statusBar().showMessage("Retrying camera…", 3000)
         self.start_source.emit(source, self._settings.mode, "")
+
+    def _maybe_autofetch_model(self) -> None:
+        """First-launch convenience: if the trained ball-detection model isn't
+        present yet, fetch it in the background so the app tracks with the real
+        model out of the box (the cue-ball heuristic runs meanwhile). Silent +
+        best-effort — offline just leaves the heuristic running."""
+        import os
+        # Never auto-download in headless/CI (offscreen) — tests must not hit the
+        # network or spawn a 38 MB download mid-run.
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return
+        from ..detector_strategies import model_fetch
+        try:
+            if model_fetch.is_present("pool_yolo11"):
+                return
+        except Exception:  # noqa: BLE001
+            return
+        from PySide6.QtCore import QThread
+
+        from .pages.settings_page import _ModelDownloadWorker
+        self.statusBar().showMessage("Downloading ball-detection model (one-time)…", 0)
+        self._model_dl_thread = QThread(self)
+        self._model_dl_worker = _ModelDownloadWorker("pool_yolo11")
+        self._model_dl_worker.moveToThread(self._model_dl_thread)
+        self._model_dl_thread.started.connect(self._model_dl_worker.run)
+        self._model_dl_worker.done.connect(self._on_model_autofetched)
+        self._model_dl_worker.failed.connect(
+            lambda m: self.statusBar().showMessage(
+                f"Model download failed ({m}); using the basic cue detector.", 6000))
+        for sig in (self._model_dl_worker.done, self._model_dl_worker.failed):
+            sig.connect(self._model_dl_thread.quit)
+        self._model_dl_thread.start()
+
+    def _on_model_autofetched(self, _strategy: str) -> None:
+        # Re-resolve the live detector ('auto') so the freshly-downloaded model is
+        # picked up immediately — no restart, calibration kept.
+        self.set_strategy_requested.emit("auto")
+        self.statusBar().showMessage("Ball-detection model ready — tracking with the "
+                                     "trained model.", 6000)
 
 
     def _on_strategy_changed(self, name: str) -> None:
@@ -357,6 +397,10 @@ class MainWindow(QMainWindow):
             self._thread.wait(2500)
             self._sync_thread.quit()
             self._sync_thread.wait(2500)
+            dl = getattr(self, "_model_dl_thread", None)
+            if dl is not None and dl.isRunning():
+                dl.quit()
+                dl.wait(2000)
         except Exception:  # noqa: BLE001
             pass
         super().closeEvent(event)

@@ -10,6 +10,18 @@ deferred so they aren't lost. Nothing here is in progress.
   `current_frame − round(5 × fps)`. Reuse the existing `video_seek` signal →
   `controller.video_seek`. *(Requested 2026-06-16; not started.)*
 
+- **Playing area should exclude the rail tops (rail-width inset).** Felt detection
+  maps the whole blue area, but the outer margin of blue is the rail/cushion TOP
+  cloth, not the bed — the true playing area is inside the cushion noses and is
+  slightly smaller. Fix: inset the detected corners toward the centroid by
+  `table.nose_inset_frac` (already exists, currently 0.0) in
+  `calibration.calibrate()` before `rectify_tabletop`, so the bird's-eye maps the
+  bed and pockets/on-table tests use the cushion-nose boundary. The exact inset is
+  table-specific, so expose it as a **live "Rail inset" slider in the Sandbox
+  tuning panel** (applies via reconfigure → recalibrate) so Joe can dial it while
+  watching. Keep default 0.0 to avoid regressing cue tracking until tuned.
+  *(Requested 2026-06-16; not started.)*
+
 ## Infra
 
 ### Dev/test machine sync mechanism  *(flagged, not implemented)*
