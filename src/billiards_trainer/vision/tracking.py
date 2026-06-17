@@ -47,12 +47,21 @@ class _Internal:
 
 class BallTracker:
     def __init__(self, max_dist_frac: float = 0.08, max_misses: int = 12,
-                 min_hits: int = 3, pos_alpha: float = 0.5, vel_alpha: float = 0.6):
+                 min_hits: int = 2, vel_alpha: float = 0.6,
+                 pos_alpha_slow: float = 0.15, pos_alpha_fast: float = 0.85,
+                 speed_lo: float = 3.0, speed_hi: float = 8.0):
         self.max_dist_frac = max_dist_frac
         self.max_misses = max_misses
         self.min_hits = min_hits
-        self.pos_alpha = pos_alpha
         self.vel_alpha = vel_alpha
+        # Adaptive position smoothing: heavy (slow alpha) when a ball is ~still so
+        # the bird's-eye doesn't jitter while Joe tunes, light (fast alpha) when it
+        # moves so a struck cue ball is FOLLOWED, not trailed by a foot. Alpha is
+        # interpolated between slow/fast over [speed_lo, speed_hi] px/frame.
+        self.pos_alpha_slow = pos_alpha_slow
+        self.pos_alpha_fast = pos_alpha_fast
+        self.speed_lo = speed_lo
+        self.speed_hi = speed_hi
         self._tracks: list[_Internal] = []
         self._next_id = 1
 
@@ -108,10 +117,19 @@ class BallTracker:
     def _apply_match(self, t: _Internal, d: Detection) -> None:
         meas_vx = d.x - t.x
         meas_vy = d.y - t.y
+        spd = (meas_vx * meas_vx + meas_vy * meas_vy) ** 0.5
         t.vx = self.vel_alpha * meas_vx + (1 - self.vel_alpha) * t.vx
         t.vy = self.vel_alpha * meas_vy + (1 - self.vel_alpha) * t.vy
-        t.x = self.pos_alpha * d.x + (1 - self.pos_alpha) * t.x
-        t.y = self.pos_alpha * d.y + (1 - self.pos_alpha) * t.y
+        if spd < self.speed_lo:
+            # a ~still ball shouldn't carry velocity, or predict() injects jitter
+            t.vx *= 0.25
+            t.vy *= 0.25
+        # adaptive position alpha: follow fast motion, smooth slow motion
+        frac = (spd - self.speed_lo) / max(1e-6, self.speed_hi - self.speed_lo)
+        frac = max(0.0, min(1.0, frac))
+        pos_a = self.pos_alpha_slow + (self.pos_alpha_fast - self.pos_alpha_slow) * frac
+        t.x = pos_a * d.x + (1 - pos_a) * t.x
+        t.y = pos_a * d.y + (1 - pos_a) * t.y
         # Radius: once a track is established, reject wild size jumps (sensor-noise
         # outliers) and smooth slowly, so a held ball stops "pumping" in size.
         if t.confirmed and t.radius > 0 and abs(d.radius - t.radius) > 0.35 * t.radius:
