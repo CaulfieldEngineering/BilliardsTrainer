@@ -96,3 +96,7 @@ _ci_eval/
 
 # external repos under evaluation (pool_coach etc.) + their isolated envs
 _external/
+
+# local debug/training artifacts (crash dumps, procdump, datasets)
+_train/
+*.dmp

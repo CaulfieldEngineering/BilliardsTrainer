@@ -776,7 +776,8 @@ class LivePage(QWidget):
     def _update_label_buttons(self) -> None:
         on = 0 <= self._label_sel < len(self._label_balls)
         for b in self._label_btns.values():
-            b.setEnabled(on)
+            if b.isEnabled() != on:   # avoid redundant state churn / restyle
+                b.setEnabled(on)
 
     def _refresh_overlay(self) -> None:
         """Push the labelling markers to the view as Qt overlay items — drawn with

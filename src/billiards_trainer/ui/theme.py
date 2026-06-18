@@ -8,7 +8,33 @@ dark surface with a single confident accent. The accent is user-configurable
 from dataclasses import dataclass
 
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleFactory
+
+
+class _NoAnimationStyle(QProxyStyle):
+    """Fusion, but with widget state-transition animations disabled.
+
+    The Fusion/Windows styles fade widget hover/enabled transitions using
+    ``QStyleAnimation`` objects, each of which owns a ``QTimer``. Rapidly toggling
+    a widget's state — e.g. Training Mode enables/disables its 16 number buttons on
+    every click — can free an in-flight animation while its timer is still
+    registered with the event dispatcher. The next ``QTimerEvent`` is then
+    delivered to freed memory, crashing natively inside
+    ``QCoreApplication::notifyInternal2`` (confirmed from a crash dump:
+    sendTimerEvent -> notifyInternal2 on a receiver whose vtable was 0x2).
+    Returning 0 for the animation-duration hint stops those animations (and their
+    timers) from ever being created. Purely cosmetic — transitions are instant."""
+
+    _ANIM_HINTS = tuple(
+        h for h in (getattr(QStyle.StyleHint, "SH_Widget_Animation_Duration", None),
+                    getattr(QStyle.StyleHint, "SH_Widget_Animate", None))
+        if h is not None
+    )
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):  # noqa: N802
+        if hint in self._ANIM_HINTS:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
 
 
 @dataclass(frozen=True)
@@ -263,7 +289,10 @@ QSplitter::handle:hover {{ background: {accent}; }}
 
 def apply_theme(app: QApplication, accent: str = PALETTE.accent) -> None:
     """Apply the dark palette + stylesheet to the whole application."""
-    app.setStyle("Fusion")
+    # Fusion wrapped to disable state-transition animations — those animations'
+    # timers were the source of a native use-after-free crash during rapid
+    # widget enable/disable (see _NoAnimationStyle).
+    app.setStyle(_NoAnimationStyle(QStyleFactory.create("Fusion")))
     pal = QPalette()
     p = PALETTE
     pal.setColor(QPalette.Window, QColor(p.bg))

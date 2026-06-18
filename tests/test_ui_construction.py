@@ -213,6 +213,23 @@ def test_ball_trainer_dialog_and_store(app, tmp_path):
     assert store.write_data_yaml().exists()
 
 
+def test_widget_state_animations_disabled(app):
+    """REGRESSION (native crash): widget state-transition animations must be OFF.
+    Fusion fades hover/enabled transitions via QStyleAnimation objects that own
+    QTimers; rapidly toggling the Training number buttons' enabled-state freed an
+    in-flight animation while its timer was still registered, delivering a stale
+    QTimerEvent to freed memory (crash in QCoreApplication::notifyInternal2,
+    confirmed from a dump). apply_theme wraps Fusion to zero the animation hint."""
+    from PySide6.QtWidgets import QPushButton, QStyle
+
+    from billiards_trainer.ui.theme import apply_theme
+
+    apply_theme(app)
+    dur = app.style().styleHint(
+        QStyle.StyleHint.SH_Widget_Animation_Duration, None, QPushButton())
+    assert dur == 0, f"widget animations must be disabled, got {dur}ms"
+
+
 def test_entering_training_mode_autopauses_video(app):
     """Entering Training Mode must auto-pause a video source: labelling is done on
     a still frame, and the streaming repaint racing GPU inference was the suspected
