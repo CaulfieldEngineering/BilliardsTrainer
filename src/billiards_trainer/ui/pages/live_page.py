@@ -12,6 +12,7 @@ boundary.
 """
 
 import logging
+import random
 
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -382,6 +383,8 @@ class LivePage(QWidget):
     def set_video_mode(self, is_video: bool, total: int, fps: float) -> None:
         self._video_fps = fps or 30.0
         self._transport.setVisible(is_video)
+        if hasattr(self, "_jump_section"):
+            self._jump_section.setVisible(is_video)  # jumping needs a seekable clip
         if is_video:
             self._seek.setRange(0, max(0, total - 1))
             self._time_lbl.setText(f"0:00 / {self._fmt_t(total)}")
@@ -681,6 +684,30 @@ class LivePage(QWidget):
         self._label_count = QLabel("0 frames collected")
         self._label_count.setObjectName("Faint")
         rail.add(self._label_count)
+
+        # Quick jump to a fresh frame to label (video sources only). Saves
+        # scrubbing the nav bar between saved frames.
+        self._jump_section = QWidget()
+        jcol = QVBoxLayout(self._jump_section)
+        jcol.setContentsMargins(0, 4, 0, 0)
+        jcol.setSpacing(6)
+        jlab = QLabel("Jump to a new frame to label")
+        jlab.setObjectName("Faint")
+        jcol.addWidget(jlab)
+        jrow = QHBoxLayout()
+        jrow.setSpacing(6)
+        for txt, fn in (("Random", lambda _=False: self._jump_random()),
+                        ("+30s", lambda _=False: self._jump_ahead(30)),
+                        ("+1m", lambda _=False: self._jump_ahead(60)),
+                        ("+5m", lambda _=False: self._jump_ahead(300))):
+            jb = QPushButton(txt)
+            jb.setObjectName("Ghost")
+            jb.setCursor(Qt.PointingHandCursor)
+            jb.clicked.connect(fn)
+            jrow.addWidget(jb)
+        jcol.addLayout(jrow)
+        rail.add(self._jump_section)
+
         rail.add(self._hsep())
         train = QPushButton("Train model on collected data")
         train.setCursor(Qt.PointingHandCursor)
@@ -806,6 +833,27 @@ class LivePage(QWidget):
     def set_training_count(self, text: str) -> None:
         if hasattr(self, "_label_count"):
             self._label_count.setText(text)
+
+    # --- Training Mode: jump to a fresh frame to label ---------------------- #
+    def _jump_to(self, target: int) -> None:
+        total = self._seek.maximum() + 1
+        if total <= 1:
+            return
+        target = max(0, min(int(target), total - 1))
+        self._seek.blockSignals(True)        # set the thumb without re-seeking
+        self._seek.setValue(target)
+        self._seek.blockSignals(False)
+        self._time_lbl.setText(f"{self._fmt_t(target)} / {self._fmt_t(total)}")
+        self.video_seek.emit(target)          # worker re-detects + re-ingests it
+        log.info("training: jump to frame %d/%d", target, total)
+
+    def _jump_ahead(self, seconds: float) -> None:
+        self._jump_to(self._seek.value() + int(seconds * self._video_fps))
+
+    def _jump_random(self) -> None:
+        total = self._seek.maximum() + 1
+        if total > 1:
+            self._jump_to(random.randint(0, total - 1))
 
     # ------------------------------------------------------------------ #
     # Intent

@@ -213,6 +213,34 @@ def test_ball_trainer_dialog_and_store(app, tmp_path):
     assert store.write_data_yaml().exists()
 
 
+def test_training_jump_buttons(app):
+    """Training Mode 'jump to a new frame' controls: +30s/+1m/+5m jump ahead by
+    fps*seconds (clamped to the clip end) and Random lands in-range. Hidden for
+    non-seekable (live camera) sources."""
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.live_page import LivePage
+
+    lp = LivePage(Settings())
+    seeks = []
+    lp.video_seek.connect(lambda f: seeks.append(f))
+
+    lp.set_video_mode(False, 0, 30.0)
+    assert lp._jump_section.isHidden()           # no jumping a live camera
+
+    lp.set_video_mode(True, 1000, 30.0)          # 1000 frames @ 30fps
+    assert not lp._jump_section.isHidden()
+    lp.set_training(True)
+
+    lp._seek.setValue(100)
+    lp._jump_ahead(1)
+    assert seeks[-1] == 130                       # 100 + 1*30
+    lp._jump_ahead(60)
+    assert seeks[-1] == 999                        # 100 + 1800 -> clamped to last
+    for _ in range(30):
+        lp._jump_random()
+        assert 0 <= seeks[-1] <= 999
+
+
 def test_widget_state_animations_disabled(app):
     """REGRESSION (native crash): widget state-transition animations must be OFF.
     Fusion fades hover/enabled transitions via QStyleAnimation objects that own
