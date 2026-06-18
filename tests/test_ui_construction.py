@@ -147,6 +147,47 @@ def test_training_mode_label_correct_add_save(app):
     assert not lp._training
 
 
+def test_training_entry_on_paused_frame_no_phantom_ball(app):
+    """REGRESSION: entering Training Mode on a paused frame must label THAT frame
+    (showing the model's guess per ball) instead of leaving the size unknown — a
+    click then selected a phantom ball stuck at image (0,0). Also: a click before
+    any frame is loaded must not drop a ball at the origin."""
+    import types
+
+    import numpy as np
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.live_page import LivePage
+    from billiards_trainer.vision.types import BallClass, Detection
+
+    # A: no frame yet -> click is a no-op, never a phantom ball at (0,0)
+    lp = LivePage(Settings())
+    lp.set_training(True)
+    lp._on_label_click(0.5, 0.5)
+    assert lp._label_balls == []
+
+    # B: a normal (non-training) frame arrives — like a paused video — THEN the
+    # user switches into Training Mode. The current frame must be ingested.
+    lp2 = LivePage(Settings())
+    frame = np.zeros((1080, 1920, 3), np.uint8)
+    raw = [Detection(800, 500, 14, (200, 200, 200), BallClass.SOLID, 0.9, number=2),
+           Detection(1000, 600, 14, (245, 245, 245), BallClass.CUE, 0.9, number=0),
+           Detection(600, 400, 14, (50, 50, 50), BallClass.STRIPE, 0.9, number=-1)]
+    pkt = types.SimpleNamespace(perspective=frame, birdseye=None, fps=30, n_balls=3,
+                                tracks=[], raw_dets=raw, status="tracking", deviated=False,
+                                shot_state="settled", clock_enabled=False)
+    lp2.on_frame(pkt)                       # arrives while NOT in training mode
+    assert lp2._frame_wh == (1920, 1080)    # size tracked even outside Training
+    lp2.set_training(True)                  # enter on the paused frame
+    assert len(lp2._label_balls) == 3       # the on-screen frame is now labellable
+    assert [b[0] for b in lp2._label_balls] == [2, 0, -1]  # model's guesses kept
+
+    # clicking the mis-id'd 2-ball selects IT (not a phantom at the origin)
+    lp2._on_label_click(800 / 1920, 500 / 1080)
+    assert lp2._label_sel == 0
+    assert lp2._label_balls[0][1] == 800 and lp2._label_balls[0][2] == 500
+
+
 def test_ball_trainer_dialog_and_store(app, tmp_path):
     """The in-app Ball-ID trainer constructs, and its labelled-data store does a
     save/read round-trip in the YOLO format the fine-tune consumes."""

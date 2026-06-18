@@ -110,6 +110,7 @@ class LivePage(QWidget):
         self._label_balls: list[list] = []
         self._label_sel = -1
         self._frame_wh = (1, 1)
+        self._last_packet = None   # newest frame packet, for labelling on entry
         self._build()
 
     # ------------------------------------------------------------------ #
@@ -644,13 +645,15 @@ class LivePage(QWidget):
         cap = QLabel("TRAINING MODE")
         cap.setObjectName("StatLabel")
         rail.add(cap)
-        hint = QLabel("Scrub/pause the video to a clear frame. Click a ball, then "
-                      "tap its correct number. Click an empty spot to ADD a missed "
+        hint = QLabel("Scrub/pause to a clear frame — each ball shows the model's "
+                      "current guess (C = cue, ? = unsure). Click any that are WRONG "
+                      "and tap the correct number; click an empty spot to ADD a missed "
                       "ball. Save good frames, then Train.")
         hint.setObjectName("Faint")
         hint.setWordWrap(True)
         rail.add(hint)
-        self._label_status = QLabel("Click a ball on the camera view to select it.")
+        self._label_status = QLabel("Each ball shows the model's guess — click any "
+                                    "that are wrong to fix them.")
         self._label_status.setObjectName("Muted")
         self._label_status.setWordWrap(True)
         rail.add(self._label_status)
@@ -702,6 +705,12 @@ class LivePage(QWidget):
         self.label_mode_toggled.emit(on)
         if on:
             self._status_badge.set_text_color("TRAINING — label the balls", PALETTE.info)
+            # Label the frame already on screen (e.g. a paused video) right away,
+            # showing the model's current guess on each ball — don't wait for a
+            # next frame. The controller also re-emits a raw frame momentarily.
+            if self._last_packet is not None and getattr(self._last_packet,
+                                                          "perspective", None) is not None:
+                self._ingest_label_frame(self._last_packet)
 
     def _ingest_label_frame(self, packet) -> None:
         try:
@@ -727,6 +736,12 @@ class LivePage(QWidget):
 
     def _on_label_click(self, xf: float, yf: float) -> None:
         w, h = self._frame_wh
+        if w <= 1 or h <= 1:   # size not yet known — recover it from the view
+            sz = self._persp.image_size()
+            if sz is None:
+                return         # no frame loaded; don't drop a phantom ball at (0,0)
+            w, h = sz
+            self._frame_wh = (w, h)
         x, y = xf * w, yf * h
         best, bd = -1, 1e18
         for i, b in enumerate(self._label_balls):
@@ -830,8 +845,11 @@ class LivePage(QWidget):
         self._set_detect_ui(on)
 
     def on_frame(self, packet) -> None:
+        self._last_packet = packet
         if packet.perspective is not None:
             self._clear_camera_error()  # a frame means the camera is alive
+            h, w = packet.perspective.shape[:2]
+            self._frame_wh = (w, h)     # keep fresh even outside Training Mode
             if self._training:
                 self._ingest_label_frame(packet)   # draw the labelling overlay
             else:

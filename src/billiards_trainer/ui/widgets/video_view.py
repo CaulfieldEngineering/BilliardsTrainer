@@ -56,6 +56,14 @@ class VideoView(QWidget):
         self._pixmap = QPixmap.fromImage(img)
         self.update()
 
+    def image_size(self) -> tuple[int, int] | None:
+        """(width, height) of the currently displayed frame in image pixels, or
+        None if no frame is shown. The labeller maps clicks against this so it
+        never relies on a separately-tracked size that can go stale."""
+        if self._pixmap is None:
+            return None
+        return (self._pixmap.width(), self._pixmap.height())
+
     def set_overlay(self, items: list) -> None:
         """Set labelling markers drawn with Qt (NOT OpenCV) over the frame, so no
         cv2 call happens on the UI thread. items: [(x, y, r, text, selected)] in

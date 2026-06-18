@@ -291,6 +291,12 @@ class PipelineController(QObject):
         """Training mode: send the raw camera frame (so the UI can draw the
         labelling overlay) + raw detections with guessed numbers in each packet."""
         self._label_mode = bool(on)
+        # Re-process the CURRENT frame immediately. Entering Training Mode on a
+        # paused video would otherwise wait for a next frame that never comes —
+        # leaving the UI with no frame size and no detections (clicks then fall
+        # back to the origin). This re-emits the raw frame + guessed numbers now.
+        if on and self._last_frame is not None and self._pipeline is not None:
+            self._run_frame(self._last_frame, detect=True)
 
     @Slot(object)
     def save_training_frame(self, balls) -> None:
