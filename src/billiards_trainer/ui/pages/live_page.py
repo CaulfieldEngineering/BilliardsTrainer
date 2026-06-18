@@ -714,6 +714,7 @@ class LivePage(QWidget):
 
     def _ingest_label_frame(self, packet) -> None:
         try:
+            import threading
             h, w = packet.perspective.shape[:2]
             self._frame_wh = (w, h)
             balls = []
@@ -724,6 +725,8 @@ class LivePage(QWidget):
                 balls.append([int(getattr(d, "number", -1)), x, y, r])
             self._label_balls = balls
             self._label_sel = -1
+            log.info("training: ingest frame %dx%d, %d balls (thread=%s)", w, h,
+                     len(balls), threading.current_thread().name)
             self._persp.set_frame(packet.perspective)   # raw frame; overlay is Qt-drawn
             self._refresh_overlay()
             self._update_label_buttons()
@@ -759,6 +762,8 @@ class LivePage(QWidget):
         self._refresh_overlay()
 
     def _assign_label(self, num: int) -> None:
+        log.info("training: assign %d to ball %d/%d", num, self._label_sel,
+                 len(self._label_balls))
         if 0 <= self._label_sel < len(self._label_balls):
             if num < 0:
                 self._label_balls.pop(self._label_sel)   # 'not a ball' -> remove
@@ -793,6 +798,7 @@ class LivePage(QWidget):
         if not boxes:
             self._label_status.setText("Label at least one ball before saving.")
             return
+        log.info("training: emit save_training_frame_requested (%d boxes)", len(boxes))
         self.save_training_frame_requested.emit(boxes)
         self._label_status.setText(f"Saved {len(boxes)} balls. Scrub to another frame and keep going.")
 

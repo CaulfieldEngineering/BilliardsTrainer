@@ -290,7 +290,18 @@ class PipelineController(QObject):
     def set_label_mode(self, on: bool) -> None:
         """Training mode: send the raw camera frame (so the UI can draw the
         labelling overlay) + raw detections with guessed numbers in each packet."""
+        import threading
         self._label_mode = bool(on)
+        log.info("set_label_mode=%s (thread=%s) video=%s last_frame=%s", on,
+                 threading.current_thread().name,
+                 getattr(self._source, "is_video", False),
+                 None if self._last_frame is None else self._last_frame.shape)
+        # Auto-pause the video on entering Training Mode. Labelling is done on a
+        # still frame (scrub to it, then correct) — pausing stops the frame
+        # stream from blowing away the user's selection mid-correction AND stops
+        # the continuous 1080p repaint racing DirectML inference on the GPU.
+        if on and getattr(self._source, "is_video", False):
+            self._video_paused = True
         # Re-process the CURRENT frame immediately. Entering Training Mode on a
         # paused video would otherwise wait for a next frame that never comes —
         # leaving the UI with no frame size and no detections (clicks then fall
@@ -304,6 +315,9 @@ class PipelineController(QObject):
         (number, cx, cy, w, h), normalised) to the ball-ID training store."""
         if self._last_frame is None or not balls:
             return
+        import threading
+        log.info("save_training_frame: %d balls (thread=%s, frame=%s)", len(balls),
+                 threading.current_thread().name, self._last_frame.shape)
         try:
             from ..config import APP_DIR
             from ..train.store import LabeledBall, TrainingStore

@@ -213,6 +213,32 @@ def test_ball_trainer_dialog_and_store(app, tmp_path):
     assert store.write_data_yaml().exists()
 
 
+def test_entering_training_mode_autopauses_video(app):
+    """Entering Training Mode must auto-pause a video source: labelling is done on
+    a still frame, and the streaming repaint racing GPU inference was the suspected
+    native-crash trigger. Also stops incoming frames from clearing the selection."""
+    import types
+    from pathlib import Path
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.db.repository import Repository
+    from billiards_trainer.workers.controller import PipelineController
+
+    ctrl = PipelineController(Settings(), Repository(db_path=Path(":memory:")))
+    ctrl._source = types.SimpleNamespace(is_video=True)   # seekable video stub
+    ctrl._pipeline = None                                 # skip the frame re-emit
+    assert ctrl._video_paused is False
+    ctrl.set_label_mode(True)
+    assert ctrl._video_paused is True      # paused for labelling
+    assert ctrl._label_mode is True
+
+    # a live (non-seekable) camera is never auto-paused (nothing to pause)
+    ctrl2 = PipelineController(Settings(), Repository(db_path=Path(":memory:")))
+    ctrl2._source = types.SimpleNamespace(is_video=False)
+    ctrl2.set_label_mode(True)
+    assert ctrl2._video_paused is False
+
+
 def test_try_demo_button_removed(app):
     from billiards_trainer.config import Settings
     from billiards_trainer.ui.pages.live_page import LivePage
