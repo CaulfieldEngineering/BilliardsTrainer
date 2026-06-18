@@ -7,7 +7,7 @@ reference to the current ndarray so its buffer stays alive while Qt paints it.
 
 import numpy as np
 from PySide6.QtCore import QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from ..theme import PALETTE
@@ -24,6 +24,7 @@ class VideoView(QWidget):
         self._pixmap: QPixmap | None = None
         self._placeholder = placeholder
         self._draw_rect: QRectF | None = None  # where the image is painted
+        self._overlay: list = []   # [(x, y, r, text, selected)] in image px (Qt-drawn)
         self._pickable = False
         self.setMinimumSize(160, 120)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -55,9 +56,17 @@ class VideoView(QWidget):
         self._pixmap = QPixmap.fromImage(img)
         self.update()
 
+    def set_overlay(self, items: list) -> None:
+        """Set labelling markers drawn with Qt (NOT OpenCV) over the frame, so no
+        cv2 call happens on the UI thread. items: [(x, y, r, text, selected)] in
+        image pixels."""
+        self._overlay = items or []
+        self.update()
+
     def clear(self) -> None:
         self._buf = None
         self._pixmap = None
+        self._overlay = []
         self.update()
 
     def paintEvent(self, _event) -> None:
@@ -75,4 +84,19 @@ class VideoView(QWidget):
         y = (rect.height() - scaled.height()) // 2
         self._draw_rect = QRectF(x, y, scaled.width(), scaled.height())
         p.drawPixmap(self._draw_rect, self._pixmap, QRectF(self._pixmap.rect()))
+        if self._overlay:
+            pw = max(1, self._pixmap.width())
+            sx = self._draw_rect.width() / pw
+            for (ox, oy, orr, text, sel) in self._overlay:
+                cx = self._draw_rect.x() + ox * sx
+                cy = self._draw_rect.y() + oy * sx
+                rr = max(3.0, orr * sx)
+                col = QColor(0, 255, 255) if sel else QColor(60, 220, 60)
+                p.setPen(QPen(col, 3 if sel else 2))
+                p.setBrush(Qt.NoBrush)
+                p.drawEllipse(QRectF(cx - rr, cy - rr, 2 * rr, 2 * rr))
+                if text:
+                    p.setFont(QFont("Arial", max(8, int(rr)), QFont.Bold))
+                    p.drawText(QRectF(cx - rr, cy - rr - 22, 2 * rr + 60, 20),
+                               Qt.AlignLeft | Qt.AlignVCenter, text)
         p.end()

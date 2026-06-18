@@ -13,7 +13,6 @@ boundary.
 
 import logging
 
-import cv2
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -698,13 +697,14 @@ class LivePage(QWidget):
         self._training = on
         self._rail_stack.setCurrentIndex(1 if on else 0)
         self._persp.set_pickable(on or self._pick_mode)
+        if not on:
+            self._persp.set_overlay([])   # clear labelling markers
         self.label_mode_toggled.emit(on)
         if on:
             self._status_badge.set_text_color("TRAINING — label the balls", PALETTE.info)
 
     def _ingest_label_frame(self, packet) -> None:
         try:
-            self._last_persp = packet.perspective
             h, w = packet.perspective.shape[:2]
             self._frame_wh = (w, h)
             balls = []
@@ -715,7 +715,8 @@ class LivePage(QWidget):
                 balls.append([int(getattr(d, "number", -1)), x, y, r])
             self._label_balls = balls
             self._label_sel = -1
-            self._redraw_label()
+            self._persp.set_frame(packet.perspective)   # raw frame; overlay is Qt-drawn
+            self._refresh_overlay()
             self._update_label_buttons()
         except Exception:  # noqa: BLE001 - a bad frame must never crash the app
             log.exception("training: ingest frame failed")
@@ -740,7 +741,7 @@ class LivePage(QWidget):
             self._label_sel = len(self._label_balls) - 1
             self._label_status.setText("Added a ball — tap its number (or 'Not a ball' to remove).")
         self._update_label_buttons()
-        self._redraw_label()
+        self._refresh_overlay()
 
     def _assign_label(self, num: int) -> None:
         if 0 <= self._label_sel < len(self._label_balls):
@@ -750,30 +751,25 @@ class LivePage(QWidget):
                 self._label_balls[self._label_sel][0] = num
             self._label_sel = -1
             self._update_label_buttons()
-            self._redraw_label()
+            self._refresh_overlay()
 
     def _update_label_buttons(self) -> None:
         on = 0 <= self._label_sel < len(self._label_balls)
         for b in self._label_btns.values():
             b.setEnabled(on)
 
-    def _redraw_label(self) -> None:
-        frame = getattr(self, "_last_persp", None)
-        if frame is None:
-            return
+    def _refresh_overlay(self) -> None:
+        """Push the labelling markers to the view as Qt overlay items — drawn with
+        QPainter on the UI thread, NOT OpenCV (concurrent cv2 across the UI + worker
+        threads can crash natively)."""
         try:
-            img = np.ascontiguousarray(frame.copy())
+            items = []
             for i, (num, x, y, r) in enumerate(self._label_balls):
-                c = (int(x), int(y))
-                sel = i == self._label_sel
-                col = (0, 255, 255) if sel else (60, 220, 60)
-                cv2.circle(img, c, max(4, int(r)), col, 3 if sel else 2, cv2.LINE_AA)
-                lbl = "C" if num == 0 else (str(num) if num > 0 else "?")
-                cv2.putText(img, lbl, (c[0] - 9, c[1] - int(r) - 6),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
-            self._persp.set_frame(img)
-        except Exception:  # noqa: BLE001 - drawing must never crash the app
-            log.exception("training: redraw failed")
+                text = "C" if num == 0 else (str(num) if num > 0 else "?")
+                items.append((x, y, r, text, i == self._label_sel))
+            self._persp.set_overlay(items)
+        except Exception:  # noqa: BLE001 - overlay must never crash the app
+            log.exception("training: overlay refresh failed")
 
     def _save_label_frame(self) -> None:
         w, h = self._frame_wh

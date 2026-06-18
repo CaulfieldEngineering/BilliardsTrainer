@@ -11,6 +11,9 @@ from .config import LOGS_DIR, Settings, ensure_dirs
 from .version import APP_NAME, ORG_NAME, __version__
 
 
+_CRASH_FILE = None  # kept alive for the lifetime of the process
+
+
 def _setup_logging() -> None:
     ensure_dirs()
     logging.basicConfig(
@@ -21,6 +24,16 @@ def _setup_logging() -> None:
             logging.FileHandler(LOGS_DIR / "billiards_trainer.log", encoding="utf-8"),
         ],
     )
+    # faulthandler dumps the C-level Python stack of ALL threads on a hard crash
+    # (segfault / abort) — the only way to see a native crash that try/except and
+    # sys.excepthook can't catch (e.g. a Qt/OpenCV abort). Lands in crash.log.
+    global _CRASH_FILE
+    try:
+        import faulthandler
+        _CRASH_FILE = open(LOGS_DIR / "crash.log", "a", buffering=1, encoding="utf-8")
+        faulthandler.enable(file=_CRASH_FILE, all_threads=True)
+    except Exception:  # noqa: BLE001 - diagnostics must never block startup
+        pass
 
 
 def _install_excepthook() -> None:

@@ -304,7 +304,10 @@ class PipelineController(QObject):
             store = TrainingStore(APP_DIR / "training" / "ballid")
             labeled = [LabeledBall(int(n), float(cx), float(cy), float(w), float(h))
                        for (n, cx, cy, w, h) in balls]
-            saved = store.add_frame(self._last_frame, labeled)
+            # Write a PRIVATE contiguous copy — never hand the live frame buffer
+            # (shared with the UI thread's overlay) to cv2.imwrite.
+            frame = np.ascontiguousarray(self._last_frame).copy()
+            saved = store.add_frame(frame, labeled)
             self.capture_progress.emit(f"Saved {saved} labelled balls "
                                        f"({store.count()} frames collected)")
         except Exception as exc:  # noqa: BLE001 - never crash the worker on a save
