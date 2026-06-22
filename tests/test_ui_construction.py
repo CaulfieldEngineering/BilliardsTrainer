@@ -258,6 +258,25 @@ def test_widget_state_animations_disabled(app):
     assert dur == 0, f"widget animations must be disabled, got {dur}ms"
 
 
+def test_worker_playback_timer_is_parented(app):
+    """REGRESSION (native crash): the controller's worker-thread QTimer must be
+    PARENTED to the controller. A parentless QTimer on a worker thread can be freed
+    by PySide6 while its OS timer is still registered with the event dispatcher; the
+    next tick then delivers a QTimerEvent into freed memory and crashes natively in
+    QCoreApplication::notifyInternal2 (confirmed from two crash dumps). Parenting
+    ties the timer's lifetime to the controller for the whole session."""
+    from pathlib import Path
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.db.repository import Repository
+    from billiards_trainer.workers.controller import PipelineController
+
+    ctrl = PipelineController(Settings(), Repository(db_path=Path(":memory:")))
+    ctrl.on_started()                       # creates the playback timer
+    assert ctrl._timer is not None
+    assert ctrl._timer.parent() is ctrl     # owned by the controller, not Python-only
+
+
 def test_entering_training_mode_autopauses_video(app):
     """Entering Training Mode must auto-pause a video source: labelling is done on
     a still frame, and the streaming repaint racing GPU inference was the suspected

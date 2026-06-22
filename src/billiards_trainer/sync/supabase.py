@@ -69,13 +69,17 @@ class SyncManager(QObject):
 
     @Slot()
     def on_started(self) -> None:
-        self._timer = QTimer()
+        # Parent the timer to self — a parentless QTimer on a worker thread can be
+        # freed by PySide6 while still registered, crashing in the event dispatcher
+        # (see the controller's playback timer for the full diagnosis).
+        self._timer = QTimer(self)
         self._timer.setInterval(_SYNC_INTERVAL_MS)
         self._timer.timeout.connect(self.sync_now)
         if self.enabled:
             self._timer.start()
-            # one initial push shortly after launch
-            QTimer.singleShot(8000, self.sync_now)
+            # one initial push shortly after launch; bind to self so it can't
+            # outlive us (context overload auto-disconnects if self is destroyed)
+            QTimer.singleShot(8000, self, self.sync_now)
 
     @Slot()
     def sync_now(self) -> None:

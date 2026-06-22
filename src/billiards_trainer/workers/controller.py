@@ -111,9 +111,19 @@ class PipelineController(QObject):
     # ------------------------------------------------------------------ #
     @Slot()
     def on_started(self) -> None:
-        self._timer = QTimer()
+        # PARENT the timer to the controller. A parentless QTimer on a worker
+        # thread is owned only by its Python reference; under PySide6 it can be
+        # freed while its OS timer is still registered with the event dispatcher,
+        # so the next tick delivers a QTimerEvent into freed memory and crashes
+        # natively in QCoreApplication::notifyInternal2 (confirmed from two crash
+        # dumps: sendTimerEvent -> notifyInternal2 on a freed receiver, on this
+        # worker thread). Parenting ties the timer's lifetime to the controller —
+        # it lives for the whole session and is destroyed (and unregistered) with us.
+        self._timer = QTimer(self)
         self._timer.setTimerType(Qt.PreciseTimer)
         self._timer.timeout.connect(self._tick)
+        log.info("playback timer created (parented), thread=%s",
+                 __import__("threading").current_thread().name)
 
     # ------------------------------------------------------------------ #
     # Control (invoked queued from the UI thread)
