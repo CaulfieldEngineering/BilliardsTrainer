@@ -123,6 +123,7 @@ pytest                              # run the test suite
 python tools/eval_table.py          # table-detection eval vs the reference capture
 python tools/eval_detection.py      # detection false-positive eval (synthetic, no camera)
 python tools/eval_detection.py --video clip.mp4   # iterate detection on a recorded clip
+python tools/bench_pipeline.py      # per-stage performance benchmark on testVideo.MP4
 ```
 
 `.\run_dev.ps1` bootstraps the venv on first run, then just launches the app.
@@ -173,7 +174,17 @@ SQLite (sessions, shots)  ──►  live + historical stats, streaks, by-pocket
 
 Key design principle (a fix for the prototype's biggest cost): **calibrate the
 table once, lock the homography, then spend the whole per-frame budget on balls.**
-The CV pipeline runs on a dedicated worker thread, never the UI thread.
+The CV pipeline runs on a dedicated worker thread, never the UI thread. A live
+camera additionally gets its own **grab thread** that keeps only the newest
+frame, so capture I/O never blocks inference and tracking latency stays pinned
+at ~1 frame even when processing runs slower than the camera.
+
+**Performance is measured, not guessed:** `python tools/bench_pipeline.py` runs
+the real pipeline over a recorded video and prints a per-stage (detect / track /
+motion / render) latency table; the same breakdown shows live in the debug
+overlay. The heaviest knob is **Settings → AI detection → "Extra far-rail
+scan"** — a second inference pass that recovers tiny far-rail balls at ~2× GPU
+cost per frame (on: better recall; off: roughly double the frame rate).
 
 ### Ball detection: manual-first, AI-ready
 

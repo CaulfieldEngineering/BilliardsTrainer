@@ -116,18 +116,21 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
     return img
 
 
-def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DDC97",
-                     show_traj: bool = True, show_ids: bool = True,
-                     debug: bool = False, detections=None, diag=None,
-                     measured_colors: bool = True,
-                     fixed_radius: float | None = None) -> np.ndarray:
-    """Render a clean, proportional top-down table from the game state — felt,
-    rails, pockets, diamonds, and balls as circles — instead of the warped camera
-    image. Ball positions are the rectified (already-proportional) coordinates."""
-    h, w = table.height, table.width
-    img = np.full((h, w, 3), (34, 38, 44), np.uint8)        # slate "rails"/frame
-    acc = _accent_bgr(accent)
+_SCHEM_BASE: tuple | None = None  # (key, image) — static table art, cached
 
+
+def _schematic_base(table: TableModel) -> np.ndarray:
+    """The static part of the schematic (rails, felt, gradient, spots, diamonds,
+    pockets). Identical every frame for a locked table, so it's drawn once and
+    cached; render_schematic copies it and adds only the dynamic layer."""
+    global _SCHEM_BASE
+    h, w = table.height, table.width
+    # exact-float key: any geometry change, however small, must redraw the base
+    key = (w, h, table.x0, table.y0, table.x1, table.y1, table.pocket_radius)
+    if _SCHEM_BASE is not None and _SCHEM_BASE[0] == key:
+        return _SCHEM_BASE[1].copy()
+
+    img = np.full((h, w, 3), (34, 38, 44), np.uint8)        # slate "rails"/frame
     x0, y0, x1, y1 = int(table.x0), int(table.y0), int(table.x1), int(table.y1)
     # felt with a soft inner gradient for depth
     cv2.rectangle(img, (x0, y0), (x1, y1), (58, 120, 72), -1, cv2.LINE_AA)
@@ -153,6 +156,21 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
     for p in table.pockets:
         cv2.circle(img, (int(p.x), int(p.y)), int(table.pocket_radius), (12, 14, 16), -1, cv2.LINE_AA)
         cv2.circle(img, (int(p.x), int(p.y)), int(table.pocket_radius), (70, 78, 86), 1, cv2.LINE_AA)
+    _SCHEM_BASE = (key, img)
+    return img.copy()
+
+
+def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DDC97",
+                     show_traj: bool = True, show_ids: bool = True,
+                     debug: bool = False, detections=None, diag=None,
+                     measured_colors: bool = True,
+                     fixed_radius: float | None = None) -> np.ndarray:
+    """Render a clean, proportional top-down table from the game state — felt,
+    rails, pockets, diamonds, and balls as circles — instead of the warped camera
+    image. Ball positions are the rectified (already-proportional) coordinates."""
+    h = table.height
+    img = _schematic_base(table)
+    acc = _accent_bgr(accent)
 
     # raw detections (debug)
     if debug and detections:
@@ -205,6 +223,11 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
                     (200, 220, 255), 1, cv2.LINE_AA)
         cv2.putText(img, line2, (8, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4,
                     (180, 255, 200), 1, cv2.LINE_AA)
+        stages = diag.get("stages") or {}
+        if stages:
+            line3 = " ".join(f"{k}={v:.1f}" for k, v in stages.items())
+            cv2.putText(img, line3, (8, h - 42), cv2.FONT_HERSHEY_SIMPLEX, 0.36,
+                        (255, 210, 170), 1, cv2.LINE_AA)
     return img
 
 

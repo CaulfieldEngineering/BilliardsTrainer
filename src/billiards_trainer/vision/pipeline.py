@@ -84,6 +84,7 @@ class Pipeline:
         self._prev_small = None
         self._last_flow = 0.0
         self._last_ms = 0.0
+        self._last_stages: dict = {}  # previous frame's per-stage ms (perf HUD)
         self._frame_ring: deque | None = None  # temporal-median buffer
 
     def reconfigure(self, settings: Settings) -> None:
@@ -107,12 +108,17 @@ class Pipeline:
         try:
             from ..detector_strategies import discover
             strategies = discover()
+            strat = None
             if name and name != "auto":
                 strat = strategies.get(name)
-                if strat is not None:
-                    return strat
-                log.warning("Live strategy '%s' not found; falling back to auto", name)
-            return self._resolve_auto(strategies)
+                if strat is None:
+                    log.warning("Live strategy '%s' not found; falling back to auto", name)
+            if strat is None:
+                strat = self._resolve_auto(strategies)
+            if strat is not None and hasattr(strat, "far_rail_rescan"):
+                strat.far_rail_rescan = bool(
+                    getattr(self.settings.balls, "far_rail_rescan", True))
+            return strat
         except Exception as exc:  # noqa: BLE001 - never let strategy loading break the app
             log.warning("Could not load live strategy '%s' (%s); using legacy", name, exc)
             return None
@@ -220,6 +226,20 @@ class Pipeline:
                                  d.bgr, d.cls, d.score, number=d.number))
         return out
 
+    def _warp_gray_roi(self, frame: np.ndarray, calib) -> np.ndarray | None:
+        """Warp ONLY the playing-area ROI of the gray frame into rectified space
+        (for motion energy). Composing a translation into H and warping the
+        1-channel ROI is ~3x cheaper than warping the full 3-channel bird's-eye;
+        values match gray-of-warp to within interpolation rounding."""
+        tbl = calib.table
+        x0, y0 = int(tbl.x0), int(tbl.y0)
+        w, h = int(tbl.x1) - x0, int(tbl.y1) - y0
+        if w <= 0 or h <= 0:
+            return None
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        T = np.array([[1.0, 0.0, -x0], [0.0, 1.0, -y0], [0.0, 0.0, 1.0]])
+        return cv2.warpPerspective(gray, T @ calib.H, (w, h), flags=cv2.INTER_LINEAR)
+
     def _draw_raw_dets(self, frame, dets):
         """Draw detection circles straight onto the live (raw) frame — used when
         there's no homography to project into the bird's-eye."""
@@ -249,6 +269,7 @@ class Pipeline:
         tracks, so playback can run faster than detection. The controller drops the
         detection cadence at higher playback speeds (every Nth frame)."""
         t_start = time.perf_counter()
+        st: dict[str, float] = {}  # per-stage ms — perf HUD + tools/bench_pipeline.py
         self._frame_idx += 1
         res = PipelineResult(frame_bgr=frame)
 
@@ -264,7 +285,9 @@ class Pipeline:
         if not detect or getattr(self._strategy, "model_based", False):
             det_frame = frame
         else:
+            t0 = time.perf_counter()
             det_frame = self._stabilize(frame)
+            st["median"] = (time.perf_counter() - t0) * 1000.0
 
         if not self.calib.is_calibrated:
             if not self._acquire_calibration(frame):
@@ -294,16 +317,25 @@ class Pipeline:
         res.corners = calib.corners
         res.table = calib.table
 
-        rect = self.calib.rectify(frame)
-        if rect is None:
+        ui = self.settings.ui
+        # The full-frame 3-channel bird's-eye warp is only needed when the warped
+        # CAMERA image is displayed (schematic off, or overlays fully off). The
+        # default schematic view renders from state, so skip the warp entirely —
+        # motion energy gets its own cheap gray-ROI warp below.
+        need_rect_bgr = not (annotate and ui.schematic_birdseye)
+        t0 = time.perf_counter()
+        rect = self.calib.rectify(frame) if need_rect_bgr else None
+        if need_rect_bgr and rect is None:
             res.status = "calibrating"
             return res
+        st["warp"] = (time.perf_counter() - t0) * 1000.0
 
         if not detect:
             # Display-only frame (cadence): reuse the current tracks, don't re-detect.
             tracks = self.tracker.tracks
             detections = []
         else:
+            t0 = time.perf_counter()
             # Detect on the RAW frame, project results into the rectified plane so
             # tracking + the bird's-eye schematic consume rectified-space points.
             if self._strategy is not None:
@@ -336,7 +368,10 @@ class Pipeline:
             else:
                 floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
             detections = [d for d in detections if d.score >= floor]
+            st["detect"] = (time.perf_counter() - t0) * 1000.0
+            t0 = time.perf_counter()
             tracks = self.tracker.update(detections, calib.table.short_side)
+            st["track"] = (time.perf_counter() - t0) * 1000.0
         res.tracks = tracks
         res.detections = detections
         res.n_balls = len(tracks)
@@ -345,14 +380,21 @@ class Pipeline:
         # *significantly* between frames. This discriminates a real moving ball
         # (a tight cluster of big changes) from compression/lighting flicker
         # (scattered small changes), unlike a plain mean difference.
-        gray = cv2.cvtColor(rect, cv2.COLOR_BGR2GRAY)
-        tbl = calib.table
-        roi = gray[int(tbl.y0):int(tbl.y1), int(tbl.x0):int(tbl.x1)]
-        if self._prev_gray is not None and self._prev_gray.shape == roi.shape:
+        t0 = time.perf_counter()
+        if rect is not None:
+            # full bird's-eye already computed for display — reuse it
+            tbl = calib.table
+            crop = rect[int(tbl.y0):int(tbl.y1), int(tbl.x0):int(tbl.x1)]
+            roi = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.size else None
+        else:
+            roi = self._warp_gray_roi(frame, calib)
+        if (roi is not None and self._prev_gray is not None
+                and self._prev_gray.shape == roi.shape):
             motion = float((cv2.absdiff(roi, self._prev_gray) > 25).mean()) * 100.0
         else:
             motion = 0.0
         self._prev_gray = roi
+        st["motion"] = (time.perf_counter() - t0) * 1000.0
 
         # extra modalities for evidence fusion: background-subtraction foreground
         # area + coherent optical-flow activity (both on a downscaled ROI). These
@@ -360,7 +402,7 @@ class Pipeline:
         # detection, so they run only when fusion is enabled — off by default
         # while cue-ball tracking (M2) is the focus, freeing the real-time budget.
         evidence = {"motion": motion}
-        if self.settings.detection.use_fusion:
+        if self.settings.detection.use_fusion and roi is not None:
             small = downscale(roi)
             fg = self._bg.update(small)
             # optical flow is the costliest + least-weighted signal — every 2nd frame
@@ -380,6 +422,8 @@ class Pipeline:
             res.diag = dict(self.shots.last_diag)
             res.diag["ms"] = round(self._last_ms, 1)
             res.diag["fps"] = int(1000 / self._last_ms) if self._last_ms > 0.1 else 0
+        if res.diag:  # not while paused — an empty diag keeps the debug HUD off
+            res.diag["stages"] = self._last_stages  # prev frame's, for the HUD
 
         # periodic deviation watchdog (cheap: only every N frames)
         if self._frame_idx % self._deviation_every == 0:
@@ -390,7 +434,7 @@ class Pipeline:
         res.deviated = self.calib.deviated
         res.status = "deviated" if self.calib.deviated else "tracking"
 
-        ui = self.settings.ui
+        t0 = time.perf_counter()
         overlays = annotate and ui.show_overlays
         # Draw every ball at its known physical radius (unless the raw-size debug
         # toggle is on) so the overhead shows uniform regulation balls.
@@ -421,7 +465,10 @@ class Pipeline:
             )
         else:
             res.frame_bgr = frame
+        st["render"] = (time.perf_counter() - t0) * 1000.0
         self._last_ms = (time.perf_counter() - t_start) * 1000.0
+        self._last_stages = {k: round(v, 2) for k, v in st.items()}
+        res.diag["stages"] = self._last_stages  # this frame's — for the bench
         return res
 
     # ------------------------------------------------------------------ #

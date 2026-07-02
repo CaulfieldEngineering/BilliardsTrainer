@@ -42,14 +42,27 @@ class DetectorStrategy:
 # --------------------------------------------------------------------------- #
 # Shared raw-frame helpers
 # --------------------------------------------------------------------------- #
+_POLY_CACHE: tuple | None = None  # (key, mask) — corners change rarely (EMA ticks)
+
+
 def table_polygon_mask(shape, calib) -> np.ndarray:
-    """uint8 mask of the table playing area in RAW coords (from calib.corners)."""
+    """uint8 mask of the table playing area in RAW coords (from calib.corners).
+
+    Cached on (frame size, corners): callers run this per frame but the locked
+    corners only move on a watchdog EMA tick, so rebuilding the full-frame mask
+    every frame was pure waste. Callers must treat the mask as read-only."""
+    global _POLY_CACHE
     h, w = shape[:2]
-    mask = np.zeros((h, w), np.uint8)
     if calib is None or getattr(calib, "corners", None) is None:
-        mask[:] = 255
-        return mask
-    cv2.fillConvexPoly(mask, np.asarray(calib.corners, np.int32).reshape(-1, 2), 255)
+        return np.full((h, w), 255, np.uint8)
+    corners = np.asarray(calib.corners, np.int32).reshape(-1, 2)
+    key = (h, w, corners.tobytes())
+    if _POLY_CACHE is not None and _POLY_CACHE[0] == key:
+        return _POLY_CACHE[1]
+    mask = np.zeros((h, w), np.uint8)
+    cv2.fillConvexPoly(mask, corners, 255)
+    mask.setflags(write=False)  # enforce read-only: an in-place edit would
+    _POLY_CACHE = (key, mask)   # corrupt every later frame via the cache
     return mask
 
 

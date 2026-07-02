@@ -4,6 +4,7 @@ Kept dependency-light (numpy only) so they can be imported by the event layer,
 the DB layer, and tests without pulling in the whole pipeline.
 """
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -97,4 +98,4 @@ class Track:
 
     @property
     def speed(self) -> float:
-        return float(np.hypot(self.vx, self.vy))
+        return math.hypot(self.vx, self.vy)

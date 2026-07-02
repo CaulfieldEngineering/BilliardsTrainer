@@ -283,6 +283,12 @@ class SettingsPage(QWidget):
         form.addRow("", self._dl_yolo_btn)
         form.addRow("", self._dl_status)
 
+        # Perf/recall trade-off: the detector can re-scan the foreshortened far
+        # rail with a second inference pass. Better far-ball recall, ~2x GPU cost.
+        self._far_rescan = QCheckBox("Extra far-rail scan (finds distant balls; "
+                                     "~2× GPU per frame)")
+        form.addRow("", self._far_rescan)
+
         # Active-learning: teach the model THIS table's ball numbers/colours. The
         # generic model can't tell adjacent colours apart on a specific felt, so a
         # quick correct-the-guesses pass + fine-tune adapts it. Redo if the camera
@@ -490,6 +496,7 @@ class SettingsPage(QWidget):
         self._show_traj.setChecked(s.ui.show_trajectories)
         self._show_ids.setChecked(s.ui.show_ball_ids)
         self._measured_colors.setChecked(s.ui.measured_ball_colors)
+        self._far_rescan.setChecked(s.balls.far_rail_rescan)
         self._auto_check.setChecked(s.updates.auto_check)
 
     def _save(self) -> None:
@@ -513,6 +520,7 @@ class SettingsPage(QWidget):
         s.ui.show_trajectories = self._show_traj.isChecked()
         s.ui.show_ball_ids = self._show_ids.isChecked()
         s.ui.measured_ball_colors = self._measured_colors.isChecked()
+        s.balls.far_rail_rescan = self._far_rescan.isChecked()
         s.updates.auto_check = self._auto_check.isChecked()
         s.save()
         self.applied.emit()

@@ -31,9 +31,14 @@ from ..vision.pipeline import Pipeline
 
 log = logging.getLogger("controller")
 
-# How many consecutive empty reads from a *live* camera we tolerate before
-# declaring it disconnected (~2 s at 30 fps). Transient empty reads are normal.
-_CAMERA_MISS_TOLERANCE = 60
+# How long a *live* camera may go without delivering a frame before we declare
+# it disconnected. WALL-TIME, not ticks — tick rate varies with the reported
+# fps, so a tick count would mean wildly different real time per camera.
+_CAMERA_MISS_SECONDS = 2.5
+# Warm-up allowance BEFORE the first-ever frame: the threaded grabber returns
+# None instantly while the camera driver is still initialising (auto-exposure
+# etc. can take seconds), so startup gets a longer leash.
+_CAMERA_STARTUP_SECONDS = 8.0
 
 
 @dataclass
@@ -86,7 +91,8 @@ class PipelineController(QObject):
         self._session_id: int | None = None
         self._mode = "free_play"
         self._running = False
-        self._miss_count = 0
+        self._miss_t0: float | None = None  # first consecutive empty-read time
+        self._got_frame = False  # ever received a frame from the current source
         self._last_frame: np.ndarray | None = None
         self._replay: deque = deque(maxlen=150)
         self._recorder = None
@@ -175,7 +181,8 @@ class PipelineController(QObject):
         self._prev_state = "settled"
         self._turn_start_t = 0.0
         self._running = True
-        self._miss_count = 0
+        self._miss_t0: float | None = None  # first consecutive empty-read time
+        self._got_frame = False
         self._last_frame = None
         self._src_fps = float(getattr(self._source, "fps", 30.0)) or 30.0
         self._replay = deque(maxlen=int(max(30, min(self._src_fps, 30) * 5)))
@@ -521,10 +528,18 @@ class PipelineController(QObject):
             # Tolerate transient empty reads from a live camera; only give up
             # after a sustained outage. Files/demo never miss, so fail fast.
             if getattr(self._source, "is_live", False):
-                self._miss_count += 1
-                if self._miss_count <= _CAMERA_MISS_TOLERANCE:
+                now = time.perf_counter()
+                if self._miss_t0 is None:
+                    self._miss_t0 = now
+                limit = _CAMERA_MISS_SECONDS if self._got_frame else _CAMERA_STARTUP_SECONDS
+                if now - self._miss_t0 <= limit:
                     return
-                self.error.emit("Camera stopped delivering frames — disconnected?")
+                if self._got_frame:
+                    self.error.emit("Camera stopped delivering frames — disconnected?")
+                else:
+                    self.error.emit("Camera opened but never delivered a frame — it may "
+                                    "be in use by another app, or blocked by Windows "
+                                    "Settings → Privacy → Camera.")
             else:
                 self.error.emit("Source ended.")
             self.stop()
@@ -541,7 +556,8 @@ class PipelineController(QObject):
         """Process one frame through the pipeline and emit results. Shared by the
         live tick and the video transport (step/seek/stop)."""
         t_wall0 = time.perf_counter()
-        self._miss_count = 0
+        self._miss_t0: float | None = None  # first consecutive empty-read time
+        self._got_frame = True
         self._last_frame = frame
         if getattr(self._source, "is_video", False):
             self._video_pos = max(0, self._source.position() - 1)

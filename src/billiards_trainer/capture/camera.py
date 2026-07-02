@@ -16,6 +16,7 @@ A ``FrameSource`` yields BGR frames via ``read()``. Four kinds:
 """
 
 import sys
+import threading
 from pathlib import Path
 
 import cv2
@@ -68,6 +69,93 @@ class CameraSource(FrameSource):
     def fps(self) -> float:
         f = self._cap.get(cv2.CAP_PROP_FPS)
         return f if f and f > 1 else 30.0
+
+
+class ThreadedCameraSource(CameraSource):
+    """CameraSource with a dedicated grab thread that always holds only the
+    NEWEST frame.
+
+    Two real-time problems this solves for live tracking:
+    * ``VideoCapture.read()`` BLOCKS until the driver delivers a frame (up to a
+      full frame period) — on the worker tick that stall serialized capture with
+      inference and capped throughput.
+    * When processing runs slower than the camera, the driver's internal queue
+      backs up and the app tracks second-old frames. Draining continuously and
+      keeping only the latest frame pins latency at ~1 frame.
+
+    ``read()`` has take-semantics: it returns each frame once and ``None`` when
+    nothing new has arrived — the controller already tolerates transient ``None``
+    reads from a live source. Pure ``threading`` (no Qt objects), so it cannot
+    reproduce the worker-thread QTimer lifetime crashes.
+    """
+
+    def __init__(self, index: int):
+        super().__init__(index)
+        self._lock = threading.Lock()
+        self._latest: np.ndarray | None = None
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        # Cache everything queried later BEFORE the grab thread starts —
+        # VideoCapture calls are not safe concurrently with read() on another
+        # thread (opened/fps are read by the controller after construction).
+        self._opened = self._cap.isOpened()
+        self._fps = super().fps if self._opened else 30.0
+        if self._opened:
+            try:
+                self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # best-effort; not all backends honour it
+            except cv2.error:
+                pass
+            self._thread = threading.Thread(target=self._grab_loop,
+                                            name="camera-grab", daemon=True)
+            self._thread.start()
+
+    @property
+    def opened(self) -> bool:
+        return self._opened
+
+    @property
+    def fps(self) -> float:
+        return self._fps
+
+    def _grab_loop(self) -> None:
+        try:
+            while not self._stop.is_set():
+                try:
+                    ok, frame = self._cap.read()
+                except cv2.error:  # backend hiccup — treat like a missed frame
+                    ok, frame = False, None
+                if not ok or frame is None:
+                    # dead/unplugged camera: don't spin hot; keep checking until
+                    # release() or the device comes back
+                    if self._stop.wait(0.01):
+                        break
+                    continue
+                with self._lock:
+                    self._latest = frame
+        finally:
+            # The grab thread OWNS the capture handle: releasing it here (only
+            # after the loop exits) guarantees the handle is freed exactly once
+            # and never while a concurrent read() is in flight — even when
+            # release() below gives up waiting on a wedged driver.
+            try:
+                self._cap.release()
+            except cv2.error:
+                pass
+
+    def read(self) -> np.ndarray | None:
+        with self._lock:
+            frame, self._latest = self._latest, None
+        return frame
+
+    def release(self) -> None:
+        self._stop.set()
+        t = self._thread
+        if t is None:
+            self._cap.release()  # thread never started (camera didn't open)
+            return
+        t.join(timeout=2.0)
+        # If the join timed out the loop is wedged inside the driver's read();
+        # its finally block releases the handle as soon as that call returns.
 
 
 class VideoSource(FrameSource):
@@ -214,11 +302,11 @@ def open_source(spec: str, *, demo_size=(1280, 720)) -> FrameSource:
     if spec.lower() == "demo":
         return DemoSource(*demo_size)
     if spec.isdigit():
-        return CameraSource(int(spec))
+        return ThreadedCameraSource(int(spec))
     ext = Path(spec).suffix.lower()
     if ext in _VIDEO_EXT:
         return VideoSource(spec)
     if ext in _IMAGE_EXT:
         return ImageSource(spec)
     # fall back to treating as camera 0
-    return CameraSource(0)
+    return ThreadedCameraSource(0)

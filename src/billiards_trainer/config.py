@@ -137,6 +137,11 @@ class BallSettings:
     # flicker in/out of the area filter. ~1-frame lag on motion (negligible).
     temporal_median: bool = True
     temporal_median_frames: int = 3
+    # ONNX detector: run a SECOND inference pass over the foreshortened far-rail
+    # region (top of the frame) and merge. Recovers tiny far balls at the cost of
+    # doubling per-frame GPU work — turn off to halve detector latency when the
+    # camera already resolves the far rail well.
+    far_rail_rescan: bool = True
     # One-time migration marker. Bumped by Settings.load() after it moves users off
     # 'legacy' — which used to be the ONLY selectable detector in shipped builds
     # (frozen strategy discovery was broken). 0 = not yet migrated.

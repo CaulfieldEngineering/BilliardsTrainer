@@ -165,7 +165,13 @@ class BallTrainerDialog(QDialog):
         if self._frame is None or self._strategy is None:
             return
         try:
-            raw = self._strategy.detect(self._frame, None)   # no calib needed to label
+            # Labelling is offline and wants MAX recall — force the far-rail
+            # rescan for this call regardless of the live pipeline's perf
+            # setting (the strategy object is shared process-wide).
+            if hasattr(self._strategy, "far_rail_rescan"):
+                raw = self._strategy.detect(self._frame, None, rescan=True)
+            else:
+                raw = self._strategy.detect(self._frame, None)   # no calib needed to label
         except Exception:  # noqa: BLE001
             raw = []
         for d in raw:

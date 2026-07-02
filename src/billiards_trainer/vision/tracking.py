@@ -9,10 +9,9 @@ No scipy/lap dependency — greedy nearest-neighbour with a distance gate is ple
 for <=16 near-rigid objects and keeps the installer lean.
 """
 
+import math
 from collections import Counter, deque
 from dataclasses import dataclass, field
-
-import numpy as np
 
 from .types import BallClass, Detection, Track
 
@@ -145,7 +144,7 @@ class BallTracker:
                 t_gate = max(t_gate, 0.18 * self._short_side)
             for di in unmatched_dets:
                 d = detections[di]
-                dist = np.hypot(t.x - d.x, t.y - d.y)
+                dist = math.hypot(t.x - d.x, t.y - d.y)
                 if dist <= t_gate:
                     pairs.append((dist, ti, di))
         pairs.sort(key=lambda p: p[0])
@@ -202,7 +201,7 @@ class BallTracker:
             keep_idx: list[int] = []
             for i in order:
                 ti = self._tracks[i]
-                if any(np.hypot(self._tracks[j].x - ti.x, self._tracks[j].y - ti.y) < merge_dist
+                if any(math.hypot(self._tracks[j].x - ti.x, self._tracks[j].y - ti.y) < merge_dist
                        for j in keep_idx):
                     continue
                 keep_idx.append(i)
