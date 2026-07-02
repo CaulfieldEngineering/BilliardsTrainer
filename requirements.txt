@@ -7,7 +7,10 @@
 #   - Ball detection falls back to the classical Hough+colour detector.
 #   - Pose analysis is simply unavailable until the [pose] extra is installed.
 numpy>=1.26,<3
-opencv-python-headless>=4.8
+# <5: OpenCV 5.0 (Jul 2026) changed API output shapes (e.g. HoughLinesP) and is
+# untested against the real camera/GPU path — move to 5.x deliberately, not via
+# an unpinned CI install silently changing the shipped build.
+opencv-python-headless>=4.8,<5
 PySide6>=6.6
 SQLAlchemy>=2.0
 requests>=2.31

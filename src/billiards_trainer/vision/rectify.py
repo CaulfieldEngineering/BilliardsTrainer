@@ -53,7 +53,8 @@ def _refine_homography(rect_bgr, rect_mask, dst_size) -> np.ndarray:
                                 minLineLength=100, maxLineGap=20)
         if lines is None or len(lines) < 4:
             return eye
-        lines = lines[:, 0, :]
+        # OpenCV 4 returns (N, 1, 4); OpenCV 5 returns (N, 4) — normalise both
+        lines = lines.reshape(-1, 4)
 
         horiz = [ln for ln in lines if _line_angle(ln) < 15.0]
         vert = [ln for ln in lines if _line_angle(ln) > 75.0]

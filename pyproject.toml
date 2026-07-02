@@ -12,7 +12,8 @@ authors = [{ name = "Caulfield Engineering" }]
 license = { text = "MIT" }
 dependencies = [
     "numpy>=1.26,<3",
-    "opencv-python-headless>=4.8",
+    # <5: OpenCV 5.0 changed API output shapes; upgrade deliberately, with testing
+    "opencv-python-headless>=4.8,<5",
     "PySide6>=6.6",
     "SQLAlchemy>=2.0",
     "requests>=2.31",
