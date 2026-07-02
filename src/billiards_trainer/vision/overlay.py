@@ -70,6 +70,51 @@ def ball_color(tr, measured: bool = True) -> tuple[tuple[int, int, int], bool]:
     return (int(bgr[0]), int(bgr[1]), int(bgr[2])), False
 
 
+_SHIFT = 4          # sub-pixel drawing: 1/16th-px precision kills integer snap
+_S = 1 << _SHIFT
+
+
+def _smooth_path(pts: np.ndarray, iterations: int = 2) -> np.ndarray:
+    """Chaikin corner-cutting: turns the jagged frame-to-frame tracked path
+    into a smooth curve (each pass replaces every corner with two points at
+    1/4 and 3/4 of its edges)."""
+    p = np.asarray(pts, np.float32)
+    if len(p) > 1:  # collapse runs of identical points (a resting ball)
+        keep = np.concatenate(([True], np.any(np.diff(p, axis=0) != 0, axis=1)))
+        p = p[keep]
+    for _ in range(iterations):
+        if len(p) < 3:
+            break
+        q = p[:-1] * 0.75 + p[1:] * 0.25
+        r = p[:-1] * 0.25 + p[1:] * 0.75
+        inter = np.empty((2 * (len(p) - 1), 2), np.float32)
+        inter[0::2] = q
+        inter[1::2] = r
+        p = np.vstack([p[:1], inter, p[-1:]])
+    return p
+
+
+def _draw_trail(img, history, color) -> None:
+    """Fading comet tail: the smoothed path drawn in chunks that brighten and
+    thicken toward the ball, so motion reads as a flowing stroke instead of a
+    jagged wire."""
+    p = _smooth_path(np.asarray(history, np.float32))
+    n = len(p)
+    if n < 2:
+        return
+    ip = np.round(p * _S).astype(np.int32)
+    chunks = min(6, n - 1)
+    for c in range(chunks):
+        i0 = n * c // chunks
+        i1 = min(n - 1, n * (c + 1) // chunks)
+        if i1 <= i0:
+            continue
+        f = (c + 1) / chunks            # oldest chunk dimmest, newest brightest
+        col = tuple(int(v * (0.25 + 0.75 * f)) for v in color)
+        cv2.polylines(img, [ip[i0:i1 + 1].reshape(-1, 1, 2)], False, col,
+                      2 if f > 0.7 else 1, cv2.LINE_AA, shift=_SHIFT)
+
+
 def _accent_bgr(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")
     if len(h) != 6:
@@ -99,12 +144,12 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
     for tr in tracks:
         color, _uncertain = ball_color(tr, measured_colors)
         c = (int(tr.x), int(tr.y))
+        cs = (int(round(tr.x * _S)), int(round(tr.y * _S)))
         r = max(4, int(fixed_radius if fixed_radius else tr.radius))
         if show_traj and len(tr.history) > 1:
-            pts = np.array(tr.history, np.int32).reshape(-1, 1, 2)
-            cv2.polylines(img, [pts], False, acc, 1, cv2.LINE_AA)
-        cv2.circle(img, c, r, color, 2, cv2.LINE_AA)
-        cv2.circle(img, c, 2, color, -1, cv2.LINE_AA)
+            _draw_trail(img, tr.history, acc)
+        cv2.circle(img, cs, r * _S, color, 2, cv2.LINE_AA, shift=_SHIFT)
+        cv2.circle(img, cs, 2 * _S, color, -1, cv2.LINE_AA, shift=_SHIFT)
         # velocity vector
         if tr.speed > 2.0:
             tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
@@ -184,19 +229,23 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
     for tr in tracks:
         color, uncertain = ball_color(tr, measured_colors)
         c = (int(tr.x), int(tr.y))
+        cs = (int(round(tr.x * _S)), int(round(tr.y * _S)))
         r = max(6, int(fixed_radius if fixed_radius else tr.radius))
+        rs = r * _S
         if show_traj and len(tr.history) > 1:
-            pts = np.array(tr.history, np.int32).reshape(-1, 1, 2)
-            cv2.polylines(img, [pts], False, acc, 1, cv2.LINE_AA)
-        cv2.circle(img, c, r, color, -1, cv2.LINE_AA)
+            _draw_trail(img, tr.history, acc)
+        # sub-pixel centres: a ball whose track sits at x.5 no longer snaps
+        # between neighbouring pixels frame to frame
+        cv2.circle(img, cs, rs, color, -1, cv2.LINE_AA, shift=_SHIFT)
         # Stripe: a white equatorial band over the base colour, so 9..15 read as
         # stripes at a glance (the base colour still identifies the number).
         if tr.cls == BallClass.STRIPE:
-            band = max(2, int(r * 0.55))
-            cv2.rectangle(img, (c[0] - r, c[1] - band // 2), (c[0] + r, c[1] + band // 2),
-                          (245, 245, 245), -1, cv2.LINE_AA)
-            cv2.circle(img, c, r, color, 2, cv2.LINE_AA)  # restore rim
-        cv2.circle(img, c, r, (20, 22, 26), 1, cv2.LINE_AA)
+            band_h = max(2 * _S, int(rs * 0.55))
+            cv2.rectangle(img, (cs[0] - rs, cs[1] - band_h // 2),
+                          (cs[0] + rs, cs[1] + band_h // 2),
+                          (245, 245, 245), -1, cv2.LINE_AA, shift=_SHIFT)
+            cv2.circle(img, cs, rs, color, 2, cv2.LINE_AA, shift=_SHIFT)  # restore rim
+        cv2.circle(img, cs, rs, (20, 22, 26), 1, cv2.LINE_AA, shift=_SHIFT)
         label = _ball_label(tr)
         if uncertain and not label:
             cv2.putText(img, "?", (c[0] - r // 2, c[1] + r // 2),
@@ -207,8 +256,8 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             _draw_centered(img, label, c,
                            (245, 245, 245) if tr.cls == BallClass.STRIPE else color, r)
         elif not uncertain:
-            cv2.circle(img, (c[0] - r // 3, c[1] - r // 3), max(2, r // 4),
-                       (255, 255, 255), -1, cv2.LINE_AA)
+            cv2.circle(img, (cs[0] - rs // 3, cs[1] - rs // 3), max(2 * _S, rs // 4),
+                       (255, 255, 255), -1, cv2.LINE_AA, shift=_SHIFT)
         if tr.speed > 2.0:
             tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
             cv2.arrowedLine(img, c, tip, acc, 1, cv2.LINE_AA, tipLength=0.3)
