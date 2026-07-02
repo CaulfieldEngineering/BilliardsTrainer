@@ -1,41 +1,41 @@
 {
- "stamp": "20260702-1557",
+ "stamp": "20260702-1631",
  "baseline": {
-  "jitter_px": 0.077,
-  "jitter_p95": 0.238,
+  "jitter_px": 0.079,
+  "jitter_p95": 0.237,
   "teleports_per_min": 0.0,
-  "phantom_rate_per_min": 2.5,
+  "phantom_rate_per_min": 1.667,
   "dup_number_frac": 0.0,
   "overcount_frac": 0.0,
-  "id_flips_per_track_min": 2.835,
-  "fps": 39.55,
-  "score": 12.645
+  "id_flips_per_track_min": 2.727,
+  "fps": 33.833,
+  "score": 10.098
  },
  "best": {
-  "trial": 4,
+  "trial": 5,
   "params": {
-   "tracker.max_dist_frac": 0.06,
-   "tracker.max_misses": 23,
+   "tracker.max_dist_frac": 0.054,
+   "tracker.max_misses": 29,
    "tracker.min_hits": 4,
-   "tracker.vel_alpha": 0.5822,
-   "tracker.pos_alpha_slow": 0.1415,
-   "tracker.pos_alpha_fast": 0.7213,
-   "tracker.still_speed_frac": 0.014,
-   "tracker.still_frames": 4,
-   "tracker.lock_dist_frac": 0.0082,
-   "detection.confidence_floor": 0.6328,
-   "balls.far_rail_rescan": true
+   "tracker.vel_alpha": 0.4812,
+   "tracker.pos_alpha_slow": 0.1224,
+   "tracker.pos_alpha_fast": 0.883,
+   "tracker.still_speed_frac": 0.0096,
+   "tracker.still_frames": 7,
+   "tracker.lock_dist_frac": 0.0175,
+   "detection.confidence_floor": 0.5269,
+   "balls.far_rail_rescan": false
   },
   "metrics": {
    "jitter_px": 0.064,
-   "jitter_p95": 0.209,
+   "jitter_p95": 0.217,
    "teleports_per_min": 0.0,
    "phantom_rate_per_min": 0.0,
    "dup_number_frac": 0.0,
    "overcount_frac": 0.0,
-   "id_flips_per_track_min": 1.835,
-   "fps": 37.45,
-   "score": 3.755
+   "id_flips_per_track_min": 1.93,
+   "fps": 41.367,
+   "score": 3.85
   }
  }
 }

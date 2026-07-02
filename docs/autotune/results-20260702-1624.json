@@ -1,0 +1,422 @@
+[
+ {
+  "trial": "baseline",
+  "params": {},
+  "metrics": {
+   "jitter_px": 0.079,
+   "jitter_p95": 0.237,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.727,
+   "fps": 36.567,
+   "score": 10.098
+  }
+ },
+ {
+  "trial": 0,
+  "params": {
+   "tracker.max_dist_frac": 0.1171,
+   "tracker.max_misses": 20,
+   "tracker.min_hits": 3,
+   "tracker.vel_alpha": 0.4094,
+   "tracker.pos_alpha_slow": 0.2997,
+   "tracker.pos_alpha_fast": 0.7516,
+   "tracker.still_speed_frac": 0.0062,
+   "tracker.still_frames": 9,
+   "tracker.lock_dist_frac": 0.0185,
+   "detection.confidence_floor": 0.5878,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.075,
+   "jitter_p95": 0.487,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.157,
+   "fps": 37.1,
+   "score": 9.408
+  }
+ },
+ {
+  "trial": 1,
+  "params": {
+   "tracker.max_dist_frac": 0.0662,
+   "tracker.max_misses": 15,
+   "tracker.min_hits": 4,
+   "tracker.vel_alpha": 0.7904,
+   "tracker.pos_alpha_slow": 0.1194,
+   "tracker.pos_alpha_fast": 0.8546,
+   "tracker.still_speed_frac": 0.0123,
+   "tracker.still_frames": 7,
+   "tracker.lock_dist_frac": 0.0165,
+   "detection.confidence_floor": 0.3645,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.106,
+   "jitter_p95": 0.269,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 3.58,
+   "fps": 40.5,
+   "score": 11.761
+  }
+ },
+ {
+  "trial": 2,
+  "params": {
+   "tracker.max_dist_frac": 0.0913,
+   "tracker.max_misses": 31,
+   "tracker.min_hits": 5,
+   "tracker.vel_alpha": 0.4761,
+   "tracker.pos_alpha_slow": 0.267,
+   "tracker.pos_alpha_fast": 0.8632,
+   "tracker.still_speed_frac": 0.0144,
+   "tracker.still_frames": 10,
+   "tracker.lock_dist_frac": 0.0198,
+   "detection.confidence_floor": 0.6351,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.057,
+   "jitter_p95": 0.213,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 0.0,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 1.71,
+   "fps": 44.3,
+   "score": 3.42
+  }
+ },
+ {
+  "trial": 3,
+  "params": {
+   "tracker.max_dist_frac": 0.0989,
+   "tracker.max_misses": 33,
+   "tracker.min_hits": 4,
+   "tracker.vel_alpha": 0.4738,
+   "tracker.pos_alpha_slow": 0.1665,
+   "tracker.pos_alpha_fast": 0.9522,
+   "tracker.still_speed_frac": 0.0137,
+   "tracker.still_frames": 9,
+   "tracker.lock_dist_frac": 0.0142,
+   "detection.confidence_floor": 0.4339,
+   "balls.far_rail_rescan": false
+  },
+  "metrics": {
+   "jitter_px": 0.06,
+   "jitter_p95": 0.207,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.38,
+   "fps": 60.767,
+   "score": 9.181
+  }
+ },
+ {
+  "trial": 4,
+  "params": {
+   "tracker.max_dist_frac": 0.0967,
+   "tracker.max_misses": 23,
+   "tracker.min_hits": 5,
+   "tracker.vel_alpha": 0.4197,
+   "tracker.pos_alpha_slow": 0.197,
+   "tracker.pos_alpha_fast": 0.709,
+   "tracker.still_speed_frac": 0.0143,
+   "tracker.still_frames": 8,
+   "tracker.lock_dist_frac": 0.0114,
+   "detection.confidence_floor": 0.6147,
+   "balls.far_rail_rescan": false
+  },
+  "metrics": {
+   "jitter_px": 0.055,
+   "jitter_p95": 0.191,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 0.0,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.45,
+   "fps": 62.067,
+   "score": 4.1
+  }
+ },
+ {
+  "trial": 5,
+  "params": {
+   "tracker.max_dist_frac": 0.0963,
+   "tracker.max_misses": 23,
+   "tracker.min_hits": 4,
+   "tracker.vel_alpha": 0.6253,
+   "tracker.pos_alpha_slow": 0.1674,
+   "tracker.pos_alpha_fast": 0.7071,
+   "tracker.still_speed_frac": 0.0108,
+   "tracker.still_frames": 8,
+   "tracker.lock_dist_frac": 0.0145,
+   "detection.confidence_floor": 0.48,
+   "balls.far_rail_rescan": false
+  },
+  "metrics": {
+   "jitter_px": 0.074,
+   "jitter_p95": 0.234,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.393,
+   "fps": 58.467,
+   "score": 9.614
+  }
+ },
+ {
+  "trial": 6,
+  "params": {
+   "tracker.max_dist_frac": 0.0562,
+   "tracker.max_misses": 40,
+   "tracker.min_hits": 4,
+   "tracker.vel_alpha": 0.4394,
+   "tracker.pos_alpha_slow": 0.2519,
+   "tracker.pos_alpha_fast": 0.7163,
+   "tracker.still_speed_frac": 0.0134,
+   "tracker.still_frames": 5,
+   "tracker.lock_dist_frac": 0.0141,
+   "detection.confidence_floor": 0.4702,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.051,
+   "jitter_p95": 0.163,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.32,
+   "fps": 43.833,
+   "score": 8.851
+  }
+ },
+ {
+  "trial": 7,
+  "params": {
+   "tracker.max_dist_frac": 0.0821,
+   "tracker.max_misses": 24,
+   "tracker.min_hits": 3,
+   "tracker.vel_alpha": 0.4121,
+   "tracker.pos_alpha_slow": 0.1628,
+   "tracker.pos_alpha_fast": 0.7501,
+   "tracker.still_speed_frac": 0.0141,
+   "tracker.still_frames": 9,
+   "tracker.lock_dist_frac": 0.0103,
+   "detection.confidence_floor": 0.3611,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.06,
+   "jitter_p95": 0.188,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 3.57,
+   "fps": 43.967,
+   "score": 10.371
+  }
+ },
+ {
+  "trial": 8,
+  "params": {
+   "tracker.max_dist_frac": 0.1057,
+   "tracker.max_misses": 24,
+   "tracker.min_hits": 2,
+   "tracker.vel_alpha": 0.4208,
+   "tracker.pos_alpha_slow": 0.1704,
+   "tracker.pos_alpha_fast": 0.9319,
+   "tracker.still_speed_frac": 0.0142,
+   "tracker.still_frames": 7,
+   "tracker.lock_dist_frac": 0.0085,
+   "detection.confidence_floor": 0.386,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.068,
+   "jitter_p95": 0.221,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 3.353,
+   "fps": 43.867,
+   "score": 10.394
+  }
+ },
+ {
+  "trial": 9,
+  "params": {
+   "tracker.max_dist_frac": 0.0909,
+   "tracker.max_misses": 42,
+   "tracker.min_hits": 5,
+   "tracker.vel_alpha": 0.6909,
+   "tracker.pos_alpha_slow": 0.2215,
+   "tracker.pos_alpha_fast": 0.7991,
+   "tracker.still_speed_frac": 0.0128,
+   "tracker.still_frames": 10,
+   "tracker.lock_dist_frac": 0.0177,
+   "detection.confidence_floor": 0.4277,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.077,
+   "jitter_p95": 0.234,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.54,
+   "fps": 43.333,
+   "score": 9.851
+  }
+ },
+ {
+  "trial": 10,
+  "params": {
+   "tracker.max_dist_frac": 0.0513,
+   "tracker.max_misses": 44,
+   "tracker.min_hits": 4,
+   "tracker.vel_alpha": 0.6538,
+   "tracker.pos_alpha_slow": 0.1549,
+   "tracker.pos_alpha_fast": 0.748,
+   "tracker.still_speed_frac": 0.0119,
+   "tracker.still_frames": 7,
+   "tracker.lock_dist_frac": 0.0164,
+   "detection.confidence_floor": 0.4032,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.076,
+   "jitter_p95": 0.225,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 3.37,
+   "fps": 44.067,
+   "score": 10.651
+  }
+ },
+ {
+  "trial": 11,
+  "params": {
+   "tracker.max_dist_frac": 0.1177,
+   "tracker.max_misses": 34,
+   "tracker.min_hits": 2,
+   "tracker.vel_alpha": 0.7973,
+   "tracker.pos_alpha_slow": 0.1976,
+   "tracker.pos_alpha_fast": 0.8363,
+   "tracker.still_speed_frac": 0.0057,
+   "tracker.still_frames": 4,
+   "tracker.lock_dist_frac": 0.0113,
+   "detection.confidence_floor": 0.3792,
+   "balls.far_rail_rescan": false
+  },
+  "metrics": {
+   "jitter_px": 0.121,
+   "jitter_p95": 0.517,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.783,
+   "fps": 44.367,
+   "score": 11.414
+  }
+ },
+ {
+  "trial": 12,
+  "params": {
+   "tracker.max_dist_frac": 0.0933,
+   "tracker.max_misses": 37,
+   "tracker.min_hits": 4,
+   "tracker.vel_alpha": 0.447,
+   "tracker.pos_alpha_slow": 0.2798,
+   "tracker.pos_alpha_fast": 0.8469,
+   "tracker.still_speed_frac": 0.0068,
+   "tracker.still_frames": 5,
+   "tracker.lock_dist_frac": 0.0125,
+   "detection.confidence_floor": 0.6047,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.076,
+   "jitter_p95": 0.344,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 1.93,
+   "fps": 33.333,
+   "score": 9.211
+  }
+ },
+ {
+  "trial": 13,
+  "params": {
+   "tracker.max_dist_frac": 0.0644,
+   "tracker.max_misses": 43,
+   "tracker.min_hits": 5,
+   "tracker.vel_alpha": 0.4197,
+   "tracker.pos_alpha_slow": 0.2315,
+   "tracker.pos_alpha_fast": 0.8174,
+   "tracker.still_speed_frac": 0.0075,
+   "tracker.still_frames": 5,
+   "tracker.lock_dist_frac": 0.0094,
+   "detection.confidence_floor": 0.6267,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.069,
+   "jitter_p95": 0.231,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 0.0,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 1.707,
+   "fps": 40.833,
+   "score": 3.777
+  }
+ },
+ {
+  "trial": 14,
+  "params": {
+   "tracker.max_dist_frac": 0.0625,
+   "tracker.max_misses": 32,
+   "tracker.min_hits": 2,
+   "tracker.vel_alpha": 0.412,
+   "tracker.pos_alpha_slow": 0.1148,
+   "tracker.pos_alpha_fast": 0.7784,
+   "tracker.still_speed_frac": 0.0135,
+   "tracker.still_frames": 9,
+   "tracker.lock_dist_frac": 0.0084,
+   "detection.confidence_floor": 0.5799,
+   "balls.far_rail_rescan": true
+  },
+  "metrics": {
+   "jitter_px": 0.063,
+   "jitter_p95": 0.215,
+   "teleports_per_min": 0.0,
+   "phantom_rate_per_min": 1.667,
+   "dup_number_frac": 0.0,
+   "overcount_frac": 0.0,
+   "id_flips_per_track_min": 2.133,
+   "fps": 43.167,
+   "score": 9.024
+  }
+ }
+]

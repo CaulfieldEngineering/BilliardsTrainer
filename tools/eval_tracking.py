@@ -106,7 +106,15 @@ def run_segment(video: str, start_s: float, dur_s: float,
     lives = [(last_seen[i] - first_seen[i]) / fps for i in first_seen]
     phantoms = sum(1 for v in lives if v < PHANTOM_LIFE_S)
     track_minutes = max(1e-6, sum(lives) / 60.0)
+    # median simultaneous confirmed tracks — the recall signal the pure physics
+    # metrics can't see (a never-detected resting ball creates no track and no
+    # penalty; an optimizer WILL exploit that without this)
+    alive_counts = sorted(
+        sum(1 for i in first_seen
+            if first_seen[i] <= f <= last_seen[i]) for f in range(done))
+    median_tracks = alive_counts[len(alive_counts) // 2] if alive_counts else 0
     return {
+        "median_tracks": median_tracks,
         "frames": done,
         "jitter_px": round(statistics.mean(jitters), 3) if jitters else 0.0,
         "jitter_p95": round(sorted(jitters)[int(0.95 * (len(jitters) - 1))], 3)
@@ -121,18 +129,23 @@ def run_segment(video: str, start_s: float, dur_s: float,
     }
 
 
-def score(m: dict) -> float:
+def score(m: dict, expected_tracks: float | None = None) -> float:
     """Single scalar objective (LOWER is better) for the tuning loop. Weights
     encode what a practice aid must get right: no phantom balls, no stutter,
-    stable identities; throughput only matters below real-time."""
+    stable identities, and EVERY real ball tracked; throughput only matters
+    below real-time. ``expected_tracks`` (human-verified ball count for the
+    segment) closes the recall blind spot: without it an optimizer can win by
+    simply not detecting hard balls."""
     fps_penalty = max(0.0, 30.0 - m["fps"]) * 0.5
+    missing = (max(0.0, expected_tracks - m.get("median_tracks", 0)) * 5.0
+               if expected_tracks else 0.0)
     return (m["jitter_px"] * 30.0
             + m["teleports_per_min"] * 2.0
             + m["phantom_rate_per_min"] * 3.0
             + m["dup_number_frac"] * 50.0
             + m["overcount_frac"] * 50.0
             + m["id_flips_per_track_min"] * 1.0
-            + fps_penalty)
+            + fps_penalty + missing)
 
 
 def main() -> int:
@@ -159,16 +172,19 @@ def main() -> int:
 
     per_seg = []
     for seg in args.segments:
-        start, dur = (float(x) for x in seg.split(":"))
+        parts = [float(x) for x in seg.split(":")]
+        start, dur = parts[0], parts[1]
+        expected = parts[2] if len(parts) > 2 else None  # human-verified ball count
         m = run_segment(args.video, start, dur, settings)
         m["segment"] = seg
+        m["score"] = round(score(m, expected), 3)
         per_seg.append(m)
         print(f"[{seg:>9}] " + "  ".join(
             f"{k}={v}" for k, v in m.items() if k not in ("segment",)))
 
     agg = {k: round(statistics.mean(s[k] for s in per_seg), 3)
-           for k in per_seg[0] if k not in ("segment", "frames", "tracks_total")}
-    agg["score"] = round(score(agg), 2)
+           for k in per_seg[0]
+           if k not in ("segment", "frames", "tracks_total", "median_tracks")}
     print("\nAGGREGATE:", "  ".join(f"{k}={v}" for k, v in agg.items()))
     if args.json:
         Path(args.json).write_text(json.dumps(

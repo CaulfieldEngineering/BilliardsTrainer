@@ -25,18 +25,23 @@ Detection accuracy against HUMAN-verified labels lives separately:
 `_eval/holdout/eval_holdout.py` (4 labelled frames, precision/recall/ID-acc).
 Use both — the physics score can't see a consistently wrong number.
 
-## 2. Tuning — nightly unattended search
+## 2. Tuning — on-demand unattended search
 
 `tools/autotune.py` random-searches the tracker/detector knob space, scoring
-each candidate with the harness. **Registered as Windows scheduled task
-"BilliardsTrainer Autotune", daily 03:00**, 40 trials (~30 min), reports to
+each candidate with the harness; ranked reports land in
 `docs/autotune/report-*.md` + `best.json`.
 
-Promotion is deliberate, not automatic: a reviewer (or Claude, next session)
-reads the report, changes the defaults in `BallTracker.__init__` /
-`config.py`, re-runs `eval_tracking.py` on FULL segments as a regression
-check, and commits. This keeps a noisy night from silently changing shipped
-behaviour.
+Run it **when the evidence changes** — new footage, a new model, or a tracker
+code change — not on a timer: against a fixed clip the search converges once
+and reruns only re-discover the same optimum. (A nightly scheduled task
+existed briefly on 2026-07-02 and was removed for exactly this reason; the
+one-time exhaustive search on testVideo.MP4 was run to convergence instead —
+see the reports from that date.)
+
+Promotion is deliberate, not automatic: read the report, verify the top
+candidates on FULL-length segments (short-segment scores are noisy), change
+the defaults in `BallTracker.__init__` / `config.py`, re-run
+`eval_tracking.py` as a regression check, and commit.
 
 ## 3. Model improvement — the ball-ID active-learning loop
 

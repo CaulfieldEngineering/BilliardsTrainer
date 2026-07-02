@@ -81,12 +81,17 @@ class _Internal:
 
 
 class BallTracker:
-    def __init__(self, max_dist_frac: float = 0.08, max_misses: int = 30,
-                 min_hits: int = 2, vel_alpha: float = 0.6,
-                 pos_alpha_slow: float = 0.15, pos_alpha_fast: float = 0.92,
+    # Defaults promoted from the 2026-07-02 autotune sweep (45 trials scored by
+    # tools/eval_tracking.py physics metrics, winners re-verified on full
+    # segments WITH the recall-aware score + human-verified ball counts):
+    # settled jitter 0.074 -> 0.049 px, phantom churn down, identity flips
+    # 2.4 -> ~2.1/track-min, recall identical to the previous defaults.
+    def __init__(self, max_dist_frac: float = 0.10, max_misses: int = 24,
+                 min_hits: int = 5, vel_alpha: float = 0.42,
+                 pos_alpha_slow: float = 0.20, pos_alpha_fast: float = 0.72,
                  speed_lo: float = 3.0, speed_hi: float = 6.0,
-                 still_speed_frac: float = 0.009, still_frames: int = 6,
-                 lock_dist_frac: float = 0.012, occluded_budget: int = 1800):
+                 still_speed_frac: float = 0.014, still_frames: int = 8,
+                 lock_dist_frac: float = 0.0115, occluded_budget: int = 1800):
         self.max_dist_frac = max_dist_frac
         self.max_misses = max_misses
         self.min_hits = min_hits

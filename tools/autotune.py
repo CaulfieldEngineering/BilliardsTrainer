@@ -73,13 +73,19 @@ def evaluate(params: dict | None, video: str, segments: list[str]) -> dict:
                     obj = getattr(obj, p)
                 setattr(obj, leaf, v)
     per = []
+    seg_scores = []
     for seg in segments:
-        start, dur = (float(x) for x in seg.split(":"))
-        per.append(run_segment(video, start, dur, settings,
-                               tracker_kwargs or None))
+        parts = [float(x) for x in seg.split(":")]
+        start, dur = parts[0], parts[1]
+        expected = parts[2] if len(parts) > 2 else None  # human-verified count
+        m = run_segment(video, start, dur, settings, tracker_kwargs or None)
+        per.append(m)
+        seg_scores.append(score(m, expected))
     agg = {k: round(statistics.mean(s[k] for s in per), 3)
-           for k in per[0] if k not in ("segment", "frames", "tracks_total")}
-    agg["score"] = round(score(agg), 3)
+           for k in per[0]
+           if k not in ("segment", "frames", "tracks_total", "median_tracks")}
+    agg["score"] = round(statistics.mean(seg_scores), 3)
+    agg["median_tracks"] = [s["median_tracks"] for s in per]
     return agg
 
 
