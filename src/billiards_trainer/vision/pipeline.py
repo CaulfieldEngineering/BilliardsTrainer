@@ -479,7 +479,13 @@ class Pipeline:
                 and self.source):
             self._tried_load = True
             if self.calib.try_load(CALIBRATION_PATH, self.source, frame.shape, self.settings):
-                return True
+                # Trust, but verify against what's actually in the frame RIGHT
+                # NOW — a stale lock (camera nudged since it was saved) would
+                # otherwise render a wrong table for many seconds before the
+                # watchdog catches up.
+                if self.calib.validate_against(frame, self.settings):
+                    return True
+                self.calib.clear()  # stale — fall through to a fresh lock
         if not self.calib.calibrate(frame, self.settings):
             return False
         if self.settings.table.persist_calibration and self.source:

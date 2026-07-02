@@ -119,6 +119,10 @@ class TableSettings:
     nose_inset_frac: float = 0.055
     auto_relock: bool = True           # re-detect automatically if the table shifts
     persist_calibration: bool = True   # save/reuse the locked table across launches
+    # The lock is the per-corner MEDIAN over this many consecutive successful
+    # felt detections (outlier frames — someone leaning over the table — are
+    # rejected), so a single occluded frame can never become the session's lock.
+    calib_consensus_frames: int = 5
 
 
 @dataclass

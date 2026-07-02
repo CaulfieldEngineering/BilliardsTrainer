@@ -54,13 +54,20 @@ class CalibrationManager:
         self._settle_px = settle_px              # RMSE under which we average-in
         self._corner_ema = corner_ema            # how fast locked corners ease over
         self._consecutive = 0
+        self._pending: list[np.ndarray] = []     # corner sets gathering consensus
 
     @property
     def is_calibrated(self) -> bool:
         return self.calib is not None
 
     def calibrate(self, frame: np.ndarray, settings: Settings) -> bool:
-        """Run full felt + rectify detection and lock the result. Returns success."""
+        """Run felt detection and lock the table. Returns success.
+
+        The lock is a MULTI-FRAME CONSENSUS (table.calib_consensus_frames): the
+        per-corner median over the last N successful detections, with outlier
+        frames rejected. A single frame with a person leaning over the table
+        (which pulls a corner tens of px inward) can therefore never become the
+        session's homography — the exact failure seen on real footage."""
         if frame is None or frame.size == 0:
             return False
         felt_settings = settings.felt
@@ -78,12 +85,16 @@ class CalibrationManager:
         if not felt.has_corners:
             log.info("Calibration failed: no felt corners")
             return False
+
+        corners = self._consensus(felt.corners, settings)
+        if corners is None:
+            return False  # still gathering frames — caller retries next frame
         # refine=False: the base homography (clean felt corners -> forced 2:1
         # rectangle) is stable and correct. The Hough-line "square-up" refinement
         # fires intermittently and, on a bad frame, skews the rectangle
         # non-uniformly (fat far rail, egg-shaped balls, pockets off their marks).
         # Fewer moving parts = a deterministic, undistorted bird's-eye. (review: calib-5)
-        rect = rectify_tabletop(frame, felt.mask, felt.corners,
+        rect = rectify_tabletop(frame, felt.mask, corners,
                                 pad_px=settings.rectify.pad_px,
                                 aspect=settings.rectify.aspect, refine=False)
         if not rect.ok:
@@ -93,13 +104,53 @@ class CalibrationManager:
                                      settings.table.pocket_radius_frac,
                                      nose_inset_frac=settings.table.nose_inset_frac)
         self.calib = Calibration(
-            corners=felt.corners, H=rect.H, Hinv=rect.Hinv,
+            corners=corners, H=rect.H, Hinv=rect.Hinv,
             dst_size=rect.dst_size, table=table, rect_mask=rect.rectified_mask,
             felt=felt_settings,
         )
         self.deviated = False
         self._consecutive = 0
         log.info("Calibrated: dst_size=%s, %d pockets", rect.dst_size, len(table.pockets))
+        return True
+
+    def _consensus(self, corners: np.ndarray, settings: Settings) -> np.ndarray | None:
+        """Accumulate corner detections; return the outlier-robust per-corner
+        median once enough agreeing frames are in, else None (keep gathering)."""
+        n = max(1, int(getattr(settings.table, "calib_consensus_frames", 1)))
+        if n == 1:
+            return np.asarray(corners, np.float32)
+        self._pending.append(np.asarray(corners, np.float32))
+        if len(self._pending) > n:
+            self._pending.pop(0)
+        if len(self._pending) < n:
+            return None
+        stack = np.stack(self._pending)
+        med = np.median(stack, axis=0)
+        errs = np.sqrt(np.mean(np.sum((stack - med) ** 2, axis=2), axis=1))
+        good = stack[errs <= 20.0]
+        if len(good) < n // 2 + 1:
+            # no stable majority (someone moving over the table) — drop the
+            # oldest and keep gathering
+            self._pending.pop(0)
+            return None
+        self._pending.clear()
+        return np.median(good, axis=0).astype(np.float32)
+
+    def validate_against(self, frame: np.ndarray, settings: Settings) -> bool:
+        """One-shot check that the CURRENT lock still matches what's actually in
+        the frame — used right after a restore, so a stale saved lock (moved
+        camera, or a lock from a different scene) is rejected immediately
+        instead of after ~12 watchdog checks. Returns True to keep the lock."""
+        if self.calib is None:
+            return False
+        felt = detect_felt(frame, self.calib.felt)
+        if not felt.has_corners or felt.area_ratio < 0.04:
+            return True  # can't judge (table occluded right now) — watchdog guards
+        rmse = float(np.sqrt(np.mean(np.sum(
+            (felt.corners - self.calib.corners) ** 2, axis=1))))
+        if rmse > self._deviation_px:
+            log.info("Restored calibration failed live validation (RMSE %.1f px)", rmse)
+            return False
         return True
 
     def rectify(self, frame: np.ndarray) -> np.ndarray | None:
@@ -135,7 +186,10 @@ class CalibrationManager:
             self.deviated = False
             self._ema_corners(felt.corners, settings)
         elif rmse > self._deviation_px:
-            self._consecutive += 1
+            # a GROSSLY wrong lock (not "the table drifted" but "this lock is
+            # nonsense") counts triple, so it's abandoned in ~4 checks (~4 s)
+            # instead of 12 — the user shouldn't watch a wrong overlay for 12 s
+            self._consecutive += 3 if rmse > 4 * self._deviation_px else 1
         else:
             # moderate disagreement (likely partial occlusion) -> decay, don't trip
             self._consecutive = max(0, self._consecutive - 1)
@@ -169,11 +223,15 @@ class CalibrationManager:
         self.calib = None
         self.deviated = False
         self._consecutive = 0
+        self._pending.clear()
 
     # ------------------------------------------------------------------ #
     # Persistence — reuse the locked table across launches
     # ------------------------------------------------------------------ #
     def save(self, path: Path, source: str, frame_shape: tuple, settings: Settings) -> None:
+        """Persist the lock, keyed BY SOURCE. One shared document used to hold a
+        single entry, so starting the laptop camera overwrote the pool table's
+        lock — the app then restored a lock for a completely different scene."""
         if self.calib is None:
             return
         h, w = frame_shape[:2]
@@ -188,22 +246,43 @@ class CalibrationManager:
             "Hinv": self.calib.Hinv.tolist(),
             "felt": asdict(self.calib.felt),
         }
+        entries = self._read_entries(path)
+        entries.pop(source, None)   # re-insert at the end (newest-last order)
+        entries[source] = payload
+        while len(entries) > 8:     # cap growth; drop the oldest source
+            entries.pop(next(iter(entries)))
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            path.write_text(json.dumps({"version": 2, "entries": entries}, indent=2),
+                            encoding="utf-8")
         except OSError as exc:
             log.warning("Could not save calibration: %s", exc)
+
+    @staticmethod
+    def _read_entries(path: Path) -> dict:
+        """Read the per-source entry map; migrate a legacy single-entry file."""
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(doc, dict):
+            return {}
+        entries = doc.get("entries")
+        if isinstance(entries, dict):
+            return entries
+        # legacy v1: the whole doc is one entry — keep it under its source key
+        if doc.get("source") and doc.get("corners"):
+            return {str(doc["source"]): doc}
+        return {}
 
     def try_load(self, path: Path, source: str, frame_shape: tuple,
                  settings: Settings | None = None) -> bool:
         """Restore a saved calibration if it matches this source + resolution."""
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        data = self._read_entries(path).get(source)
+        if data is None:
             return False
         h, w = frame_shape[:2]
-        if data.get("source") != source or data.get("frame_w") != int(w) \
-                or data.get("frame_h") != int(h):
+        if data.get("frame_w") != int(w) or data.get("frame_h") != int(h):
             return False
         try:
             dst_size = tuple(data["dst_size"])

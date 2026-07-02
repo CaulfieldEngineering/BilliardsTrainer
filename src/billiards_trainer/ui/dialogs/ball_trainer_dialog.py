@@ -69,6 +69,7 @@ class BallTrainerDialog(QDialog):
         self._dets: list = []           # current detections (LabeledBall-like, mutable number)
         self._sel = -1                  # selected ball index
         self._scale = 1.0
+        self._worker: _TrainWorker | None = None
         self._strategy = self._load_strategy()
         self._build()
         self._open_source(settings.source if Path(str(settings.source)).exists() else "")
@@ -295,6 +296,15 @@ class BallTrainerDialog(QDialog):
             self._status.setText(f"Training failed. {log[-300:]}")
 
     def closeEvent(self, ev) -> None:  # noqa: N802
+        # NEVER let the dialog die while the training QThread runs — destroying
+        # a running QThread aborts the whole process natively (the "crashed in
+        # the middle of training" class). Block the close instead.
+        if self._worker is not None and self._worker.isRunning():
+            self._status.setText("Training is still running — leave this window "
+                                 "open until it finishes (a few minutes). It will "
+                                 "say 'Trained ✓' when done.")
+            ev.ignore()
+            return
         if self._cap is not None:
             self._cap.release()
         super().closeEvent(ev)
