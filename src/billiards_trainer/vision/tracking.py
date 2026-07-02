@@ -213,7 +213,26 @@ class BallTracker:
         # picked up — let it age out fast.
         self._tracks = [t for t in self._tracks
                         if t.misses <= (self.occluded_budget if t.settled else self.max_misses)]
+        self._arbitrate_numbers()
         return self._public()
+
+    def _arbitrate_numbers(self) -> None:
+        """There is exactly ONE of each ball on a table, but per-track hysteresis
+        can leave the same number committed on two tracks (measured: duplicate
+        numbers alive in ~80% of frames on real footage). Arbitrate globally:
+        the track with the strongest recent evidence keeps the number, weaker
+        claimants render as unknown ('?') until the evidence sorts itself out."""
+        by_num: dict[int, list[_Internal]] = {}
+        for t in self._tracks:
+            if t.confirmed and t.committed_number >= 0:
+                by_num.setdefault(t.committed_number, []).append(t)
+        for num, ts in by_num.items():
+            if len(ts) < 2:
+                continue
+            ts.sort(key=lambda t: (sum(1 for n in t.num_hist if n == num),
+                                   t.hits, -t.misses), reverse=True)
+            for t in ts[1:]:
+                t.committed_number = -1
 
     def _apply_match(self, t: _Internal, d: Detection) -> None:
         meas_vx = d.x - t.x

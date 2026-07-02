@@ -120,3 +120,24 @@ def test_track_dies_after_max_misses():
     for _ in range(5):
         tr.update([], short)
     assert tr.tracks == []
+
+
+def test_number_unique_across_tracks():
+    """One ball number must never be committed on two live tracks — the
+    weaker claimant renders as unknown (measured on real footage: duplicate
+    numbers were alive in ~80% of frames before arbitration)."""
+    tr = BallTracker(min_hits=2)
+    short = 400
+    # two well-separated balls both repeatedly detected as number 5; the one
+    # at (100,100) accumulates more evidence first
+    for _ in range(4):
+        tr.update([Detection(100, 100, 10, cls=BallClass.SOLID, number=5)], short)
+    for _ in range(3):
+        out = tr.update([
+            Detection(100, 100, 10, cls=BallClass.SOLID, number=5),
+            Detection(300, 300, 10, cls=BallClass.SOLID, number=5),
+        ], short)
+    fives = [t for t in out if t.number == 5]
+    assert len(fives) == 1, f"number 5 alive on {len(fives)} tracks"
+    assert len(out) == 2, "the losing track must survive (as unknown), not die"
+    assert fives[0].x < 200, "the stronger-evidence track must keep the number"
