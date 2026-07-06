@@ -347,13 +347,21 @@ class SettingsPage(QWidget):
 
     def _clock_card(self) -> Card:
         card, form = self._card("Shot clock")
+        msg = QLabel("The countdown starts when the cue ball comes to rest and "
+                     "stops when you strike it — beat the buzzer. One beep at "
+                     "10 s left, tick beeps at 3-2-1, buzz at 0.")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
         self._clock_enabled = QCheckBox("Enable shot clock")
         form.addRow("", self._clock_enabled)
-        self._clock_seconds = self._spin(5, 120)
-        form.addRow("Duration (s)", self._clock_seconds)
+        self._clock_seconds = QComboBox()
+        self._clock_seconds.addItem("30 seconds", 30)
+        self._clock_seconds.addItem("60 seconds", 60)
+        form.addRow("Per shot", self._clock_seconds)
         self._clock_warn = self._spin(0, 60)
         form.addRow("Warn at (s left)", self._clock_warn)
-        self._clock_audio = QCheckBox("Audio cue")
+        self._clock_audio = QCheckBox("Audio cues (beeps + buzzer)")
         form.addRow("", self._clock_audio)
         self._clock_autoreset = QCheckBox("Auto-reset on detected shot")
         form.addRow("", self._clock_autoreset)
@@ -547,7 +555,12 @@ class SettingsPage(QWidget):
         self._persist_calib.setChecked(s.table.persist_calibration)
         self._show_overlays.setChecked(s.ui.show_overlays)
         self._clock_enabled.setChecked(s.shot_clock.enabled)
-        self._clock_seconds.setValue(s.shot_clock.seconds)
+        idx = self._clock_seconds.findData(s.shot_clock.seconds)
+        if idx < 0:  # legacy custom duration (old spinbox) — keep honouring it
+            self._clock_seconds.addItem(f"{s.shot_clock.seconds} seconds",
+                                        s.shot_clock.seconds)
+            idx = self._clock_seconds.count() - 1
+        self._clock_seconds.setCurrentIndex(idx)
         self._clock_warn.setValue(s.shot_clock.warn_seconds)
         self._clock_audio.setChecked(s.shot_clock.audio)
         self._clock_autoreset.setChecked(s.shot_clock.auto_reset_on_shot)
@@ -570,7 +583,7 @@ class SettingsPage(QWidget):
         s.table.auto_relock = self._auto_relock.isChecked()
         s.table.persist_calibration = self._persist_calib.isChecked()
         s.shot_clock.enabled = self._clock_enabled.isChecked()
-        s.shot_clock.seconds = self._clock_seconds.value()
+        s.shot_clock.seconds = int(self._clock_seconds.currentData())
         s.shot_clock.warn_seconds = self._clock_warn.value()
         s.shot_clock.audio = self._clock_audio.isChecked()
         s.shot_clock.auto_reset_on_shot = self._clock_autoreset.isChecked()

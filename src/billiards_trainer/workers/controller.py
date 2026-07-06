@@ -28,6 +28,7 @@ from ..game.shot_clock import ShotClock
 from ..version import __version__
 from ..vision.felt import felt_from_point
 from ..vision.pipeline import Pipeline
+from ..vision.types import BallClass
 
 log = logging.getLogger("controller")
 
@@ -111,6 +112,11 @@ class PipelineController(QObject):
         # next recorded shot by wall-clock freshness (the strike precedes the
         # balls settling by however long they roll).
         self._last_stroke: dict | None = None
+        # Cue-ball shot-clock state (Joe's rule: the countdown starts when the
+        # CUE BALL stops; the strike stops it = made it in time).
+        self._cue_still = 0            # consecutive at-rest frames
+        self._saw_cue_t = -1e9         # last time a cue track existed
+        self._clock_armed = True       # a new turn may start the clock
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
         self._speed = 1.0
@@ -184,6 +190,9 @@ class PipelineController(QObject):
         self._t0 = time.perf_counter()
         self._prev_state = "settled"
         self._turn_start_t = 0.0
+        self._cue_still = 0
+        self._saw_cue_t = -1e9
+        self._clock_armed = True
         self._running = True
         self._miss_t0: float | None = None  # first consecutive empty-read time
         self._got_frame = False
@@ -304,6 +313,10 @@ class PipelineController(QObject):
                 # overhead when we fall back to the empty-table preview
                 self._pipeline.tracker.reset()
                 self._pipeline.shots.reset()
+                # without tracking there is no strike to detect — never leave a
+                # countdown running that nothing can stop
+                self._clock.stop()
+                self._clock_armed = True
         self.detection_changed.emit(on)
         log.info("Auto-detection %s", "ON" if on else "OFF")
 
@@ -383,10 +396,14 @@ class PipelineController(QObject):
     @Slot(object)
     def on_cue_impact(self, stroke: dict) -> None:
         """A confirmed cue-ball strike from the IMU — fires within ~0.5 s of
-        contact, long before the balls settle. Future: this is the precise
-        'shot taken' moment for the shot clock (stop/reset on strike instead
-        of on visual motion) — wire it into self._clock here when that lands."""
+        contact, long before the balls settle. This is the precise 'shot
+        taken' moment: it stops the shot clock (made it in time) even if the
+        camera hasn't registered motion yet."""
         log.info("cue impact felt: %.1f g", stroke.get("peak_g", 0.0))
+        if self._clock.enabled and self._clock.running:
+            self._clock.stop()
+            self._clock_armed = True    # next cue-ball rest starts the next turn
+            log.info("shot clock stopped by cue impact (made it in time)")
 
     @Slot(object)
     def on_stroke_metrics(self, metrics: dict) -> None:
@@ -610,6 +627,7 @@ class PipelineController(QObject):
             return
 
         self._handle_state(res.shot_state, t)
+        self._update_cue_clock(res.tracks, t)
         if res.shot_event is not None:
             if self._settings.detection.manual_confirm:
                 # suggest only — the user commits via the make/miss buttons
@@ -717,11 +735,57 @@ class PipelineController(QObject):
 
     def _handle_state(self, state: str, t: float) -> None:
         if self._prev_state != "settled" and state == "settled":
-            self._clock.start(t)        # no-op when the clock is disabled
+            # Table settled: start the clock ONLY when cue-ball tracking isn't
+            # available — with a tracked cue, _update_cue_clock owns the start
+            # (the countdown begins the moment the CUE BALL stops, which is
+            # usually earlier than full-table settle).
+            if t - self._saw_cue_t > self._CUE_GAP_S * 2:
+                self._clock.start(t)    # no-op when the clock is disabled
             self._turn_start_t = t
         elif self._prev_state == "settled" and state == "moving":
-            self._clock.stop()
+            if self._clock.running:
+                self._clock.stop()      # table-motion strike (fallback stop)
+                log.info("shot clock stopped: table motion (made it)")
         self._prev_state = state
+
+    # Cue-ball shot-clock rule (Joe's spec): the countdown starts once the cue
+    # ball comes to rest, and the strike stops it — made it in time. The IMU
+    # impact (on_cue_impact) is the precise stop; this is the vision side.
+    _CUE_MOVE_SPEED = 3.0   # rectified px/frame — clearly rolling, not jitter
+    _CUE_STOP_FRAMES = 6    # consecutive at-rest frames before "stopped"
+    _CUE_GAP_S = 1.0        # cue absent this long = pocketed / ball-in-hand
+
+    def _update_cue_clock(self, tracks, t: float) -> None:
+        if not self._clock.enabled:
+            return
+        cue = next((tr for tr in tracks if tr.cls == BallClass.CUE), None)
+        if cue is None:
+            self._cue_still = 0
+            return
+        if t - self._saw_cue_t > self._CUE_GAP_S:
+            # cue reappeared (scratch -> ball-in-hand, or long occlusion): the
+            # next time it rests is a fresh turn even if it was placed gently
+            self._clock_armed = True
+        self._saw_cue_t = t
+        stop_v = max(0.4, float(self._settings.balls.stop_speed))
+        if cue.speed > max(self._CUE_MOVE_SPEED, 2.0 * stop_v):
+            if self._clock.running:
+                self._clock.stop()      # the strike — player made it in time
+                log.info("shot clock stopped: cue ball moving (made it)")
+            self._clock_armed = True    # rolling cue = the next rest is a new turn
+            self._cue_still = 0
+            return
+        if cue.speed < stop_v:
+            self._cue_still += 1
+            if (self._cue_still >= self._CUE_STOP_FRAMES
+                    and self._clock_armed and not self._clock.running):
+                self._clock.start(t)    # cue at rest -> you're on the clock
+                self._clock_armed = False  # re-arms on motion/absence, so an
+                self._turn_start_t = t     # expired clock can't restart itself
+                log.info("shot clock started: cue ball at rest (%ds)",
+                         self._settings.shot_clock.seconds)
+        else:
+            self._cue_still = 0
 
     def _record_shot(self, event: ShotEvent, t: float) -> None:
         if self._session_id is None:

@@ -149,6 +149,59 @@ def test_shot_clock_enabled_counts_down():
     assert clock.poll(11.0) == "expired"
 
 
+def test_shot_clock_beep_cadence():
+    """Joe's audio spec: single warn beep at 10 s left, one tick each at
+    3-2-1, buzz at 0 — each edge fires exactly once however often we poll."""
+    clock = ShotClock(ShotClockSettings(enabled=True, seconds=30, warn_seconds=10))
+    clock.start(0.0)
+    assert clock.poll(19.5) == ""          # 10.5 s left — nothing yet
+    assert clock.poll(20.0) == "warn"      # 10 s left — the heads-up beep
+    assert clock.poll(20.5) == ""          # warn is one-shot
+    assert clock.poll(26.5) == ""          # 3.5 s — cadence not started
+    assert clock.poll(27.0) == "tick"      # 3
+    assert clock.poll(27.5) == ""          # same second, no re-beep
+    assert clock.poll(28.1) == "tick"      # 2
+    assert clock.poll(29.05) == "tick"     # 1
+    assert clock.poll(29.6) == ""
+    assert clock.poll(30.0) == "expired"   # the buzz
+    assert not clock.running
+    assert clock.poll(31.0) == ""          # expired is one-shot too
+
+
+def test_shot_clock_warn_inside_cadence_no_double_beep():
+    """A warn threshold at/below 3 s must not stack a tick on the same second."""
+    clock = ShotClock(ShotClockSettings(enabled=True, seconds=10, warn_seconds=3))
+    clock.start(0.0)
+    assert clock.poll(7.2) == "warn"       # 2.8 s left
+    assert clock.poll(7.3) == ""           # tick for '3' suppressed
+    assert clock.poll(8.1) == "tick"       # 1.9 s -> the '2' tick fires
+    assert clock.poll(9.05) == "tick"      # 1
+    assert clock.poll(10.0) == "expired"
+
+
+def test_shot_clock_sound_cues_defined(monkeypatch):
+    """play() spawns one beep thread per known edge and ignores unknown edges
+    (patched Thread — the suite must stay silent)."""
+    from billiards_trainer.ui import sounds
+
+    started = []
+
+    class _FakeThread:
+        def __init__(self, target=None, args=(), **_kw):
+            started.append((target, args))
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(sounds.threading, "Thread", _FakeThread)
+    for edge in ("warn", "tick", "expired"):
+        sounds.play(edge)
+    assert len(started) == 3
+    sounds.play("bogus")
+    sounds.play("")
+    assert len(started) == 3               # unknown edges are silent no-ops
+
+
 # ---- click-to-pick felt -------------------------------------------------- #
 def test_felt_from_point_keys_on_clicked_pixel():
     hsv = np.full((300, 300, 3), (100, 150, 200), np.uint8)

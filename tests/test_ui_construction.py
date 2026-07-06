@@ -403,6 +403,99 @@ def test_settings_page_has_cue_sensor_card(app):
     assert s.cue.impact_g == 2.0
 
 
+def test_shot_clock_cue_ball_rules(app):
+    """Joe's shot-clock rules: the countdown starts when the CUE BALL stops;
+    the strike stops it (made it in time); an expired clock can't restart
+    until the cue moves again — or reappears after a scratch/ball-in-hand."""
+    import types
+    from pathlib import Path
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.db.repository import Repository
+    from billiards_trainer.vision.types import BallClass
+    from billiards_trainer.workers.controller import PipelineController
+
+    s = Settings()
+    s.shot_clock.enabled = True
+    s.shot_clock.seconds = 30
+    ctrl = PipelineController(s, Repository(db_path=Path(":memory:")))
+
+    def cue(speed):
+        return [types.SimpleNamespace(cls=BallClass.CUE, speed=speed)]
+
+    # cue at rest -> the clock starts after the stop debounce
+    for i in range(6):
+        ctrl._update_cue_clock(cue(0.1), i * 0.033)
+    assert ctrl._clock.running
+    started_at = ctrl._clock._start_t
+
+    # staying at rest must NOT restart/extend the countdown
+    for i in range(6, 30):
+        ctrl._update_cue_clock(cue(0.1), i * 0.033)
+    assert ctrl._clock._start_t == started_at
+
+    # the strike: a fast cue ball stops the clock = made it in time
+    ctrl._update_cue_clock(cue(12.0), 2.0)
+    assert not ctrl._clock.running
+
+    # it comes to rest again -> next turn's countdown starts
+    for i in range(6):
+        ctrl._update_cue_clock(cue(0.2), 3.0 + i * 0.033)
+    assert ctrl._clock.running
+
+    # feed CONTINUOUS rest frames through the whole countdown (as a real video
+    # would): the buzz fires once, and the still-resting cue must not re-arm
+    t, expired = 3.2, False
+    while t < 35.0:
+        ctrl._update_cue_clock(cue(0.1), t)
+        if ctrl._clock.poll(t) == "expired":
+            expired = True
+        t += 0.5
+    assert expired
+    assert not ctrl._clock.running
+
+    # scratch/ball-in-hand: cue absent > 1 s, re-placed at rest -> fresh turn
+    for i in range(6):
+        ctrl._update_cue_clock(cue(0.1), 37.0 + i * 0.033)
+    assert ctrl._clock.running
+
+
+def test_shot_clock_stopped_by_imu_impact(app):
+    """The cue sensor's strike is the precise 'made it in time' signal."""
+    from pathlib import Path
+
+    from billiards_trainer.config import Settings
+    from billiards_trainer.db.repository import Repository
+    from billiards_trainer.workers.controller import PipelineController
+
+    s = Settings()
+    s.shot_clock.enabled = True
+    ctrl = PipelineController(s, Repository(db_path=Path(":memory:")))
+    ctrl._clock.start(0.0)
+    assert ctrl._clock.running
+    ctrl.on_cue_impact({"peak_g": 3.0, "hit_epoch": 0.0})
+    assert not ctrl._clock.running
+    assert ctrl._clock_armed                    # next cue-rest starts a new turn
+
+
+def test_settings_clock_card_offers_30_and_60(app):
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
+
+    s = Settings()
+    page = SettingsPage(s)
+    datas = [page._clock_seconds.itemData(i)
+             for i in range(page._clock_seconds.count())]
+    assert 30 in datas and 60 in datas
+    assert page._clock_seconds.currentData() == 30   # default
+
+    # a legacy custom duration (old spinbox settings) is preserved, not clobbered
+    s2 = Settings()
+    s2.shot_clock.seconds = 45
+    page2 = SettingsPage(s2)
+    assert page2._clock_seconds.currentData() == 45
+
+
 def test_cue_diagnostics_dialog_streams_and_disconnects(app):
     """The waveform diagnostics dialog constructs, ingests samples/impacts/status
     from the worker signals, and disconnects cleanly on close."""

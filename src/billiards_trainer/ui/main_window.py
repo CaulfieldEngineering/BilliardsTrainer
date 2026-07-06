@@ -303,8 +303,9 @@ class MainWindow(QMainWindow):
     def _on_clock_event(self, edge: str) -> None:
         if not self._settings.shot_clock.audio:
             return
-        # Asset-free audio cue.
-        QApplication.beep()
+        # warn = single beep at 10 s, tick = 3-2-1 cadence, expired = the buzz
+        from .sounds import play
+        play(edge)
 
     def _push_settings(self) -> None:
         self.apply_settings_requested.emit(self._settings)
