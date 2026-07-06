@@ -17,3 +17,6 @@ requests>=2.31
 # Friendly camera names on Windows (DirectShow). Optional elsewhere — the app
 # falls back to probing indices if it's missing.
 pygrabber>=0.2 ; sys_platform == "win32"
+# Bluetooth LE for the cue-stroke sensor (imported lazily; the app runs fine
+# without it — the cue card just reports the feature as unavailable).
+bleak>=0.22

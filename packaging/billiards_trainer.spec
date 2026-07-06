@@ -29,13 +29,25 @@ try:
 except Exception:  # onnxruntime not installed in this build env -> ship without it
     _ort_datas, _ort_bins, _ort_hidden = [], [], []
 
+# bleak's Windows backend rides on the winrt namespace packages, which
+# modulegraph misses (runtime-generated bindings). Collect both so the cue
+# sensor works in the frozen exe; a build env without them just ships without
+# BLE (the worker degrades to an 'unavailable' status).
+_ble_datas, _ble_bins, _ble_hidden = [], [], []
+for _pkg in ("bleak", "winrt"):
+    try:
+        _d, _b, _h = collect_all(_pkg)
+        _ble_datas += _d; _ble_bins += _b; _ble_hidden += _h
+    except Exception:
+        pass
+
 a = Analysis(
     [os.path.join(ROOT, "packaging", "launch.py")],
     pathex=[os.path.join(ROOT, "src")],
-    binaries=list(_ort_bins),
+    binaries=list(_ort_bins) + list(_ble_bins),
     datas=([(os.path.join(ROOT, "packaging", "app.ico"), ".")]
            if os.path.exists(os.path.join(ROOT, "packaging", "app.ico")) else [])
-          + list(_ort_datas),
+          + list(_ort_datas) + list(_ble_datas),
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",
         "billiards_trainer",
@@ -58,9 +70,19 @@ a = Analysis(
         "comtypes",
         "comtypes.client",
         "comtypes.stream",
+        # cue-stroke sensor: worker + diagnostics dialog are imported lazily, so
+        # name the whole package explicitly (frozen discovery finds nothing on
+        # disk — the same lesson as the detector strategies above).
+        "billiards_trainer.cue",
+        "billiards_trainer.cue.protocol",
+        "billiards_trainer.cue.analysis",
+        "billiards_trainer.cue.detector",
+        "billiards_trainer.cue.worker",
+        "billiards_trainer.ui.dialogs.cue_diagnostics_dialog",
         # ensure HTTPS verification works in the frozen build (update check)
         "certifi",
         *_ort_hidden,
+        *_ble_hidden,
     ],
     hookspath=[],
     runtime_hooks=[],

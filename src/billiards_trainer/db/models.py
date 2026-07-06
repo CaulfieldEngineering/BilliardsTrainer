@@ -49,6 +49,10 @@ class Shot(Base):
     duration_s: Mapped[float] = mapped_column(Float, default=0.0)
     shot_seconds: Mapped[float] = mapped_column(Float, default=0.0)  # time on the clock
     streak_index: Mapped[int] = mapped_column(Integer, default=0)
+    # Cue-stroke metrics from the Bluetooth IMU (JSON dict: peak_g, v_impact,
+    # stroke_len, pause, yaw_swing, steer_ratio, finish, …), joined to the shot
+    # by wall-clock at record time. Empty string = no sensor data for this shot.
+    stroke_json: Mapped[str] = mapped_column(Text, default="")
     synced: Mapped[bool] = mapped_column(Boolean, default=False)
 
     session: Mapped["Session"] = relationship(back_populates="shots")

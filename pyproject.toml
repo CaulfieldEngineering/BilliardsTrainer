@@ -18,6 +18,8 @@ dependencies = [
     "SQLAlchemy>=2.0",
     "requests>=2.31",
     "pygrabber>=0.2 ; sys_platform == 'win32'",
+    # Bluetooth LE cue-stroke sensor (lazily imported; degrades gracefully)
+    "bleak>=0.22",
 ]
 
 [project.optional-dependencies]
@@ -61,3 +63,8 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Verbatim port of the video-validated stroke analysis (pool-stroke-analyzer).
+# Kept byte-comparable to the reference — style is not worth diverging over.
+"src/billiards_trainer/cue/analysis.py" = ["E702", "F841", "B905"]

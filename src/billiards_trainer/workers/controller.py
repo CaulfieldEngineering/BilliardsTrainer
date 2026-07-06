@@ -107,6 +107,10 @@ class PipelineController(QObject):
         # ride along in the packet for correcting.
         self._label_mode = False
         self._capture: dict | None = None  # active analysis-capture context
+        # Latest cue-stroke metrics from the Bluetooth IMU worker, joined to the
+        # next recorded shot by wall-clock freshness (the strike precedes the
+        # balls settling by however long they roll).
+        self._last_stroke: dict | None = None
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
         self._speed = 1.0
@@ -369,8 +373,39 @@ class PipelineController(QObject):
         if self._session_id is None:
             return
         self._repo.record_shot(self._session_id, outcome=outcome,
-                               num_pocketed=1 if outcome == "make" else 0)
+                               num_pocketed=1 if outcome == "make" else 0,
+                               stroke_json=self._consume_stroke())
         self.stats_updated.emit(self._repo.session_summary(self._session_id))
+
+    # ------------------------------------------------------------------ #
+    # Cue-stroke sensor (Bluetooth IMU on the cue butt)
+    # ------------------------------------------------------------------ #
+    @Slot(object)
+    def on_cue_impact(self, stroke: dict) -> None:
+        """A confirmed cue-ball strike from the IMU — fires within ~0.5 s of
+        contact, long before the balls settle. Future: this is the precise
+        'shot taken' moment for the shot clock (stop/reset on strike instead
+        of on visual motion) — wire it into self._clock here when that lands."""
+        log.info("cue impact felt: %.1f g", stroke.get("peak_g", 0.0))
+
+    @Slot(object)
+    def on_stroke_metrics(self, metrics: dict) -> None:
+        """Full stroke metrics (~2.6 s after the strike). Kept until the next
+        recorded shot consumes them (vision-settled or manual +Make/-Miss)."""
+        self._last_stroke = metrics
+
+    _STROKE_JOIN_SECONDS = 25.0  # max stroke→record gap (long rolls + settle time)
+
+    def _consume_stroke(self) -> str:
+        """The latest stroke metrics as JSON iff fresh; consumed exactly once
+        so one physical stroke can never annotate two shots."""
+        m, self._last_stroke = self._last_stroke, None
+        if not m or time.time() - m.get("hit_epoch", 0.0) > self._STROKE_JOIN_SECONDS:
+            return ""
+        try:
+            return json.dumps(m)
+        except (TypeError, ValueError):
+            return ""
 
     @Slot(bool)
     def set_recording(self, on: bool) -> None:
@@ -696,7 +731,7 @@ class PipelineController(QObject):
             self._session_id, outcome=event.outcome.value,
             num_pocketed=event.num_pocketed, target_pocket=event.target_pocket,
             cue_scratch=event.cue_scratch, duration_s=event.duration_s,
-            shot_seconds=shot_seconds,
+            shot_seconds=shot_seconds, stroke_json=self._consume_stroke(),
         )
         self._log_shot(event, shot_seconds)
         self.shot_recorded.emit(event)

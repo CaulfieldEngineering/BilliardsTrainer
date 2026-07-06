@@ -59,8 +59,14 @@ class MainWindow(QMainWindow):
         self._sync = SyncManager(self._repo)
         self._sync_thread = make_sync_thread(self._sync)
 
+        # Cue-stroke sensor (Bluetooth IMU). Owns its own daemon BLE thread;
+        # a missing sensor/radio/bleak is just a status, never a failure.
+        from ..cue.worker import CueSensorWorker
+        self._cue = CueSensorWorker(self)
+
         self._build_ui()
         self._wire()
+        self._cue.apply_settings(settings.cue)
         self._autostart_preview()
         self._maybe_autofetch_model()
         self._maybe_check_updates()
@@ -187,6 +193,18 @@ class MainWindow(QMainWindow):
         self._controller.capture_progress.connect(self._live.set_training_count)
         self._controller.capture_saved.connect(self._on_capture_saved)
 
+        # cue-stroke sensor -> UI + controller. The worker emits from its BLE
+        # thread, so every connection below auto-resolves to a queued delivery
+        # on the receiver's own thread.
+        self._cue.status_changed.connect(self._live.on_cue_status)
+        self._cue.status_changed.connect(self._settings_page.set_cue_status)
+        self._cue.impact.connect(self._live.on_cue_impact)
+        self._cue.impact.connect(self._controller.on_cue_impact, q)
+        self._cue.metrics.connect(self._live.on_cue_metrics)
+        self._cue.metrics.connect(self._controller.on_stroke_metrics, q)
+        self._cue.address_resolved.connect(self._on_cue_address)
+        self._settings_page.cue_diagnostics_requested.connect(self._open_cue_diagnostics)
+
         # settings + drills
         self._settings_page.applied.connect(self._on_settings_applied)
         self._settings_page.check_updates_requested.connect(self._check_for_updates_forced)
@@ -295,6 +313,8 @@ class MainWindow(QMainWindow):
         apply_theme(QApplication.instance(), self._settings.ui.accent)
         self._push_settings()
         self._live.set_detector_label(self._settings.balls.live_strategy)
+        self._cue.apply_settings(self._settings.cue)
+        self._live.set_cue_enabled(self._settings.cue.enabled)
         # If the camera source changed, re-open the preview on the new device.
         if (self._settings.source or "0") != self._started_source:
             self._started_source = self._settings.source or "0"
@@ -431,6 +451,17 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage(f"Training failed: {log[-200:]}", 12000)
 
+    def _on_cue_address(self, addr: str) -> None:
+        """Remember the sensor so later scans prefer it (no reconfiguration UX)."""
+        if addr and addr != self._settings.cue.address:
+            self._settings.cue.address = addr
+            self._settings.save()
+
+    def _open_cue_diagnostics(self) -> None:
+        from .dialogs.cue_diagnostics_dialog import CueDiagnosticsDialog
+        dlg = CueDiagnosticsDialog(self._cue, self)
+        dlg.exec()
+
     def _open_feedback(self) -> None:
         from .dialogs.feedback_dialog import FeedbackDialog
         dlg = FeedbackDialog(self._repo, self)
@@ -453,6 +484,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ #
     def closeEvent(self, event) -> None:
         try:
+            self._cue.shutdown()
             from PySide6.QtCore import QMetaObject
             QMetaObject.invokeMethod(self._controller, "stop", Qt.QueuedConnection)
             # final backup attempt (no-op if Supabase isn't configured)

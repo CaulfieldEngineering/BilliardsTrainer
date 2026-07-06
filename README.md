@@ -215,6 +215,26 @@ python tools/train_pool_model.py --api-key <FREE_ROBOFLOW_KEY>   # -> models/poo
 
 See [`docs/CV_ROADMAP.md`](docs/CV_ROADMAP.md) for the full model situation.
 
+### Cue-stroke sensor (Bluetooth IMU)
+
+An optional 6-axis motion sensor on the cue butt (JINOU JO-BEC12-2, ported from
+the [pool-stroke-analyzer](../pool-stroke-analyzer) project) measures each
+stroke the camera can't see: **impact shock, cue speed at contact, draw length,
+steer (cue twist during delivery), backstroke pause, contact cleanliness, and
+follow-through stillness**. Enable it in **Settings → Cue stroke sensor**; it
+connects automatically and the per-shot stats appear in a **CUE STROKE** card
+on the Sandbox rail (peak g immediately at the strike, kinematics ~2.6 s
+later). Stroke metrics are joined to each recorded shot in the database, so
+make/miss can be correlated against stroke quality — and the strike moment is
+the future trigger for shot-clock integration.
+
+Everything degrades gracefully: no sensor, no Bluetooth radio, or no `bleak`
+install just shows a status on the card — detection, tracking and scoring are
+unaffected. The impact signature is video-validated (14/14 true hits, 0 false
+positives on labelled footage) and the app **never writes to the sensor**
+(`src/billiards_trainer/cue/`). Raw waveforms live in **Settings → Sensor
+diagnostics** for checking the mounting and stream health.
+
 ---
 
 ## Detector experiments (Phase 1)
@@ -271,6 +291,7 @@ it does not run the experiment matrix.
 ```
 src/billiards_trainer/
   vision/      felt detection, rectification, balls, tracking, calibration, pipeline
+  cue/         Bluetooth cue-stroke sensor: protocol, validated analysis, BLE worker
   events/      shot / make / miss state machine
   game/        drills, shot clock, modes
   db/          SQLAlchemy models + repository (stats, export)

@@ -340,6 +340,96 @@ def test_seek_guard_keeps_thumb_under_cursor_during_drag(app):
     assert not page._user_is_seeking
 
 
+def test_cue_stroke_card_hidden_until_enabled_and_fills_metrics(app):
+    """The cue-stroke card only appears when the sensor is enabled, shows peak g
+    immediately on impact ('…' while kinematics compute), then fills the tiles."""
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.live_page import LivePage
+
+    s = Settings()
+    assert s.cue.enabled is False              # sensor is opt-in
+    page = LivePage(s)
+    assert page._stroke_card.isHidden()        # invisible for non-sensor users
+
+    s2 = Settings()
+    s2.cue.enabled = True
+    page2 = LivePage(s2)
+    assert not page2._stroke_card.isHidden()
+    page2.on_cue_status("connected", {"address": "AA", "battery": 78})
+    assert "78%" in page2._cue_badge.text()
+
+    page2.on_cue_impact({"peak_g": 3.4, "hit_t": 1.0, "hit_epoch": 1.0})
+    assert page2._stroke_vals["impact"].text() == "3.4 g"
+    assert page2._stroke_vals["v_impact"].text() == "…"   # analyzing
+
+    page2.on_cue_metrics({"peak_g": 3.4, "v_impact": 1.83, "stroke_len": 0.152,
+                          "yaw_swing": -1.2, "pause": 0.31, "steer_ratio": 0.25,
+                          "finish": 1.4, "interval": 41.0})
+    assert page2._stroke_vals["v_impact"].text() == "1.83 m/s"
+    assert page2._stroke_vals["stroke_len"].text() == "15 cm"
+    assert page2._stroke_vals["yaw_swing"].text() == "R 1.2°"
+    assert page2._stroke_vals["steer_ratio"].text() == "75%"
+
+
+def test_settings_page_has_cue_sensor_card(app):
+    from billiards_trainer.config import Settings
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
+
+    s = Settings()
+    page = SettingsPage(s)
+    assert not page._cue_enabled.isChecked()
+    assert page._cue_floor.value() == 1.6
+    page.set_cue_status("no_sensor", None)
+    assert "No sensor" in page._cue_status.text()
+    page.set_cue_status("connected", {"name": "JINOU", "battery": 66})
+    assert "JINOU" in page._cue_status.text() and "66%" in page._cue_status.text()
+
+    # Save round-trips the two knobs into settings
+    page._cue_enabled.setChecked(True)
+    page._cue_floor.setValue(2.0)
+    s.cue.enabled = False
+    # call the real save path but avoid touching the user's settings file
+    import billiards_trainer.config as cfg
+    orig = cfg.SETTINGS_PATH
+    try:
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as td:
+            cfg.SETTINGS_PATH = Path(td) / "settings.json"
+            page._save()
+    finally:
+        cfg.SETTINGS_PATH = orig
+    assert s.cue.enabled is True
+    assert s.cue.impact_g == 2.0
+
+
+def test_cue_diagnostics_dialog_streams_and_disconnects(app):
+    """The waveform diagnostics dialog constructs, ingests samples/impacts/status
+    from the worker signals, and disconnects cleanly on close."""
+    from billiards_trainer.cue.worker import CueSensorWorker
+    from billiards_trainer.ui.dialogs.cue_diagnostics_dialog import CueDiagnosticsDialog
+
+    w = CueSensorWorker()
+    dlg = CueDiagnosticsDialog(w)
+    w.sample.emit("accel", {"x": 0.0, "y": 1.0, "z": 0.3}, 100.0)
+    w.sample.emit("gyro", {"x": 10.0, "y": 0.0, "z": 0.0}, 100.01)
+    w.impact.emit({"hit_t": 100.0, "peak_g": 2.9})
+    w.status_changed.emit("connected", {"address": "AA:BB", "battery": 91})
+    app.processEvents()
+    assert len(dlg._accel_pane.points) == 1
+    assert len(dlg._gyro_pane.points) == 1
+    assert list(dlg._accel_pane.marks) == [100.0]
+    assert "2.9 g" in dlg._last_hit.text()
+    assert "91%" in dlg._status.text()
+    dlg.close()
+    app.processEvents()
+    # closed dialog no longer listens
+    w.sample.emit("accel", {"x": 0.0, "y": 1.0, "z": 0.0}, 101.0)
+    app.processEvents()
+    assert len(dlg._accel_pane.points) == 1
+    w.shutdown()
+
+
 def test_camera_dropdown_autosaves_without_save_click(app, tmp_path, monkeypatch):
     """The P0 fix: picking a camera in the dropdown must persist immediately —
     no Save click needed — so Start opens the selected camera."""

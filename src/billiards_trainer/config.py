@@ -272,6 +272,20 @@ class PoseSettings:
 
 
 @dataclass
+class CueSettings:
+    """Bluetooth cue-stroke sensor (JINOU JO-BEC12-2 IMU on the cue butt).
+
+    Fully optional: when disabled (default) or when no sensor/radio/bleak is
+    present, the app behaves exactly as before. The impact floor is the ONLY
+    tuning knob deliberately exposed — the video-validated signature gates in
+    cue/analysis.py do the real work of separating hits from handling."""
+
+    enabled: bool = False
+    address: str = ""       # last-connected sensor MAC (preferred in scans)
+    impact_g: float = 1.6   # impact candidate floor in g (soft pokes ≈ 1.7 g)
+
+
+@dataclass
 class Settings:
     source: str = "0"  # camera index (as str) | path to video | path to image | "demo"
     source_name: str = ""  # friendly camera name, to survive index reshuffles
@@ -285,6 +299,7 @@ class Settings:
     ui: UiSettings = field(default_factory=UiSettings)
     updates: UpdateSettings = field(default_factory=UpdateSettings)
     pose: PoseSettings = field(default_factory=PoseSettings)
+    cue: CueSettings = field(default_factory=CueSettings)
 
     # ------------------------------------------------------------------ #
     def to_dict(self) -> dict[str, Any]:

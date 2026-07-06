@@ -35,7 +35,8 @@ class Repository:
         """Lightweight additive migration: SQLAlchemy create_all never ALTERs, so
         add columns introduced after a user's DB was created."""
         wanted = {"sessions": [("synced", "BOOLEAN DEFAULT 0")],
-                  "shots": [("synced", "BOOLEAN DEFAULT 0")]}
+                  "shots": [("synced", "BOOLEAN DEFAULT 0"),
+                            ("stroke_json", "TEXT DEFAULT ''")]}
         with self.engine.begin() as conn:
             for table, cols in wanted.items():
                 existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
@@ -129,7 +130,8 @@ class Repository:
 
     def record_shot(self, session_id: int, outcome: str, num_pocketed: int = 0,
                     target_pocket: str | None = None, cue_scratch: bool = False,
-                    duration_s: float = 0.0, shot_seconds: float = 0.0) -> int:
+                    duration_s: float = 0.0, shot_seconds: float = 0.0,
+                    stroke_json: str = "") -> int:
         with self._Session() as s:
             # streak index = running count of consecutive makes ending at this shot
             prev = s.execute(
@@ -140,7 +142,8 @@ class Repository:
                      (1 if outcome == "make" else 0)
             shot = Shot(session_id=session_id, outcome=outcome, num_pocketed=num_pocketed,
                         target_pocket=target_pocket, cue_scratch=cue_scratch,
-                        duration_s=duration_s, shot_seconds=shot_seconds, streak_index=streak)
+                        duration_s=duration_s, shot_seconds=shot_seconds, streak_index=streak,
+                        stroke_json=stroke_json)
             s.add(shot)
             s.commit()
             return shot.id
@@ -215,6 +218,7 @@ class Repository:
                         "target_pocket": sh.target_pocket, "cue_scratch": sh.cue_scratch,
                         "duration_s": sh.duration_s, "shot_seconds": sh.shot_seconds,
                         "streak_index": sh.streak_index,
+                        "stroke": json.loads(sh.stroke_json) if sh.stroke_json else None,
                     } for sh in sess.shots],
                 })
         dest.parent.mkdir(parents=True, exist_ok=True)

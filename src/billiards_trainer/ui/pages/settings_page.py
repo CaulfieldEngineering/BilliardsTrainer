@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
@@ -51,6 +52,7 @@ class SettingsPage(QWidget):
     flag_failure_requested = Signal()
     detector_changed = Signal(str)   # live detector strategy switched
     train_balls_requested = Signal()  # open the in-app Ball ID Trainer
+    cue_diagnostics_requested = Signal()  # open the cue-sensor waveform dialog
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -106,8 +108,9 @@ class SettingsPage(QWidget):
         grid.addWidget(self._model_card(), 1, 1)
         grid.addWidget(self._clock_card(), 2, 0)
         grid.addWidget(self._appearance_card(), 2, 1)
-        grid.addWidget(self._feedback_card(), 3, 0)
-        grid.addWidget(self._debug_card(), 3, 1)
+        grid.addWidget(self._cue_card(), 3, 0)
+        grid.addWidget(self._feedback_card(), 3, 1)
+        grid.addWidget(self._debug_card(), 4, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -448,6 +451,62 @@ class SettingsPage(QWidget):
         form.addRow("", hint)
         return card
 
+    def _cue_card(self) -> Card:
+        card, form = self._card("Cue stroke sensor")
+        msg = QLabel("A Bluetooth motion sensor on the cue butt measures each "
+                     "stroke: cue speed, draw length, steer, pause and contact "
+                     "quality appear on the Sandbox panel after every shot. "
+                     "Everything works normally when no sensor is around.")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
+        self._cue_enabled = QCheckBox("Enable cue sensor (connects automatically)")
+        form.addRow("", self._cue_enabled)
+        self._cue_floor = QDoubleSpinBox()
+        self._cue_floor.setRange(1.0, 4.0)
+        self._cue_floor.setSingleStep(0.1)
+        self._cue_floor.setDecimals(1)
+        self._cue_floor.setSuffix(" g")
+        self._cue_floor.setToolTip("Impact sensitivity: the minimum shock that can "
+                                   "count as a shot. Lower finds softer pokes; the "
+                                   "validated hit signature filters the noise.")
+        form.addRow("Impact floor", self._cue_floor)
+        diag = QPushButton("  Sensor diagnostics…")
+        diag.setObjectName("Ghost")
+        diag.setCursor(Qt.PointingHandCursor)
+        diag.setToolTip("Live waveforms + connection details — for checking the "
+                        "mounting and stream health")
+        diag.clicked.connect(self.cue_diagnostics_requested.emit)
+        form.addRow("", diag)
+        self._cue_status = QLabel("")
+        self._cue_status.setObjectName("Faint")
+        self._cue_status.setWordWrap(True)
+        form.addRow("", self._cue_status)
+        note = QLabel("Mounting: sensor on the butt, +Z pointing butt→tip. "
+                      "The sensor is never written to by this app.")
+        note.setObjectName("Faint")
+        note.setWordWrap(True)
+        form.addRow("", note)
+        return card
+
+    def set_cue_status(self, state: str, detail) -> None:
+        pretty = {
+            "disabled": "Sensor disabled.",
+            "unavailable": "Bluetooth support isn't available in this build.",
+            "bluetooth_off": "Bluetooth appears to be off — enable it in Windows.",
+            "scanning": "Scanning for the sensor…",
+            "no_sensor": "No sensor found — is it powered and in range? "
+                         "Rescanning periodically.",
+            "connecting": "Sensor found — connecting…",
+            "reconnecting": "Connection dropped — reconnecting…",
+            "error": "Connection error — retrying.",
+        }.get(state, state)
+        if state == "connected" and isinstance(detail, dict):
+            batt = detail.get("battery")
+            pretty = (f"Connected to {detail.get('name') or detail.get('address', '')}"
+                      + (f" · battery {batt}%" if batt is not None else ""))
+        self._cue_status.setText(pretty)
+
     def _on_check_clicked(self) -> None:
         self._update_status.setText("Checking…")
         self._check_btn.setEnabled(False)
@@ -498,6 +557,8 @@ class SettingsPage(QWidget):
         self._measured_colors.setChecked(s.ui.measured_ball_colors)
         self._far_rescan.setChecked(s.balls.far_rail_rescan)
         self._auto_check.setChecked(s.updates.auto_check)
+        self._cue_enabled.setChecked(s.cue.enabled)
+        self._cue_floor.setValue(s.cue.impact_g)
 
     def _save(self) -> None:
         s = self._s
@@ -522,5 +583,7 @@ class SettingsPage(QWidget):
         s.ui.measured_ball_colors = self._measured_colors.isChecked()
         s.balls.far_rail_rescan = self._far_rescan.isChecked()
         s.updates.auto_check = self._auto_check.isChecked()
+        s.cue.enabled = self._cue_enabled.isChecked()
+        s.cue.impact_g = round(self._cue_floor.value(), 2)
         s.save()
         self.applied.emit()

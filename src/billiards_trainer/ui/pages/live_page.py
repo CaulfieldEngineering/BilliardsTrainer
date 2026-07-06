@@ -489,6 +489,9 @@ class LivePage(QWidget):
         grid.addWidget(self._k_streak)
         rail.layout().addLayout(grid)
 
+        # Cue-stroke stats (Bluetooth IMU) — hidden unless the sensor is enabled.
+        rail.layout().addWidget(self._stroke_section())
+
         # Shot clock — only visible when enabled, so it never crowds sandbox.
         self._clock_row = QHBoxLayout()
         self._clock_row.addStretch(1)
@@ -531,6 +534,107 @@ class LivePage(QWidget):
         box.add(lbl)
         box.add(val)
         return box, val
+
+    # ------------------------------------------------------------------ #
+    # Cue-stroke card (Bluetooth IMU on the cue butt)
+    # ------------------------------------------------------------------ #
+    # (key, label, formatter). Labels/formats mirror the validated reference
+    # analyzer's stats board; 'impact' is peak_g (known at the strike), the
+    # rest arrive ~2.6 s later once the follow-through has streamed in.
+    _STROKE_TILES = (
+        ("impact", "IMPACT", None),
+        ("v_impact", "CUE SPEED", lambda v: f"{v:.2f} m/s"),
+        ("stroke_len", "DRAW", lambda v: f"{v * 100:.0f} cm"),
+        ("yaw_swing", "STEER", None),
+        ("pause", "PAUSE", lambda v: f"{v:.2f} s"),
+        ("steer_ratio", "CONTACT", lambda v: f"{max(0.0, (1 - min(v, 1.0)) * 100):.0f}%"),
+        ("finish", "FINISH", lambda v: f"{min(v, 9.9):.1f} s"),
+        ("interval", "SINCE LAST", lambda v: f"{v:.0f} s"),
+    )
+
+    def _stroke_section(self) -> QWidget:
+        self._stroke_card = QWidget()
+        col = QVBoxLayout(self._stroke_card)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(6)
+        col.addWidget(self._hsep())
+        head = QHBoxLayout()
+        cap = QLabel("CUE STROKE")
+        cap.setObjectName("StatLabel")
+        head.addWidget(cap)
+        head.addStretch(1)
+        self._cue_badge = Badge("OFF", PALETTE.text_dim)
+        head.addWidget(self._cue_badge)
+        col.addLayout(head)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(6)
+        self._stroke_vals: dict[str, QLabel] = {}
+        for i, (key, label, _fmt) in enumerate(self._STROKE_TILES):
+            cell = QVBoxLayout()
+            cell.setContentsMargins(0, 0, 0, 0)
+            cell.setSpacing(0)
+            lab = QLabel(label)
+            lab.setStyleSheet(
+                f"font-size: 9px; font-weight: 700; color: {PALETTE.text_faint};")
+            val = QLabel("—")
+            val.setStyleSheet("font-size: 15px; font-weight: 800;")
+            cell.addWidget(lab)
+            cell.addWidget(val)
+            holder = QWidget()
+            holder.setLayout(cell)
+            grid.addWidget(holder, i // 2, i % 2)
+            self._stroke_vals[key] = val
+        col.addLayout(grid)
+        self._stroke_card.setVisible(self._settings.cue.enabled)
+        return self._stroke_card
+
+    def set_cue_enabled(self, on: bool) -> None:
+        self._stroke_card.setVisible(on)
+
+    def on_cue_status(self, state: str, detail) -> None:
+        text, color = {
+            "connected": ("LIVE", PALETTE.success),
+            "scanning": ("SCANNING…", PALETTE.info),
+            "connecting": ("CONNECTING…", PALETTE.info),
+            "reconnecting": ("RECONNECTING…", PALETTE.warn),
+            "no_sensor": ("NO SENSOR", PALETTE.warn),
+            "bluetooth_off": ("BLUETOOTH OFF", PALETTE.danger),
+            "unavailable": ("UNAVAILABLE", PALETTE.text_dim),
+            "error": ("RETRYING…", PALETTE.warn),
+            "disabled": ("OFF", PALETTE.text_dim),
+        }.get(state, (state.upper(), PALETTE.text_dim))
+        if state == "connected" and isinstance(detail, dict) \
+                and detail.get("battery") is not None:
+            text = f"LIVE · {detail['battery']}%"
+        self._cue_badge.set_text_color(text, color)
+        self._stroke_card.setVisible(self._settings.cue.enabled)
+
+    def on_cue_impact(self, stroke: dict) -> None:
+        """The strike itself — show peak g now, '…' while kinematics compute."""
+        self._stroke_vals["impact"].setText(f"{stroke.get('peak_g', 0.0):.1f} g")
+        for key, _label, _fmt in self._STROKE_TILES[1:]:
+            self._stroke_vals[key].setText("…")
+
+    def on_cue_metrics(self, m: dict) -> None:
+        for key, _label, fmt in self._STROKE_TILES:
+            if key == "impact":
+                self._stroke_vals[key].setText(f"{m.get('peak_g', 0.0):.1f} g")
+                continue
+            if key == "yaw_swing":
+                v = m.get("yaw_swing")
+                if v is None:
+                    txt = "—"
+                elif abs(v) < 0.05:
+                    txt = "0.0°"
+                else:
+                    # +yaw ≈ tip toward the aim-frame's lat axis ("L") —
+                    # provisional sign, same convention as the reference app
+                    txt = f"{'L' if v > 0 else 'R'} {abs(v):.1f}°"
+                self._stroke_vals[key].setText(txt)
+                continue
+            v = m.get(key)
+            self._stroke_vals[key].setText("—" if v is None else fmt(v))
 
     # ------------------------------------------------------------------ #
     # Live tuning panel  (mutates the shared Settings in place → the pipeline
