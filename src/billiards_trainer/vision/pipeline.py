@@ -86,6 +86,7 @@ class Pipeline:
         self._last_ms = 0.0
         self._last_stages: dict = {}  # previous frame's per-stage ms (perf HUD)
         self._frame_ring: deque | None = None  # temporal-median buffer
+        self._cam_pose: tuple | None = None  # (key, C) parallax-camera cache
 
     def reconfigure(self, settings: Settings) -> None:
         """Apply edited settings (e.g. new felt range / detector) and recalibrate."""
@@ -210,9 +211,17 @@ class Pipeline:
             return frame
         return _median_frames(list(ring))
 
-    def _project_raw_to_rect(self, raw_dets, calib):
+    def _project_raw_to_rect(self, raw_dets, calib, frame_shape=None):
         """Map RAW-frame detections into the rectified plane (via calib.H) so the
-        tracker + bird's-eye schematic (both rectified-space) consume them."""
+        tracker + bird's-eye schematic (both rectified-space) consume them.
+
+        Includes the ball-height parallax correction: the homography maps the
+        CLOTH plane, but a ball's centre sits one radius above it, so an oblique
+        camera projects every centre radially outward from itself — rail balls
+        landed visibly IN the rail on the overhead (up to ~2 ball diameters at
+        the far rail). With the camera position recovered from the homography,
+        sliding each point back along the camera ray by radius/height fixes the
+        bias everywhere (and tightens pocket-capture geometry for free)."""
         if not raw_dets:
             return []
         from .rectify import project_points
@@ -220,11 +229,40 @@ class Pipeline:
         rect = project_points(pts, calib.H)
         off = np.array([[d.x + max(d.radius, 1.0), d.y] for d in raw_dets], np.float64)
         rect_off = project_points(off, calib.H)
+        cam = self._camera_position(calib, frame_shape) if frame_shape else None
+        if cam is not None:
+            r_ball = expected_ball_radius_px(calib.table, self.settings.table.size)
+            shrink = max(0.0, 1.0 - r_ball / float(cam[2]))
+            rect = cam[:2] + (rect - cam[:2]) * shrink
         out = []
         for d, (rx, ry), (ox, oy) in zip(raw_dets, rect, rect_off, strict=False):
             out.append(Detection(float(rx), float(ry), float(np.hypot(ox - rx, oy - ry)),
                                  d.bgr, d.cls, d.score, number=d.number))
         return out
+
+    def _camera_position(self, calib, frame_shape) -> np.ndarray | None:
+        """Camera centre in rect coords for the parallax correction, cached per
+        homography (recomputed only when the lock changes). None = no correction
+        (degenerate pose, implausible height, or the feature flag is off)."""
+        if not getattr(self.settings.balls, "parallax_correction", True):
+            return None
+        key = (calib.H.tobytes(), frame_shape[1], frame_shape[0])
+        if self._cam_pose is not None and self._cam_pose[0] == key:
+            return self._cam_pose[1]
+        from .rectify import estimate_camera_position
+        cam = estimate_camera_position(calib.Hinv, (frame_shape[1], frame_shape[0]))
+        if cam is not None:
+            # plausibility: the camera should sit somewhere between "just above
+            # the table" and "gymnasium ceiling", in rect-px units
+            long_side = float(max(calib.table.play_w, calib.table.play_h))
+            if not (0.1 * long_side <= cam[2] <= 20.0 * long_side):
+                log.info("parallax: implausible camera height %.0f px — disabled", cam[2])
+                cam = None
+            else:
+                log.info("parallax: camera at (%.0f, %.0f) height %.0f rect px",
+                         cam[0], cam[1], cam[2])
+        self._cam_pose = (key, cam)
+        return cam
 
     def _warp_gray_roi(self, frame: np.ndarray, calib) -> np.ndarray | None:
         """Warp ONLY the playing-area ROI of the gray frame into rectified space
@@ -345,7 +383,7 @@ class Pipeline:
                     log.debug("detector failed on a frame: %s", exc)
                     raw_dets = []
                 res.raw_dets = list(raw_dets)   # camera-coord, for the in-app labeller
-                detections = self._project_raw_to_rect(raw_dets, calib)
+                detections = self._project_raw_to_rect(raw_dets, calib, frame.shape)
                 # Physical-size prior: reject blobs whose radius is far from the
                 # known ball radius (pocket-shadow "balls" too big, speckle too
                 # small). Skipped for model-based detectors, which already validate

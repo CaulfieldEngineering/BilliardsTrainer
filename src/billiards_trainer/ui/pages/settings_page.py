@@ -349,7 +349,8 @@ class SettingsPage(QWidget):
         card, form = self._card("Shot clock")
         msg = QLabel("The countdown starts when the cue ball comes to rest and "
                      "stops when you strike it — beat the buzzer. One beep at "
-                     "10 s left, tick beeps at 3-2-1, buzz at 0.")
+                     "10 s left, tick beeps at 3-2-1, buzz at 0. Runs during "
+                     "LIVE camera play only — never over a video you're reviewing.")
         msg.setObjectName("Faint")
         msg.setWordWrap(True)
         form.addRow("", msg)

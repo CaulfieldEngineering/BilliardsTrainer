@@ -202,6 +202,75 @@ def test_shot_clock_sound_cues_defined(monkeypatch):
     assert len(started) == 3               # unknown edges are silent no-ops
 
 
+# ---- ball-height parallax correction ------------------------------------- #
+def _synthetic_plane_camera(cam_center, img_w=1920, img_h=1080, f=1400.0):
+    """Ground-truth rect-plane -> image homography for a pinhole camera at
+    ``cam_center`` (rect coords, z above the cloth), aimed at the table centre."""
+    fwd = np.array([487 / 2, 1053 / 2, 0], float) - np.asarray(cam_center, float)
+    fwd /= np.linalg.norm(fwd)
+    right = np.cross(fwd, (0, 0, 1))
+    right /= np.linalg.norm(right)
+    down = np.cross(fwd, right)
+    R = np.vstack([right, down, fwd])
+    t = -R @ np.asarray(cam_center, float)
+    K = np.array([[f, 0, img_w / 2], [0, f, img_h / 2], [0, 0, 1.0]])
+    G = K @ np.column_stack([R[:, 0], R[:, 1], t])
+    return G / G[2, 2]
+
+
+def test_camera_position_recovery_from_homography():
+    from billiards_trainer.vision.rectify import estimate_camera_position
+    for true_c in [(283.0, 1900.0, 700.0), (100.0, 1600.0, 500.0),
+                   (500.0, 2400.0, 420.0)]:
+        G = _synthetic_plane_camera(true_c)
+        c = estimate_camera_position(G, (1920, 1080))
+        assert c is not None
+        assert np.allclose(c, true_c, atol=1.0), (true_c, c)
+
+
+def test_parallax_correction_pulls_projected_balls_toward_camera():
+    """The homography maps the CLOTH plane; ball centres sit one radius above
+    it, so projections land radially outward from the camera (rail balls were
+    rendered IN the rail). The pipeline must slide each point back along the
+    camera ray — and leave points untouched when the flag is off."""
+    import types
+
+    from billiards_trainer.vision.geometry import TableModel, expected_ball_radius_px
+    from billiards_trainer.vision.pipeline import Pipeline
+    from billiards_trainer.vision.rectify import project_points
+    from billiards_trainer.vision.types import Detection
+
+    cam = np.array([283.0, 1900.0, 480.0])       # like the real rig: end-on, ~55" up
+    G = _synthetic_plane_camera(cam)             # rect -> image
+    calib = types.SimpleNamespace(
+        H=np.linalg.inv(G), Hinv=G,
+        table=TableModel.from_rect((567, 1053), 40, nose_inset_frac=0.055))
+    shape = (1080, 1920, 3)
+
+    p_far = np.array([283.0, 80.0])              # far-rail ball, worst case
+    img_pt = project_points(p_far[None, :], G)[0]
+    det = Detection(float(img_pt[0]), float(img_pt[1]), 8.0, (200, 200, 200))
+
+    s = Settings()
+    pipe = Pipeline(s, source="")
+    out = pipe._project_raw_to_rect([det], calib, shape)[0]
+    r = expected_ball_radius_px(calib.table, s.table.size)
+    d_before = np.linalg.norm(p_far - cam[:2])
+    d_after = np.linalg.norm(np.array([out.x, out.y]) - cam[:2])
+    # pulled toward the camera ground point by radius/height of the distance
+    assert d_after < d_before
+    assert np.isclose(d_after / d_before, 1.0 - r / cam[2], atol=1e-3)
+    shift = np.hypot(out.x - p_far[0], out.y - p_far[1])
+    assert shift > 2 * r                          # the far-rail bias is REAL money
+
+    # escape hatch: flag off = untouched projection
+    s.balls.parallax_correction = False
+    pipe2 = Pipeline(s, source="")
+    out2 = pipe2._project_raw_to_rect([det], calib, shape)[0]
+    assert np.isclose(out2.x, p_far[0], atol=1e-6)
+    assert np.isclose(out2.y, p_far[1], atol=1e-6)
+
+
 # ---- click-to-pick felt -------------------------------------------------- #
 def test_felt_from_point_keys_on_clicked_pixel():
     hsv = np.full((300, 300, 3), (100, 150, 200), np.uint8)

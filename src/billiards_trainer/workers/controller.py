@@ -117,6 +117,9 @@ class PipelineController(QObject):
         self._cue_still = 0            # consecutive at-rest frames
         self._saw_cue_t = -1e9         # last time a cue track existed
         self._clock_armed = True       # a new turn may start the clock
+        # Flow rule: a shot clock only makes sense while PLAYING — live camera
+        # sources only. Reviewing a recorded video must never run a countdown.
+        self._clock_allowed = False
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
         self._speed = 1.0
@@ -193,6 +196,7 @@ class PipelineController(QObject):
         self._cue_still = 0
         self._saw_cue_t = -1e9
         self._clock_armed = True
+        self._clock_allowed = bool(getattr(self._source, "is_live", False))
         self._running = True
         self._miss_t0: float | None = None  # first consecutive empty-read time
         self._got_frame = False
@@ -336,6 +340,8 @@ class PipelineController(QObject):
         # the continuous 1080p repaint racing DirectML inference on the GPU.
         if on and getattr(self._source, "is_video", False):
             self._video_paused = True
+        if on:
+            self._clock.stop()   # training is not play — no countdown pressure
         # Re-process the CURRENT frame immediately. Entering Training Mode on a
         # paused video would otherwise wait for a next frame that never comes —
         # leaving the UI with no frame size and no detections (clicks then fall
@@ -655,7 +661,8 @@ class PipelineController(QObject):
             perspective=res.frame_bgr, birdseye=res.rect_bgr, status=res.status,
             fps=self._fps, n_balls=res.n_balls, shot_state=res.shot_state,
             clock_remaining=self._clock.remaining(t),
-            clock_enabled=self._clock.enabled, clock_warning=self._clock.is_warning(t),
+            clock_enabled=self._clock.enabled and self._clock_allowed,
+            clock_warning=self._clock.is_warning(t),
             deviated=res.deviated, tracks=res.tracks, raw_dets=res.raw_dets,
         ))
         if getattr(self._source, "is_video", False):
@@ -738,8 +745,9 @@ class PipelineController(QObject):
             # Table settled: start the clock ONLY when cue-ball tracking isn't
             # available — with a tracked cue, _update_cue_clock owns the start
             # (the countdown begins the moment the CUE BALL stops, which is
-            # usually earlier than full-table settle).
-            if t - self._saw_cue_t > self._CUE_GAP_S * 2:
+            # usually earlier than full-table settle). Live sources only: a
+            # countdown over a recorded video is meaningless.
+            if self._clock_allowed and t - self._saw_cue_t > self._CUE_GAP_S * 2:
                 self._clock.start(t)    # no-op when the clock is disabled
             self._turn_start_t = t
         elif self._prev_state == "settled" and state == "moving":
@@ -756,7 +764,7 @@ class PipelineController(QObject):
     _CUE_GAP_S = 1.0        # cue absent this long = pocketed / ball-in-hand
 
     def _update_cue_clock(self, tracks, t: float) -> None:
-        if not self._clock.enabled:
+        if not (self._clock.enabled and self._clock_allowed):
             return
         cue = next((tr for tr in tracks if tr.cls == BallClass.CUE), None)
         if cue is None:

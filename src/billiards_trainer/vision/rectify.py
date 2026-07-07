@@ -217,3 +217,70 @@ def project_points(pts: np.ndarray, H: np.ndarray) -> np.ndarray:
     pts = np.asarray(pts, dtype=np.float64).reshape(-1, 1, 2)
     out = cv2.perspectiveTransform(pts, H)
     return out.reshape(-1, 2)
+
+
+def estimate_camera_position(Hinv: np.ndarray,
+                             image_size: tuple[int, int]) -> np.ndarray | None:
+    """Camera centre in RECTIFIED-plane coordinates (x, y, z; z = height above
+    the cloth, all in rect px) from the rect→image homography.
+
+    Why: the homography maps the CLOTH plane, but a ball's centre sits one ball
+    radius ABOVE it, so an oblique camera projects every ball centre radially
+    outward from itself — up to a couple of ball diameters at the far rail,
+    which is exactly the "balls sitting in the rail" artefact on the overhead.
+    Knowing where the camera is lets the pipeline slide each projected point
+    back along the camera ray to the true contact point.
+
+    Standard plane-pose decomposition with assumed intrinsics (principal point
+    at the image centre, square pixels): Hinv ∝ K·[r1 r2 t], the focal length
+    solved from r1⊥r2 and |r1|=|r2|, camera centre C = -Rᵀt. Returns None when
+    the decomposition is degenerate or lands somewhere physically absurd —
+    callers must treat correction as best-effort.
+    """
+    G = np.asarray(Hinv, dtype=np.float64)
+    if G.shape != (3, 3) or not np.all(np.isfinite(G)):
+        return None
+    w, h = float(image_size[0]), float(image_size[1])
+    cx, cy = w / 2.0, h / 2.0
+    # remove the principal point: rows of K⁻¹·G with f still unknown
+    u = G[0] - cx * G[2]
+    v = G[1] - cy * G[2]
+    wv = G[2]
+    # focal from the two rotation-column constraints (least-squares-ish: use
+    # both estimates when available, geometric mean)
+    f_sq = []
+    denom = wv[0] * wv[1]
+    if abs(denom) > 1e-12:
+        est = -(u[0] * u[1] + v[0] * v[1]) / denom
+        if est > 0:
+            f_sq.append(est)
+    denom = wv[1] ** 2 - wv[0] ** 2
+    if abs(denom) > 1e-12:
+        est = ((u[0] ** 2 + v[0] ** 2) - (u[1] ** 2 + v[1] ** 2)) / denom
+        if est > 0:
+            f_sq.append(est)
+    if not f_sq:
+        return None
+    f = float(np.sqrt(np.exp(np.mean(np.log(f_sq)))))
+    if not (0.2 * w <= f <= 20.0 * w):        # nonsense focal -> bail
+        return None
+    B = np.vstack([u / f, v / f, wv])          # K⁻¹·G, columns ∝ [r1 r2 t]
+    n1, n2 = np.linalg.norm(B[:, 0]), np.linalg.norm(B[:, 1])
+    if n1 < 1e-9 or n2 < 1e-9:
+        return None
+    s = 2.0 / (n1 + n2)
+    if B[2, 2] * s < 0:                        # camera must be in front of the plane
+        s = -s
+    r1, r2, t = s * B[:, 0], s * B[:, 1], s * B[:, 2]
+    r3 = np.cross(r1, r2)
+    R = np.column_stack([r1, r2, r3])
+    C = -R.T @ t                               # camera centre, rect-plane coords
+    if not np.all(np.isfinite(C)) or abs(C[2]) < 1e-6:
+        return None
+    # The rect frame is y-DOWN (image convention), so its right-handed z axis
+    # points INTO the table — a camera physically above the cloth decomposes to
+    # NEGATIVE z (and the planar two-fold ambiguity can flip it again). The
+    # ground point C[:2] is identical for both mirror solutions and the ball is
+    # always on the camera's side of the plane, so report height as |z|.
+    C[2] = abs(C[2])
+    return C

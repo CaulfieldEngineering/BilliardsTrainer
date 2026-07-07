@@ -423,6 +423,14 @@ def test_shot_clock_cue_ball_rules(app):
     def cue(speed):
         return [types.SimpleNamespace(cls=BallClass.CUE, speed=speed)]
 
+    # flow rule: on a non-live source (video playback) the clock NEVER starts
+    assert not ctrl._clock_allowed
+    for i in range(10):
+        ctrl._update_cue_clock(cue(0.1), i * 0.033)
+    assert not ctrl._clock.running
+
+    ctrl._clock_allowed = True   # live camera (set by start() from source.is_live)
+
     # cue at rest -> the clock starts after the stop debounce
     for i in range(6):
         ctrl._update_cue_clock(cue(0.1), i * 0.033)

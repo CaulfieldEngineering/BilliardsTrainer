@@ -146,6 +146,12 @@ class BallSettings:
     # doubling per-frame GPU work — turn off to halve detector latency when the
     # camera already resolves the far rail well.
     far_rail_rescan: bool = True
+    # Ball-height parallax correction: the homography maps the cloth plane, but a
+    # ball's centre sits one radius above it, so an oblique camera projects centres
+    # radially outward (rail balls rendered IN the rail). With the camera position
+    # recovered from the homography, each point slides back along the camera ray.
+    # Escape hatch only — no UI knob.
+    parallax_correction: bool = True
     # One-time migration marker. Bumped by Settings.load() after it moves users off
     # 'legacy' — which used to be the ONLY selectable detector in shipped builds
     # (frozen strategy discovery was broken). 0 = not yet migrated.
