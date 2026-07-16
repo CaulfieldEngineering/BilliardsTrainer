@@ -100,3 +100,5 @@ _external/
 # local debug/training artifacts (crash dumps, procdump, datasets)
 _train/
 *.dmp
+# base YOLO weights (auto-downloaded by ultralytics during fine-tunes)
+*.pt
