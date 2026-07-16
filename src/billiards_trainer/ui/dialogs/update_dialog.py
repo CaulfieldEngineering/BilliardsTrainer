@@ -1,5 +1,13 @@
 """Update-available dialog: shows release notes, downloads with progress, and
-launches the installer (then quits the app so files can be replaced)."""
+launches the installer (then quits the app so files can be replaced).
+
+Windows gets the full verified download + self-swap. On macOS (and any
+platform the release has no binary for) the button opens the releases page
+instead — the auto-swap is Windows-tested machinery, and an untested in-place
+.app replacement is exactly how you brick a dedicated billiards-room machine
+remotely. Automate it once it can be validated on the real Mac."""
+
+import sys
 
 from PySide6.QtWidgets import (
     QApplication,
@@ -18,7 +26,7 @@ from ...update.updater import (
     install_and_relaunch,
     run_in_thread,
 )
-from ...version import __version__
+from ...version import RELEASES_PAGE_URL, __version__
 from ..icons import icon
 
 
@@ -70,12 +78,22 @@ class UpdateDialog(QDialog):
         self._later.clicked.connect(self.reject)
         buttons.addWidget(self._later)
 
-        self._update_btn = QPushButton("  Download & install")
+        # Auto-install only on Windows (the tested swap path). Elsewhere the
+        # button opens the releases page for a manual download.
+        self._auto_install = sys.platform == "win32" and bool(self._info.url)
+        label = "  Download & install" if self._auto_install else "  Open download page"
+        self._update_btn = QPushButton(label)
         self._update_btn.setObjectName("Accent")
         self._update_btn.setIcon(icon("download", "#0A0E12"))
-        self._update_btn.clicked.connect(self._start_download)
+        self._update_btn.clicked.connect(
+            self._start_download if self._auto_install else self._open_releases)
         buttons.addWidget(self._update_btn)
         root.addLayout(buttons)
+
+    def _open_releases(self) -> None:
+        import webbrowser
+        webbrowser.open(RELEASES_PAGE_URL)
+        self.accept()
 
     def _start_download(self) -> None:
         if not self._info.url:

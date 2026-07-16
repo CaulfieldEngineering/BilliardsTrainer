@@ -410,7 +410,9 @@ class MainWindow(QMainWindow):
         from pathlib import Path
         root = Path(__file__).resolve().parents[2].parent
         for c in (root / "_refs" / "pool_coach" / ".venv" / "Scripts" / "python.exe",
-                  root / ".trainvenv" / "Scripts" / "python.exe"):
+                  root / ".trainvenv" / "Scripts" / "python.exe",
+                  root / "_refs" / "pool_coach" / ".venv" / "bin" / "python",
+                  root / ".trainvenv" / "bin" / "python"):
             if c.exists():
                 return str(c)
         return ""

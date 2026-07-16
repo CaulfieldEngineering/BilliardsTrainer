@@ -1,14 +1,15 @@
-"""Asset-free audio cues for the shot clock.
+"""Asset-free audio cues for the shot clock — cross-platform.
 
-winsound square-wave beeps on Windows (the shipped platform), falling back to
-the plain system beep elsewhere. winsound.Beep is SYNCHRONOUS, so every cue
-plays on a short daemon thread — the UI/worker thread must never block on
-audio. Failures are swallowed: sound is a nicety, never an error.
+Windows: winsound square-wave beeps (synchronous, so every cue plays on a
+short daemon thread). macOS: the same tones rendered once to tiny WAV files
+(pure stdlib) and played with the built-in ``afplay``. Anywhere else: the
+plain system beep. Failures are swallowed — sound is a nicety, never an error.
 
 Cadence (Joe's spec): single beep at 10 s left, tick beeps at 3-2-1, buzz at 0.
 """
 
 import logging
+import struct
 import sys
 import threading
 
@@ -21,6 +22,38 @@ _CUES = {
     "expired": [(220, 260), (185, 520)],  # two falling low tones = the buzz
 }
 
+_wav_cache: dict[tuple, str] = {}
+_SR = 44100
+
+
+def _render_wav(seq) -> str:
+    """Render a tone sequence to a cached mono 16-bit WAV (for afplay)."""
+    import tempfile
+    import wave
+    from pathlib import Path
+
+    key = tuple(seq)
+    cached = _wav_cache.get(key)
+    if cached and Path(cached).exists():
+        return cached
+    frames = bytearray()
+    for freq, ms in seq:
+        n = int(_SR * ms / 1000)
+        fade = max(1, int(_SR * 0.005))          # 5 ms ramps kill the clicks
+        half_period = _SR / (2.0 * freq)
+        for i in range(n):
+            v = 0.35 if int(i / half_period) % 2 == 0 else -0.35
+            env = min(1.0, i / fade, (n - i) / fade)
+            frames += struct.pack("<h", int(v * env * 32767))
+    path = str(Path(tempfile.gettempdir()) / f"bt-cue-{abs(hash(key)):x}.wav")
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(_SR)
+        w.writeframes(bytes(frames))
+    _wav_cache[key] = path
+    return path
+
 
 def _play_seq(seq) -> None:
     try:
@@ -29,8 +62,13 @@ def _play_seq(seq) -> None:
             for freq, ms in seq:
                 winsound.Beep(freq, ms)
             return
+        if sys.platform == "darwin":
+            import subprocess
+            subprocess.run(["afplay", _render_wav(seq)], check=False,
+                           capture_output=True, timeout=10)
+            return
     except Exception:  # noqa: BLE001 - no audio device / server session
-        log.debug("winsound beep failed", exc_info=True)
+        log.debug("tone playback failed", exc_info=True)
     try:
         from PySide6.QtWidgets import QApplication
         QApplication.beep()

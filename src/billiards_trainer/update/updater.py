@@ -48,10 +48,12 @@ def is_newer(candidate: str, current: str) -> bool:
 @dataclass
 class UpdateInfo:
     version: str
-    url: str
+    url: str                 # Windows .exe (the original single-asset field)
     notes: str = ""
     pub_date: str = ""
     sha256: str = ""
+    mac_url: str = ""        # macOS .app zip (empty on pre-Mac releases)
+    mac_sha256: str = ""
 
     @classmethod
     def from_manifest(cls, data: dict) -> "UpdateInfo":
@@ -61,7 +63,19 @@ class UpdateInfo:
             notes=str(data.get("notes", "")),
             pub_date=str(data.get("pub_date", "")),
             sha256=str(data.get("sha256", "")).lower(),
+            mac_url=str(data.get("mac_url", "")),
+            mac_sha256=str(data.get("mac_sha256", "")).lower(),
         )
+
+    def asset_for_platform(self, platform: str | None = None) -> tuple[str, str]:
+        """(download_url, sha256) for the given (default: current) platform.
+        Empty url = no binary for this platform in the release."""
+        platform = platform or sys.platform
+        if platform == "darwin":
+            return self.mac_url, self.mac_sha256
+        if platform == "win32":
+            return self.url, self.sha256
+        return "", ""
 
 
 def fetch_manifest(url: str = UPDATE_MANIFEST_URL, timeout: float = 6.0) -> UpdateInfo | None:

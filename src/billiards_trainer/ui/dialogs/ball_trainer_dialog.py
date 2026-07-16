@@ -258,7 +258,9 @@ class BallTrainerDialog(QDialog):
         """A python with torch+ultralytics (the shipped app is torch-free)."""
         root = Path(__file__).resolve().parents[3]
         cands = [root / "_refs" / "pool_coach" / ".venv" / "Scripts" / "python.exe",
-                 root / ".trainvenv" / "Scripts" / "python.exe"]
+                 root / ".trainvenv" / "Scripts" / "python.exe",
+                 root / "_refs" / "pool_coach" / ".venv" / "bin" / "python",
+                 root / ".trainvenv" / "bin" / "python"]
         for c in cands:
             if c.exists():
                 return str(c)

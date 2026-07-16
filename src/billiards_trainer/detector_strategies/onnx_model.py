@@ -31,6 +31,19 @@ ROOT = Path(__file__).resolve().parents[3]
 MODEL_DIRS = [ROOT / "_eval" / "models", USER_MODELS_DIR]
 
 
+def pick_providers(available) -> list[str]:
+    """Execution providers in accelerator-first order, filtered to what this
+    install actually has (an unavailable provider must never raise):
+    DirectML (Windows, any DX12 GPU), CUDA (onnxruntime-gpu), CoreML (Apple
+    silicon — GPU/ANE, ships in the standard macOS wheel), then CPU. The
+    caller LOGS the one chosen, so a silent CPU fallback (the real-time
+    killer) is always visible."""
+    avail = set(available)
+    preferred = ["DmlExecutionProvider", "CUDAExecutionProvider",
+                 "CoreMLExecutionProvider", "CPUExecutionProvider"]
+    return [p for p in preferred if p in avail] or ["CPUExecutionProvider"]
+
+
 class OnnxModelStrategy(DetectorStrategy):
     model_based = True  # trained detector — skip the classical size prior
     # Class-level defaults (not set in __init__) so tests can build instances via
@@ -57,20 +70,15 @@ class OnnxModelStrategy(DetectorStrategy):
     def _session(self):
         if self._sess is None:
             import onnxruntime as ort
-            # GPU first, CPU last. DirectML (Dml) is the pragmatic Windows GPU path
-            # (any DX12 GPU, no CUDA toolkit); CUDA is tried too for non-Windows /
-            # onnxruntime-gpu installs. Filter to what's actually available so an
-            # unavailable provider never raises — and LOG the one chosen, so a
-            # silent CPU fallback (the real-time killer) is visible.
-            avail = set(ort.get_available_providers())
-            preferred = ["DmlExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
-            providers = [p for p in preferred if p in avail] or ["CPUExecutionProvider"]
+            providers = pick_providers(ort.get_available_providers())
             self._sess = ort.InferenceSession(str(self._path), providers=providers)
             active = self._sess.get_providers()
             log.info("ONNX detector %s on %s", self._path.name, active[0] if active else "?")
             if active and active[0] == "CPUExecutionProvider":
-                log.warning("ONNX running on CPU — real-time will be slow; install "
-                            "onnxruntime-directml (Windows) or onnxruntime-gpu for GPU.")
+                log.warning("ONNX running on CPU — real-time may be slow; install "
+                            "onnxruntime-directml (Windows) or onnxruntime-gpu "
+                            "(CUDA) for GPU. On Apple silicon the standard "
+                            "onnxruntime wheel ships CoreML.")
             self._inp = self._sess.get_inputs()[0]
             s = self._inp.shape[2]
             self._size = int(s) if isinstance(s, int) and s > 0 else 640

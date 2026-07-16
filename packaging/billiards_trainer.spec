@@ -1,14 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec — builds a single-file Windows executable.
+"""PyInstaller spec — Windows single-file exe, or a macOS .app bundle.
 
 Heavy optional backends (torch/ultralytics/mediapipe) are excluded to keep the
 download small (~150 MB instead of ~2 GB); the app degrades to the classical
 ball detector without them. Run from the repo root:
 
     pyinstaller packaging/billiards_trainer.spec --noconfirm
+
+On macOS this produces dist/BilliardsTrainer.app with the camera + Bluetooth
+usage strings in Info.plist (without them, macOS silently denies the webcam
+and the cue sensor instead of prompting). The bundle is unsigned: first launch
+on a new Mac is right-click → Open.
 """
 
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -119,3 +125,24 @@ exe = EXE(
     icon=(os.path.join(ROOT, "packaging", "app.ico")
           if os.path.exists(os.path.join(ROOT, "packaging", "app.ico")) else None),
 )
+
+if sys.platform == "darwin":
+    _icns = os.path.join(ROOT, "packaging", "app.icns")
+    app = BUNDLE(
+        exe,
+        name="BilliardsTrainer.app",
+        icon=_icns if os.path.exists(_icns) else None,
+        bundle_identifier="com.caulfieldengineering.billiardstrainer",
+        info_plist={
+            # TCC permission strings — REQUIRED, or macOS denies the hardware
+            # without ever prompting the user.
+            "NSCameraUsageDescription":
+                "Billiards Trainer watches your table through the overhead "
+                "camera to track balls and score shots.",
+            "NSBluetoothAlwaysUsageDescription":
+                "Billiards Trainer connects to the motion sensor on your cue "
+                "to measure each stroke.",
+            "NSHighResolutionCapable": True,
+            "LSMinimumSystemVersion": "12.0",
+        },
+    )

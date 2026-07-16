@@ -1,9 +1,10 @@
 # 🎱 Billiards Trainer
 
-A local, real-time **pool/billiards practice analyst** for Windows. Point a camera
-at your table, and it detects the table, tracks the balls, recognises your shots,
-and keeps your **make/miss statistics** — all running **locally and free** (no
-cloud APIs, no subscriptions).
+A local, real-time **pool/billiards practice analyst** for **Windows and macOS
+(Apple silicon)**. Point a camera at your table, and it detects the table,
+tracks the balls, recognises your shots, and keeps your **make/miss
+statistics** — all running **locally and free** (no cloud APIs, no
+subscriptions).
 
 > Rebuilt from the original C++/Win32 table-detection prototype into a Python +
 > PySide6 application. The hard-won CV (felt → corners → homography) was ported
@@ -27,6 +28,24 @@ cloud APIs, no subscriptions).
    order later.
 
 The app checks for updates on launch and prompts you when a newer build exists.
+
+### macOS (Apple silicon — e.g. a Mac Mini M1 by the table)
+
+1. Download `BilliardsTrainer-mac-<version>.zip` from the
+   [latest release](https://github.com/CaulfieldEngineering/BilliardsTrainer/releases/latest),
+   unzip, and drag **BilliardsTrainer.app** into Applications.
+2. First launch: **right-click → Open** (the app is unsigned; macOS only asks
+   once). Grant the **camera** and **Bluetooth** prompts on first use — the
+   bundle declares both, so the prompts appear instead of a silent denial.
+3. Ball detection runs the same trained ONNX model via **CoreML** on the M-series
+   GPU/Neural Engine (falling back to CPU automatically); the cue sensor works
+   over CoreBluetooth; shot-clock beeps play natively.
+
+Every release CI-builds and tests on an Apple-silicon runner. One current
+difference: on macOS the updater **notifies** you and opens the download page
+rather than self-installing — replacing a running `.app` in place is kept
+manual until it's been validated on real hardware. Data lives in
+`~/Library/Application Support/BilliardsTrainer`.
 
 ### Sandbox = the core loop
 

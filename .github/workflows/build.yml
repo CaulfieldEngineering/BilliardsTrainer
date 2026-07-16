@@ -1,8 +1,11 @@
 name: Build & Release
 
-# Every push to main: run tests, build a Windows .exe with PyInstaller, and
-# publish it + version.json to a GitHub Release. The in-app updater polls
-# releases/latest/download/version.json on launch (see update/updater.py).
+# Every push to main: run tests and build BOTH platform binaries — a Windows
+# .exe and a macOS (Apple silicon) .app — then publish them + version.json to
+# one GitHub Release. The in-app updater polls
+# releases/latest/download/version.json on launch (see update/updater.py);
+# Windows self-updates in place, macOS opens the download page (the .app swap
+# isn't automated until it can be validated on real hardware).
 
 on:
   push:
@@ -27,19 +30,13 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Compute version
-        id: ver
-        shell: pwsh
-        run: |
-          $v = "0.2.$($env:GITHUB_RUN_NUMBER)"
-          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "Version: $v"
-
       - name: Bake version into the package
         shell: pwsh
         run: |
+          $v = "0.2.$($env:GITHUB_RUN_NUMBER)"
+          Write-Host "Version: $v"
           $f = "src/billiards_trainer/version.py"
-          (Get-Content $f) -replace '__version__ = ".*"', "__version__ = `"${{ steps.ver.outputs.version }}`"" | Set-Content $f
+          (Get-Content $f) -replace '__version__ = ".*"', "__version__ = `"$v`"" | Set-Content $f
 
       - name: Install dependencies
         run: |
@@ -55,47 +52,117 @@ jobs:
       - name: Build executable
         run: pyinstaller packaging/billiards_trainer.spec --noconfirm
 
-      - name: Stage release artifacts
-        id: stage
+      - name: Stage artifact
         shell: pwsh
         run: |
-          $v = "${{ steps.ver.outputs.version }}"
+          $v = "0.2.$($env:GITHUB_RUN_NUMBER)"
           Copy-Item dist/BilliardsTrainer.exe "dist/BilliardsTrainer-$v.exe"
-          $hash = (Get-FileHash "dist/BilliardsTrainer-$v.exe" -Algorithm SHA256).Hash.ToLower()
-          Write-Host "SHA256: $hash"
-          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          $url = "https://github.com/${{ github.repository }}/releases/download/v$v/BilliardsTrainer-$v.exe"
-          python packaging/make_version_json.py --version $v --url $url --sha256 $hash --notes "Automated build of ${{ github.sha }}" --out dist/version.json
-          Get-Content dist/version.json
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BilliardsTrainer-windows
-          path: |
-            dist/BilliardsTrainer-*.exe
-            dist/version.json
+          name: windows-build
+          path: dist/BilliardsTrainer-*.exe
+
+  build-macos:
+    # macos-14 runners are Apple silicon (M-series) — the same architecture as
+    # the billiards-room Mac Mini, so tests here are real ARM verification.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Bake version into the package
+        run: |
+          v="0.2.${GITHUB_RUN_NUMBER}"
+          echo "Version: $v"
+          sed -i '' "s/__version__ = \".*\"/__version__ = \"$v\"/" src/billiards_trainer/version.py
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -q
+
+      - name: Build .app bundle
+        run: pyinstaller packaging/billiards_trainer.spec --noconfirm
+
+      - name: Stage artifact (zip the .app)
+        run: |
+          v="0.2.${GITHUB_RUN_NUMBER}"
+          # ditto preserves bundle metadata; plain zip breaks .app bundles
+          ditto -c -k --keepParent dist/BilliardsTrainer.app "dist/BilliardsTrainer-mac-$v.zip"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: dist/BilliardsTrainer-mac-*.zip
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Build version.json manifest
+        id: stage
+        run: |
+          v="0.2.${GITHUB_RUN_NUMBER}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          win_sha=$(sha256sum "dist/BilliardsTrainer-$v.exe" | cut -d' ' -f1)
+          mac_sha=$(sha256sum "dist/BilliardsTrainer-mac-$v.zip" | cut -d' ' -f1)
+          echo "win_sha=$win_sha" >> "$GITHUB_OUTPUT"
+          echo "mac_sha=$mac_sha" >> "$GITHUB_OUTPUT"
+          base="https://github.com/${{ github.repository }}/releases/download/v$v"
+          python packaging/make_version_json.py \
+            --version "$v" \
+            --url "$base/BilliardsTrainer-$v.exe" --sha256 "$win_sha" \
+            --mac-url "$base/BilliardsTrainer-mac-$v.zip" --mac-sha256 "$mac_sha" \
+            --notes "Automated build of ${{ github.sha }}" \
+            --out dist/version.json
+          cat dist/version.json
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          name: Billiards Trainer v${{ steps.ver.outputs.version }}
+          tag_name: v${{ steps.stage.outputs.version }}
+          name: Billiards Trainer v${{ steps.stage.outputs.version }}
           generate_release_notes: true
           body: |
-            ## Billiards Trainer v${{ steps.ver.outputs.version }}
+            ## Billiards Trainer v${{ steps.stage.outputs.version }}
 
-            **Download:** `BilliardsTrainer-${{ steps.ver.outputs.version }}.exe`
-            **SHA256:** `${{ steps.stage.outputs.sha256 }}`
+            **Windows:** `BilliardsTrainer-${{ steps.stage.outputs.version }}.exe`
+            SHA256 `${{ steps.stage.outputs.win_sha }}`
 
-            Verify your download (PowerShell):
-            ```powershell
-            (Get-FileHash .\BilliardsTrainer-${{ steps.ver.outputs.version }}.exe -Algorithm SHA256).Hash
-            ```
+            **macOS (Apple silicon):** `BilliardsTrainer-mac-${{ steps.stage.outputs.version }}.zip`
+            SHA256 `${{ steps.stage.outputs.mac_sha }}`
+            Unzip, drag `BilliardsTrainer.app` to Applications, then
+            **right-click → Open** the first time (the app is unsigned). Grant
+            the camera and Bluetooth prompts on first use.
 
-            The in-app updater verifies this hash automatically. If a self-update
-            ever fails to relaunch, see `updater.log` / `RECOVERY.txt` next to the
-            exe, or just re-download from this page.
+            The Windows in-app updater verifies its hash automatically. If a
+            self-update ever fails to relaunch, see `updater.log` /
+            `RECOVERY.txt` next to the exe, or just re-download from this page.
           files: |
             dist/BilliardsTrainer-*.exe
+            dist/BilliardsTrainer-mac-*.zip
             dist/version.json

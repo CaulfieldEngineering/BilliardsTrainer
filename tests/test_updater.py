@@ -49,6 +49,23 @@ def test_check_for_update_offers_only_when_newer(monkeypatch):
     assert updater.check_for_update("0.1.5") is None
 
 
+def test_manifest_platform_assets():
+    """The manifest carries per-platform binaries; each platform gets its own
+    (url, sha) — and platforms without a binary get an empty url, never a
+    wrong-OS download. Pre-Mac manifests (no mac fields) parse fine."""
+    info = updater.UpdateInfo.from_manifest({
+        "version": "0.3.0",
+        "url": "https://x/BilliardsTrainer-0.3.0.exe", "sha256": "AA",
+        "mac_url": "https://x/BilliardsTrainer-mac-0.3.0.zip", "mac_sha256": "BB",
+    })
+    assert info.asset_for_platform("win32") == (info.url, "aa")
+    assert info.asset_for_platform("darwin") == (info.mac_url, "bb")
+    assert info.asset_for_platform("linux") == ("", "")
+
+    legacy = updater.UpdateInfo.from_manifest({"version": "0.2.60", "url": "u"})
+    assert legacy.asset_for_platform("darwin") == ("", "")
+
+
 def test_check_logs_decision(monkeypatch, caplog):
     import logging
     monkeypatch.setattr(updater.requests, "get",

@@ -22,6 +22,20 @@ def test_discovery_includes_core_detectors():
     assert "cue_ball_white" in names
 
 
+def test_onnx_provider_choice_is_platform_agnostic():
+    """Accelerator-first, filtered to availability: DirectML (Windows), CUDA,
+    CoreML (Apple silicon), CPU last — an unavailable provider never leaks."""
+    from billiards_trainer.detector_strategies.onnx_model import pick_providers
+    assert pick_providers(["CPUExecutionProvider", "DmlExecutionProvider"]) == \
+        ["DmlExecutionProvider", "CPUExecutionProvider"]
+    assert pick_providers(["CoreMLExecutionProvider", "CPUExecutionProvider"]) == \
+        ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+    assert pick_providers(["CPUExecutionProvider"]) == ["CPUExecutionProvider"]
+    assert pick_providers([]) == ["CPUExecutionProvider"]
+    # never request something the install doesn't have
+    assert "DmlExecutionProvider" not in pick_providers(["CPUExecutionProvider"])
+
+
 def test_discovery_is_frozen_safe(monkeypatch):
     """REGRESSION: in a PyInstaller onefile, ``pkgutil.iter_modules(__path__)``
     finds nothing on disk. The old iter_modules-only discovery returned {}, which

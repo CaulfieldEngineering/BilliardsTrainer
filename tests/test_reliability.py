@@ -202,6 +202,22 @@ def test_shot_clock_sound_cues_defined(monkeypatch):
     assert len(started) == 3               # unknown edges are silent no-ops
 
 
+def test_shot_clock_wav_render_for_macos():
+    """The macOS playback path renders each cue to a valid mono 16-bit WAV
+    (played via afplay); rendering is platform-independent and cached."""
+    import wave
+
+    from billiards_trainer.ui import sounds
+
+    path = sounds._render_wav(sounds._CUES["expired"])
+    with wave.open(path, "rb") as w:
+        assert w.getnchannels() == 1
+        assert w.getsampwidth() == 2
+        dur_ms = 1000 * w.getnframes() / w.getframerate()
+    assert abs(dur_ms - (260 + 520)) < 5           # the two buzz tones
+    assert sounds._render_wav(sounds._CUES["expired"]) == path  # cached
+
+
 # ---- ball-height parallax correction ------------------------------------- #
 def _synthetic_plane_camera(cam_center, img_w=1920, img_h=1080, f=1400.0):
     """Ground-truth rect-plane -> image homography for a pinhole camera at
