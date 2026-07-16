@@ -174,10 +174,15 @@ class MainWindow(QMainWindow):
         self._live.record_toggled.connect(self._controller.set_recording, q)
         self.apply_settings_requested.connect(self._controller.apply_settings, q)
 
-        # controller -> UI
+        # controller -> UI.
+        # THREADING RULE (crash found by the macOS CI, latent on Windows): a
+        # bare lambda has no receiver QObject, so Qt runs it DIRECTLY on the
+        # EMITTING (worker) thread — touching widgets there is native-crash
+        # territory. Every cross-thread signal must land on a bound method of
+        # a UI-thread QObject so the connection auto-queues.
         self._controller.frame_ready.connect(self._live.on_frame)
         self._controller.stats_updated.connect(self._live.on_stats)
-        self._controller.stats_updated.connect(lambda _s: self._stats.refresh())
+        self._controller.stats_updated.connect(self._refresh_stats_page)
         self._controller.shot_recorded.connect(self._live.on_shot)
         self._controller.shot_suggested.connect(self._live.on_suggestion)
         self._controller.recording_changed.connect(self._live.on_recording)
@@ -188,8 +193,7 @@ class MainWindow(QMainWindow):
         self._controller.error.connect(self._on_error)
         self._controller.settings_changed.connect(self._on_settings_changed)
         self._controller.replay_saved.connect(self._on_replay_saved)
-        self._controller.capture_progress.connect(
-            lambda m: self.statusBar().showMessage(f"Capture: {m}", 4000))
+        self._controller.capture_progress.connect(self._on_capture_progress)
         self._controller.capture_progress.connect(self._live.set_training_count)
         self._controller.capture_saved.connect(self._on_capture_saved)
 
@@ -215,7 +219,18 @@ class MainWindow(QMainWindow):
         self._settings_page.flag_failure_requested.connect(self._controller.flag_failure, q)
         self._controller.failure_flagged.connect(self._on_failure_flagged)
         self._drills.drill_chosen.connect(self._on_drill_chosen)
-        self._sync.status.connect(lambda msg: self.statusBar().showMessage(f"Sync: {msg}", 4000))
+        self._sync.status.connect(self._on_sync_status)
+
+    # Cross-thread signal landing pads (bound methods of this UI-thread QObject
+    # -> Qt auto-queues; see the THREADING RULE note in _wire).
+    def _refresh_stats_page(self, _summary) -> None:
+        self._stats.refresh()
+
+    def _on_capture_progress(self, msg: str) -> None:
+        self.statusBar().showMessage(f"Capture: {msg}", 4000)
+
+    def _on_sync_status(self, msg: str) -> None:
+        self.statusBar().showMessage(f"Sync: {msg}", 4000)
 
     # ------------------------------------------------------------------ #
     def _autostart_preview(self) -> None:
@@ -257,12 +272,14 @@ class MainWindow(QMainWindow):
         self._model_dl_worker.moveToThread(self._model_dl_thread)
         self._model_dl_thread.started.connect(self._model_dl_worker.run)
         self._model_dl_worker.done.connect(self._on_model_autofetched)
-        self._model_dl_worker.failed.connect(
-            lambda m: self.statusBar().showMessage(
-                f"Model download failed ({m}); using the basic cue detector.", 6000))
+        self._model_dl_worker.failed.connect(self._on_model_dl_failed)
         for sig in (self._model_dl_worker.done, self._model_dl_worker.failed):
             sig.connect(self._model_dl_thread.quit)
         self._model_dl_thread.start()
+
+    def _on_model_dl_failed(self, msg: str) -> None:
+        self.statusBar().showMessage(
+            f"Model download failed ({msg}); using the basic cue detector.", 6000)
 
     def _on_model_autofetched(self, _strategy: str) -> None:
         # Re-resolve the live detector ('auto') so the freshly-downloaded model is
@@ -420,8 +437,6 @@ class MainWindow(QMainWindow):
     def _train_ball_ids(self) -> None:
         """Fine-tune on the labelled store (Training Mode) in a torch env, then
         switch the app to the table-trained model."""
-        from pathlib import Path
-
         from ..config import APP_DIR, MODELS_DIR
         from ..train import TrainingStore
         store = TrainingStore(APP_DIR / "training" / "ballid")
