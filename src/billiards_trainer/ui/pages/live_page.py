@@ -17,7 +17,6 @@ import random
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QFrame,
     QGridLayout,
@@ -34,10 +33,9 @@ from PySide6.QtWidgets import (
 )
 
 from ...config import Settings
-from ...vision.types import BallClass
 from ..icons import icon
 from ..theme import PALETTE
-from ..widgets.common import Badge, Card, SegmentedControl, StatCard
+from ..widgets.common import Badge, Card, StatCard
 from ..widgets.shot_clock_widget import ShotClockWidget
 from ..widgets.video_view import VideoView
 
@@ -68,18 +66,30 @@ class _SeekSlider(QSlider):
         super().mousePressEvent(ev)
 
 
+class _StatusPill(QLabel):
+    """Broadcast-style status bug: a coloured dot + spaced uppercase label on a
+    dark pill — the LIVE/PLAYBACK indicator you'd see on a stream deck, not a
+    generic badge."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTextFormat(Qt.RichText)
+        self.set_text_color("IDLE", PALETTE.text_faint)
+
+    def set_text_color(self, text: str, color: str) -> None:
+        self.setText(f'<span style="color:{color}; font-size:10px;">●</span>'
+                     f'&nbsp;&nbsp;{text}')
+        self.setStyleSheet(
+            "background: rgba(0,0,0,0.35); border-radius: 5px;"
+            "padding: 4px 12px; font-size: 11px; font-weight: 800;"
+            f"letter-spacing: 1.5px; color: {PALETTE.text};")
+
+
 class LivePage(QWidget):
     start_requested = Signal(str, str, str)   # source, mode, drill_key
     stop_requested = Signal()
-    recalibrate_requested = Signal()
-    pick_felt_requested = Signal(float, float)  # normalised click coords
-    overlays_toggled = Signal(bool)
-    save_replay_requested = Signal()
-    pause_toggled = Signal(bool)
-    reset_requested = Signal()
-    manual_shot = Signal(str)                 # 'make' | 'miss'
     record_toggled = Signal(bool)
-    detection_toggled = Signal(bool)          # auto-detection on/off
+    record_pause_toggled = Signal(bool)       # pause/resume the active recording
     retry_requested = Signal()                # re-open the camera after an error
     open_settings_requested = Signal()        # jump to Settings → Camera
     video_play_pause = Signal(bool)           # paused?
@@ -98,9 +108,9 @@ class LivePage(QWidget):
         self._running = False
         self._detect_on = False
         self._video_fps = 30.0
-        self._drill_key = ""
-        self._drill_name = ""
-        self._pick_mode = False
+        self._is_video = False   # playing back a recording (badge: PLAYBACK)
+        self._recording_on = False
+        self._stats_active = False
         # transport scrub state
         self._user_is_seeking = False
         self._was_playing = False
@@ -112,6 +122,7 @@ class LivePage(QWidget):
         self._label_sel = -1
         self._frame_wh = (1, 1)
         self._last_packet = None   # newest frame packet, for labelling on entry
+        self._settings.ui.normalize_ball_size = True  # never per-frame radius wobble
         self._build()
 
     # ------------------------------------------------------------------ #
@@ -142,7 +153,6 @@ class LivePage(QWidget):
         self._persp_stack.addWidget(self._persp)
         self._persp_stack.addWidget(self._camera_error_panel())
         persp_card.add(self._persp_stack)
-        persp_card.add(self._transport_bar())   # video play/seek/step strip
         splitter.addWidget(persp_card)
 
         # Right rail swaps between the normal tuning/score rail and the Training
@@ -155,7 +165,7 @@ class LivePage(QWidget):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 4)
         splitter.setStretchFactor(2, 0)
-        splitter.setSizes([400, 540, 340])
+        splitter.setSizes([430, 570, 260])
         root.addWidget(splitter, 1)
 
     def _caption(self, text: str) -> QLabel:
@@ -164,89 +174,98 @@ class LivePage(QWidget):
         return lbl
 
     def _control_bar(self) -> QWidget:
+        """The media header: status bug, record cluster, playback cluster.
+        Everything is always visible; enablement follows context (record on the
+        live camera, playback while reviewing a session)."""
         bar = QFrame()
         bar.setObjectName("Card")
         lay = QHBoxLayout(bar)
-        lay.setContentsMargins(14, 10, 14, 10)
-        lay.setSpacing(10)
+        lay.setContentsMargins(14, 8, 14, 8)
+        lay.setSpacing(8)
 
-        # Auto-detection is a toggle, not a Start gate: the camera previews the
-        # moment the app opens. Detection defaults OFF so nothing fake is drawn.
-        self._detect_btn = QPushButton("  Detection: OFF")
-        self._detect_btn.setObjectName("Ghost")
-        self._detect_btn.setCheckable(True)
-        self._detect_btn.setCursor(Qt.PointingHandCursor)
-        self._detect_btn.setIcon(icon("zap", PALETTE.text_dim))
-        self._detect_btn.setToolTip("Turn AI ball/shot detection on or off")
-        self._detect_btn.clicked.connect(self._toggle_detection)
-        lay.addWidget(self._detect_btn)
-
-        # Which live detector runs when Detection is ON (Phase-1 winner default).
-        # Read-only label here; switch detectors in Settings → Ball detection.
-        self._detector_lbl = QLabel(f"Detector: {self._live_strategy_name()}")
-        self._detector_lbl.setObjectName("Muted")
-        lay.addWidget(self._detector_lbl)
-
-        # 'Try demo' removed — the synthetic demo source didn't reflect real
-        # detection and confused the surface. Demo is still reachable via
-        # Settings → Camera → "Demo simulation" for engineering use.
-        self._mode = SegmentedControl(
-            [("free_play", "Sandbox"), ("practice", "Practice"), ("drill", "Drill")],
-            current=self._settings.mode)
-        # Practice/Drill are deferred until detection milestones M1–M6 land
-        # (see docs/ROADMAP.md): disable so the surface only offers what works.
-        self._mode.disable_option("practice", "Coming soon — see roadmap")
-        self._mode.disable_option("drill", "Coming soon — see roadmap")
-        if self._mode.current() == "":  # saved mode was a now-disabled one
-            self._mode.set_current("free_play")
-        lay.addWidget(self._mode)
-
-        lay.addStretch(1)
-
-        self._status_badge = Badge("IDLE", PALETTE.text_faint)
+        # Broadcast bug: ● LIVE / ▶ PLAYBACK / table states.
+        self._status_badge = _StatusPill()
         lay.addWidget(self._status_badge)
-        self._balls_lbl = QLabel("0 balls")
-        self._balls_lbl.setObjectName("Muted")
-        lay.addWidget(self._balls_lbl)
-        self._fps_lbl = QLabel("0 fps")
-        self._fps_lbl.setObjectName("Faint")
-        lay.addWidget(self._fps_lbl)
+        lay.addWidget(self._vsep())
 
-        # tuning tools
-        self._pause_btn = self._tool_btn("pause", "Pause shot counting (video keeps running)")
-        self._pause_btn.setCheckable(True)
-        self._pause_btn.clicked.connect(self._toggle_pause)
-        lay.addWidget(self._pause_btn)
+        # Record cluster (solid glyphs): ● ❚❚ ■ + elapsed clock.
+        self._rec_btn = self._tool_btn("rec", "Start recording this session")
+        self._rec_btn.clicked.connect(self._on_rec_clicked)
+        self._rec_pause_btn = self._tool_btn("rec-pause", "Pause / resume recording")
+        self._rec_pause_btn.setCheckable(True)
+        self._rec_pause_btn.setEnabled(False)
+        self._rec_pause_btn.clicked.connect(self._on_rec_pause)
+        self._rec_stop_btn = self._tool_btn("rec-stop", "Stop recording + save")
+        self._rec_stop_btn.setEnabled(False)
+        self._rec_stop_btn.clicked.connect(lambda: self.record_toggled.emit(False))
+        for w in (self._rec_btn, self._rec_pause_btn, self._rec_stop_btn):
+            lay.addWidget(w)
+        self._rec_time = QLabel("")
+        self._rec_time.setObjectName("Muted")
+        lay.addWidget(self._rec_time)
+        lay.addWidget(self._vsep())
 
-        self._record_btn = self._tool_btn("activity", "Record this session to a video clip")
-        self._record_btn.setCheckable(True)
-        self._record_btn.clicked.connect(lambda: self.record_toggled.emit(self._record_btn.isChecked()))
-        lay.addWidget(self._record_btn)
+        # Playback cluster — greyed out until a session is open.
+        self._play_btn = self._tool_btn("play-solid", "Play / pause")
+        self._play_btn.setCheckable(True)
+        self._play_btn.clicked.connect(self._toggle_play)
+        pb_stop = self._tool_btn("rec-stop", "Stop (back to first frame)")
+        pb_stop.clicked.connect(self.video_stop_requested.emit)
+        back_btn = self._tool_btn("step-back", "Step back one frame")
+        back_btn.clicked.connect(lambda: self.video_step.emit(-1))
+        fwd_btn = self._tool_btn("step-fwd", "Step forward one frame")
+        fwd_btn.clicked.connect(lambda: self.video_step.emit(1))
+        for w in (self._play_btn, pb_stop, back_btn, fwd_btn):
+            lay.addWidget(w)
+        self._seek = _SeekSlider(Qt.Horizontal)
+        self._seek.setRange(0, 0)
+        self._seek.setSingleStep(1)
+        self._seek.sliderPressed.connect(self._on_seek_pressed)
+        self._seek.sliderMoved.connect(self._on_seek_moved)
+        self._seek.sliderReleased.connect(self._on_seek_released)
+        # Debounce the live scrub: each seek decodes + (maybe) detects; cap at
+        # ~12/s and seek the exact final frame on release.
+        self._seek_debounce = QTimer(self)
+        self._seek_debounce.setSingleShot(True)
+        self._seek_debounce.setInterval(80)
+        self._seek_debounce.timeout.connect(self._emit_pending_seek)
+        lay.addWidget(self._seek, 1)
+        self._time_lbl = QLabel("0:00 / 0:00")
+        self._time_lbl.setObjectName("Faint")
+        lay.addWidget(self._time_lbl)
+        self._speed_combo = QComboBox()
+        self._speed_combo.addItems(["0.25×", "0.5×", "1×", "2×", "4×"])
+        self._speed_combo.setCurrentText("1×")
+        self._speed_combo.activated.connect(
+            lambda _i: self.video_speed.emit(float(self._speed_combo.currentText().rstrip("×"))))
+        lay.addWidget(self._speed_combo)
+        self._fix_labels_btn = QPushButton("Train AI")
+        self._fix_labels_btn.setObjectName("Ghost")
+        self._fix_labels_btn.setCheckable(True)
+        self._fix_labels_btn.setCursor(Qt.PointingHandCursor)
+        self._fix_labels_btn.setToolTip("Teach the AI this table: correct ball "
+                                        "numbers on this frame")
+        self._fix_labels_btn.toggled.connect(self.set_training)
+        lay.addWidget(self._fix_labels_btn)
 
-        self._pick_btn = self._tool_btn("crosshair", "Pick felt colour (click the table)")
-        self._pick_btn.clicked.connect(self._toggle_pick)
-        lay.addWidget(self._pick_btn)
-
-        self._overlay_btn = self._tool_btn("layers", "Toggle detection overlays")
-        self._overlay_btn.clicked.connect(self._toggle_overlays)
-        lay.addWidget(self._overlay_btn)
-
-        self._recal_btn = self._tool_btn("refresh", "Recalibrate the table")
-        self._recal_btn.clicked.connect(self.recalibrate_requested.emit)
-        lay.addWidget(self._recal_btn)
+        self._playback_widgets = [self._play_btn, pb_stop, back_btn, fwd_btn,
+                                  self._seek, self._time_lbl, self._speed_combo,
+                                  self._fix_labels_btn]
+        for w in self._playback_widgets:
+            w.setEnabled(False)
         return bar
 
-    def _toggle_pause(self) -> None:
-        paused = self._pause_btn.isChecked()
-        self._pause_btn.setIcon(icon("play" if paused else "pause",
-                                     PALETTE.warn if paused else PALETTE.text_dim))
-        self.pause_toggled.emit(paused)
+    def _vsep(self) -> QFrame:
+        sep = QFrame()
+        sep.setFrameShape(QFrame.VLine)
+        sep.setStyleSheet(f"color:{PALETTE.text_faint};")
+        return sep
 
-    def _live_strategy_name(self) -> str:
-        return getattr(self._settings.balls, "live_strategy", "simple_blob")
+    def _on_rec_clicked(self) -> None:
+        self.record_toggled.emit(True)          # start recording
 
-    def set_detector_label(self, name: str) -> None:
-        self._detector_lbl.setText(f"Detector: {name}")
+    def _on_rec_pause(self) -> None:
+        self.record_pause_toggled.emit(self._rec_pause_btn.isChecked())
 
     def _camera_error_panel(self) -> QWidget:
         panel = QFrame()
@@ -282,60 +301,9 @@ class LivePage(QWidget):
         col.addStretch(1)
         return panel
 
-    def _transport_bar(self) -> QWidget:
-        bar = QFrame()
-        bar.setObjectName("Card")
-        lay = QHBoxLayout(bar)
-        lay.setContentsMargins(10, 6, 10, 6)
-        lay.setSpacing(6)
-        self._play_btn = self._tool_btn("play", "Play / pause")
-        self._play_btn.setCheckable(True)
-        self._play_btn.clicked.connect(self._toggle_play)
-        stop_btn = self._tool_btn("stop", "Stop (back to first frame)")
-        stop_btn.clicked.connect(self.video_stop_requested.emit)
-        back_btn = QPushButton("◀|")
-        back_btn.setObjectName("Ghost")
-        back_btn.setToolTip("Step back one frame")
-        back_btn.setCursor(Qt.PointingHandCursor)
-        back_btn.clicked.connect(lambda: self.video_step.emit(-1))
-        fwd_btn = QPushButton("|▶")
-        fwd_btn.setObjectName("Ghost")
-        fwd_btn.setToolTip("Step forward one frame")
-        fwd_btn.setCursor(Qt.PointingHandCursor)
-        fwd_btn.clicked.connect(lambda: self.video_step.emit(1))
-        for w in (self._play_btn, stop_btn, back_btn, fwd_btn):
-            lay.addWidget(w)
-        self._seek = _SeekSlider(Qt.Horizontal)
-        self._seek.setRange(0, 0)
-        self._seek.setSingleStep(1)
-        self._seek.sliderPressed.connect(self._on_seek_pressed)
-        self._seek.sliderMoved.connect(self._on_seek_moved)
-        self._seek.sliderReleased.connect(self._on_seek_released)
-        # Debounce the live scrub: each seek decodes + (maybe) detects, so firing
-        # on every mouse-move (60+/s) backs the worker up and frames arrive out of
-        # order — the "rewinds frame-by-frame" feel. Cap it at ~12/s; the exact
-        # final frame is seeked on release.
-        self._seek_debounce = QTimer(self)
-        self._seek_debounce.setSingleShot(True)
-        self._seek_debounce.setInterval(80)
-        self._seek_debounce.timeout.connect(self._emit_pending_seek)
-        lay.addWidget(self._seek, 1)
-        self._time_lbl = QLabel("0:00 / 0:00")
-        self._time_lbl.setObjectName("Faint")
-        lay.addWidget(self._time_lbl)
-        self._speed_combo = QComboBox()
-        self._speed_combo.addItems(["0.25×", "0.5×", "1×", "2×", "4×"])
-        self._speed_combo.setCurrentText("1×")
-        self._speed_combo.activated.connect(
-            lambda _i: self.video_speed.emit(float(self._speed_combo.currentText().rstrip("×"))))
-        lay.addWidget(self._speed_combo)
-        self._transport = bar
-        bar.setVisible(False)   # only shown for video-file sources
-        return bar
-
     def _toggle_play(self) -> None:
         paused = self._play_btn.isChecked()
-        self._play_btn.setIcon(icon("play" if paused else "pause", PALETTE.text_dim))
+        self._play_btn.setIcon(icon("play-solid" if paused else "rec-pause", PALETTE.text_dim))
         self.video_play_pause.emit(paused)
 
     # --- seek-bar scrubbing -------------------------------------------------- #
@@ -382,7 +350,10 @@ class LivePage(QWidget):
 
     def set_video_mode(self, is_video: bool, total: int, fps: float) -> None:
         self._video_fps = fps or 30.0
-        self._transport.setVisible(is_video)
+        self._is_video = is_video   # badge shows PLAYBACK instead of LIVE
+        self._update_stats_active()
+        for w in self._playback_widgets:
+            w.setEnabled(is_video)
         if hasattr(self, "_jump_section"):
             self._jump_section.setVisible(is_video)  # jumping needs a seekable clip
         if is_video:
@@ -400,22 +371,7 @@ class LivePage(QWidget):
             self._seek.blockSignals(False)
             self._time_lbl.setText(f"{self._fmt_t(pos)} / {self._fmt_t(total)}")
             self._play_btn.setChecked(not playing)
-            self._play_btn.setIcon(icon("play" if not playing else "pause", PALETTE.text_dim))
-
-    def _toggle_detection(self) -> None:
-        on = self._detect_btn.isChecked()
-        self._set_detect_ui(on)
-        self.detection_toggled.emit(on)
-
-    def _set_detect_ui(self, on: bool) -> None:
-        self._detect_on = on
-        self._detect_btn.setChecked(on)
-        self._detect_btn.setText("  Detection: ON" if on else "  Detection: OFF")
-        self._detect_btn.setObjectName("Accent" if on else "Ghost")
-        self._detect_btn.setIcon(icon("zap", "#0A0E12" if on else PALETTE.text_dim))
-        # restyle after objectName change
-        self._detect_btn.style().unpolish(self._detect_btn)
-        self._detect_btn.style().polish(self._detect_btn)
+            self._play_btn.setIcon(icon("play-solid" if not playing else "rec-pause", PALETTE.text_dim))
 
     def show_camera_error(self, msg: str) -> None:
         self._cam_err_lbl.setText(msg)
@@ -427,64 +383,35 @@ class LivePage(QWidget):
             self._persp_stack.setCurrentIndex(0)
 
     def _tool_btn(self, ic: str, tip: str) -> QPushButton:
+        from PySide6.QtCore import QSize
         btn = QPushButton()
         btn.setObjectName("Ghost")
-        btn.setIcon(icon(ic, PALETTE.text_dim))
+        btn.setIcon(icon(ic, PALETTE.text_dim, size=26))
+        btn.setIconSize(QSize(20, 20))
         btn.setToolTip(tip)
         btn.setCursor(Qt.PointingHandCursor)
         return btn
 
     def _stats_rail(self) -> QWidget:
-        rail = Card(padding=16, spacing=14)
-        rail.setMinimumWidth(300)
-        rail.setMaximumWidth(400)
-
-        # Live tuning panel up top — adjust while watching the clip (instant, no
-        # recalibration). The score readout below stays for manual +Make/-Miss.
-        rail.layout().addWidget(self._tuning_section())
-        rail.layout().addWidget(self._hsep())
+        # Compact scoreboard — tight spacing, narrow column; more stats land
+        # here later, so the layout leaves the room in the middle, not the edges.
+        rail = Card(padding=12, spacing=8)
+        rail.setMinimumWidth(240)
+        rail.setMaximumWidth(300)
 
         # The headline: makes vs misses, big.
         mm = QHBoxLayout()
-        mm.setSpacing(12)
+        mm.setSpacing(8)
         self._makes_box, self._makes_val = self._big_stat("MAKES", PALETTE.success)
         self._misses_box, self._misses_val = self._big_stat("MISSES", PALETTE.danger)
         mm.addWidget(self._makes_box)
         mm.addWidget(self._misses_box)
         rail.layout().addLayout(mm)
 
-        self._outcome = Badge("READY", PALETTE.text_dim)
-        oc_row = QHBoxLayout()
-        oc_row.addStretch(1)
-        oc_row.addWidget(self._outcome)
-        oc_row.addStretch(1)
-        rail.layout().addLayout(oc_row)
-
-        # Manual entry — always available, and the reliable fallback when
-        # auto-detection isn't trusted (or in confirm-manually mode).
-        manual = QHBoxLayout()
-        make_btn = QPushButton("＋ Make")
-        make_btn.setObjectName("Accent")
-        make_btn.setCursor(Qt.PointingHandCursor)
-        make_btn.clicked.connect(lambda: self.manual_shot.emit("make"))
-        miss_btn = QPushButton("－ Miss")
-        miss_btn.setObjectName("Danger")
-        miss_btn.setCursor(Qt.PointingHandCursor)
-        miss_btn.clicked.connect(lambda: self.manual_shot.emit("miss"))
-        manual.addWidget(make_btn)
-        manual.addWidget(miss_btn)
-        rail.layout().addLayout(manual)
-
-        reset_btn = QPushButton("Reset counters")
-        reset_btn.setObjectName("Ghost")
-        reset_btn.setCursor(Qt.PointingHandCursor)
-        reset_btn.clicked.connect(self.reset_requested.emit)
-        rail.layout().addWidget(reset_btn)
-
         grid = QHBoxLayout()
-        grid.setSpacing(10)
-        self._k_pct = StatCard("Make %", "0%", accent=True)
-        self._k_streak = StatCard("Streak", "0")
+        grid.setSpacing(8)
+        self._k_pct = StatCard("Make %", "—", accent=True)
+        self._k_streak = StatCard("Streak", "—")
         grid.addWidget(self._k_pct)
         grid.addWidget(self._k_streak)
         rail.layout().addLayout(grid)
@@ -503,37 +430,36 @@ class LivePage(QWidget):
         self._clock_holder.setVisible(self._settings.shot_clock.enabled)
         rail.layout().addWidget(self._clock_holder)
 
-        self._drill_lbl = QLabel("")
-        self._drill_lbl.setObjectName("Faint")
-        self._drill_lbl.setWordWrap(True)
-        rail.layout().addWidget(self._drill_lbl)
-
         rail.layout().addStretch(1)
 
-        self._replay_btn = QPushButton("  Save last 5s")
-        self._replay_btn.setCursor(Qt.PointingHandCursor)
-        self._replay_btn.setIcon(icon("activity", PALETTE.text_dim))
-        self._replay_btn.setToolTip("Save a clip of what the detector just saw")
-        self._replay_btn.clicked.connect(self.save_replay_requested.emit)
-        rail.layout().addWidget(self._replay_btn)
-
-        hint = QLabel("Your camera previews automatically. Score with +Make / "
-                      "−Miss, or flip Detection: ON for automatic ball detection "
-                      "(no setup needed); use Pick felt if the table read looks off.")
-        hint.setObjectName("Faint")
-        hint.setWordWrap(True)
-        rail.layout().addWidget(hint)
         return rail
 
     def _big_stat(self, label: str, color: str):
         box = Card(padding=14, spacing=2)
         lbl = QLabel(label)
         lbl.setObjectName("StatLabel")
-        val = QLabel("0")
-        val.setStyleSheet(f"font-size: 40px; font-weight: 800; color: {color};")
+        val = QLabel("—")
+        val.setProperty("statColor", color)
+        val.setStyleSheet(f"font-size: 40px; font-weight: 800; color: {PALETTE.text_faint};")
         box.add(lbl)
         box.add(val)
         return box, val
+
+    def _update_stats_active(self) -> None:
+        """Stats belong to a RECORDING: coloured + counting only while the
+        session recorder runs; greyed dashes any other time (Joe's rule)."""
+        active = self._recording_on
+        if active == self._stats_active:
+            return
+        self._stats_active = active
+        for val in (self._makes_val, self._misses_val):
+            color = val.property("statColor") if active else PALETTE.text_faint
+            val.setStyleSheet(f"font-size: 40px; font-weight: 800; color: {color};")
+        if not active:
+            self._makes_val.setText("—")
+            self._misses_val.setText("—")
+            self._k_pct.set_value("—")
+            self._k_streak.set_value("—")
 
     # ------------------------------------------------------------------ #
     # Cue-stroke card (Bluetooth IMU on the cue butt)
@@ -647,101 +573,6 @@ class LivePage(QWidget):
         line.setStyleSheet(f"background:{PALETTE.text_faint};border:none;")
         return line
 
-    def _tuning_section(self) -> QWidget:
-        col = QVBoxLayout()
-        col.setContentsMargins(0, 0, 0, 0)
-        col.setSpacing(8)
-        cap = QLabel("TUNING — adjust while watching")
-        cap.setObjectName("StatLabel")
-        col.addWidget(cap)
-
-        # Live cue-ball status (updated every frame from the tracker output).
-        self._cue_status = QLabel("○  CUE: —")
-        self._cue_status.setStyleSheet("font-size: 17px; font-weight: 800;")
-        col.addWidget(self._cue_status)
-        self._cue_sub = QLabel("detection off")
-        self._cue_sub.setObjectName("Faint")
-        self._cue_sub.setWordWrap(True)
-        col.addWidget(self._cue_sub)
-
-        # Detector min-confidence: lower → finds more (recovers a faint cue),
-        # higher → stricter (drops false blobs). Applies live.
-        col.addWidget(self._conf_row())
-
-        # Display toggles — pure render flags, instant.
-        # 'Uniform ball size' is always on (Joe never wants per-frame detector
-        # radius wobble), so it's not exposed as a toggle.
-        self._settings.ui.normalize_ball_size = True
-        for label, attr in (
-            ("Show ball numbers", "show_ball_ids"),
-            ("Show trajectories", "show_trajectories"),
-            ("Clean schematic bird's-eye", "schematic_birdseye"),
-            ("Show overlays", "show_overlays"),
-        ):
-            col.addWidget(self._ui_toggle(label, attr))
-
-        w = QWidget()
-        w.setLayout(col)
-        return w
-
-    def _conf_row(self) -> QWidget:
-        row = QVBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(2)
-        head = QHBoxLayout()
-        lbl = QLabel("Detector min-confidence")
-        lbl.setObjectName("Muted")
-        self._conf_val = QLabel(f"{self._settings.detection.confidence_floor:.2f}")
-        self._conf_val.setObjectName("Faint")
-        head.addWidget(lbl)
-        head.addStretch(1)
-        head.addWidget(self._conf_val)
-        row.addLayout(head)
-        sld = QSlider(Qt.Horizontal)
-        sld.setRange(10, 90)
-        sld.setValue(int(round(self._settings.detection.confidence_floor * 100)))
-        sld.valueChanged.connect(self._on_conf_changed)
-        row.addWidget(sld)
-        w = QWidget()
-        w.setLayout(row)
-        return w
-
-    def _ui_toggle(self, label: str, attr: str) -> QCheckBox:
-        cb = QCheckBox(label)
-        cb.setCursor(Qt.PointingHandCursor)
-        cb.setChecked(bool(getattr(self._settings.ui, attr)))
-        cb.toggled.connect(lambda on, a=attr: self._on_ui_toggle(a, on))
-        return cb
-
-    def _on_conf_changed(self, v: int) -> None:
-        self._settings.detection.confidence_floor = v / 100.0
-        self._conf_val.setText(f"{v / 100.0:.2f}")
-        self.tuning_changed.emit()
-
-    def _on_ui_toggle(self, attr: str, on: bool) -> None:
-        setattr(self._settings.ui, attr, on)
-        self.tuning_changed.emit()
-
-    def _update_cue_status(self, packet) -> None:
-        if not self._detect_on:
-            self._cue_status.setText("○  CUE: —")
-            self._cue_status.setStyleSheet("font-size:17px;font-weight:800;color:%s;"
-                                           % PALETTE.text_faint)
-            self._cue_sub.setText("detection off — flip Detection: ON")
-            return
-        cue = next((t for t in (packet.tracks or []) if t.cls == BallClass.CUE), None)
-        if cue is not None:
-            self._cue_status.setText("●  CUE: TRACKED")
-            self._cue_status.setStyleSheet("font-size:17px;font-weight:800;color:%s;"
-                                           % PALETTE.success)
-            self._cue_sub.setText(f"id #{cue.id} · ({cue.x:.0f}, {cue.y:.0f}) · "
-                                  f"{packet.n_balls} balls · {packet.fps:.0f} fps")
-        else:
-            self._cue_status.setText("○  CUE: searching…")
-            self._cue_status.setStyleSheet("font-size:17px;font-weight:800;color:%s;"
-                                           % PALETTE.warn)
-            self._cue_sub.setText(f"{packet.n_balls} balls · {packet.fps:.0f} fps")
-
     # ------------------------------------------------------------------ #
     # Training Mode — label/correct ball numbers on the playback video
     # ------------------------------------------------------------------ #
@@ -752,6 +583,7 @@ class LivePage(QWidget):
         cap = QLabel("TRAINING MODE")
         cap.setObjectName("StatLabel")
         rail.add(cap)
+
         hint = QLabel("Scrub/pause to a clear frame — each ball shows the model's "
                       "current guess (C = cue, ? = unsure). Click any that are WRONG "
                       "and tap the correct number; click an empty spot to ADD a missed "
@@ -812,25 +644,75 @@ class LivePage(QWidget):
         jcol.addLayout(jrow)
         rail.add(self._jump_section)
 
-        rail.add(self._hsep())
-        train = QPushButton("Train model on collected data")
-        train.setCursor(Qt.PointingHandCursor)
-        train.clicked.connect(self.train_balls_requested.emit)
-        rail.add(train)
-        tnote = QLabel("Training fine-tunes the model on what you've labelled and "
-                       "switches the app to it. Re-train if your camera moves.")
-        tnote.setObjectName("Faint")
-        tnote.setWordWrap(True)
-        rail.add(tnote)
         rail.layout().addStretch(1)
+
+        # Bottom action cluster (Joe's spec): Save · Auto-Label with AI · Train.
+        rail.add(self._hsep())
+        row = QHBoxLayout()
+        row.setSpacing(6)
+        save_b = QPushButton("＋ Save")
+        save_b.setObjectName("Accent")
+        save_b.setCursor(Qt.PointingHandCursor)
+        save_b.setToolTip("Add this frame's labels to the training data")
+        save_b.clicked.connect(self._save_label_frame)
+        row.addWidget(save_b)
+        self._train_ai_btn = QPushButton("✨ Train with AI")
+        self._train_ai_btn.setCursor(Qt.PointingHandCursor)
+        self._train_ai_btn.setToolTip("Auto-label the recorded session (if AI is "
+                                      "configured), fine-tune on everything saved, "
+                                      "and switch to the new model automatically")
+        self._train_ai_btn.clicked.connect(self.train_balls_requested.emit)
+        row.addWidget(self._train_ai_btn)
+        rw = QWidget()
+        rw.setLayout(row)
+        rail.add(rw)
+        from PySide6.QtWidgets import QProgressBar
+        self._train_progress = QProgressBar()
+        self._train_progress.setRange(0, 100)
+        self._train_progress.setValue(0)
+        self._train_progress.setTextVisible(True)
+        self._train_progress.setVisible(False)
+        rail.add(self._train_progress)
+        self._train_log = QLabel("")
+        self._train_log.setObjectName("Faint")
+        self._train_log.setWordWrap(True)
+        rail.add(self._train_log)
+        self._autolabel_status = self._train_log   # shared status line
         return rail
 
+    def on_train_progress(self, pct: int, line: str) -> None:
+        """Live training progress: bar + latest log line; -1 pct = indeterminate."""
+        self._train_progress.setVisible(True)
+        if pct < 0:
+            self._train_progress.setRange(0, 0)      # busy animation
+        else:
+            self._train_progress.setRange(0, 100)
+            self._train_progress.setValue(pct)
+        if line:
+            self._train_log.setText(line)
+
+    def on_train_done(self, ok: bool, msg: str) -> None:
+        self._train_progress.setVisible(False)
+        self._train_progress.setRange(0, 100)
+        self._train_log.setText(msg)
+        self._train_ai_btn.setEnabled(True)
+
+    def set_autolabel_status(self, text: str, busy: bool = False) -> None:
+        self._train_log.setText(text)
+        self._train_ai_btn.setEnabled(not busy)
+        if busy:
+            self.on_train_progress(-1, text)
+
     def set_training(self, on: bool) -> None:
-        """Enter/leave Training Mode: swap the right rail and make the camera view
-        clickable for labelling. Reuses the normal video + transport."""
+        """Enter/leave label mode ('Fix labels'): swap the right rail to the
+        number pad and make the camera view clickable for labelling."""
         self._training = on
         self._rail_stack.setCurrentIndex(1 if on else 0)
-        self._persp.set_pickable(on or self._pick_mode)
+        if hasattr(self, "_fix_labels_btn") and self._fix_labels_btn.isChecked() != on:
+            self._fix_labels_btn.blockSignals(True)
+            self._fix_labels_btn.setChecked(on)
+            self._fix_labels_btn.blockSignals(False)
+        self._persp.set_pickable(on)
         if not on:
             self._persp.set_overlay([])   # clear labelling markers
         self.label_mode_toggled.emit(on)
@@ -962,32 +844,10 @@ class LivePage(QWidget):
     # ------------------------------------------------------------------ #
     # Intent
     # ------------------------------------------------------------------ #
-    def set_drill(self, drill_key: str, drill_name: str) -> None:
-        self._drill_key = drill_key
-        self._drill_name = drill_name
-        self._mode.set_current("drill")
-        self._drill_lbl.setText(f"Drill: {drill_name}" if drill_name else "")
-
-    def _toggle_pick(self) -> None:
-        self._pick_mode = not self._pick_mode
-        self._persp.set_pickable(self._pick_mode)
-        self._pick_btn.setIcon(icon("crosshair",
-                                    PALETTE.accent if self._pick_mode else PALETTE.text_dim))
-        if self._pick_mode:
-            self._status_badge.set_text_color("TAP THE CLOTH", PALETTE.info)
 
     def _on_persp_click(self, xf: float, yf: float) -> None:
-        if self._pick_mode:
-            self.pick_felt_requested.emit(xf, yf)
-            self._toggle_pick()  # one-shot
-        elif self._training:
+        if self._training:
             self._on_label_click(xf, yf)
-
-    def _toggle_overlays(self) -> None:
-        new = not self._settings.ui.show_overlays
-        self._settings.ui.show_overlays = new
-        self._overlay_btn.setIcon(icon("layers", PALETTE.accent if new else PALETTE.text_dim))
-        self.overlays_toggled.emit(new)
 
     # ------------------------------------------------------------------ #
     # Controller signal handlers
@@ -1000,8 +860,8 @@ class LivePage(QWidget):
             self._bird.clear()
 
     def set_detection(self, on: bool) -> None:
-        """Reflect the controller's auto-detection state (e.g. after Try demo)."""
-        self._set_detect_ui(on)
+        """Track the controller's auto-detection state (toggle lives in Settings)."""
+        self._detect_on = on
 
     def on_frame(self, packet) -> None:
         self._last_packet = packet
@@ -1015,16 +875,11 @@ class LivePage(QWidget):
                 self._persp.set_frame(packet.perspective)
         if packet.birdseye is not None:
             self._bird.set_frame(packet.birdseye)
-        self._fps_lbl.setText(f"{packet.fps:.0f} fps")
-        self._balls_lbl.setText(f"{packet.n_balls} balls")
-        self._update_cue_status(packet)
         self._clock_holder.setVisible(packet.clock_enabled)
         if packet.clock_enabled:
             self._clock.update_clock(packet.clock_remaining,
                                      max(1.0, self._settings.shot_clock.seconds),
                                      packet.clock_warning, True)
-        if self._pick_mode:
-            return  # keep the "tap the cloth" prompt
         if packet.status == "preview":
             self._status_badge.set_text_color("PREVIEW", PALETTE.text_dim)
         elif packet.status == "detecting_nolock":
@@ -1035,28 +890,57 @@ class LivePage(QWidget):
             self._status_badge.set_text_color("FINDING TABLE", PALETTE.info)
         elif packet.shot_state == "moving":
             self._status_badge.set_text_color("SHOT IN PLAY", PALETTE.accent)
+        elif self._is_video:
+            self._status_badge.set_text_color("PLAYBACK", PALETTE.info)
         else:
-            self._status_badge.set_text_color("LIVE", PALETTE.success)
+            self._status_badge.set_text_color("LIVE", PALETTE.danger)
 
     def on_stats(self, summary: dict) -> None:
+        if not self._stats_active:
+            return   # idle: keep the greyed dashes
         self._makes_val.setText(str(summary.get("makes", 0)))
         self._misses_val.setText(str(summary.get("misses", 0)))
         self._k_pct.set_value(f"{summary.get('make_pct', 0):.0f}%")
         self._k_streak.set_value(str(summary.get("current_streak", 0)))
 
     def on_shot(self, event) -> None:
-        outcome = event.outcome.value
-        color = {"make": PALETTE.success, "miss": PALETTE.danger,
-                 "scratch": PALETTE.warn}.get(outcome, PALETTE.text_dim)
-        self._outcome.set_text_color(outcome.upper(), color)
+        # Scoreboard numbers update via on_stats; a shot needs no extra banner.
+        pass
 
     def on_suggestion(self, event) -> None:
-        # confirm-manually mode: detector suggests, user taps Make/Miss to commit
-        self._outcome.set_text_color(f"{event.outcome.value.upper()}?", PALETTE.info)
+        # confirm-manually mode is retired from the surface; nothing to show.
+        pass
 
     def on_recording(self, on: bool) -> None:
-        self._record_btn.setChecked(on)
-        self._record_btn.setIcon(icon("activity", PALETTE.danger if on else PALETTE.text_dim))
+        """Reflect recording state on the transport cluster + run the elapsed clock."""
+        self._recording_on = on
+        self._update_stats_active()
+        self._rec_btn.setIcon(icon("rec", PALETTE.danger if on else PALETTE.text_dim))
+        self._rec_btn.setEnabled(not on)
+        self._rec_pause_btn.setEnabled(on)
+        self._rec_stop_btn.setEnabled(on)
+        timer = getattr(self, "_rec_timer", None)
+        if timer is None:
+            from PySide6.QtCore import QTimer
+            self._rec_timer = timer = QTimer(self)
+            timer.setInterval(1000)
+            timer.timeout.connect(self._tick_rec_time)
+        if on:
+            import time
+            self._rec_t0 = time.monotonic()
+            self._tick_rec_time()
+            timer.start()
+        else:
+            timer.stop()
+            self._rec_pause_btn.setChecked(False)
+            self._rec_time.setText("")
+
+    def _tick_rec_time(self) -> None:
+        import time
+        secs = int(time.monotonic() - getattr(self, "_rec_t0", time.monotonic()))
+        paused = self._rec_pause_btn.isChecked()
+        tag = "❚❚ PAUSED" if paused else "● REC"
+        self._rec_time.setText(f"{tag}  {secs // 60}:{secs % 60:02d}")
 
     def on_status(self, status: str) -> None:
         if status == "running":

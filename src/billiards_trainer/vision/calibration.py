@@ -102,7 +102,7 @@ class CalibrationManager:
             return False
         table = TableModel.from_rect(rect.dst_size, settings.rectify.pad_px,
                                      settings.table.pocket_radius_frac,
-                                     nose_inset_frac=settings.table.nose_inset_frac)
+                                     nose_inset_frac=settings.table.computed_nose_inset_frac())
         self.calib = Calibration(
             corners=corners, H=rect.H, Hinv=rect.Hinv,
             dst_size=rect.dst_size, table=table, rect_mask=rect.rectified_mask,
@@ -288,7 +288,7 @@ class CalibrationManager:
             dst_size = tuple(data["dst_size"])
             felt_keys = {f.name for f in fields(FeltSettings)}
             felt = FeltSettings(**{k: v for k, v in data["felt"].items() if k in felt_keys})
-            inset = settings.table.nose_inset_frac if settings is not None else 0.0
+            inset = settings.table.computed_nose_inset_frac() if settings is not None else 0.0
             table = TableModel.from_rect(dst_size, data["pad"], data["pocket_frac"],
                                          nose_inset_frac=inset)
             self.calib = Calibration(

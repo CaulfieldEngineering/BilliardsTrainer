@@ -32,8 +32,8 @@ def test_window_builds(app):
     apply_theme(app, settings.ui.accent)
     win = MainWindow(settings)
     app.processEvents()
-    # four nav destinations
-    assert win._stack.count() == 4
+    # Sandbox + Settings pages (Training reuses the Sandbox page)
+    assert win._stack.count() == 2
     # auto-start opens the source immediately (no Start click); detection now
     # defaults ON (the trained model is reliable, so we track out of the box).
     assert win._started_source == "demo"
@@ -99,15 +99,21 @@ def test_settings_page_has_no_dev_detector_knobs(app):
         assert not hasattr(page, gone), f"dev knob {gone} should be removed from Settings"
 
 
-def test_live_tuning_panel_present(app):
-    """The Sandbox page exposes a live tuning panel (cue status + sensitivity +
-    display toggles) so settings can be adjusted while watching the clip."""
+def test_live_rail_is_score_only_tuning_lives_in_settings(app):
+    """The rail is the scoreboard (makes/misses); all tuning knobs and status
+    readouts moved to Settings or were removed entirely (Joe's simplification:
+    no manual ±make/miss, no cue-status line, no inline sliders)."""
     from billiards_trainer.config import Settings
     from billiards_trainer.ui.pages.live_page import LivePage
+    from billiards_trainer.ui.pages.settings_page import SettingsPage
 
     page = LivePage(Settings())
-    assert hasattr(page, "_cue_status")
-    assert hasattr(page, "_conf_val")
+    assert not hasattr(page, "_cue_status")     # status line removed
+    assert not hasattr(page, "_conf_val")       # slider gone from the rail
+    assert hasattr(page, "_makes_val")          # the scoreboard remains
+    sp = SettingsPage(Settings())
+    assert hasattr(sp, "_conf_slider")          # tuning lives in Settings now
+    assert hasattr(sp, "_schematic")
 
 
 def test_training_mode_label_correct_add_save(app):
@@ -312,15 +318,19 @@ def test_try_demo_button_removed(app):
     assert not hasattr(page, "_start_demo")
 
 
-def test_practice_and_drill_modes_disabled(app):
+def test_recording_transport_cluster(app):
+    """The Sandbox has a broadcast-style Record/Pause/Stop cluster; Pause and Stop
+    are disabled until recording starts."""
     from billiards_trainer.config import Settings
     from billiards_trainer.ui.pages.live_page import LivePage
 
     page = LivePage(Settings())
-    assert page._mode._buttons["free_play"].isEnabled()
-    assert not page._mode._buttons["practice"].isEnabled()
-    assert not page._mode._buttons["drill"].isEnabled()
-    assert page._mode.current() == "free_play"  # always lands on the working mode
+    assert page._rec_btn.isEnabled()
+    assert not page._rec_pause_btn.isEnabled()
+    assert not page._rec_stop_btn.isEnabled()
+    page.on_recording(True)
+    assert not page._rec_btn.isEnabled()
+    assert page._rec_pause_btn.isEnabled() and page._rec_stop_btn.isEnabled()
 
 
 def test_seek_guard_keeps_thumb_under_cursor_during_drag(app):
@@ -541,6 +551,9 @@ def test_camera_dropdown_autosaves_without_save_click(app, tmp_path, monkeypatch
     from billiards_trainer.ui.pages.settings_page import SettingsPage
 
     monkeypatch.setattr(cfg, "SETTINGS_PATH", tmp_path / "settings.json")
+    # This test exercises the real default-path save; lift the suite-wide guard
+    # (SETTINGS_PATH is monkeypatched to tmp, so nothing real is touched).
+    monkeypatch.delenv("BILLIARDS_TRAINER_NO_SAVE", raising=False)
     monkeypatch.setattr(devices, "list_cameras",
                         lambda: [CameraInfo(0, "Cam A"), CameraInfo(1, "Cam B")])
     s = Settings()

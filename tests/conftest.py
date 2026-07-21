@@ -1,11 +1,15 @@
 """Shared pytest fixtures: the labelled table capture and its ground truth."""
 
 import json
+import os
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pytest
+
+# Never let tests write the real user settings file (Settings.save guards on this).
+os.environ.setdefault("BILLIARDS_TRAINER_NO_SAVE", "1")
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CORNER_ORDER = ("TL", "TR", "BR", "BL")

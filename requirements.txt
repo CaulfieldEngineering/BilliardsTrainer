@@ -20,3 +20,8 @@ pygrabber>=0.2 ; sys_platform == "win32"
 # Bluetooth LE for the cue-stroke sensor (imported lazily; the app runs fine
 # without it — the cue card just reports the feature as unavailable).
 bleak>=0.22
+# Tethered Canon DSLR (native PTP over libusb; imported lazily, degrades
+# gracefully). macOS additionally needs the libusb dylib: brew install libusb.
+pyusb>=1.2
+# macOS: request camera permission on the main thread (bundled .app TCC prompt).
+pyobjc-framework-AVFoundation>=10 ; sys_platform == "darwin"

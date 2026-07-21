@@ -76,6 +76,9 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Per-machine Claude Code overrides (paths/permissions differ per dev box)
+.claude/settings.local.json
+
 _local_models/
 
 # Read-only reference clones for prior-art research (never committed)
@@ -102,3 +105,4 @@ _train/
 *.dmp
 # base YOLO weights (auto-downloaded by ultralytics during fine-tunes)
 *.pt
+.trainvenv/

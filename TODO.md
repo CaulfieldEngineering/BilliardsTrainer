@@ -22,6 +22,49 @@ deferred so they aren't lost. Nothing here is in progress.
   watching. Keep default 0.0 to avoid regressing cue tracking until tuned.
   *(Requested 2026-06-16; not started.)*
 
+- **LLM/VLM post-session video analysis (deep, offline second pass).** Real-time
+  OpenCV does what it can live; then, once a session ends, a vision-language model
+  re-analyzes the *recorded video itself* for depth the frame-by-frame pipeline
+  can't reach: miss patterns (which angles/distances/cut directions miss most,
+  clustering by pocket and shot type), positional/strategic notes, and a **review
+  pass that grades and corrects the real-time results** — confirming or flipping
+  each auto make/miss and catching shots the live detector dropped.
+
+  *Model selection (config-gated, mirror `cue`/Supabase optionality):* add an
+  `AnalysisSettings` block — `backend = off | local | openrouter`, `model`,
+  `api_key`, `endpoint`. **Local** talks to an Ollama-style HTTP endpoint running a
+  vision model (Qwen2.5-VL / moondream) to honour the "local & free" ethos;
+  **OpenRouter** posts over HTTPS with the user's key (the app already uses
+  `requests`). Off by default; degrades silently like the cue sensor.
+
+  *Hooks that already exist* (low-friction path): sessions are recorded (Record →
+  `controller._write_recording`; clips land in `exports/`), every shot is logged
+  to `logs/shots.jsonl` with timestamps, and the SQLite DB holds sessions+shots.
+  So the second pass keys off shot timestamps to sample keyframes around each
+  shot, sends frame(s) + context to the VLM, and writes structured JSON verdicts
+  back to the DB (new per-shot `grade`/`notes` + a session summary). Trigger it
+  from `stop()`/`end_session` as a background job so it never blocks the UI.
+
+  *Surface:* a "Session review" panel (extend the Stats page) showing the model's
+  corrections + patterns; corrected make/miss can update the recorded counts.
+
+  *Synergy:* the VLM's per-shot make/miss verdicts are exactly the labels the
+  YOLO fine-tune pipeline wants — the review pass doubles as an **auto-labeler**
+  for training data (ties into `tools/train_pool_model.py` + the
+  Capture-for-analysis flow). *(Requested 2026-07-17; not started.)*
+
+- **HDMI-dongle rig validation (when the capture device arrives).** Joe's ceiling
+  rig sends video over an HDMI→USB capture dongle (plain UVC webcam to the app)
+  and keeps USB for touchless control (`tether.remote_camera_sync`). To verify on
+  hardware: (1) dongle appears in the camera dropdown and streams at its full
+  resolution (set Settings→Camera width/height if it defaults to 720p);
+  (2) whether the T3i keeps HDMI output alive during a transient USB control
+  session, or blanks it for the few seconds (either is acceptable, just confirm);
+  (3) the T3i needs its HDMI info overlay OFF (DISP cycling) for a clean feed —
+  document the camera-menu steps; (4) `packaging/`: bundle libusb.dylib in the
+  PyInstaller spec for the frozen mac build (pyusb needs it).
+  *(Planned 2026-07-17.)*
+
 ## Infra
 
 ### Dev/test machine sync mechanism  *(flagged, not implemented)*

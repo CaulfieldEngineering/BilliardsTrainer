@@ -86,7 +86,7 @@ class BallTracker:
     # segments WITH the recall-aware score + human-verified ball counts):
     # settled jitter 0.074 -> 0.049 px, phantom churn down, identity flips
     # 2.4 -> ~2.1/track-min, recall identical to the previous defaults.
-    def __init__(self, max_dist_frac: float = 0.10, max_misses: int = 24,
+    def __init__(self, max_dist_frac: float = 0.16, max_misses: int = 24,
                  min_hits: int = 5, vel_alpha: float = 0.42,
                  pos_alpha_slow: float = 0.20, pos_alpha_fast: float = 0.72,
                  speed_lo: float = 3.0, speed_hi: float = 6.0,
@@ -125,12 +125,39 @@ class BallTracker:
         self._next_id = 1
 
     # ------------------------------------------------------------------ #
-    def update(self, detections: list[Detection], short_side: float) -> list[Track]:
+    def update(self, detections: list[Detection], short_side: float,
+               bounds: tuple[float, float, float, float] | None = None) -> list[Track]:
         self._short_side = max(1.0, short_side)
+        # Velocity-aware gate: a struck ball can cross more than the static gate
+        # in one frame; letting the gate grow with track speed keeps the SAME
+        # track attached through the fast phase instead of coasting a stale one.
         gate = max(8.0, self.max_dist_frac * short_side)
 
         for t in self._tracks:
             t.predict()
+        # Cushion-aware coasting: reflect predicted positions off the nose lines
+        # (bounds = playing-area rect). Motion blur drops detection exactly when
+        # a ball is fastest — right at a rail impact — so without this the
+        # coasted track either sails through the cushion or dies short of it and
+        # the animation shows the ball "rebounding in thin air". Reflecting the
+        # prediction makes the coasted ball bounce WHERE the real ball bounces,
+        # which also puts it next to the reappearing detection for re-matching.
+        if bounds is not None:
+            bx0, by0, bx1, by1 = bounds
+            for t in self._tracks:
+                r = max(2.0, t.radius)
+                lo, hi = bx0 + r, bx1 - r
+                if lo < hi:
+                    if t.x < lo:
+                        t.x, t.vx = min(hi, 2 * lo - t.x), abs(t.vx)
+                    elif t.x > hi:
+                        t.x, t.vx = max(lo, 2 * hi - t.x), -abs(t.vx)
+                lo, hi = by0 + r, by1 - r
+                if lo < hi:
+                    if t.y < lo:
+                        t.y, t.vy = min(hi, 2 * lo - t.y), abs(t.vy)
+                    elif t.y > hi:
+                        t.y, t.vy = max(lo, 2 * hi - t.y), -abs(t.vy)
 
         unmatched_dets = set(range(len(detections)))
         # Build all (track, det) pairs within the gate, then assign greedily. The
@@ -178,14 +205,55 @@ class BallTracker:
             matched_dets.add(di)
             self._apply_match(self._tracks[ti], detections[di])
 
+        # Second-chance revival: a fast ball motion-blurs out of detection and
+        # reappears FEET away a few frames later — far beyond the primary gate.
+        # Without this it spawns a brand-new track while the old one holds its
+        # last position: the "several copies of the same ball" ghost. Re-bind
+        # unmatched detections to lost confirmed tracks with a gate that grows
+        # the longer the track has been missing, and SNAP across the gap (the
+        # intermediate path was never observed — smoothing it in would whip the
+        # velocity estimate).
+        lost_tis = [ti for ti, t in enumerate(self._tracks)
+                    if ti not in matched_tracks and t.confirmed and t.misses >= 1]
+        if lost_tis and len(matched_dets) < len(detections):
+            revive = []
+            for ti in lost_tis:
+                t = self._tracks[ti]
+                r_gate = min(0.45 * self._short_side,
+                             gate + 0.06 * self._short_side * t.misses)
+                for di in range(len(detections)):
+                    if di in matched_dets:
+                        continue
+                    d = detections[di]
+                    dist = math.hypot(t.x - d.x, t.y - d.y)
+                    if dist <= r_gate:
+                        revive.append((dist, ti, di))
+            revive.sort(key=lambda p: p[0])
+            for dist, ti, di in revive:
+                if ti in matched_tracks or di in matched_dets:
+                    continue
+                matched_tracks.add(ti)
+                matched_dets.add(di)
+                t = self._tracks[ti]
+                if dist > gate:
+                    d = detections[di]
+                    t.x, t.y = d.x, d.y
+                    t.vx = t.vy = 0.0
+                    t.settled = False
+                    t.still_count = 0
+                self._apply_match(t, detections[di])
+
         # Unmatched tracks -> coast / age out
         for ti, t in enumerate(self._tracks):
             if ti in matched_tracks:
                 continue
             t.misses += 1
-            # damp velocity while coasting so it doesn't drift forever
-            t.vx *= 0.6
-            t.vy *= 0.6
+            # Mild rolling-friction damping while coasting: a blurred-out ball is
+            # still rolling at nearly full speed, so the coast must carry it (into
+            # the cushion reflection above), not kill it in a few frames. Drift is
+            # bounded — a moving track ages out after max_misses anyway.
+            t.vx *= 0.92
+            t.vy *= 0.92
 
         # Unmatched detections -> new tentative tracks
         for di, d in enumerate(detections):
@@ -231,13 +299,28 @@ class BallTracker:
         for t in self._tracks:
             if t.confirmed and t.committed_number >= 0:
                 by_num.setdefault(t.committed_number, []).append(t)
+        doomed: set[int] = set()
         for num, ts in by_num.items():
             if len(ts) < 2:
                 continue
+            # If the number is LIVE on some track while another claimant has
+            # been missing beyond the normal miss budget, the missing one is a
+            # stale ghost of the same physical ball (it moved while undetected —
+            # thrown/struck through motion blur). Blanking its number isn't
+            # enough: the ghost graphic stays frozen on the table. Delete it.
+            if any(t.misses == 0 for t in ts):
+                for t in ts:
+                    if t.misses > self.max_misses:
+                        doomed.add(t.id)
+                ts = [t for t in ts if t.id not in doomed]
+                if len(ts) < 2:
+                    continue
             ts.sort(key=lambda t: (sum(1 for n in t.num_hist if n == num),
                                    t.hits, -t.misses), reverse=True)
             for t in ts[1:]:
                 t.committed_number = -1
+        if doomed:
+            self._tracks = [t for t in self._tracks if t.id not in doomed]
 
     def _apply_match(self, t: _Internal, d: Detection) -> None:
         meas_vx = d.x - t.x

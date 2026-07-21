@@ -21,14 +21,27 @@ def main() -> int:
     ap.add_argument("--out", required=True, help="output .onnx path")
     ap.add_argument("--base", default="", help="base .pt weights (default: prior ball-ID run, else yolov8n)")
     ap.add_argument("--epochs", type=int, default=60)
+    ap.add_argument("--device", default="auto",
+                    help="'auto' (mps on Apple, else cuda:0, else cpu), or an explicit device")
     args = ap.parse_args()
 
     try:
+        import torch
         from ultralytics import YOLO
     except ImportError:
         print("ERROR: ultralytics/torch not available in this python. Run with a "
               "torch env (e.g. the pool_coach venv).", file=sys.stderr)
         return 2
+
+    device = args.device
+    if device == "auto":
+        if torch.backends.mps.is_available():
+            device = "mps"          # Apple GPU (this rig)
+        elif torch.cuda.is_available():
+            device = 0
+        else:
+            device = "cpu"
+    print(f"Training device: {device}")
 
     base = args.base
     if not base:
@@ -37,7 +50,7 @@ def main() -> int:
         base = str(prior if prior.exists() else prior2 if prior2.exists() else "yolov8n.pt")
     print(f"Fine-tuning from {base} on {args.data} for {args.epochs} epochs …")
     model = YOLO(base)
-    model.train(data=args.data, epochs=args.epochs, imgsz=640, device=0, batch=16,
+    model.train(data=args.data, epochs=args.epochs, imgsz=640, device=device, batch=16,
                 patience=15, project=str(ROOT / "_train"), name="ballid_finetune",
                 plots=False, verbose=False)
     onnx = Path(model.export(format="onnx", imgsz=640, opset=12))

@@ -10,12 +10,13 @@ Labelling is fully in-app (no torch). Training shells out to a torch env (the
 shipped app is torch-free) — auto-detected, with the exact CLI shown if absent.
 """
 import subprocess
-import sys
+import tempfile
+import zipfile
 from pathlib import Path
 
 import cv2
 import numpy as np
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
@@ -24,7 +25,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSlider,
     QVBoxLayout,
 )
 
@@ -33,6 +33,7 @@ from ...train import TrainingStore
 from ...train.store import LabeledBall
 
 _DISPLAY_W = 880
+_IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 
 
 class _TrainWorker(QThread):
@@ -65,8 +66,12 @@ class BallTrainerDialog(QDialog):
         self._s = settings
         self._store = TrainingStore(APP_DIR / "training" / "ballid")
         self._cap: cv2.VideoCapture | None = None
+        self._img_paths: list[Path] = []   # image-sequence mode (capture zip/folder)
+        self._img_i = 0
+        self._tmpdir: tempfile.TemporaryDirectory | None = None
         self._frame: np.ndarray | None = None
         self._dets: list = []           # current detections (LabeledBall-like, mutable number)
+        self._prev_labeled: list = []   # (cx, cy, number) carried from the last frame
         self._sel = -1                  # selected ball index
         self._scale = 1.0
         self._worker: _TrainWorker | None = None
@@ -85,9 +90,10 @@ class BallTrainerDialog(QDialog):
 
     def _build(self) -> None:
         root = QVBoxLayout(self)
-        hint = QLabel("Open a recorded clip of your table. The model guesses each "
-                      "ball's number — click a ball, then tap the correct number. "
-                      "Save good frames, then Train. Do this again if your camera moves.")
+        hint = QLabel("Open a recorded clip. Label every ball once (click a ball, tap "
+                      "its number) — then Save and step forward: your labels follow "
+                      "the balls automatically, so you only fix what moved. Collect "
+                      "20–40 varied frames, then Train. Redo if the camera moves.")
         hint.setWordWrap(True)
         hint.setObjectName("Faint")
         root.addWidget(hint)
@@ -135,30 +141,96 @@ class BallTrainerDialog(QDialog):
 
     # ------------------------------------------------------------------ #
     def _choose_clip(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Choose a clip of your table",
-                                              filter="Video (*.mp4 *.avi *.mov *.mkv)")
+        # Accept a video clip OR a "Capture 60s for analysis" bundle (its zip or
+        # the unpacked frames folder) — the latter is RAW frames, the right
+        # training data (the Record button bakes in overlays).
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a clip or capture of your table",
+            filter="Clip or capture (*.mp4 *.avi *.mov *.mkv *.zip);;All files (*)")
         if path:
             self._open_source(path)
 
     def _open_source(self, path: str) -> None:
         if not path:
             return
-        if self._cap is not None:
-            self._cap.release()
-        self._cap = cv2.VideoCapture(path)
+        self._release_source()
+        self._prev_labeled = []   # don't carry labels across different sources
+        p = Path(path)
+        if p.suffix.lower() == ".zip" or p.is_dir():
+            self._open_images(p)
+        else:
+            self._cap = cv2.VideoCapture(str(p))
         self._step(0)
 
+    def _open_images(self, p: Path) -> None:
+        """Load a capture zip (frames/*.jpg + meta.json) or an image folder."""
+        root = p
+        if p.suffix.lower() == ".zip":
+            self._tmpdir = tempfile.TemporaryDirectory(prefix="ballid_")
+            with zipfile.ZipFile(p) as z:
+                z.extractall(self._tmpdir.name)
+            root = Path(self._tmpdir.name)
+        imgs = [q for q in sorted(root.rglob("*")) if q.suffix.lower() in _IMG_EXT]
+        self._img_paths = imgs
+        self._img_i = 0
+        if not imgs:
+            self._status.setText("No images found in that capture.")
+
+    def _release_source(self) -> None:
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
+        self._img_paths = []
+        self._img_i = 0
+        if self._tmpdir is not None:
+            self._tmpdir.cleanup()
+            self._tmpdir = None
+
     def _step(self, delta: int) -> None:
-        if self._cap is None:
-            return
-        pos = int(self._cap.get(cv2.CAP_PROP_POS_FRAMES))
-        self._cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, pos + delta))
-        ok, frame = self._cap.read()
-        if not ok:
+        # Snapshot the labels the user just set so they carry to the next frame.
+        if self._dets:
+            self._prev_labeled = [(d.cx, d.cy, d.number) for d in self._dets]
+        frame = None
+        if self._img_paths:
+            # Image mode: frames are already strided, so a ±15 video step maps to
+            # a smaller image step for sensible traversal of distinct layouts.
+            stepn = int(np.sign(delta)) * max(1, abs(delta) // 5) if delta else 0
+            self._img_i = max(0, min(len(self._img_paths) - 1, self._img_i + stepn))
+            frame = cv2.imread(str(self._img_paths[self._img_i]))
+        elif self._cap is not None:
+            pos = int(self._cap.get(cv2.CAP_PROP_POS_FRAMES))
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, pos + delta))
+            ok, frame = self._cap.read()
+            if not ok:
+                return
+        if frame is None:
             return
         self._frame = frame
         self._detect()
+        self._propagate_labels()
         self._render()
+
+    def _propagate_labels(self) -> None:
+        """Carry the previous frame's labels onto this frame's detections by
+        nearest match — so labelling one settled frame propagates to the rest and
+        you only correct what actually moved. Detector guesses are only overridden
+        where a confident nearby prior label exists."""
+        if not self._prev_labeled or not self._dets:
+            return
+        r = self._default_radius()
+        thresh2 = (2.2 * max(r, 6.0)) ** 2   # within ~2 ball-widths = same ball
+        used = [False] * len(self._prev_labeled)
+        for d in self._dets:
+            best_j, best_d2 = -1, thresh2
+            for j, (px, py, pn) in enumerate(self._prev_labeled):
+                if used[j] or pn < 0:
+                    continue
+                dd = (d.cx - px) ** 2 + (d.cy - py) ** 2
+                if dd < best_d2:
+                    best_d2, best_j = dd, j
+            if best_j >= 0:
+                d.number = self._prev_labeled[best_j][2]
+                used[best_j] = True
 
     def _detect(self) -> None:
         self._sel = -1
@@ -185,7 +257,8 @@ class BallTrainerDialog(QDialog):
             return
         img = self._frame.copy()
         for i, d in enumerate(self._dets):
-            c = (int(d.cx), int(d.cy)); r = int(max(d.w, d.h) / 2)
+            c = (int(d.cx), int(d.cy))
+            r = int(max(d.w, d.h) / 2)
             sel = i == self._sel
             col = (0, 255, 255) if sel else (60, 220, 60)
             cv2.circle(img, c, r, col, 3 if sel else 2)
@@ -307,6 +380,5 @@ class BallTrainerDialog(QDialog):
                                  "say 'Trained ✓' when done.")
             ev.ignore()
             return
-        if self._cap is not None:
-            self._cap.release()
+        self._release_source()
         super().closeEvent(ev)

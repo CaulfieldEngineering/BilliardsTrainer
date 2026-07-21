@@ -108,15 +108,30 @@ class RectifySettings:
     aspect: float = 2.0
 
 
+# Regulation playing-surface short side (cushion nose to nose), inches.
+_BED_SHORT_IN = {"9ft": 50.0, "8ft": 46.0, "7ft": 39.0}
+
+
 @dataclass
 class TableSettings:
     size: str = "9ft"           # 9ft | 8ft | 7ft (display/scale only)
     pocket_radius_frac: float = 0.045  # pocket capture radius as frac of short side
-    # The detected felt spans the cloth (bed + rail tops). The real PLAYING area
-    # (cushion-nose to cushion-nose) is inset by the rail-top width — automatically,
-    # so the overhead/playing area excludes the rails. ~0.055 of the short side is a
-    # typical rail-top proportion; refine per-table later if needed.
+    # Felt detection finds the edge of the BLUE CLOTH — the outer edge of the
+    # cushion top. Balls rebound off the cushion NOSE, which sits inboard of
+    # that edge by the cushion width. A physical measurement (Joe's table: 2"),
+    # converted to a fraction of the detected felt at calibration time.
+    cushion_inset_in: float = 2.0
+    # Legacy fractional inset — superseded by cushion_inset_in; kept so old
+    # settings files load cleanly.
     nose_inset_frac: float = 0.055
+
+    def computed_nose_inset_frac(self) -> float:
+        """Cushion inset as a fraction of the detected felt SHORT side.
+
+        felt_short = bed_short + 2×inset, so frac = inset / (bed + 2×inset)."""
+        inset = max(0.0, float(self.cushion_inset_in))
+        bed = _BED_SHORT_IN.get(self.size, 50.0)
+        return inset / (bed + 2.0 * inset) if inset > 0 else 0.0
     auto_relock: bool = True           # re-detect automatically if the table shifts
     persist_calibration: bool = True   # save/reuse the locked table across launches
     # The lock is the per-corner MEDIAN over this many consecutive successful
@@ -135,11 +150,12 @@ class BallSettings:
     # cue-ball heuristic. Runs on the RAW frame; results project into the
     # bird's-eye for display. Specific names (onnx_*, cue_ball_white, …) force one.
     live_strategy: str = "auto"
-    # Temporal median preprocessing: run detection on the per-pixel median of the
-    # last few raw frames. A perfectly still scene becomes pixel-identical frame to
-    # frame, which kills the sensor-noise jitter that makes blob size pump and balls
-    # flicker in/out of the area filter. ~1-frame lag on motion (negligible).
-    temporal_median: bool = True
+    # Temporal median preprocessing (median of the last 3 frames). OFF: a fast
+    # ball occupies 3 different spots across those frames, so the median ERASES
+    # it — measured on Joe's table as balls "not moving" for the first 6-12
+    # inches of travel. The trained model doesn't need the noise suppression;
+    # the tracker's settled-lock handles resting-ball shimmer.
+    temporal_median: bool = False
     temporal_median_frames: int = 3
     # ONNX detector: run a SECOND inference pass over the foreshortened far-rail
     # region (top of the frame) and merge. Recovers tiny far balls at the cost of
@@ -187,6 +203,8 @@ class DetectionSettings:
     kill false positives from lighting flicker / compression noise; all are
     tunable from Settings -> Detection for a specific table/lighting."""
 
+    # Master switch for AI ball/shot detection (Settings window; no top-bar toggle).
+    enabled: bool = True
     warmup_seconds: float = 6.0       # ignore shots right after Start (stabilise)
     cooldown_seconds: float = 4.0     # min gap between counted shots
     # Shots are gated on MOTION ENERGY (mean frame-to-frame change in the playing
@@ -292,8 +310,111 @@ class CueSettings:
 
 
 @dataclass
+class ColorCorrectionSettings:
+    """Automatic-or-manual colour correction of the raw frame before detection.
+
+    ``auto`` is tuned for a pool table: it white-balances off the brightest pixels
+    (the white cue ball / table lights are a reliable neutral reference), which is
+    robust on a scene dominated by green felt — where a naive grey-world balance
+    would wrongly try to neutralise the felt itself. ``manual`` exposes per-channel
+    gains + saturation; ``off`` passes the frame through untouched."""
+
+    # Default OFF — show the true camera image. The auto white-patch balance can
+    # over-warm/‑cool real feeds, so it's opt-in via the COLOUR control on the
+    # live view rather than a silent default.
+    mode: str = "off"           # off | auto | manual
+    auto_strength: float = 1.0  # 0..1 blend of the auto white-balance toward neutral
+    # Manual per-channel gains (multipliers, 1.0 = unchanged) and saturation.
+    gain_r: float = 1.0
+    gain_g: float = 1.0
+    gain_b: float = 1.0
+    saturation: float = 1.0
+
+
+@dataclass
+class TetherSettings:
+    """Canon DSLR (or any libgphoto2 camera) driven over USB via the ``gphoto2``
+    CLI — the only way to get live video + focus/exposure control out of a body
+    like the EOS 600D (T3i), which has no UVC/webcam mode. Fully optional and
+    lazily probed: with no ``gphoto2`` binary or no camera attached the app falls
+    back to the normal OpenCV path and this just reports unavailable."""
+
+    enabled: bool = False
+    # Fixed overhead rig: focus once at calibration then never re-drive AF (so it
+    # can't hunt mid-shot). 'continuous' re-drives every reconnect; 'manual' never.
+    focus_mode: str = "auto_once_lock"  # auto_once_lock | continuous | manual
+    # Exposure values applied over USB; "auto" or "" leaves the body's own
+    # setting untouched. ISO/WB accept the camera's own values (e.g. "400",
+    # "daylight"); shutter/aperture are currently set on the body.
+    iso: str = "auto"
+    shutterspeed: str = "auto"
+    aperture: str = "auto"
+    whitebalance: str = "auto"
+    # Smart-plug power-cycle commands (shell). When set, the session keeper
+    # RESTARTS THE CAMERA ITSELF whenever its one-session-per-power-on is spent
+    # — the user never power-cycles anything. Examples:
+    #   shortcuts run "Camera Off"            (any HomeKit plug via Shortcuts)
+    #   kasa --host 10.0.0.5 off              (TP-Link Kasa, python-kasa)
+    #   curl -s http://10.0.0.6/relay/0?turn=off   (Shelly)
+    plug_off_cmd: str = ""
+    plug_on_cmd: str = ""
+
+
+@dataclass
+class CameraSettings:
+    """Capture-side settings shared across every frame source: frame rotation,
+    colour correction, UVC webcam controls, and the tethered-DSLR path."""
+
+    # Frame rotation applied at ingest (whole pipeline sees it, so detection,
+    # felt-picking, display and recording all share one coordinate space).
+    # Degrees clockwise: 0/180 = landscape, 90/270 = portrait.
+    rotation: int = 0
+    # Mirror the frame (applied after rotation). flip_h mirrors left/right,
+    # flip_v mirrors top/bottom — needed when the camera is mounted mirrored or
+    # the ceiling bracket faces the "wrong" way.
+    flip_h: bool = False
+    flip_v: bool = False
+    # True once the camera is mounted directly overhead. Disables the oblique-only
+    # parallax + far-rail-rescan corrections and tightens the ball-size band, since
+    # a top-down view has no foreshortening and balls are one constant size.
+    overhead: bool = True
+    # UVC webcam controls (OpenCV CAP_PROP_*). Apply only to index-based cameras;
+    # the tethered T3i uses TetherSettings instead. -1 / auto flags = driver default.
+    auto_focus: bool = True
+    focus: float = -1.0            # 0..255 manual focus when auto_focus is off
+    auto_exposure: bool = True
+    exposure: float = -1.0
+    auto_wb: bool = True
+    wb_temperature: float = -1.0   # Kelvin when auto_wb is off (driver-dependent)
+    gain: float = -1.0
+    # Full 1080p by default — an HDMI capture dongle delivers it, and the extra
+    # resolution sharpens ball detection + identification (balls are small on an
+    # overhead 9-ft table). Detection still runs at 640 internally, so the cost
+    # is modest.
+    width: int = 1920
+    height: int = 1080
+    color: ColorCorrectionSettings = field(default_factory=ColorCorrectionSettings)
+    tether: TetherSettings = field(default_factory=TetherSettings)
+
+
+@dataclass
+class AutoLabelSettings:
+    """AI auto-labelling of a recorded training session via a vision-language
+    model. A VLM reads a sheet of enlarged ball crops and returns each ball's
+    number — the labelling the user would otherwise do by hand. Config-gated and
+    optional (backend 'off'); the user still labels manually without it."""
+
+    backend: str = "off"           # off | openrouter
+    api_key: str = ""
+    # An OpenRouter vision-capable model id.
+    model: str = "anthropic/claude-3.7-sonnet"
+    endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
+    max_layouts: int = 12          # distinct settled arrangements to label per session
+
+
+@dataclass
 class Settings:
-    source: str = "0"  # camera index (as str) | path to video | path to image | "demo"
+    source: str = "0"  # camera index (as str) | path to video | path to image | "demo" | "tether"
     source_name: str = ""  # friendly camera name, to survive index reshuffles
     mode: str = "free_play"  # free_play | practice | drill
     felt: FeltSettings = field(default_factory=FeltSettings)
@@ -306,6 +427,8 @@ class Settings:
     updates: UpdateSettings = field(default_factory=UpdateSettings)
     pose: PoseSettings = field(default_factory=PoseSettings)
     cue: CueSettings = field(default_factory=CueSettings)
+    camera: CameraSettings = field(default_factory=CameraSettings)
+    autolabel: AutoLabelSettings = field(default_factory=AutoLabelSettings)
 
     # ------------------------------------------------------------------ #
     def to_dict(self) -> dict[str, Any]:
@@ -316,6 +439,11 @@ class Settings:
         return _build(cls, data or {})
 
     def save(self, path: Path | None = None) -> None:
+        # Guard for tests/headless probes: constructing UI with default Settings
+        # must NEVER clobber the real settings file (it did, twice). Only the
+        # DEFAULT path is guarded — tests saving to explicit tmp paths still work.
+        if path is None and os.environ.get("BILLIARDS_TRAINER_NO_SAVE"):
+            return
         path = path or SETTINGS_PATH
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".json.tmp")

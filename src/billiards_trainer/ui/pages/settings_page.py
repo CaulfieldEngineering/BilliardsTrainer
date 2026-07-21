@@ -48,9 +48,9 @@ class SettingsPage(QWidget):
     applied = Signal()
     check_updates_requested = Signal()
     feedback_requested = Signal()
-    capture_requested = Signal()
     flag_failure_requested = Signal()
     detector_changed = Signal(str)   # live detector strategy switched
+    recalibrate_requested = Signal()  # re-detect the table now
     train_balls_requested = Signal()  # open the in-app Ball ID Trainer
     cue_diagnostics_requested = Signal()  # open the cue-sensor waveform dialog
 
@@ -104,13 +104,15 @@ class SettingsPage(QWidget):
         # backend, detector strictness, felt HSV) is no longer surfaced.
         grid.addWidget(self._source_card(), 0, 0)
         grid.addWidget(self._updates_card(), 0, 1)
-        grid.addWidget(self._table_card(), 1, 0)
-        grid.addWidget(self._model_card(), 1, 1)
-        grid.addWidget(self._clock_card(), 2, 0)
-        grid.addWidget(self._appearance_card(), 2, 1)
-        grid.addWidget(self._cue_card(), 3, 0)
-        grid.addWidget(self._feedback_card(), 3, 1)
-        grid.addWidget(self._debug_card(), 4, 0)
+        grid.addWidget(self._camera_card(), 1, 0)
+        grid.addWidget(self._table_card(), 1, 1)
+        grid.addWidget(self._model_card(), 2, 0)
+        grid.addWidget(self._clock_card(), 2, 1)
+        grid.addWidget(self._appearance_card(), 3, 0)
+        grid.addWidget(self._cue_card(), 3, 1)
+        grid.addWidget(self._feedback_card(), 4, 0)
+        grid.addWidget(self._debug_card(), 4, 1)
+        grid.addWidget(self._ai_card(), 5, 0)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -171,33 +173,12 @@ class SettingsPage(QWidget):
         self._mirror = QCheckBox("Mirror preview horizontally")
         form.addRow("", self._mirror)
 
-        # Training-data capture: records ~60 s of the raw camera feed to a zip we
-        # can fine-tune YOLO on (the path to real AI detection on Joe's table).
-        self._capture_btn = QPushButton("  Capture 60s for analysis")
-        self._capture_btn.setObjectName("Ghost")
-        self._capture_btn.setCursor(Qt.PointingHandCursor)
-        self._capture_btn.setToolTip("Save 60 seconds of raw frames to a zip for "
-                                     "AI-detection training")
-        self._capture_btn.clicked.connect(self._on_capture_clicked)
-        form.addRow("", self._capture_btn)
-        self._capture_status = QLabel("")
-        self._capture_status.setObjectName("Faint")
-        self._capture_status.setWordWrap(True)
-        form.addRow("", self._capture_status)
-
         self._cam_names: dict[str, str] = {}
         self._populate_cameras()
         # Auto-save the camera the moment it's picked — no Save click needed, so
         # the dropdown is actually wired to what the live preview opens.
         self._source_combo.currentIndexChanged.connect(self._on_source_changed)
         return card
-
-    def _on_capture_clicked(self) -> None:
-        self._capture_status.setText("Capturing… keep the camera pointed at the table.")
-        self.capture_requested.emit()
-
-    def set_capture_status(self, text: str) -> None:
-        self._capture_status.setText(text)
 
     def _on_source_changed(self) -> None:
         if not self._loaded:
@@ -248,21 +229,150 @@ class SettingsPage(QWidget):
             self._source_combo.addItem(f"\U0001F4C4 {path.split('/')[-1]}", path)
             self._select_source_data(path)
 
+    @staticmethod
+    def _gain_spin() -> QDoubleSpinBox:
+        s = QDoubleSpinBox()
+        s.setRange(0.3, 2.5)
+        s.setSingleStep(0.05)
+        s.setDecimals(2)
+        return s
+
+    def _camera_card(self) -> Card:
+        card, form = self._card("Camera controls")
+
+        # --- Orientation ------------------------------------------------- #
+        self._orientation = QComboBox()
+        self._orientation.addItem("Landscape", 0)
+        self._orientation.addItem("Portrait (90° CW)", 90)
+        self._orientation.addItem("Portrait (90° CCW)", 270)
+        self._orientation.addItem("Upside down (180°)", 180)
+        self._orientation.currentIndexChanged.connect(self._on_camera_changed)
+        form.addRow("Orientation", self._orientation)
+
+        self._flip_h = QCheckBox("Flip horizontally (mirror left/right)")
+        self._flip_h.toggled.connect(self._on_camera_changed)
+        form.addRow("", self._flip_h)
+        self._flip_v = QCheckBox("Flip vertically (mirror top/bottom)")
+        self._flip_v.toggled.connect(self._on_camera_changed)
+        form.addRow("", self._flip_v)
+
+        self._overhead = QCheckBox("Camera is directly overhead")
+        self._overhead.setToolTip("Turns off the oblique-only parallax + far-rail "
+                                  "corrections (≈2× frame rate) now that the view is top-down.")
+        self._overhead.toggled.connect(self._on_camera_changed)
+        form.addRow("", self._overhead)
+
+        # --- Colour correction ------------------------------------------- #
+        self._cc_mode = QComboBox()
+        self._cc_mode.addItem("Auto (pool table)", "auto")
+        self._cc_mode.addItem("Manual", "manual")
+        self._cc_mode.addItem("Off", "off")
+        self._cc_mode.currentIndexChanged.connect(self._on_cc_mode_changed)
+        form.addRow("Colour correction", self._cc_mode)
+
+        self._cc_r = self._gain_spin()
+        self._cc_g = self._gain_spin()
+        self._cc_b = self._gain_spin()
+        self._cc_sat = self._gain_spin()
+        for w in (self._cc_r, self._cc_g, self._cc_b, self._cc_sat):
+            w.valueChanged.connect(self._on_camera_changed)
+        grow = QHBoxLayout()
+        for lbl, w in (("R", self._cc_r), ("G", self._cc_g), ("B", self._cc_b)):
+            grow.addWidget(QLabel(lbl))
+            grow.addWidget(w)
+        gw = QWidget()
+        gw.setLayout(grow)
+        form.addRow("Manual gain", gw)
+        form.addRow("Saturation", self._cc_sat)
+
+        return card
+
+    def _on_cc_mode_changed(self) -> None:
+        manual = self._cc_mode.currentData() == "manual"
+        for w in (self._cc_r, self._cc_g, self._cc_b, self._cc_sat):
+            w.setEnabled(manual)
+        self._on_camera_changed()
+
+    def _on_camera_changed(self) -> None:
+        if not self._loaded:
+            return
+        s = self._s
+        s.camera.rotation = int(self._orientation.currentData() or 0)
+        s.camera.flip_h = self._flip_h.isChecked()
+        s.camera.flip_v = self._flip_v.isChecked()
+        s.camera.overhead = self._overhead.isChecked()
+        s.camera.color.mode = str(self._cc_mode.currentData() or "auto")
+        s.camera.color.gain_r = round(self._cc_r.value(), 2)
+        s.camera.color.gain_g = round(self._cc_g.value(), 2)
+        s.camera.color.gain_b = round(self._cc_b.value(), 2)
+        s.camera.color.saturation = round(self._cc_sat.value(), 2)
+        s.save()
+        self.applied.emit()
+
+    def _ai_card(self) -> Card:
+        card, form = self._card("AI labelling (Training)")
+        msg = QLabel("Let a vision model label your recorded training sessions "
+                     "automatically — the 'Auto-label with AI' button on the "
+                     "Training tab. Needs an OpenRouter API key.")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
+
+        self._ai_backend = QComboBox()
+        self._ai_backend.addItem("Off", "off")
+        self._ai_backend.addItem("OpenRouter", "openrouter")
+        self._ai_backend.currentIndexChanged.connect(self._on_ai_changed)
+        form.addRow("Backend", self._ai_backend)
+
+        self._ai_key = QLineEdit()
+        self._ai_key.setEchoMode(QLineEdit.Password)
+        self._ai_key.setPlaceholderText("sk-or-…")
+        self._ai_key.editingFinished.connect(self._on_ai_changed)
+        form.addRow("API key", self._ai_key)
+
+        self._ai_model = QLineEdit()
+        self._ai_model.editingFinished.connect(self._on_ai_changed)
+        form.addRow("Model", self._ai_model)
+
+        hint = QLabel("A vision-capable model id, e.g. anthropic/claude-3.7-sonnet "
+                      "or openai/gpt-4o. Your key stays on this machine.")
+        hint.setObjectName("Faint")
+        hint.setWordWrap(True)
+        form.addRow("", hint)
+        return card
+
+    def _on_ai_changed(self) -> None:
+        if not self._loaded:
+            return
+        a = self._s.autolabel
+        a.backend = str(self._ai_backend.currentData() or "off")
+        a.api_key = self._ai_key.text().strip()
+        a.model = self._ai_model.text().strip() or a.model
+        self._s.save()
+
     def _table_card(self) -> Card:
         card, form = self._card("Table")
         self._table_size = QComboBox()
         self._table_size.addItems(["9ft", "8ft", "7ft"])
         form.addRow("Table size", self._table_size)
+        self._cushion_in = QDoubleSpinBox()
+        self._cushion_in.setRange(0.0, 4.0)
+        self._cushion_in.setSingleStep(0.25)
+        self._cushion_in.setSuffix('"')
+        self._cushion_in.setToolTip("Cushion width: felt edge to cushion nose. Balls "
+                                    "rebound off the nose, not the felt edge.")
+        form.addRow("Cushion inset", self._cushion_in)
         self._auto_relock = QCheckBox("Auto re-lock if the table shifts")
         form.addRow("", self._auto_relock)
         self._persist_calib = QCheckBox("Remember calibration between launches")
         form.addRow("", self._persist_calib)
-        tip = QLabel("The table is found automatically. If the read looks off, use "
-                     "'Pick felt' on the Sandbox tab (tap the cloth) or "
-                     "'Recalibrate'.")
-        tip.setObjectName("Faint")
-        tip.setWordWrap(True)
-        form.addRow("", tip)
+        recal = QPushButton("Recalibrate table now")
+        recal.setObjectName("Ghost")
+        recal.setCursor(Qt.PointingHandCursor)
+        recal.setToolTip("Re-detect the table (use if the read looks off or the "
+                         "camera moved)")
+        recal.clicked.connect(self.recalibrate_requested.emit)
+        form.addRow("", recal)
         return card
 
     def _model_card(self) -> Card:
@@ -369,7 +479,10 @@ class SettingsPage(QWidget):
         return card
 
     def _appearance_card(self) -> Card:
-        card, form = self._card("Appearance")
+        card, form = self._card("Detection & display")
+        self._detection_enabled = QCheckBox("Ball detection enabled")
+        self._detection_enabled.setToolTip("Master switch for AI ball/shot detection")
+        form.addRow("", self._detection_enabled)
         self._accent = QLineEdit()
         self._accent.setPlaceholderText("#3DDC97")
         form.addRow("Accent colour", self._accent)
@@ -382,7 +495,25 @@ class SettingsPage(QWidget):
         self._measured_colors = QCheckBox("Draw balls in their real measured colour "
                                           "(grey ? when unsure)")
         form.addRow("", self._measured_colors)
-        note = QLabel("Accent changes apply after Save.")
+        self._schematic = QCheckBox("Clean schematic bird's-eye (vs warped camera)")
+        form.addRow("", self._schematic)
+
+        # Detector min-confidence: lower finds more (recovers a faint ball),
+        # higher is stricter (drops false blobs). Applies live on Save.
+        from PySide6.QtWidgets import QSlider
+        self._conf_slider = QSlider(Qt.Horizontal)
+        self._conf_slider.setRange(10, 90)
+        self._conf_val = QLabel("")
+        self._conf_slider.valueChanged.connect(
+            lambda v: self._conf_val.setText(f"{v / 100.0:.2f}"))
+        crow = QHBoxLayout()
+        crow.addWidget(self._conf_slider, 1)
+        crow.addWidget(self._conf_val)
+        cw = QWidget()
+        cw.setLayout(crow)
+        form.addRow("Detection confidence", cw)
+
+        note = QLabel("Changes apply after Save.")
         note.setObjectName("Faint")
         form.addRow("", note)
         return card
@@ -551,10 +682,27 @@ class SettingsPage(QWidget):
         s = self._s
         self._select_source(s.source, s.source_name)
         self._mirror.setChecked(s.ui.mirror_preview)
+        # Camera controls
+        oi = self._orientation.findData(s.camera.rotation)
+        self._orientation.setCurrentIndex(oi if oi >= 0 else 0)
+        self._flip_h.setChecked(s.camera.flip_h)
+        self._flip_v.setChecked(s.camera.flip_v)
+        self._overhead.setChecked(s.camera.overhead)
+        ci = self._cc_mode.findData(s.camera.color.mode)
+        self._cc_mode.setCurrentIndex(ci if ci >= 0 else 0)
+        self._cc_r.setValue(s.camera.color.gain_r)
+        self._cc_g.setValue(s.camera.color.gain_g)
+        self._cc_b.setValue(s.camera.color.gain_b)
+        self._cc_sat.setValue(s.camera.color.saturation)
+        manual = s.camera.color.mode == "manual"
+        for w in (self._cc_r, self._cc_g, self._cc_b, self._cc_sat):
+            w.setEnabled(manual)
         self._table_size.setCurrentText(s.table.size)
+        self._cushion_in.setValue(float(getattr(s.table, 'cushion_inset_in', 2.0)))
         self._auto_relock.setChecked(s.table.auto_relock)
         self._persist_calib.setChecked(s.table.persist_calibration)
         self._show_overlays.setChecked(s.ui.show_overlays)
+        self._detection_enabled.setChecked(bool(getattr(s.detection, 'enabled', True)))
         self._clock_enabled.setChecked(s.shot_clock.enabled)
         idx = self._clock_seconds.findData(s.shot_clock.seconds)
         if idx < 0:  # legacy custom duration (old spinbox) — keep honouring it
@@ -569,10 +717,17 @@ class SettingsPage(QWidget):
         self._show_traj.setChecked(s.ui.show_trajectories)
         self._show_ids.setChecked(s.ui.show_ball_ids)
         self._measured_colors.setChecked(s.ui.measured_ball_colors)
+        self._schematic.setChecked(s.ui.schematic_birdseye)
+        self._conf_slider.setValue(int(round(s.detection.confidence_floor * 100)))
+        self._conf_val.setText(f"{s.detection.confidence_floor:.2f}")
         self._far_rescan.setChecked(s.balls.far_rail_rescan)
         self._auto_check.setChecked(s.updates.auto_check)
         self._cue_enabled.setChecked(s.cue.enabled)
         self._cue_floor.setValue(s.cue.impact_g)
+        bi = self._ai_backend.findData(s.autolabel.backend)
+        self._ai_backend.setCurrentIndex(bi if bi >= 0 else 0)
+        self._ai_key.setText(s.autolabel.api_key)
+        self._ai_model.setText(s.autolabel.model)
 
     def _save(self) -> None:
         s = self._s
@@ -581,6 +736,7 @@ class SettingsPage(QWidget):
         s.source_name = self._cam_names.get(spec, "") if spec.isdigit() else ""
         s.ui.mirror_preview = self._mirror.isChecked()
         s.table.size = self._table_size.currentText()
+        s.table.cushion_inset_in = round(self._cushion_in.value(), 2)
         s.table.auto_relock = self._auto_relock.isChecked()
         s.table.persist_calibration = self._persist_calib.isChecked()
         s.shot_clock.enabled = self._clock_enabled.isChecked()
@@ -592,9 +748,12 @@ class SettingsPage(QWidget):
         if accent:
             s.ui.accent = accent
         s.ui.show_overlays = self._show_overlays.isChecked()
+        s.detection.enabled = self._detection_enabled.isChecked()
         s.ui.show_trajectories = self._show_traj.isChecked()
         s.ui.show_ball_ids = self._show_ids.isChecked()
         s.ui.measured_ball_colors = self._measured_colors.isChecked()
+        s.ui.schematic_birdseye = self._schematic.isChecked()
+        s.detection.confidence_floor = self._conf_slider.value() / 100.0
         s.balls.far_rail_rescan = self._far_rescan.isChecked()
         s.updates.auto_check = self._auto_check.isChecked()
         s.cue.enabled = self._cue_enabled.isChecked()

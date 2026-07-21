@@ -20,6 +20,9 @@ dependencies = [
     "pygrabber>=0.2 ; sys_platform == 'win32'",
     # Bluetooth LE cue-stroke sensor (lazily imported; degrades gracefully)
     "bleak>=0.22",
+    # Tethered Canon DSLR: native PTP over libusb (lazily imported; degrades
+    # gracefully). macOS also needs the libusb dylib (brew install libusb).
+    "pyusb>=1.2",
 ]
 
 [project.optional-dependencies]

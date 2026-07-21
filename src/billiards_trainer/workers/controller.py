@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 
+from ..capture.preprocess import preprocess_frame
 from ..config import EXPORTS_DIR, SHOTLOG_PATH, Settings
 from ..db.repository import Repository
 from ..events.shot_detector import ShotEvent
@@ -98,11 +99,12 @@ class PipelineController(QObject):
         self._replay: deque = deque(maxlen=150)
         self._recorder = None
         self._recording_path = ""
+        self._recording_paused = False
         # App default: detection ON. The trained YOLO model is reliable, so the
         # old "preview-only, show nothing rather than something wrong" default
         # (which existed because classical CV was untrustworthy) no longer applies
         # — the user wants to USE the tracker, not opt into it every launch.
-        self._detection_enabled = True
+        self._detection_enabled = bool(getattr(settings.detection, "enabled", True))
         # Training mode: when on, the camera view is sent UN-annotated (so the live
         # page can draw the labelling overlay) and raw detections + guessed numbers
         # ride along in the packet for correcting.
@@ -165,12 +167,16 @@ class PipelineController(QObject):
         log.info('[start] opening source=%s name="%s" mode=%s (settings.source=%s name="%s")',
                  source_spec, resolved_name, mode, self._settings.source, self._settings.source_name)
         try:
-            self._source = open_source(source_spec)
+            self._source = open_source(source_spec, cam=self._settings.camera)
         except Exception as exc:  # noqa: BLE001
             self.error.emit(f"Could not open source '{source_spec}': {exc}")
             return
         if hasattr(self._source, "opened") and not self._source.opened:
-            if source_spec.isdigit():
+            if source_spec.lower() in ("tether", "canon", "gphoto"):
+                self.error.emit("Tethered camera didn't open. Check the USB cable, close any "
+                                "other tether app (Smart Shooter, EOS Utility), and make sure "
+                                "the camera is switched on.")
+            elif source_spec.isdigit():
                 self.error.emit(f"Camera {source_spec} didn't open — it may be in use by "
                                 "another app (close Zoom/Teams/OBS) or disconnected. On "
                                 "Windows, also check Settings → Privacy → Camera.")
@@ -183,13 +189,12 @@ class PipelineController(QObject):
         self._pipeline.detect_enabled = self._detection_enabled
         self._clock = ShotClock(self._settings.shot_clock)
         self._mode = mode
-        from ..game.drills import get_drill
-        drill = get_drill(drill_key) if drill_key else None
-        self._session_id = self._repo.start_session(
-            mode=mode, drill_key=drill_key or None,
-            drill_target=drill.target_makes if drill else 0,
-            table_size=self._settings.table.size,
-        )
+        # STATS BELONG TO A RECORDING SESSION. Vision runs continuously, but no
+        # DB session opens (and no shots count) until the user hits Record —
+        # set_recording(True) opens one, set_recording(False) closes it.
+        self._session_id = None
+        self.stats_updated.emit({"makes": 0, "misses": 0, "make_pct": 0,
+                                 "current_streak": 0})
         self._t0 = time.perf_counter()
         self._prev_state = "settled"
         self._turn_start_t = 0.0
@@ -226,12 +231,11 @@ class PipelineController(QObject):
             self._timer.stop()
         if self._capture is not None:
             self._finalize_capture()  # save whatever we captured before stopping
-        if self._running and self._session_id is not None:
+        if self._recorder is not None:
+            self.set_recording(False)  # closes the stats session with the video
+        if self._session_id is not None:  # safety: never leave a session open
             self._repo.end_session(self._session_id)
-            self.stats_updated.emit(self._repo.global_summary())
-        if self._recorder is not None and hasattr(self._recorder, "release"):
-            self._recorder.release()
-        self._recorder = None
+            self._session_id = None
         if self._source:
             try:
                 self._source.release()
@@ -246,9 +250,33 @@ class PipelineController(QObject):
         if self._pipeline:
             self._pipeline.request_recalibration()
 
+    @Slot()
+    def refocus(self) -> None:
+        """Touchless camera sync for the ceiling-mounted DSLR: re-drive autofocus
+        and re-apply the saved exposure config.
+
+        Two paths: when the tether IS the video source, ask its grab thread; in
+        the HDMI-dongle rig (video from the capture dongle, USB purely for
+        control) open a transient PTP session instead — apply config + AF, then
+        disconnect so the camera's HDMI liveview resumes. The transient path
+        blocks this worker for a few seconds; video stalls briefly, which is
+        acceptable for a manual button press."""
+        fn = getattr(self._source, "refocus", None)
+        if callable(fn):
+            try:
+                fn()
+            except Exception as exc:  # noqa: BLE001
+                self.error.emit(f"Refocus failed: {exc}")
+            return
+        from ..capture.tether import remote_camera_sync
+        msg = remote_camera_sync(self._settings.camera.tether, autofocus=True)
+        if msg:
+            self.error.emit(f"Camera sync: {msg}")
+
     @Slot(object)
     def apply_settings(self, settings: Settings) -> None:
         self._settings = settings
+        self.set_detection_enabled(bool(getattr(settings.detection, "enabled", True)))
         self._clock = ShotClock(settings.shot_clock)
         if self._pipeline:
             self._pipeline.reconfigure(settings)
@@ -431,32 +459,45 @@ class PipelineController(QObject):
             return ""
 
     @Slot(bool)
+    def set_recording_paused(self, paused: bool) -> None:
+        """Pause/resume writing frames to the active recording (session stays open)."""
+        self._recording_paused = paused
+
+    @Slot(bool)
     def set_recording(self, on: bool) -> None:
         if on and self._recorder is None:
             EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             self._recording_path = str(EXPORTS_DIR / f"session-{stamp}.mp4")
             self._recorder = "pending"  # opened lazily on first frame (need size)
+            self._recording_paused = False
+            # Stats live and die with the recording: fresh session, zeroed count.
+            self._session_id = self._repo.start_session(
+                mode=self._mode, drill_key=None, drill_target=0,
+                table_size=self._settings.table.size)
+            self.stats_updated.emit(self._repo.session_summary(self._session_id))
             self.recording_changed.emit(True)
         elif not on and self._recorder is not None:
             if hasattr(self._recorder, "release"):
                 self._recorder.release()
             self._recorder = None
+            if self._session_id is not None:
+                self._repo.end_session(self._session_id)
+                self._session_id = None
             self.recording_changed.emit(False)
             if self._recording_path:
                 self.replay_saved.emit(self._recording_path)
 
     @Slot()
-    def start_analysis_capture(self, seconds: float = 60.0) -> None:
-        """Record raw camera frames (+ a metadata sidecar) to a zip for offline
-        YOLO training. Captures the UNANNOTATED feed so the frames are usable as
-        real training images. Bounded in time and frame count to keep the zip
-        sane; sampled every other frame (~15 fps)."""
+    def start_analysis_capture(self, seconds: float = 150.0) -> None:
+        """Record raw, FULL-RESOLUTION camera frames to a zip for training.
+        Bounded in time/count to keep the zip sane; sampled every other frame
+        (~15 fps)."""
         if self._capture is not None:
-            self.capture_progress.emit("Already capturing…")
+            self.capture_progress.emit("Already recording…")
             return
         if not self._running or self._source is None:
-            self.error.emit("Start the camera before capturing a session.")
+            self.error.emit("Start the camera before recording a session.")
             return
         EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -464,12 +505,12 @@ class PipelineController(QObject):
         (cap_dir / "frames").mkdir(parents=True, exist_ok=True)
         self._capture = {
             "dir": cap_dir, "stamp": stamp, "saved": 0, "seen": 0,
-            "stride": 2, "max_frames": 900,
+            "stride": 2, "max_frames": 2000,
             "deadline": time.perf_counter() + max(5.0, seconds),
             "started_iso": datetime.now(timezone.utc).isoformat(),
         }
-        self.capture_progress.emit("Capturing 0 frames…")
-        log.info("Analysis capture started -> %s", cap_dir)
+        self.capture_progress.emit("Recording session… 0 frames")
+        log.info("Training-session recording started -> %s", cap_dir)
 
     def _write_capture(self, frame: np.ndarray) -> None:
         cap = self._capture
@@ -479,13 +520,15 @@ class PipelineController(QObject):
         done = (time.perf_counter() >= cap["deadline"]
                 or cap["saved"] >= cap["max_frames"])
         if not done and cap["seen"] % cap["stride"] == 0:
-            small = self._small(frame, max_w=720)
+            # Full resolution (only lightly capped) — the auto-labeller needs the
+            # detail to read each ball's colour + solid/stripe.
+            img = self._small(frame, max_w=1280) if frame.shape[1] > 1280 else frame
             path = cap["dir"] / "frames" / f"f{cap['saved']:05d}.jpg"
             try:
-                cv2.imwrite(str(path), small, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+                cv2.imwrite(str(path), img, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
                 cap["saved"] += 1
-                if cap["saved"] % 30 == 0:
-                    self.capture_progress.emit(f"Capturing {cap['saved']} frames…")
+                if cap["saved"] % 15 == 0:
+                    self.capture_progress.emit(f"● Recording session… {cap['saved']} frames")
             except Exception:  # noqa: BLE001
                 pass
         if done:
@@ -616,6 +659,12 @@ class PipelineController(QObject):
         t_wall0 = time.perf_counter()
         self._miss_t0: float | None = None  # first consecutive empty-read time
         self._got_frame = True
+        # Rotation/flip + colour correction apply to the LIVE camera only.
+        # Recordings are saved post-preprocess (baked exactly as seen), so
+        # re-applying on playback would double-rotate — a session always plays
+        # back in the orientation it was recorded in.
+        if not getattr(self._source, "is_video", False):
+            frame = preprocess_frame(frame, self._settings.camera)
         self._last_frame = frame
         if getattr(self._source, "is_video", False):
             self._video_pos = max(0, self._source.position() - 1)
@@ -634,12 +683,10 @@ class PipelineController(QObject):
 
         self._handle_state(res.shot_state, t)
         self._update_cue_clock(res.tracks, t)
-        if res.shot_event is not None:
-            if self._settings.detection.manual_confirm:
-                # suggest only — the user commits via the make/miss buttons
-                self.shot_suggested.emit(res.shot_event)
-            else:
-                self._record_shot(res.shot_event, t)
+        # Shots only COUNT while a recording session is open — vision analyses
+        # the table continuously, but stats belong to a session.
+        if res.shot_event is not None and self._session_id is not None:
+            self._record_shot(res.shot_event, t)
 
         clock_edge = self._clock.poll(t)
         if clock_edge:
@@ -649,9 +696,11 @@ class PipelineController(QObject):
         if res.frame_bgr is not None:
             self._replay.append(self._small(res.frame_bgr))
 
-        # recording mode: write the annotated camera frame to disk for offline analysis
-        if self._recorder is not None and res.frame_bgr is not None:
-            self._write_recording(res.frame_bgr)
+        # recording mode: write the RAW (unannotated) frame — replayable through
+        # the pipeline for testing, and reusable as training data.
+        if (self._recorder is not None and not self._recording_paused
+                and self._last_frame is not None):
+            self._write_recording(self._last_frame)
 
         dt = time.perf_counter() - t_wall0
         inst = 1.0 / dt if dt > 0 else 0.0
@@ -729,14 +778,17 @@ class PipelineController(QObject):
         return cv2.resize(frame, (max_w, int(h * scale)))
 
     def _write_recording(self, frame: np.ndarray) -> None:
-        small = self._small(frame, max_w=640)
+        # Near-full resolution so one recording serves BOTH playback/testing and
+        # training. Raw (unannotated) so replaying it re-runs the CURRENT analysis
+        # over old footage — the app-testing use case.
+        img = self._small(frame, max_w=1280) if frame.shape[1] > 1280 else frame
         if self._recorder == "pending":
-            h, w = small.shape[:2]
+            h, w = img.shape[:2]
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             self._recorder = cv2.VideoWriter(
                 self._recording_path, fourcc, max(10.0, min(self._src_fps, 30)), (w, h))
         try:
-            self._recorder.write(small)
+            self._recorder.write(img)
         except Exception:  # noqa: BLE001
             pass
 

@@ -37,11 +37,28 @@ _PATHS: dict[str, str] = {
     "award": '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
     "sliders": '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
     "user": '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    "rotate": '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+    "flip-h": '<line x1="12" y1="3" x2="12" y2="21"/><path d="M9 6l-5 6 5 6z"/><path d="M15 6l5 6-5 6z"/>',
+    "flip-v": '<line x1="3" y1="12" x2="21" y2="12"/><path d="M6 9l6-5 6 5z"/><path d="M6 15l6 5 6-5z"/>',
+    # Recording transport (broadcast-style, SOLID media glyphs)
+    "rec": '<circle cx="12" cy="12" r="8" fill="{c}" stroke="none"/>',
+    "rec-stop": '<rect x="5.5" y="5.5" width="13" height="13" rx="2.5" fill="{c}" stroke="none"/>',
+    "rec-pause": ('<rect x="6" y="5" width="4.4" height="14" rx="1.4" fill="{c}" stroke="none"/>'
+                  '<rect x="13.6" y="5" width="4.4" height="14" rx="1.4" fill="{c}" stroke="none"/>'),
+    "play-solid": '<polygon points="7,4.5 20,12 7,19.5" fill="{c}" stroke="none"/>',
+    "step-back": ('<rect x="5" y="5" width="3" height="14" rx="1" fill="{c}" stroke="none"/>'
+                  '<polygon points="19,5 9.5,12 19,19" fill="{c}" stroke="none"/>'),
+    "step-fwd": ('<polygon points="5,5 14.5,12 5,19" fill="{c}" stroke="none"/>'
+                 '<rect x="16" y="5" width="3" height="14" rx="1" fill="{c}" stroke="none"/>'),
+    "film": '<rect x="2" y="3" width="20" height="18" rx="2"/><line x1="7" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="2" y1="15" x2="22" y2="15"/>',
 }
 
 
 def _svg(name: str, color: str, stroke: float = 2.0) -> str:
     inner = _PATHS.get(name, _PATHS["target"])
+    # {c} placeholders let a glyph opt into SOLID fills (media-transport icons);
+    # everything else stays stroke-outlined via the svg-level defaults.
+    inner = inner.replace("{c}", color)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
         f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="{stroke}" '

@@ -268,6 +268,7 @@ def test_parallax_correction_pulls_projected_balls_toward_camera():
     det = Detection(float(img_pt[0]), float(img_pt[1]), 8.0, (200, 200, 200))
 
     s = Settings()
+    s.camera.overhead = False  # this test exercises the OBLIQUE parallax correction
     pipe = Pipeline(s, source="")
     out = pipe._project_raw_to_rect([det], calib, shape)[0]
     r = expected_ball_radius_px(calib.table, s.table.size)

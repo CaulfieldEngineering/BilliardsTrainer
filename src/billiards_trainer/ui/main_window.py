@@ -6,17 +6,14 @@ work never runs on the UI thread.
 """
 
 import logging
+from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QButtonGroup,
-    QFrame,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QStackedWidget,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -24,14 +21,80 @@ from ..config import Settings
 from ..db.repository import Repository
 from ..version import APP_NAME, __version__
 from ..workers.controller import PipelineController, make_controller_thread
-from .pages.drills_page import DrillsPage
 from .pages.live_page import LivePage
 from .pages.settings_page import SettingsPage
-from .pages.stats_page import StatsPage
-from .theme import PALETTE, apply_theme
-from .widgets.common import nav_button
+from .theme import apply_theme
 
 log = logging.getLogger("ui")
+
+
+class _AutoLabelWorker(QThread):
+    """Runs the session -> VLM -> TrainingStore pipeline off the UI thread.
+    Torch-free (ONNX detection + an HTTPS call to the vision model)."""
+    progress = Signal(str)
+    done = Signal(bool, str)   # ok, human-readable report
+
+    def __init__(self, session: Path, settings, store_dir: Path):
+        super().__init__()
+        self._session, self._settings, self._store_dir = session, settings, store_dir
+
+    def run(self) -> None:
+        try:
+            from ..train import TrainingStore
+            from ..train.autolabel import autolabel_session
+            store = TrainingStore(self._store_dir)
+            rep = autolabel_session(self._session, self._settings, store,
+                                    progress=self.progress.emit)
+            msg = (f"AI labelled {rep['balls_saved']} balls across "
+                   f"{rep['layouts']} layouts. Real-time detector agreed "
+                   f"{rep['heuristic_agreement_pct']}%. Now tap Train.")
+            self.done.emit(rep["balls_saved"] > 0, msg)
+        except Exception as exc:  # noqa: BLE001 - surface to the UI
+            self.done.emit(False, f"Auto-label failed: {exc}")
+
+
+class _StreamingTrainWorker(QThread):
+    """Runs finetune_ballid.py, streaming per-epoch progress ('Epoch 12/80' →
+    15%) so the Training rail can show a real bar + log instead of a black box."""
+    progress = Signal(int, str)   # percent (or -1 = indeterminate), latest line
+    done = Signal(bool, str)
+
+    def __init__(self, py: str, data: str, out: str):
+        super().__init__()
+        self._py, self._data, self._out = py, data, out
+
+    def run(self) -> None:
+        import re
+        import subprocess
+        root = Path(__file__).resolve().parents[3]
+        tail: list[str] = []
+        try:
+            proc = subprocess.Popen(
+                [self._py, str(root / "tools" / "finetune_ballid.py"),
+                 "--data", self._data, "--out", self._out],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1)
+            epoch_re = re.compile(r"(\d+)/(\d+)")
+            for line in proc.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                tail.append(line)
+                del tail[:-30]
+                m = epoch_re.search(line)
+                if ("/" in line and m and "Epoch" not in line
+                        and line.split()[0].count("/") == 1):
+                    cur, tot = int(m.group(1)), int(m.group(2))
+                    if 0 < cur <= tot and tot > 1:
+                        self.progress.emit(int(100 * cur / tot),
+                                           f"Epoch {cur}/{tot}")
+                elif "export" in line.lower():
+                    self.progress.emit(97, "Exporting model…")
+            proc.wait(timeout=60)
+            ok = proc.returncode == 0 and any("FINETUNE_OK" in t for t in tail)
+            self.done.emit(ok, "\n".join(tail[-3:]))
+        except Exception as exc:  # noqa: BLE001
+            self.done.emit(False, str(exc))
 
 
 class MainWindow(QMainWindow):
@@ -77,67 +140,37 @@ class MainWindow(QMainWindow):
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addWidget(self._nav_rail())
+
+        # The sessions sidebar IS the navigation: LIVE + recordings + Settings.
+        from .widgets.sessions_sidebar import SessionsSidebar
+        self._sidebar = SessionsSidebar()
+        root.addWidget(self._sidebar)
 
         self._stack = QStackedWidget()
         self._live = LivePage(self._settings)
-        self._drills = DrillsPage()
-        self._stats = StatsPage(self._repo)
         self._settings_page = SettingsPage(self._settings)
-        for page in (self._live, self._drills, self._stats, self._settings_page):
+        for page in (self._live, self._settings_page):
             self._stack.addWidget(page)
         root.addWidget(self._stack, 1)
         self.setCentralWidget(central)
         self.statusBar().showMessage("Ready")
 
-    def _nav_rail(self) -> QWidget:
-        rail = QFrame()
-        rail.setObjectName("Sidebar")
-        rail.setFixedWidth(208)
-        lay = QVBoxLayout(rail)
-        lay.setContentsMargins(14, 18, 14, 16)
-        lay.setSpacing(6)
+    def _toggle_settings(self) -> None:
+        self._stack.setCurrentIndex(1 if self._stack.currentIndex() == 0 else 0)
 
-        brand = QHBoxLayout()
-        dot = QLabel("●")
-        dot.setStyleSheet(f"color: {PALETTE.accent}; font-size: 16px;")
-        brand.addWidget(dot)
-        name = QLabel("Billiards Trainer")
-        name.setStyleSheet("font-size: 15px; font-weight: 700;")
-        brand.addWidget(name)
-        brand.addStretch(1)
-        lay.addLayout(brand)
-        lay.addSpacing(14)
+    def _on_live_selected(self) -> None:
+        """Sidebar LIVE clicked: back to the camera."""
+        self._stack.setCurrentIndex(0)
+        self._live.set_training(False)
+        source = self._settings.source or "0"
+        self._started_source = source
+        self.start_source.emit(source, self._settings.mode, "")
 
-        self._nav_group = QButtonGroup(self)
-        self._nav_group.setExclusive(True)
-        self._nav_items = []
-        # nav index -> stacked-page index ('Training' reuses the Sandbox page +
-        # flips its Training Mode, so labelling happens on the same video/transport)
-        self._nav_to_stack = {0: 0, 1: 0, 2: 1, 3: 2, 4: 3}
-        for idx, (ic, label) in enumerate([
-            ("activity", "Sandbox"), ("crosshair", "Training"), ("target", "Drills"),
-            ("stats", "Stats"), ("settings", "Settings"),
-        ]):
-            btn = nav_button(ic, label)
-            btn.clicked.connect(lambda _=False, i=idx: self._go(i))
-            self._nav_group.addButton(btn)
-            self._nav_items.append(btn)
-            lay.addWidget(btn)
-        self._nav_items[0].setChecked(True)
-
-        lay.addStretch(1)
-        ver = QLabel(f"v{__version__}")
-        ver.setObjectName("Faint")
-        lay.addWidget(ver)
-        return rail
-
-    def _go(self, nav_index: int) -> None:
-        stack_i = self._nav_to_stack.get(nav_index, 0)
-        self._stack.setCurrentIndex(stack_i)
-        self._live.set_training(nav_index == 1)   # 'Training' nav = label mode on
-        if self._stack.currentWidget() is self._stats:
-            self._stats.refresh()
+    def _on_session_selected(self, path: str) -> None:
+        """Sidebar session clicked: play the recording through the analysis."""
+        self._stack.setCurrentIndex(0)
+        self._started_source = path
+        self.start_source.emit(path, self._settings.mode, "")
 
     # ------------------------------------------------------------------ #
     def _wire(self) -> None:
@@ -146,9 +179,9 @@ class MainWindow(QMainWindow):
         self.start_source.connect(self._controller.start, q)
         self._live.start_requested.connect(self._controller.start, q)
         self._live.stop_requested.connect(self._controller.stop, q)
-        self._live.detection_toggled.connect(self._controller.set_detection_enabled, q)
         self.set_strategy_requested.connect(self._controller.set_detector_strategy, q)
         self._settings_page.detector_changed.connect(self._on_strategy_changed)
+        self._settings_page.recalibrate_requested.connect(self._controller.recalibrate, q)
         self._live.retry_requested.connect(self._retry_camera)
         # video transport (UI -> controller, queued onto the worker thread)
         self._live.video_play_pause.connect(self._controller.set_video_paused, q)
@@ -158,20 +191,18 @@ class MainWindow(QMainWindow):
         self._live.video_speed.connect(self._controller.set_playback_speed, q)
         self._controller.source_is_video.connect(self._live.set_video_mode)
         self._controller.video_state.connect(self._live.update_video_state)
-        self._live.open_settings_requested.connect(lambda: self._go(3))
-        self._live.recalibrate_requested.connect(self._controller.recalibrate, q)
-        self._live.pick_felt_requested.connect(self._controller.pick_felt, q)
-        self._live.save_replay_requested.connect(self._controller.save_replay, q)
-        self._live.overlays_toggled.connect(self._on_overlays_toggled)
+        self._live.open_settings_requested.connect(lambda: self._stack.setCurrentIndex(1))
+        # Sidebar navigation (the only navigation)
+        self._sidebar.live_selected.connect(self._on_live_selected)
+        self._sidebar.session_selected.connect(self._on_session_selected)
+        self._sidebar.settings_toggled.connect(self._toggle_settings)
         self._live.tuning_changed.connect(self._on_tuning_changed)
         # Training Mode (label/correct ball numbers on the playback)
         self._live.label_mode_toggled.connect(self._controller.set_label_mode, q)
         self._live.save_training_frame_requested.connect(self._controller.save_training_frame, q)
         self._live.train_balls_requested.connect(self._train_ball_ids)
-        self._live.pause_toggled.connect(self._controller.set_paused, q)
-        self._live.reset_requested.connect(self._controller.reset_counters, q)
-        self._live.manual_shot.connect(self._controller.record_manual_shot, q)
         self._live.record_toggled.connect(self._controller.set_recording, q)
+        self._live.record_pause_toggled.connect(self._controller.set_recording_paused, q)
         self.apply_settings_requested.connect(self._controller.apply_settings, q)
 
         # controller -> UI.
@@ -182,7 +213,6 @@ class MainWindow(QMainWindow):
         # a UI-thread QObject so the connection auto-queues.
         self._controller.frame_ready.connect(self._live.on_frame)
         self._controller.stats_updated.connect(self._live.on_stats)
-        self._controller.stats_updated.connect(self._refresh_stats_page)
         self._controller.shot_recorded.connect(self._live.on_shot)
         self._controller.shot_suggested.connect(self._live.on_suggestion)
         self._controller.recording_changed.connect(self._live.on_recording)
@@ -208,24 +238,25 @@ class MainWindow(QMainWindow):
         self._cue.metrics.connect(self._controller.on_stroke_metrics, q)
         self._cue.address_resolved.connect(self._on_cue_address)
         self._settings_page.cue_diagnostics_requested.connect(self._open_cue_diagnostics)
+        # Zero-restart camera ownership: when tethered control is enabled, a
+        # resident keeper claims the DSLR the instant it appears on USB (app
+        # launch / power event), holds its one-per-power-on session, and turns
+        # liveview on for the HDMI capture path — no user action, ever.
+        if self._settings.camera.tether.enabled:
+            from ..capture.tether import start_session_keeper
+            start_session_keeper(self._settings.camera.tether)
 
-        # settings + drills
+        # settings
         self._settings_page.applied.connect(self._on_settings_applied)
         self._settings_page.check_updates_requested.connect(self._check_for_updates_forced)
         self._settings_page.feedback_requested.connect(self._open_feedback)
-        self._settings_page.capture_requested.connect(
-            self._controller.start_analysis_capture, q)
         self._settings_page.train_balls_requested.connect(self._open_ball_trainer)
         self._settings_page.flag_failure_requested.connect(self._controller.flag_failure, q)
         self._controller.failure_flagged.connect(self._on_failure_flagged)
-        self._drills.drill_chosen.connect(self._on_drill_chosen)
         self._sync.status.connect(self._on_sync_status)
 
     # Cross-thread signal landing pads (bound methods of this UI-thread QObject
     # -> Qt auto-queues; see the THREADING RULE note in _wire).
-    def _refresh_stats_page(self, _summary) -> None:
-        self._stats.refresh()
-
     def _on_capture_progress(self, msg: str) -> None:
         self.statusBar().showMessage(f"Capture: {msg}", 4000)
 
@@ -246,6 +277,10 @@ class MainWindow(QMainWindow):
         self._started_source = source
         self.statusBar().showMessage("Retrying camera…", 3000)
         self.start_source.emit(source, self._settings.mode, "")
+
+    def retry_camera(self) -> None:
+        """Public re-scan hook (used after camera permission is granted)."""
+        self._retry_camera()
 
     def _maybe_autofetch_model(self) -> None:
         """First-launch convenience: if the trained ball-detection model isn't
@@ -293,12 +328,40 @@ class MainWindow(QMainWindow):
         self._settings.balls.live_strategy = name
         self._settings.save()
         self.set_strategy_requested.emit(name)        # live switch, keeps calibration
-        self._live.set_detector_label(name)
         self.statusBar().showMessage(f"Live detector → {name}", 4000)
 
     def _on_capture_saved(self, path: str) -> None:
-        self.statusBar().showMessage(f"Analysis capture saved: {path}", 8000)
-        self._settings_page.set_capture_status(f"Saved: {path}")
+        self._last_capture_path = path
+        self.statusBar().showMessage(f"Training session saved: {path}", 8000)
+        self._live.set_autolabel_status("Session recorded — Train AI when ready.")
+
+    def _autolabel_session(self) -> None:
+        """AI auto-label the most recent recorded session into the training store."""
+        from ..config import APP_DIR
+        from ..train import vlm
+        from ..train.autolabel import find_latest_session
+        session = getattr(self, "_last_capture_path", "") or find_latest_session()
+        if not session:
+            self._live.set_autolabel_status("Record a training session first.")
+            return
+        if not vlm.available(self._settings.autolabel):
+            self._live.set_autolabel_status(
+                "AI labelling needs an OpenRouter API key — add it in Settings → "
+                "AI labelling. (Or label manually with the number pad above.)")
+            return
+        if getattr(self, "_autolabel_worker", None) is not None:
+            return
+        self._live.set_autolabel_status("AI is labelling the session…", busy=True)
+        self._autolabel_worker = _AutoLabelWorker(
+            Path(session), self._settings, APP_DIR / "training" / "ballid")
+        self._autolabel_worker.progress.connect(
+            lambda m: self._live.set_autolabel_status(m, busy=True))
+        self._autolabel_worker.done.connect(self._on_autolabel_done)
+        self._autolabel_worker.start()
+
+    def _on_autolabel_done(self, ok: bool, report: str) -> None:
+        self._autolabel_worker = None
+        self._live.set_autolabel_status(report, busy=False)
 
     def _on_failure_flagged(self, path: str) -> None:
         self.statusBar().showMessage(f"Failure flagged + staged: {path}", 8000)
@@ -330,7 +393,6 @@ class MainWindow(QMainWindow):
     def _on_settings_applied(self) -> None:
         apply_theme(QApplication.instance(), self._settings.ui.accent)
         self._push_settings()
-        self._live.set_detector_label(self._settings.balls.live_strategy)
         self._cue.apply_settings(self._settings.cue)
         self._live.set_cue_enabled(self._settings.cue.enabled)
         # If the camera source changed, re-open the preview on the new device.
@@ -338,13 +400,6 @@ class MainWindow(QMainWindow):
             self._started_source = self._settings.source or "0"
             self.start_source.emit(self._started_source, self._settings.mode, "")
         self.statusBar().showMessage("Settings saved", 4000)
-
-    def _on_overlays_toggled(self, on: bool) -> None:
-        # live page already flipped self._settings.ui.show_overlays (shared object)
-        self._push_settings()
-        self._settings.save()
-        self.statusBar().showMessage(
-            f"Detection overlays {'on' if on else 'off'}", 3000)
 
     def _on_tuning_changed(self) -> None:
         """A live-tuning control on the main window changed. The control already
@@ -374,13 +429,8 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Replay attached to feedback", 5000)
             return
         self._live.on_replay_saved(path)
+        self._sidebar.refresh()   # a stopped recording appears in the list at once
         self.statusBar().showMessage(f"Replay saved: {path}", 6000)
-
-    def _on_drill_chosen(self, drill) -> None:
-        self._live.set_drill(drill.key, drill.name)
-        self._nav_items[0].setChecked(True)
-        self._go(0)
-        self.statusBar().showMessage(f"Drill ready: {drill.name} — press Start", 6000)
 
     # ------------------------------------------------------------------ #
     def _maybe_check_updates(self) -> None:
@@ -435,39 +485,64 @@ class MainWindow(QMainWindow):
         return ""
 
     def _train_ball_ids(self) -> None:
-        """Fine-tune on the labelled store (Training Mode) in a torch env, then
-        switch the app to the table-trained model."""
+        """'Train with AI': auto-label the latest session first (when the AI
+        backend is configured), then fine-tune on everything saved — one flow,
+        one progress readout — and switch to the new model when done."""
+        from ..train import vlm
+        from ..train.autolabel import find_latest_session
+        session = find_latest_session()
+        if (vlm.available(self._settings.autolabel) and session
+                and getattr(self, "_autolabel_worker", None) is None):
+            from ..config import APP_DIR
+            self._live.set_autolabel_status("AI labelling the session…", busy=True)
+            self._autolabel_worker = _AutoLabelWorker(
+                Path(session), self._settings, APP_DIR / "training" / "ballid")
+            self._autolabel_worker.progress.connect(
+                lambda m: self._live.set_autolabel_status(m, busy=True))
+            self._autolabel_worker.done.connect(self._after_autolabel_train)
+            self._autolabel_worker.start()
+            return
+        self._start_finetune()
+
+    def _after_autolabel_train(self, ok: bool, report: str) -> None:
+        self._autolabel_worker = None
+        self._live.set_autolabel_status(report, busy=True)
+        self._start_finetune()
+
+    def _start_finetune(self) -> None:
+        """Fine-tune on everything saved, streaming progress to the rail."""
         from ..config import APP_DIR, MODELS_DIR
         from ..train import TrainingStore
         store = TrainingStore(APP_DIR / "training" / "ballid")
         if store.count() < 5:
-            self.statusBar().showMessage("Label at least ~5 frames in Training Mode "
-                                         "before training.", 6000)
+            self._live.on_train_done(False, "Save at least ~5 labelled frames first.")
             return
         py = self._find_train_python()
         data = str(store.write_data_yaml())
         out = str(MODELS_DIR / "pool_ballid.onnx")
         if not py:
-            self.statusBar().showMessage("No torch env found for training. Run once: "
-                                         f"python tools/finetune_ballid.py --data {data} "
-                                         f"--out {out}", 15000)
+            self._live.on_train_done(False, "No training environment found "
+                                            "(.trainvenv missing).")
             return
-        from .dialogs.ball_trainer_dialog import _TrainWorker
-        self.statusBar().showMessage("Training on your labelled balls… (runs in the "
-                                     "background, a few minutes)", 0)
-        self._ball_train = _TrainWorker(py, data, out)
+        if getattr(self, "_ball_train", None) is not None and self._ball_train.isRunning():
+            return
+        self._live._train_ai_btn.setEnabled(False)
+        self._live.on_train_progress(-1, "Starting training…")
+        self._ball_train = _StreamingTrainWorker(py, data, out)
+        self._ball_train.progress.connect(self._live.on_train_progress)
         self._ball_train.done.connect(self._on_balls_trained)
         self._ball_train.start()
 
     def _on_balls_trained(self, ok: bool, log: str) -> None:
         if ok:
+            # Deploy immediately: the new model becomes the live detector now.
             self._settings.balls.live_strategy = "onnx_pool_ballid"
             self._settings.save()
             self.set_strategy_requested.emit("onnx_pool_ballid")
-            self.statusBar().showMessage("Trained ✓ — now using your table's ball-ID "
-                                         "model.", 8000)
+            self._live.on_train_done(True, "Trained ✓ — saved and active. The app "
+                                           "is now using your table's model.")
         else:
-            self.statusBar().showMessage(f"Training failed: {log[-200:]}", 12000)
+            self._live.on_train_done(False, f"Training failed: {log[-200:]}")
 
     def _on_cue_address(self, addr: str) -> None:
         """Remember the sensor so later scans prefer it (no reconfiguration UX)."""

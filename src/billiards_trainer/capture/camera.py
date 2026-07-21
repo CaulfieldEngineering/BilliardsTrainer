@@ -15,12 +15,17 @@ A ``FrameSource`` yields BGR frames via ``read()``. Four kinds:
     "*.mp4/..." -> VideoSource ; image extensions -> ImageSource
 """
 
+import logging
 import sys
 import threading
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+from ..config import CameraSettings
+
+log = logging.getLogger("capture.camera")
 
 _VIDEO_EXT = {".mp4", ".avi", ".mov", ".mkv", ".m4v", ".wmv"}
 _IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -44,13 +49,54 @@ class FrameSource:
 class CameraSource(FrameSource):
     is_live = True
 
-    def __init__(self, index: int):
+    def __init__(self, index: int, cam: CameraSettings | None = None):
         self.name = f"Camera {index}"
         backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
         self._cap = cv2.VideoCapture(index, backend)
         # request a sensible resolution; the camera will clamp to what it supports
-        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        w = cam.width if cam else 1280
+        h = cam.height if cam else 720
+        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        # Prefer MJPEG delivery: HDMI capture dongles renegotiate their raw
+        # pixel format when the input signal changes mode, and a stale YUV
+        # interpretation shows as green/purple chroma garbage. Compressed MJPEG
+        # sidesteps raw-format ambiguity entirely; backends that don't support
+        # it ignore the request.
+        try:
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        except cv2.error:
+            pass
+        if cam is not None:
+            self._apply_controls(cam)
+
+    def _apply_controls(self, cam: CameraSettings) -> None:
+        """Best-effort UVC control set (focus / exposure / white balance / gain).
+
+        Called once, before any grab thread starts, so it never races read().
+        Not all backends honour every property — failures are silently ignored,
+        which is why these are exposed as 'requests' in the UI, not guarantees.
+        The tethered DSLR path does NOT use these (it has no UVC controls); it
+        goes through :class:`~billiards_trainer.capture.tether.GphotoSource`.
+        """
+        def _set(prop: int, value: float) -> None:
+            try:
+                self._cap.set(prop, value)
+            except cv2.error:
+                pass
+
+        _set(cv2.CAP_PROP_AUTOFOCUS, 1.0 if cam.auto_focus else 0.0)
+        if not cam.auto_focus and cam.focus >= 0:
+            _set(cv2.CAP_PROP_FOCUS, cam.focus)
+        # AUTO_EXPOSURE: 0.75 = auto, 0.25 = manual is the common V4L2/DShow convention.
+        _set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75 if cam.auto_exposure else 0.25)
+        if not cam.auto_exposure and cam.exposure != -1:
+            _set(cv2.CAP_PROP_EXPOSURE, cam.exposure)
+        _set(cv2.CAP_PROP_AUTO_WB, 1.0 if cam.auto_wb else 0.0)
+        if not cam.auto_wb and cam.wb_temperature >= 0:
+            _set(cv2.CAP_PROP_WB_TEMPERATURE, cam.wb_temperature)
+        if cam.gain >= 0:
+            _set(cv2.CAP_PROP_GAIN, cam.gain)
 
     @property
     def opened(self) -> bool:
@@ -89,8 +135,8 @@ class ThreadedCameraSource(CameraSource):
     reproduce the worker-thread QTimer lifetime crashes.
     """
 
-    def __init__(self, index: int):
-        super().__init__(index)
+    def __init__(self, index: int, cam: CameraSettings | None = None):
+        super().__init__(index, cam)
         self._lock = threading.Lock()
         self._latest: np.ndarray | None = None
         self._stop = threading.Event()
@@ -297,16 +343,23 @@ class DemoSource(FrameSource):
         return tuple(home), (0.0, 0.0), False        # settle, object gone until loop
 
 
-def open_source(spec: str, *, demo_size=(1280, 720)) -> FrameSource:
+def open_source(spec: str, *, demo_size=(1280, 720),
+                cam: CameraSettings | None = None) -> FrameSource:
     spec = (spec or "0").strip()
     if spec.lower() == "demo":
         return DemoSource(*demo_size)
+    if spec.lower() in ("tether", "canon", "gphoto"):
+        # Lazy import: the tether module is only needed on this path and keeps
+        # camera.py free of a hard dependency on it (and avoids an import cycle).
+        from ..config import TetherSettings
+        from .tether import GphotoSource
+        return GphotoSource(cam.tether if cam else TetherSettings())
     if spec.isdigit():
-        return ThreadedCameraSource(int(spec))
+        return ThreadedCameraSource(int(spec), cam)
     ext = Path(spec).suffix.lower()
     if ext in _VIDEO_EXT:
         return VideoSource(spec)
     if ext in _IMAGE_EXT:
         return ImageSource(spec)
     # fall back to treating as camera 0
-    return ThreadedCameraSource(0)
+    return ThreadedCameraSource(0, cam)

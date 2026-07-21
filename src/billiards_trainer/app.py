@@ -10,7 +10,6 @@ import sys
 from .config import LOGS_DIR, Settings, ensure_dirs
 from .version import APP_NAME, ORG_NAME, __version__
 
-
 _CRASH_FILE = None  # kept alive for the lifetime of the process
 
 
@@ -114,6 +113,44 @@ def main() -> int:
         geo = screen.availableGeometry()
         window.resize(min(1480, int(geo.width() * 0.9)), min(940, int(geo.height() * 0.9)))
         window.move(geo.center() - window.rect().center())
+
+    # macOS camera permission: request it on the MAIN thread once the event loop
+    # is live (the only context where macOS shows the prompt for a bundled app).
+    # When granted, re-scan so the camera list populates without a restart.
+    from .capture.macos_permissions import (
+        AUTHORIZED,
+        DENIED,
+        camera_auth_status,
+        request_camera_access,
+    )
+
+    if camera_auth_status() != AUTHORIZED:
+        from PySide6.QtCore import QTimer
+
+        _perm_state = {"granted": None}
+
+        def _fire_prompt() -> None:
+            log.info("requesting camera permission on main loop")
+            request_camera_access(lambda g: _perm_state.__setitem__("granted", g))
+
+        def _poll_perm() -> None:
+            if _perm_state["granted"] is True or camera_auth_status() == AUTHORIZED:
+                log.info("camera authorized — re-scanning sources")
+                _perm_timer.stop()
+                try:
+                    window.retry_camera()
+                except Exception:  # noqa: BLE001
+                    log.exception("camera re-scan after grant failed")
+            elif _perm_state["granted"] is False or camera_auth_status() == DENIED:
+                _perm_timer.stop()
+                log.warning("camera permission denied — enable it in System "
+                            "Settings › Privacy & Security › Camera")
+
+        QTimer.singleShot(400, _fire_prompt)
+        _perm_timer = QTimer()
+        _perm_timer.setInterval(500)
+        _perm_timer.timeout.connect(_poll_perm)
+        _perm_timer.start()
 
     # If a prior self-update was rolled back (or files look incomplete), explain it.
     integrity = recovery.verify_frozen_integrity()

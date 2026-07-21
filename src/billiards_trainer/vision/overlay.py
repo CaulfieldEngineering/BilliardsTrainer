@@ -282,7 +282,7 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
 
 def draw_perspective(frame: np.ndarray, corners: np.ndarray | None,
                      tracks: list[Track], Hinv: np.ndarray | None,
-                     accent: str = "#3DDC97") -> np.ndarray:
+                     accent: str = "#3DDC97", table=None) -> np.ndarray:
     img = frame.copy()
     acc = _accent_bgr(accent)
     if corners is not None:
@@ -290,6 +290,14 @@ def draw_perspective(frame: np.ndarray, corners: np.ndarray | None,
         cv2.polylines(img, [pts], True, acc, 2, cv2.LINE_AA)
         for (cx, cy) in corners.astype(int):
             cv2.circle(img, (int(cx), int(cy)), 5, acc, -1, cv2.LINE_AA)
+    # Cushion-nose line: the playing boundary the app actually uses, projected
+    # back onto the camera. The calibration aid for Settings -> Cushion inset:
+    # tune the inches until this line sits ON the cushion noses.
+    if Hinv is not None and table is not None:
+        nose = np.array([[table.x0, table.y0], [table.x1, table.y0],
+                         [table.x1, table.y1], [table.x0, table.y1]], np.float64)
+        cam = project_points(nose, Hinv).astype(np.int32).reshape(-1, 1, 2)
+        cv2.polylines(img, [cam], True, (60, 200, 255), 1, cv2.LINE_AA)
     if Hinv is not None and tracks:
         rect_pts = np.array([[tr.x, tr.y] for tr in tracks], np.float64)
         orig = project_points(rect_pts, Hinv)

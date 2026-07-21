@@ -21,7 +21,7 @@ from .calibration import CalibrationManager
 from .geometry import TableModel, expected_ball_radius_px
 from .overlay import draw_perspective, draw_rectified, render_schematic
 from .tracking import BallTracker
-from .types import Detection, Track
+from .types import BallClass, Detection, Track
 
 log = logging.getLogger("vision.pipeline")
 
@@ -117,8 +117,12 @@ class Pipeline:
             if strat is None:
                 strat = self._resolve_auto(strategies)
             if strat is not None and hasattr(strat, "far_rail_rescan"):
+                # A true overhead camera has no foreshortened far rail, so the
+                # second inference pass is wasted work — force it off (≈2× frame
+                # rate) regardless of the tuning knob when overhead is set.
+                overhead = getattr(self.settings.camera, "overhead", False)
                 strat.far_rail_rescan = bool(
-                    getattr(self.settings.balls, "far_rail_rescan", True))
+                    getattr(self.settings.balls, "far_rail_rescan", True)) and not overhead
             return strat
         except Exception as exc:  # noqa: BLE001 - never let strategy loading break the app
             log.warning("Could not load live strategy '%s' (%s); using legacy", name, exc)
@@ -246,6 +250,11 @@ class Pipeline:
         (degenerate pose, implausible height, or the feature flag is off)."""
         if not getattr(self.settings.balls, "parallax_correction", True):
             return None
+        # A directly-overhead camera has no oblique radial parallax: the pose
+        # decomposition is degenerate for a fronto-parallel homography and the
+        # correction collapses to a no-op, so skip it entirely when overhead.
+        if getattr(self.settings.camera, "overhead", False):
+            return None
         key = (calib.H.tobytes(), frame_shape[1], frame_shape[0])
         if self._cam_pose is not None and self._cam_pose[0] == key:
             return self._cam_pose[1]
@@ -357,10 +366,11 @@ class Pipeline:
 
         ui = self.settings.ui
         # The full-frame 3-channel bird's-eye warp is only needed when the warped
-        # CAMERA image is displayed (schematic off, or overlays fully off). The
-        # default schematic view renders from state, so skip the warp entirely —
-        # motion energy gets its own cheap gray-ROI warp below.
-        need_rect_bgr = not (annotate and ui.schematic_birdseye)
+        # CAMERA image is displayed (schematic off). The default schematic view
+        # renders from state, so skip the warp entirely — motion energy gets its
+        # own cheap gray-ROI warp below. Independent of ``annotate``: Training
+        # (label mode) keeps the same schematic bird's-eye as the Sandbox.
+        need_rect_bgr = not ui.schematic_birdseye
         t0 = time.perf_counter()
         rect = self.calib.rectify(frame) if need_rect_bgr else None
         if need_rect_bgr and rect is None:
@@ -406,9 +416,30 @@ class Pipeline:
             else:
                 floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
             detections = [d for d in detections if d.score >= floor]
+            # Geometry sanity — the single-class ball-finder fires on things that
+            # aren't balls. Two safe rejects: (1) anything off the playing surface
+            # (floor/rail/hand beyond the bed); (2) an empty POCKET void, which is
+            # dark and gets mistaken for the 8-ball — a detection sitting in a
+            # pocket capture zone that reads as EIGHT/UNKNOWN is the pocket itself,
+            # not a ball. A genuinely potted 8 is transient, so dropping it here is
+            # harmless. Real balls on the bed (incl. near rails) are untouched.
+            tbl = calib.table
+            edge = tbl.pocket_radius * 0.5
+            kept = []
+            for d in detections:
+                if not tbl.on_table(d.x, d.y, margin=edge):
+                    continue
+                if (d.cls in (BallClass.EIGHT, BallClass.UNKNOWN)
+                        and tbl.pocket_at(d.x, d.y, scale=0.9) is not None):
+                    continue
+                kept.append(d)
+            detections = kept
             st["detect"] = (time.perf_counter() - t0) * 1000.0
             t0 = time.perf_counter()
-            tracks = self.tracker.update(detections, calib.table.short_side)
+            tracks = self.tracker.update(
+                detections, calib.table.short_side,
+                bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),
+            )
             st["track"] = (time.perf_counter() - t0) * 1000.0
         res.tracks = tracks
         res.detections = detections
@@ -479,8 +510,9 @@ class Pipeline:
         norm_r = (expected_ball_radius_px(calib.table, self.settings.table.size)
                   if (ui.normalize_ball_size and not ui.show_raw_detection_size) else None)
         # Bird's-eye: a clean rendered schematic (proportional) by default, rather
-        # than the warped/clipped camera image.
-        if annotate and ui.schematic_birdseye:
+        # than the warped/clipped camera image. Also used in Training/label mode
+        # so both tabs share the same camera + animated-schematic layout.
+        if ui.schematic_birdseye:
             res.rect_bgr = render_schematic(
                 calib.table, tracks, accent=ui.accent,
                 show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
@@ -499,7 +531,8 @@ class Pipeline:
         # Live camera view keeps the real feed (with light overlay unless off).
         if overlays:
             res.frame_bgr = draw_perspective(
-                frame, calib.corners, tracks, calib.Hinv, accent=ui.accent
+                frame, calib.corners, tracks, calib.Hinv, accent=ui.accent,
+                table=calib.table,
             )
         else:
             res.frame_bgr = frame
