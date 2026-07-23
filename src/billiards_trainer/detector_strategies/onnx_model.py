@@ -175,14 +175,20 @@ class OnnxModelStrategy(DetectorStrategy):
         # No calibration => no polygon to test against; skip the mask entirely
         # (an all-255 full-frame mask filters nothing and costs a 2MP alloc).
         table = table_polygon_mask(frame_bgr.shape, calib) if calib is not None else None
-        rmax = ball_radius_raw(calib, frame_bgr.shape) * 4.0
+        # Tight size band around the expected ball radius. Measured on real
+        # frames: pockets, a keyboard, and hands all detect at >=2.7x the
+        # expected raw radius, while true balls stay under ~1.6x (the raw-scale
+        # estimate runs small) — 2.0x cleanly separates them. (Was 6x, which
+        # let anything vaguely round through.) Without a table lock the radius
+        # estimate is a blind frame-width guess, so keep the old loose band.
+        rmax = ball_radius_raw(calib, frame_bgr.shape) * (2.0 if calib is not None else 6.0)
         # A 16-class model is the trained cue+1..15 detector — its class IS the ball
         # number, so trust it directly (no colour heuristic). Anything else (the
         # single-class ball model, or COCO) gets the appearance classifier.
         numbered = getattr(self, "_nc", 0) == 16
         out_dets = []
         for ccx, ccy, rr, cf, cid in boxes:
-            if rr > rmax * 1.5 or rr < 2:
+            if rr > rmax or rr < 2:
                 continue
             ix, iy = int(np.clip(ccx, 0, w - 1)), int(np.clip(ccy, 0, h - 1))
             if table is not None and table[iy, ix] == 0:  # drop clearly off-table detections

@@ -104,17 +104,49 @@ class SettingsPage(QWidget):
         # backend, detector strictness, felt HSV) is no longer surfaced.
         # One card per row (Joe's preference: a plain vertical list, no columns);
         # capped width so form rows don't stretch across the whole window.
-        cards = [self._source_card(), self._camera_card(), self._table_card(),
-                 self._model_card(), self._recording_card(), self._clock_card(),
-                 self._appearance_card(), self._cue_card(), self._ai_card(),
-                 self._updates_card(), self._feedback_card(), self._debug_card()]
-        for row, card in enumerate(cards):
+        sections = [
+            ("Camera & audio", self._source_card()),
+            ("Camera controls", self._camera_card()),
+            ("Table", self._table_card()),
+            ("AI detection", self._model_card()),
+            ("Recording", self._recording_card()),
+            ("Shot clock", self._clock_card()),
+            ("Appearance", self._appearance_card()),
+            ("Cue sensor", self._cue_card()),
+            ("AI labelling", self._ai_card()),
+            ("Updates", self._updates_card()),
+            ("Feedback", self._feedback_card()),
+            ("Debug", self._debug_card()),
+        ]
+        self._section_cards = []
+        for row, (_title, card) in enumerate(sections):
             card.setMaximumWidth(820)
             grid.addWidget(card, row, 0)
+            self._section_cards.append(card)
         grid.setColumnStretch(0, 1)
 
         scroll.setWidget(body)
-        root.addWidget(scroll, 1)
+        self._scroll = scroll
+
+        # Section nav: a slim list on the left that jumps the scroll to a card.
+        from PySide6.QtWidgets import QListWidget
+        nav = QListWidget()
+        nav.setFixedWidth(160)
+        nav.setFrameShape(QScrollArea.NoFrame)
+        for title, _card in sections:
+            nav.addItem(title)
+        nav.currentRowChanged.connect(self._scroll_to_section)
+
+        split = QHBoxLayout()
+        split.setSpacing(16)
+        split.addWidget(nav)
+        split.addWidget(scroll, 1)
+        root.addLayout(split, 1)
+
+    def _scroll_to_section(self, row: int) -> None:
+        if 0 <= row < len(self._section_cards):
+            card = self._section_cards[row]
+            self._scroll.verticalScrollBar().setValue(max(0, card.y() - 8))
 
     def _card(self, title: str) -> tuple[Card, QFormLayout]:
         card = Card(padding=18, spacing=12)
@@ -131,7 +163,7 @@ class SettingsPage(QWidget):
     def _source_card(self) -> Card:
         from ..icons import icon
         from ..theme import PALETTE
-        card, form = self._card("Camera / source")
+        card, form = self._card("Camera & audio")
 
         self._source_combo = QComboBox()
         self._source_combo.setMinimumWidth(220)
@@ -169,6 +201,27 @@ class SettingsPage(QWidget):
 
         self._mirror = QCheckBox("Mirror preview horizontally")
         form.addRow("", self._mirror)
+
+        # Audio input lives with the camera: one place for capture sources.
+        self._rec_device = QComboBox()
+        self._rec_device.addItem("System default input", "default")
+        try:
+            from PySide6.QtMultimedia import QMediaDevices
+            for dev in QMediaDevices.audioInputs():
+                name = dev.description()
+                if name:
+                    self._rec_device.addItem(name, name)
+        except Exception:  # noqa: BLE001 - multimedia module absent
+            pass
+        self._rec_device.currentIndexChanged.connect(self._on_recording_changed)
+        form.addRow("Microphone", self._rec_device)
+
+        mic_hint = QLabel("The camera's HDMI feed carries no live audio (Canon "
+                          "T3i limitation) — plug any USB mic into the Mac and "
+                          "pick it here to get sound with your sessions.")
+        mic_hint.setObjectName("Faint")
+        mic_hint.setWordWrap(True)
+        form.addRow("", mic_hint)
 
         self._cam_names: dict[str, str] = {}
         self._populate_cameras()
@@ -362,25 +415,6 @@ class SettingsPage(QWidget):
         self._rec_audio.toggled.connect(self._on_recording_changed)
         form.addRow("", self._rec_audio)
 
-        self._rec_device = QComboBox()
-        self._rec_device.addItem("System default input", "default")
-        try:
-            from PySide6.QtMultimedia import QMediaDevices
-            for dev in QMediaDevices.audioInputs():
-                name = dev.description()
-                if name:
-                    self._rec_device.addItem(name, name)
-        except Exception:  # noqa: BLE001 - multimedia module absent
-            pass
-        self._rec_device.currentIndexChanged.connect(self._on_recording_changed)
-        form.addRow("Microphone", self._rec_device)
-
-        hint = QLabel("The camera's HDMI feed carries no live audio (Canon T3i "
-                      "limitation) — plug any USB mic into the Mac and pick it "
-                      "here to get sound with your sessions.")
-        hint.setObjectName("Faint")
-        hint.setWordWrap(True)
-        form.addRow("", hint)
         return card
 
     def _browse_rec_dir(self) -> None:

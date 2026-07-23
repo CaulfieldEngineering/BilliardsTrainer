@@ -117,12 +117,15 @@ class Pipeline:
             if strat is None:
                 strat = self._resolve_auto(strategies)
             if strat is not None and hasattr(strat, "far_rail_rescan"):
-                # A true overhead camera has no foreshortened far rail, so the
-                # second inference pass is wasted work — force it off (≈2× frame
-                # rate) regardless of the tuning knob when overhead is set.
-                overhead = getattr(self.settings.camera, "overhead", False)
+                # Honor the tuning knob even on an overhead camera. The old
+                # "overhead has no foreshortened far rail -> skip the 2nd pass"
+                # shortcut measurably LOSES balls on the real rig: the portrait
+                # frame letterboxes to 640px and top-band balls shrink below the
+                # model's floor — the band rescan is the only pass that finds
+                # them (verified 2026-07-23: two top-rail balls, 0.83 conf in
+                # the rescan, absent at full-frame scale).
                 strat.far_rail_rescan = bool(
-                    getattr(self.settings.balls, "far_rail_rescan", True)) and not overhead
+                    getattr(self.settings.balls, "far_rail_rescan", True))
             return strat
         except Exception as exc:  # noqa: BLE001 - never let strategy loading break the app
             log.warning("Could not load live strategy '%s' (%s); using legacy", name, exc)
