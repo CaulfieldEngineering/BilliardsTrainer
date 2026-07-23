@@ -103,6 +103,7 @@ class PipelineController(QObject):
         self._recording_paused = False
         self._audio = None            # AudioRecorder (or None when not recording)
         self._audio_dir = None        # temp dir holding audio segments
+        self._rec_crop = None         # (x0,y0,x1,y1) HDMI content box for this recording
         self._rec_frames = 0          # frames actually written this recording
         self._rec_fps = 0.0           # fps declared to the video writer
         self._rec_t0 = None           # start of current unpaused stretch
@@ -500,6 +501,7 @@ class PipelineController(QObject):
             self._rec_frames = 0
             self._rec_t0 = None
             self._rec_elapsed = 0.0
+            self._rec_crop = None
             self._audio = audio_mod.make_recorder(rec.audio, rec.audio_device)
             self._audio_dir = rec_dir / f".audio-{stamp}"
             self._audio.start(self._audio_dir)
@@ -828,11 +830,22 @@ class PipelineController(QObject):
         # over old footage — the app-testing use case.
         img = self._small(frame, max_w=1280) if frame.shape[1] > 1280 else frame
         if self._recorder == "pending":
+            # Crop the HDMI letterbox once per recording: the T3i's live feed
+            # fills only ~63% of the 1080p frame, so recording the content box
+            # makes the clip all image instead of a picture floating in black.
+            # (Played-back clips recalibrate on their own frames, so pipeline
+            # coordinates stay valid.)
+            from ..capture.videowriter import content_box, open_writer
+            self._rec_crop = content_box(img)
+            if self._rec_crop is not None:
+                x0, y0, x1, y1 = self._rec_crop
+                img = img[y0:y1 + 1, x0:x1 + 1]
             h, w = img.shape[:2]
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             self._rec_fps = max(10.0, min(self._src_fps, 30))
-            self._recorder = cv2.VideoWriter(
-                self._recording_path, fourcc, self._rec_fps, (w, h))
+            self._recorder = open_writer(self._recording_path, self._rec_fps, (w, h))
+        elif self._rec_crop is not None:
+            x0, y0, x1, y1 = self._rec_crop
+            img = img[y0:y1 + 1, x0:x1 + 1]
         if self._rec_t0 is None:
             self._rec_t0 = audio_mod.elapsed_monotonic()
         try:
