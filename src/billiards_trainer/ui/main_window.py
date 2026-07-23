@@ -401,6 +401,7 @@ class MainWindow(QMainWindow):
         self._live.set_cue_enabled(self._settings.cue.enabled)
         self._sidebar.recordings_dir = self._settings.recording.resolved_dir()
         self._sidebar.refresh()
+        self._live.reconfigure_audio_meter()
         # If the camera source changed, re-open the preview on the new device.
         if (self._settings.source or "0") != self._started_source:
             self._started_source = self._settings.source or "0"

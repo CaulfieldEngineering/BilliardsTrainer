@@ -102,20 +102,16 @@ class SettingsPage(QWidget):
         # toggles) lives on the Sandbox panel; shot-detection gates are deferred
         # until cue-ball tracking is locked; dev/internal config (weights URL,
         # backend, detector strictness, felt HSV) is no longer surfaced.
-        grid.addWidget(self._source_card(), 0, 0)
-        grid.addWidget(self._updates_card(), 0, 1)
-        grid.addWidget(self._camera_card(), 1, 0)
-        grid.addWidget(self._table_card(), 1, 1)
-        grid.addWidget(self._model_card(), 2, 0)
-        grid.addWidget(self._clock_card(), 2, 1)
-        grid.addWidget(self._appearance_card(), 3, 0)
-        grid.addWidget(self._cue_card(), 3, 1)
-        grid.addWidget(self._feedback_card(), 4, 0)
-        grid.addWidget(self._debug_card(), 4, 1)
-        grid.addWidget(self._ai_card(), 5, 0)
-        grid.addWidget(self._recording_card(), 5, 1)
+        # One card per row (Joe's preference: a plain vertical list, no columns);
+        # capped width so form rows don't stretch across the whole window.
+        cards = [self._source_card(), self._camera_card(), self._table_card(),
+                 self._model_card(), self._recording_card(), self._clock_card(),
+                 self._appearance_card(), self._cue_card(), self._ai_card(),
+                 self._updates_card(), self._feedback_card(), self._debug_card()]
+        for row, card in enumerate(cards):
+            card.setMaximumWidth(820)
+            grid.addWidget(card, row, 0)
         grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
 
         scroll.setWidget(body)
         root.addWidget(scroll, 1)
@@ -199,14 +195,13 @@ class SettingsPage(QWidget):
         self._cam_names = {}
         cams = list_cameras()
         for c in cams:
-            self._source_combo.addItem(c.label(), str(c.index))
+            self._source_combo.addItem(c.name, str(c.index))
             self._cam_names[str(c.index)] = c.name
-        self._source_combo.addItem("Demo simulation (no camera)", "demo")
         if not cams:
             self._source_hint.setText("No cameras detected. Plug one in and press the "
-                                      "refresh icon, or use Demo / a file.")
+                                      "refresh icon, or use a file.")
         else:
-            self._source_hint.setText("Pick your camera, then Test preview to confirm.")
+            self._source_hint.setText("")
         self._source_combo.blockSignals(False)
         if target is not None:
             self._select_source_data(target)

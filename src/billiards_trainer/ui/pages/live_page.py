@@ -203,6 +203,13 @@ class LivePage(QWidget):
         self._rec_time = QLabel("")
         self._rec_time.setObjectName("Muted")
         lay.addWidget(self._rec_time)
+        # Mic level meter: proves the audio path end-to-end at a glance (the
+        # HDMI feed has no sound, so this reads the selected USB mic).
+        from ..widgets.audio_meter import AudioMeter
+        self._audio_meter = AudioMeter()
+        lay.addWidget(self._audio_meter)
+        self._audio_meter.configure(self._settings.recording.audio,
+                                    self._settings.recording.audio_device)
         lay.addWidget(self._vsep())
 
         # Playback cluster — greyed out until a session is open.
@@ -375,6 +382,11 @@ class LivePage(QWidget):
             self._play_btn.setChecked(not playing)
             self._play_btn.setIcon(icon("play-solid" if not playing else "rec-pause", PALETTE.text_dim))
         self._sync_audio(pos, playing)
+
+    def reconfigure_audio_meter(self) -> None:
+        """Re-apply mic-meter settings (device / on-off) after a settings change."""
+        self._audio_meter.configure(self._settings.recording.audio,
+                                    self._settings.recording.audio_device)
 
     # --- playback audio ------------------------------------------------------ #
     # Frames replay through the analysis pipeline (cv2), which is silent; a

@@ -193,7 +193,8 @@ class OnnxModelStrategy(DetectorStrategy):
             else:
                 crop = frame_bgr[max(0, int(ccy - rr)):int(ccy + rr) + 1,
                                  max(0, int(ccx - rr)):int(ccx + rr) + 1]
-                cls, number, bgr = classify_pool_ball(crop)
+                felt_hsv = tuple(calib.felt.picked_hsv) if calib is not None else None
+                cls, number, bgr = classify_pool_ball(crop, felt_hsv=felt_hsv)
             out_dets.append(Detection(ccx, ccy, rr, bgr, cls, float(cf), number=number))
         if numbered:
             self._enforce_unique_numbers(out_dets)

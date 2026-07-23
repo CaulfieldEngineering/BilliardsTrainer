@@ -110,7 +110,8 @@ def _hue_to_base(hue: float, val: float) -> int:
     return best
 
 
-def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None
+def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
+                       felt_hsv: tuple[int, int, int] | None = None
                        ) -> tuple[BallClass, int, tuple[int, int, int]]:
     """Identify a ball crop as cue / 1..15 and return (class, number, canonical BGR).
 
@@ -141,6 +142,18 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None
     white_frac = float(np.mean((s < 60) & (v > 150)))
     dark_frac = float(np.mean(v < 55))
     colored = (s > 90) & (v > 60)
+    # Felt subtraction: on a BLUE table the felt itself is a legal ball colour,
+    # so any felt in the crop votes "blue ball" and everything drifts toward
+    # 2/10. Pixels matching the calibrated felt hue are background, not ball —
+    # drop them from the colour vote. A REAL blue ball is then recovered below
+    # by its gloss: it matches the felt hue but not the felt brightness.
+    felt_like = None
+    if felt_hsv is not None:
+        fh = float(felt_hsv[0])
+        dh = np.abs(hh - fh)
+        dh = np.minimum(dh, 180.0 - dh)
+        felt_like = (dh < 14) & (s > 60)
+        colored = colored & ~felt_like
     colored_frac = float(np.mean(colored))
 
     # CUE: essentially no saturated colour and bright. (The 9-ball's yellow band
@@ -153,6 +166,11 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None
     if dark_frac > 0.5 and colored_frac < 0.15:
         return BallClass.EIGHT, 8, _SOLID_BGR[8]
     if colored_frac < 0.05:
+        # Nothing colourful besides (possibly) felt-hue pixels. A genuine blue
+        # ball on blue felt also lands here — same hue as the cloth — but so do
+        # shadowed felt patches, and on a bright felt (V pegged at 255) gloss
+        # and shadow are indistinguishable by brightness. UNKNOWN ('?') is the
+        # honest answer; blue-on-blue identity is the 16-class model's job.
         return BallClass.UNKNOWN, -1, (190, 190, 190)
 
     ch = hh[colored]
@@ -162,6 +180,11 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None
         base = 7 if float(np.median(cvv)) < 110 else 3
     else:
         base = _hue_to_base(float(np.median(ch)), float(np.median(cvv)))
+        # On BLUE felt, true-blue ball pixels were excluded with the felt above,
+        # so a surviving blue-family vote is really the purple 4/12 (measured
+        # hue ~112-125 on this camera — right at the blue reference).
+        if base == 2 and felt_hsv is not None and abs(float(felt_hsv[0]) - 110.0) < 20.0:
+            base = 4
     # Stripe (9..15) vs solid (1..7): a stripe's white band is a LARGE fraction of
     # the ball; a solid's glare is a small spot. Bias toward solid (raise the bar)
     # so glare doesn't turn the 1 into a 9. (solid/stripe is a known hard pair.)

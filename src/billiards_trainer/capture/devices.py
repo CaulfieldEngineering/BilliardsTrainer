@@ -52,6 +52,30 @@ def _probe_cameras(max_index: int = 5) -> list[CameraInfo]:
     return found
 
 
+def _macos_cameras() -> list[CameraInfo]:
+    """AVFoundation enumeration: real device names WITHOUT opening anything.
+
+    Probing (cv2.VideoCapture per index) actively starts each device — which
+    wakes a paired iPhone via Continuity Camera every launch. Enumeration is
+    passive. The index mirrors AVFoundation's device order, which is what
+    OpenCV's AVFoundation backend uses. Continuity (iPhone/iPad) cameras are
+    excluded outright: the overhead rig must never grab the phone."""
+    import AVFoundation as AV
+
+    devs = list(AV.AVCaptureDevice.devicesWithMediaType_(AV.AVMediaTypeVideo))
+    cams: list[CameraInfo] = []
+    for i, d in enumerate(devs):
+        try:
+            name = str(d.localizedName())
+            dtype = str(d.deviceType())
+        except Exception:  # noqa: BLE001
+            name, dtype = f"Camera {i}", ""
+        if "ContinuityCamera" in dtype or "iPhone" in name or "iPad" in name:
+            continue
+        cams.append(CameraInfo(i, name or f"Camera {i}"))
+    return cams
+
+
 def list_cameras() -> list[CameraInfo]:
     """Enumerate connected cameras with friendly names where possible."""
     cams: list[CameraInfo] = []
@@ -60,6 +84,11 @@ def list_cameras() -> list[CameraInfo]:
             cams = _windows_cameras()
         except Exception as exc:  # noqa: BLE001 - pygrabber/comtypes can fail; probe instead
             log.warning("pygrabber enumeration failed (%s); probing instead", exc)
+    elif sys.platform == "darwin":
+        try:
+            cams = _macos_cameras()
+        except Exception as exc:  # noqa: BLE001 - pyobjc binding absent
+            log.warning("AVFoundation enumeration failed (%s); probing instead", exc)
     if not cams:
         cams = _probe_cameras()
     log.info("Cameras detected: %s", [c.label() for c in cams] or "none")
