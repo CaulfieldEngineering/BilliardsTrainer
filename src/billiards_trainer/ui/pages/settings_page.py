@@ -180,20 +180,6 @@ class SettingsPage(QWidget):
         cw.setLayout(crow)
         form.addRow("Camera", cw)
 
-        # The live Sandbox view is the camera preview now (it's always on), so a
-        # separate "Test preview" modal is redundant — picking a camera here shows
-        # up immediately on the Sandbox tab.
-        brow = QHBoxLayout()
-        file_btn = QPushButton("Use a file…")
-        file_btn.setObjectName("Ghost")
-        file_btn.setCursor(Qt.PointingHandCursor)
-        file_btn.clicked.connect(self._choose_file)
-        brow.addWidget(file_btn)
-        brow.addStretch(1)
-        bw = QWidget()
-        bw.setLayout(brow)
-        form.addRow("", bw)
-
         self._source_hint = QLabel("")
         self._source_hint.setObjectName("Faint")
         self._source_hint.setWordWrap(True)
@@ -268,15 +254,6 @@ class SettingsPage(QWidget):
             idx = self._source_combo.findData(spec)
         if idx >= 0:
             self._source_combo.setCurrentIndex(idx)
-
-    def _choose_file(self) -> None:
-        from PySide6.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Choose a video or image",
-            filter="Media (*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png);;All files (*)")
-        if path:
-            self._source_combo.addItem(f"\U0001F4C4 {path.split('/')[-1]}", path)
-            self._select_source_data(path)
 
     @staticmethod
     def _gain_spin() -> QDoubleSpinBox:

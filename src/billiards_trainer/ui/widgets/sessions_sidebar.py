@@ -82,15 +82,23 @@ class SessionsSidebar(QFrame):
         f.setBold(True)
         live.setFont(f)
         self._list.addItem(live)
+        # ANY video dropped into the recordings folder is a session — recorded
+        # by the app (session-*.mp4) or copied in by hand.
         try:
-            clips = sorted(self.recordings_dir.glob("session-*.mp4"),
-                           key=lambda p: p.stat().st_mtime, reverse=True)
+            clips = sorted(
+                (p for ext in ("*.mp4", "*.mov", "*.m4v", "*.avi", "*.mkv")
+                 for p in self.recordings_dir.glob(ext)),
+                key=lambda p: p.stat().st_mtime, reverse=True)
         except OSError:
             clips = []
         for p in clips[:60]:
-            when = datetime.fromtimestamp(p.stat().st_mtime).strftime("%b %d  %H:%M")
             mb = p.stat().st_size / 1e6
-            it = QListWidgetItem(f"{when}   ·  {mb:.0f} MB")
+            if p.name.startswith("session-"):
+                when = datetime.fromtimestamp(p.stat().st_mtime).strftime("%b %d  %H:%M")
+                label = f"{when}   ·  {mb:.0f} MB"
+            else:  # a hand-copied clip: its filename IS its identity
+                label = f"{p.stem[:22]}   ·  {mb:.0f} MB"
+            it = QListWidgetItem(label)
             it.setData(Qt.UserRole, str(p))
             it.setToolTip(p.name)
             self._list.addItem(it)
