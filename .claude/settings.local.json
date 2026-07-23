@@ -37,7 +37,8 @@
       "Bash(.venv/bin/python -c \"from billiards_trainer.capture.tether import GphotoSource, _DaemonSuppressor; print\\('tether hardened OK'\\)\")",
       "Bash(.venv/bin/python -m pytest tests/test_camera_preprocess.py -q)",
       "Bash(killall -9 ptpcamerad mscamerad-xpc mscamerad)",
-      "Bash(gphoto2 --summary)"
+      "Bash(gphoto2 --summary)",
+      "Bash(/opt/homebrew/bin/brew install *)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

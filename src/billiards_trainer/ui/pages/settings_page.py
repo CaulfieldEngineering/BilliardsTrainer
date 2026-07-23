@@ -113,6 +113,7 @@ class SettingsPage(QWidget):
         grid.addWidget(self._feedback_card(), 4, 0)
         grid.addWidget(self._debug_card(), 4, 1)
         grid.addWidget(self._ai_card(), 5, 0)
+        grid.addWidget(self._recording_card(), 5, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -340,6 +341,74 @@ class SettingsPage(QWidget):
         hint.setWordWrap(True)
         form.addRow("", hint)
         return card
+
+    def _recording_card(self) -> Card:
+        card, form = self._card("Recording")
+        msg = QLabel("Where session recordings are saved. Point it at a Dropbox "
+                     "or iCloud folder to back sessions up automatically.")
+        msg.setObjectName("Faint")
+        msg.setWordWrap(True)
+        form.addRow("", msg)
+
+        from PySide6.QtWidgets import QHBoxLayout, QWidget
+        self._rec_dir = QLineEdit()
+        self._rec_dir.setPlaceholderText("Default — app exports folder")
+        self._rec_dir.editingFinished.connect(self._on_recording_changed)
+        browse = QPushButton("Browse…")
+        browse.clicked.connect(self._browse_rec_dir)
+        row = QWidget()
+        rlay = QHBoxLayout(row)
+        rlay.setContentsMargins(0, 0, 0, 0)
+        rlay.addWidget(self._rec_dir, 1)
+        rlay.addWidget(browse)
+        form.addRow("Folder", row)
+
+        self._rec_audio = QCheckBox("Record audio into session clips")
+        self._rec_audio.toggled.connect(self._on_recording_changed)
+        form.addRow("", self._rec_audio)
+
+        self._rec_device = QComboBox()
+        self._rec_device.addItem("System default input", "default")
+        try:
+            from PySide6.QtMultimedia import QMediaDevices
+            for dev in QMediaDevices.audioInputs():
+                name = dev.description()
+                if name:
+                    self._rec_device.addItem(name, name)
+        except Exception:  # noqa: BLE001 - multimedia module absent
+            pass
+        self._rec_device.currentIndexChanged.connect(self._on_recording_changed)
+        form.addRow("Microphone", self._rec_device)
+
+        hint = QLabel("The camera's HDMI feed carries no live audio (Canon T3i "
+                      "limitation) — plug any USB mic into the Mac and pick it "
+                      "here to get sound with your sessions.")
+        hint.setObjectName("Faint")
+        hint.setWordWrap(True)
+        form.addRow("", hint)
+        return card
+
+    def _browse_rec_dir(self) -> None:
+        import os
+
+        from PySide6.QtWidgets import QFileDialog
+        start = self._rec_dir.text().strip() or os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(self, "Choose recordings folder", start)
+        if path:
+            self._rec_dir.setText(path)
+            self._on_recording_changed()
+
+    def _on_recording_changed(self) -> None:
+        if not self._loaded:
+            return
+        r = self._s.recording
+        dir_changed = r.directory != self._rec_dir.text().strip()
+        r.directory = self._rec_dir.text().strip()
+        r.audio = self._rec_audio.isChecked()
+        r.audio_device = str(self._rec_device.currentData() or "default")
+        self._s.save()
+        if dir_changed:
+            self.applied.emit()   # sidebar re-lists from the new folder
 
     def _on_ai_changed(self) -> None:
         if not self._loaded:
@@ -721,6 +790,10 @@ class SettingsPage(QWidget):
         self._conf_slider.setValue(int(round(s.detection.confidence_floor * 100)))
         self._conf_val.setText(f"{s.detection.confidence_floor:.2f}")
         self._far_rescan.setChecked(s.balls.far_rail_rescan)
+        self._rec_dir.setText(s.recording.directory)
+        self._rec_audio.setChecked(s.recording.audio)
+        di = self._rec_device.findData(s.recording.audio_device)
+        self._rec_device.setCurrentIndex(di if di >= 0 else 0)
         self._auto_check.setChecked(s.updates.auto_check)
         self._cue_enabled.setChecked(s.cue.enabled)
         self._cue_floor.setValue(s.cue.impact_g)

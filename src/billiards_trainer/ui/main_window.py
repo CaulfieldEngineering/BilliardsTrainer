@@ -144,6 +144,8 @@ class MainWindow(QMainWindow):
         # The sessions sidebar IS the navigation: LIVE + recordings + Settings.
         from .widgets.sessions_sidebar import SessionsSidebar
         self._sidebar = SessionsSidebar()
+        self._sidebar.recordings_dir = self._settings.recording.resolved_dir()
+        self._sidebar.refresh()
         root.addWidget(self._sidebar)
 
         self._stack = QStackedWidget()
@@ -170,6 +172,7 @@ class MainWindow(QMainWindow):
         """Sidebar session clicked: play the recording through the analysis."""
         self._stack.setCurrentIndex(0)
         self._started_source = path
+        self._live.set_media_path(path)   # synced audio track for the clip
         self.start_source.emit(path, self._settings.mode, "")
 
     # ------------------------------------------------------------------ #
@@ -340,7 +343,8 @@ class MainWindow(QMainWindow):
         from ..config import APP_DIR
         from ..train import vlm
         from ..train.autolabel import find_latest_session
-        session = getattr(self, "_last_capture_path", "") or find_latest_session()
+        session = (getattr(self, "_last_capture_path", "")
+                   or find_latest_session(self._settings.recording.resolved_dir()))
         if not session:
             self._live.set_autolabel_status("Record a training session first.")
             return
@@ -395,6 +399,8 @@ class MainWindow(QMainWindow):
         self._push_settings()
         self._cue.apply_settings(self._settings.cue)
         self._live.set_cue_enabled(self._settings.cue.enabled)
+        self._sidebar.recordings_dir = self._settings.recording.resolved_dir()
+        self._sidebar.refresh()
         # If the camera source changed, re-open the preview on the new device.
         if (self._settings.source or "0") != self._started_source:
             self._started_source = self._settings.source or "0"
@@ -490,7 +496,7 @@ class MainWindow(QMainWindow):
         one progress readout — and switch to the new model when done."""
         from ..train import vlm
         from ..train.autolabel import find_latest_session
-        session = find_latest_session()
+        session = find_latest_session(self._settings.recording.resolved_dir())
         if (vlm.available(self._settings.autolabel) and session
                 and getattr(self, "_autolabel_worker", None) is None):
             from ..config import APP_DIR

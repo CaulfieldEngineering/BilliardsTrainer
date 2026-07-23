@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 
+from ..capture import audio as audio_mod
 from ..capture.preprocess import preprocess_frame
 from ..config import EXPORTS_DIR, SHOTLOG_PATH, Settings
 from ..db.repository import Repository
@@ -100,6 +101,12 @@ class PipelineController(QObject):
         self._recorder = None
         self._recording_path = ""
         self._recording_paused = False
+        self._audio = None            # AudioRecorder (or None when not recording)
+        self._audio_dir = None        # temp dir holding audio segments
+        self._rec_frames = 0          # frames actually written this recording
+        self._rec_fps = 0.0           # fps declared to the video writer
+        self._rec_t0 = None           # start of current unpaused stretch
+        self._rec_elapsed = 0.0       # accumulated unpaused wall-clock seconds
         # App default: detection ON. The trained YOLO model is reliable, so the
         # old "preview-only, show nothing rather than something wrong" default
         # (which existed because classical CV was untrustworthy) no longer applies
@@ -462,15 +469,40 @@ class PipelineController(QObject):
     def set_recording_paused(self, paused: bool) -> None:
         """Pause/resume writing frames to the active recording (session stays open)."""
         self._recording_paused = paused
+        if self._recorder is None or self._audio is None:
+            return
+        # Audio must pause WITH the frames or the tracks drift apart: each
+        # unpaused stretch is its own segment, concatenated at stop.
+        if paused:
+            self._audio.pause()
+            if self._rec_t0 is not None:
+                self._rec_elapsed += audio_mod.elapsed_monotonic() - self._rec_t0
+                self._rec_t0 = None
+        elif self._audio_dir is not None:
+            self._audio.start(self._audio_dir)
 
     @Slot(bool)
     def set_recording(self, on: bool) -> None:
         if on and self._recorder is None:
-            EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+            rec = self._settings.recording
+            rec_dir = rec.resolved_dir()
+            try:
+                rec_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                # A vanished synced folder must not kill the session start.
+                log.warning("recordings dir %s unusable (%s) — using exports", rec_dir, exc)
+                rec_dir = EXPORTS_DIR
+                rec_dir.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-            self._recording_path = str(EXPORTS_DIR / f"session-{stamp}.mp4")
+            self._recording_path = str(rec_dir / f"session-{stamp}.mp4")
             self._recorder = "pending"  # opened lazily on first frame (need size)
             self._recording_paused = False
+            self._rec_frames = 0
+            self._rec_t0 = None
+            self._rec_elapsed = 0.0
+            self._audio = audio_mod.make_recorder(rec.audio, rec.audio_device)
+            self._audio_dir = rec_dir / f".audio-{stamp}"
+            self._audio.start(self._audio_dir)
             # Stats live and die with the recording: fresh session, zeroed count.
             self._session_id = self._repo.start_session(
                 mode=self._mode, drill_key=None, drill_target=0,
@@ -485,6 +517,19 @@ class PipelineController(QObject):
                 self._repo.end_session(self._session_id)
                 self._session_id = None
             self.recording_changed.emit(False)
+            if self._rec_t0 is not None:
+                self._rec_elapsed += audio_mod.elapsed_monotonic() - self._rec_t0
+                self._rec_t0 = None
+            if self._audio is not None:
+                # Video timestamps are declared-fps but written at the pipeline's
+                # real rate; scale them so the audio stays in sync end to end.
+                scale = 1.0
+                if self._rec_frames > 30 and self._rec_elapsed > 1.0 and self._rec_fps > 0:
+                    actual = self._rec_frames / self._rec_elapsed
+                    scale = self._rec_fps / max(1e-6, actual)
+                self._audio.stop_and_mux(self._recording_path, ts_scale=scale)
+                self._audio = None
+                self._audio_dir = None
             if self._recording_path:
                 self.replay_saved.emit(self._recording_path)
 
@@ -785,10 +830,14 @@ class PipelineController(QObject):
         if self._recorder == "pending":
             h, w = img.shape[:2]
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            self._rec_fps = max(10.0, min(self._src_fps, 30))
             self._recorder = cv2.VideoWriter(
-                self._recording_path, fourcc, max(10.0, min(self._src_fps, 30)), (w, h))
+                self._recording_path, fourcc, self._rec_fps, (w, h))
+        if self._rec_t0 is None:
+            self._rec_t0 = audio_mod.elapsed_monotonic()
         try:
             self._recorder.write(img)
+            self._rec_frames += 1
         except Exception:  # noqa: BLE001
             pass
 

@@ -359,6 +359,8 @@ class LivePage(QWidget):
         if is_video:
             self._seek.setRange(0, max(0, total - 1))
             self._time_lbl.setText(f"0:00 / {self._fmt_t(total)}")
+        else:
+            self.set_media_path("")
 
     def update_video_state(self, pos: int, total: int, playing: bool) -> None:
         # Never move the thumb out from under the user mid-drag (the old "thumb
@@ -372,6 +374,56 @@ class LivePage(QWidget):
             self._time_lbl.setText(f"{self._fmt_t(pos)} / {self._fmt_t(total)}")
             self._play_btn.setChecked(not playing)
             self._play_btn.setIcon(icon("play-solid" if not playing else "rec-pause", PALETTE.text_dim))
+        self._sync_audio(pos, playing)
+
+    # --- playback audio ------------------------------------------------------ #
+    # Frames replay through the analysis pipeline (cv2), which is silent; a
+    # QMediaPlayer plays the same mp4's audio track and is kept glued to the
+    # frame clock — play/pause/seek/speed all follow the transport.
+
+    def set_media_path(self, path: str) -> None:
+        """The session clip under playback ('' = live camera, audio off)."""
+        self._media_path = path or ""
+        player = getattr(self, "_audio_player", None)
+        if not self._media_path:
+            if player is not None:
+                player.stop()
+            return
+        self._ensure_audio_player()
+        if self._audio_player is not None:
+            from PySide6.QtCore import QUrl
+            self._audio_player.setSource(QUrl.fromLocalFile(self._media_path))
+
+    def _ensure_audio_player(self) -> None:
+        if getattr(self, "_audio_player", None) is not None or \
+                getattr(self, "_audio_player_dead", False):
+            return
+        try:
+            from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+        except Exception:  # noqa: BLE001 - multimedia backend absent
+            self._audio_player = None
+            self._audio_player_dead = True
+            return
+        self._audio_out = QAudioOutput(self)
+        self._audio_out.setVolume(1.0)
+        self._audio_player = QMediaPlayer(self)
+        self._audio_player.setAudioOutput(self._audio_out)
+        self.video_speed.connect(self._audio_player.setPlaybackRate)
+
+    def _sync_audio(self, pos: int, playing: bool) -> None:
+        player = getattr(self, "_audio_player", None)
+        if player is None or not getattr(self, "_media_path", ""):
+            return
+        from PySide6.QtMultimedia import QMediaPlayer
+        target_ms = int(pos / max(1.0, self._video_fps) * 1000)
+        # Re-anchor only on real divergence (a seek, or analysis hitching) so
+        # normal playback isn't peppered with micro-seeks.
+        if abs(player.position() - target_ms) > 350:
+            player.setPosition(target_ms)
+        if playing and player.playbackState() != QMediaPlayer.PlayingState:
+            player.play()
+        elif not playing and player.playbackState() == QMediaPlayer.PlayingState:
+            player.pause()
 
     def show_camera_error(self, msg: str) -> None:
         self._cam_err_lbl.setText(msg)

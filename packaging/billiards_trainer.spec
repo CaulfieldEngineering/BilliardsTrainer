@@ -142,6 +142,9 @@ if sys.platform == "darwin":
             "NSBluetoothAlwaysUsageDescription":
                 "Billiards Trainer connects to the motion sensor on your cue "
                 "to measure each stroke.",
+            "NSMicrophoneUsageDescription":
+                "Billiards Trainer records audio with your session videos so "
+                "playback has sound.",
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
         },

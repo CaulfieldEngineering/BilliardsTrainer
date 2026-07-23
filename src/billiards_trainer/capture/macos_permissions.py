@@ -41,6 +41,45 @@ def camera_auth_status() -> int:
         return AUTHORIZED
 
 
+def microphone_auth_status() -> int:
+    """Current mic authorization status (AUTHORIZED on non-mac/no binding)."""
+    if sys.platform != "darwin":
+        return AUTHORIZED
+    try:
+        av = _av()
+        return int(av.AVCaptureDevice.authorizationStatusForMediaType_(
+            av.AVMediaTypeAudio))
+    except Exception:  # noqa: BLE001 - binding missing
+        return AUTHORIZED
+
+
+def request_microphone_access(on_result=None) -> None:
+    """Fire the macOS microphone prompt (MAIN THREAD, event loop running).
+    Needed for audio in session recordings — the ffmpeg child inherits this
+    app's TCC grant."""
+    if sys.platform != "darwin":
+        if on_result:
+            on_result(True)
+        return
+    try:
+        av = _av()
+    except Exception:  # noqa: BLE001
+        if on_result:
+            on_result(True)
+        return
+
+    def _handler(granted) -> None:
+        log.info("microphone permission %s", "granted" if granted else "refused")
+        if on_result:
+            try:
+                on_result(bool(granted))
+            except Exception:  # noqa: BLE001
+                pass
+
+    av.AVCaptureDevice.requestAccessForMediaType_completionHandler_(
+        av.AVMediaTypeAudio, _handler)
+
+
 def request_camera_access(on_result=None) -> None:
     """Fire the macOS camera prompt (MAIN THREAD, event loop must be running).
 

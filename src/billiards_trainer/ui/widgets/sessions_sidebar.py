@@ -35,6 +35,9 @@ class SessionsSidebar(QFrame):
         super().__init__(parent)
         self.setObjectName("Sidebar")
         self.setFixedWidth(210)
+        # Where recordings are listed from; main_window points this at the
+        # configured recordings folder (Settings -> Recording).
+        self.recordings_dir: Path = EXPORTS_DIR
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 18, 14, 14)
         lay.setSpacing(8)
@@ -80,7 +83,7 @@ class SessionsSidebar(QFrame):
         live.setFont(f)
         self._list.addItem(live)
         try:
-            clips = sorted(EXPORTS_DIR.glob("session-*.mp4"),
+            clips = sorted(self.recordings_dir.glob("session-*.mp4"),
                            key=lambda p: p.stat().st_mtime, reverse=True)
         except OSError:
             clips = []

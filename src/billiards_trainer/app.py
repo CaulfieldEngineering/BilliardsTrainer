@@ -152,6 +152,17 @@ def main() -> int:
         _perm_timer.timeout.connect(_poll_perm)
         _perm_timer.start()
 
+    # Microphone permission (audio in session recordings). Same main-thread
+    # rule as the camera; the ffmpeg capture child inherits this app's grant.
+    from .capture.macos_permissions import (
+        microphone_auth_status,
+        request_microphone_access,
+    )
+
+    if settings.recording.audio and microphone_auth_status() != AUTHORIZED:
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(900, lambda: request_microphone_access())
+
     # If a prior self-update was rolled back (or files look incomplete), explain it.
     integrity = recovery.verify_frozen_integrity()
     if recovery.consume_update_failed() or integrity:

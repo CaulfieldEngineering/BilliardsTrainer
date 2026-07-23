@@ -119,12 +119,19 @@ def _dedupe(frames: list[np.ndarray], idxs: list[int], min_change: float = 6.0,
     return kept
 
 
-def find_latest_session() -> str:
-    """Newest recorded session (mp4 preferred; legacy capture zips too), or ''."""
+def find_latest_session(recordings_dir: Path | None = None) -> str:
+    """Newest recorded session (mp4 preferred; legacy capture zips too), or ''.
+
+    Session mp4s live in the configurable recordings folder; capture zips are
+    internal training artifacts and stay in the app's exports folder."""
     from ..config import EXPORTS_DIR
-    cands = sorted(list(EXPORTS_DIR.glob("session-*.mp4"))
-                   + list(EXPORTS_DIR.glob("capture-*.zip")),
-                   key=lambda p: p.stat().st_mtime)
+    rec_dir = recordings_dir or EXPORTS_DIR
+    try:
+        cands = sorted(list(rec_dir.glob("session-*.mp4"))
+                       + list(EXPORTS_DIR.glob("capture-*.zip")),
+                       key=lambda p: p.stat().st_mtime)
+    except OSError:
+        return ""
     return str(cands[-1]) if cands else ""
 
 

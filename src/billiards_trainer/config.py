@@ -413,6 +413,27 @@ class AutoLabelSettings:
 
 
 @dataclass
+class RecordingSettings:
+    """Where session recordings go and whether they carry audio."""
+
+    # Absolute path where session-*.mp4 clips are written and listed from.
+    # Empty = the app's own exports folder. Point it at a synced folder
+    # (Dropbox/iCloud) to back sessions up automatically.
+    directory: str = ""
+    # Capture audio alongside video and mux it into the session mp4. Needs
+    # ffmpeg and an audio input device; silently records video-only without
+    # them. NOTE: the Canon T3i does NOT send live audio over HDMI, so with no
+    # separate mic attached the track will be silence.
+    audio: bool = True
+    # avfoundation audio device name; "default" = the system default input.
+    audio_device: str = "default"
+
+    def resolved_dir(self) -> Path:
+        d = self.directory.strip()
+        return Path(os.path.expanduser(d)) if d else EXPORTS_DIR
+
+
+@dataclass
 class Settings:
     source: str = "0"  # camera index (as str) | path to video | path to image | "demo" | "tether"
     source_name: str = ""  # friendly camera name, to survive index reshuffles
@@ -429,6 +450,7 @@ class Settings:
     cue: CueSettings = field(default_factory=CueSettings)
     camera: CameraSettings = field(default_factory=CameraSettings)
     autolabel: AutoLabelSettings = field(default_factory=AutoLabelSettings)
+    recording: RecordingSettings = field(default_factory=RecordingSettings)
 
     # ------------------------------------------------------------------ #
     def to_dict(self) -> dict[str, Any]:
