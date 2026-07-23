@@ -188,8 +188,15 @@ class LivePage(QWidget):
         lay.addWidget(self._status_badge)
         lay.addWidget(self._vsep())
 
-        # Record cluster (solid glyphs): ● ❚❚ ■ + elapsed clock.
+        # Record cluster: a broadcast-deck capsule — ● ❚❚ ■ + elapsed clock.
+        # The capsule (and clock) light up red while recording, amber on pause.
+        self._rec_capsule = QFrame()
+        self._rec_capsule.setObjectName("RecCapsule")
+        cap = QHBoxLayout(self._rec_capsule)
+        cap.setContentsMargins(8, 2, 10, 2)
+        cap.setSpacing(2)
         self._rec_btn = self._tool_btn("rec", "Start recording this session")
+        self._rec_btn.setIcon(icon("rec", "#B0524C", size=26))  # muted red, armed
         self._rec_btn.clicked.connect(self._on_rec_clicked)
         self._rec_pause_btn = self._tool_btn("rec-pause", "Pause / resume recording")
         self._rec_pause_btn.setCheckable(True)
@@ -199,10 +206,12 @@ class LivePage(QWidget):
         self._rec_stop_btn.setEnabled(False)
         self._rec_stop_btn.clicked.connect(lambda: self.record_toggled.emit(False))
         for w in (self._rec_btn, self._rec_pause_btn, self._rec_stop_btn):
-            lay.addWidget(w)
+            cap.addWidget(w)
         self._rec_time = QLabel("")
-        self._rec_time.setObjectName("Muted")
-        lay.addWidget(self._rec_time)
+        self._rec_time.setObjectName("RecClock")
+        self._rec_time.setMinimumWidth(86)
+        cap.addWidget(self._rec_time)
+        lay.addWidget(self._rec_capsule)
         # Mic level meter: proves the audio path end-to-end at a glance (the
         # HDMI feed has no sound, so this reads the selected USB mic).
         from ..widgets.audio_meter import AudioMeter
@@ -272,7 +281,12 @@ class LivePage(QWidget):
         self.record_toggled.emit(True)          # start recording
 
     def _on_rec_pause(self) -> None:
-        self.record_pause_toggled.emit(self._rec_pause_btn.isChecked())
+        paused = self._rec_pause_btn.isChecked()
+        # Amber pause glyph while paused — reads at a glance across the room.
+        self._rec_pause_btn.setIcon(
+            icon("rec-pause", PALETTE.warn if paused else PALETTE.text_dim, size=26))
+        self.record_pause_toggled.emit(paused)
+        self._tick_rec_time()
 
     def _camera_error_panel(self) -> QWidget:
         panel = QFrame()
@@ -446,10 +460,16 @@ class LivePage(QWidget):
         if self._persp_stack.currentIndex() != 0:
             self._persp_stack.setCurrentIndex(0)
 
+    @staticmethod
+    def _repolish(w) -> None:
+        """Re-apply QSS after a dynamic property change."""
+        w.style().unpolish(w)
+        w.style().polish(w)
+
     def _tool_btn(self, ic: str, tip: str) -> QPushButton:
         from PySide6.QtCore import QSize
         btn = QPushButton()
-        btn.setObjectName("Ghost")
+        btn.setObjectName("Transport")
         btn.setIcon(icon(ic, PALETTE.text_dim, size=26))
         btn.setIconSize(QSize(20, 20))
         btn.setToolTip(tip)
@@ -979,10 +999,14 @@ class LivePage(QWidget):
         """Reflect recording state on the transport cluster + run the elapsed clock."""
         self._recording_on = on
         self._update_stats_active()
-        self._rec_btn.setIcon(icon("rec", PALETTE.danger if on else PALETTE.text_dim))
+        self._rec_btn.setIcon(icon("rec", PALETTE.danger if on else "#B0524C", size=26))
         self._rec_btn.setEnabled(not on)
         self._rec_pause_btn.setEnabled(on)
         self._rec_stop_btn.setEnabled(on)
+        for w in (self._rec_capsule, self._rec_time):
+            w.setProperty("recOn", on)
+            w.setProperty("paused", False)
+            self._repolish(w)
         timer = getattr(self, "_rec_timer", None)
         if timer is None:
             from PySide6.QtCore import QTimer
@@ -997,14 +1021,21 @@ class LivePage(QWidget):
         else:
             timer.stop()
             self._rec_pause_btn.setChecked(False)
+            self._rec_pause_btn.setIcon(icon("rec-pause", PALETTE.text_dim, size=26))
             self._rec_time.setText("")
 
     def _tick_rec_time(self) -> None:
         import time
         secs = int(time.monotonic() - getattr(self, "_rec_t0", time.monotonic()))
         paused = self._rec_pause_btn.isChecked()
-        tag = "❚❚ PAUSED" if paused else "● REC"
+        if paused:
+            tag = "❚❚ PAUSED"
+        else:
+            tag = "● REC" if secs % 2 == 0 else "  REC"   # blinking tally dot
         self._rec_time.setText(f"{tag}  {secs // 60}:{secs % 60:02d}")
+        if self._rec_time.property("paused") != paused:
+            self._rec_time.setProperty("paused", paused)
+            self._repolish(self._rec_time)
 
     def on_status(self, status: str) -> None:
         if status == "running":

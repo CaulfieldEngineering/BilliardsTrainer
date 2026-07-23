@@ -168,6 +168,14 @@ class OnnxModelStrategy(DetectorStrategy):
         # settings.balls.far_rail_rescan turns it off when the budget is tight.
         th = int(h * 0.60)
         do_rescan = self.far_rail_rescan if rescan is None else rescan
+        if do_rescan and rescan is None:
+            # The band pass costs a FULL second inference, which halved the live
+            # frame rate. Amortize it: every 3rd call on the live path. Rail
+            # balls are settled/position-locked between refreshes, so a slower
+            # top-band cadence loses nothing; explicit rescan=True callers (the
+            # offline labeller) still always get both passes.
+            self._rescan_tick = getattr(self, "_rescan_tick", -1) + 1
+            do_rescan = self._rescan_tick % 3 == 0
         if th > 64 and do_rescan:
             boxes = self._merge_boxes(boxes + self._infer(frame_bgr[0:th, 0:w]))
         if not boxes:

@@ -162,6 +162,32 @@ QPushButton#Danger:hover {{ background-color: {p.danger}; color: #0A0E12; }}
 QPushButton#Ghost {{ background-color: transparent; border: none; color: {p.text_dim}; }}
 QPushButton#Ghost:hover {{ color: {p.text}; background-color: {p.surface}; }}
 
+/* ---- Transport buttons + record capsule (media header) ---- */
+QPushButton#Transport {{
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    padding: 4px 6px;
+}}
+QPushButton#Transport:hover {{ background-color: {p.surface_hi}; border-color: {p.border_soft}; }}
+QPushButton#Transport:pressed {{ background-color: {p.surface}; }}
+QFrame#RecCapsule {{
+    background-color: {p.surface};
+    border: 1px solid {p.border_soft};
+    border-radius: 18px;
+}}
+QFrame#RecCapsule[recOn="true"] {{
+    background-color: rgba(248, 81, 73, 26);
+    border-color: rgba(248, 81, 73, 130);
+}}
+QLabel#RecClock {{
+    color: {p.text_faint};
+    font-weight: 700;
+    letter-spacing: 1px;
+}}
+QLabel#RecClock[recOn="true"] {{ color: {p.danger}; }}
+QLabel#RecClock[paused="true"] {{ color: {p.warn}; }}
+
 /* ---- Nav buttons (left rail) ---- */
 QPushButton#NavItem {{
     background-color: transparent;
