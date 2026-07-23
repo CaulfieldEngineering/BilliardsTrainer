@@ -71,3 +71,7 @@ ignore = ["E501", "B008"]
 # Verbatim port of the video-validated stroke analysis (pool-stroke-analyzer).
 # Kept byte-comparable to the reference — style is not worth diverging over.
 "src/billiards_trainer/cue/analysis.py" = ["E702", "F841", "B905"]
+# Review-harness scripts: exploratory tooling, mid-file imports are deliberate.
+"tools/replay_review.py" = ["E402", "E741", "E702", "I001"]
+"tools/mine_review.py" = ["E402", "E741", "B007", "E702"]
+"tools/render_review.py" = ["E402", "E741", "E702", "I001"]
