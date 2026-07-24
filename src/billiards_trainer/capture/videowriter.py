@@ -68,13 +68,20 @@ class FfmpegWriter:
                "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}",
                "-r", f"{fps:.3f}", "-i", "-"]
         if w < 1000:
-            # The T3i's live feed is only ~760 real columns; phones upscale it
-            # with their worst-case scaler and it reads as mush. Do the upscale
-            # OURSELVES at record time (Lanczos to a standard 1080 width) with a
-            # mild unsharp — no invented detail, but the phone decoder gets its
-            # happy path and perceived sharpness improves markedly.
-            cmd += ["-vf", "scale=1080:-2:flags=lanczos,unsharp=5:5:0.35:5:5:0.0"]
+            # The T3i's live feed is ~760 real columns AND noisy. Recipe:
+            # light temporal denoise FIRST (noise caps how hard you can
+            # sharpen — it amplifies into grain), Lanczos up to a standard
+            # 1080 width, then a stronger unsharp than noise would otherwise
+            # allow. No invented detail, but markedly crisper on phones.
+            cmd += ["-vf", ("hqdn3d=1.5:1.5:6:6,"
+                            "scale=1080:-2:flags=lanczos,"
+                            "unsharp=5:5:0.6:5:5:0.0")]
+            bitrate = "14M"   # more pixels after the upscale deserve more bits
         cmd += ["-c:v", "h264_videotoolbox", "-b:v", bitrate,
+                # tag bt709 explicitly — untagged video renders washed-out on
+                # iPhones, which reads as further softness
+                "-color_primaries", "bt709", "-color_trc", "bt709",
+                "-colorspace", "bt709",
                 "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                 "-y", path]
         self._proc = subprocess.Popen(
