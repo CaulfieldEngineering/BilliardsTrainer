@@ -106,3 +106,4 @@ _train/
 # base YOLO weights (auto-downloaded by ultralytics during fine-tunes)
 *.pt
 .trainvenv/
+docs/feedmeter-snaps/
