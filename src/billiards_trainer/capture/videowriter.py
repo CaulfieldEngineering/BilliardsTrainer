@@ -66,10 +66,17 @@ class FfmpegWriter:
             raise RuntimeError("ffmpeg not available")
         cmd = [ffmpeg, "-hide_banner", "-loglevel", "error",
                "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}",
-               "-r", f"{fps:.3f}", "-i", "-",
-               "-c:v", "h264_videotoolbox", "-b:v", bitrate,
-               "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-               "-y", path]
+               "-r", f"{fps:.3f}", "-i", "-"]
+        if w < 1000:
+            # The T3i's live feed is only ~760 real columns; phones upscale it
+            # with their worst-case scaler and it reads as mush. Do the upscale
+            # OURSELVES at record time (Lanczos to a standard 1080 width) with a
+            # mild unsharp — no invented detail, but the phone decoder gets its
+            # happy path and perceived sharpness improves markedly.
+            cmd += ["-vf", "scale=1080:-2:flags=lanczos,unsharp=5:5:0.35:5:5:0.0"]
+        cmd += ["-c:v", "h264_videotoolbox", "-b:v", bitrate,
+                "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                "-y", path]
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
