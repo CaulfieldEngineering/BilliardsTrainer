@@ -233,7 +233,8 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
                      debug: bool = False, detections=None, diag=None,
                      measured_colors: bool = True,
                      fixed_radius: float | None = None,
-                     play_paths: dict | None = None) -> np.ndarray:
+                     play_paths: dict | None = None,
+                     paths_alpha: float = 1.0) -> np.ndarray:
     """Render a clean, proportional top-down table from the game state — felt,
     rails, pockets, diamonds, and balls as circles — instead of the warped camera
     image. Ball positions are the rectified (already-proportional) coordinates."""
@@ -248,9 +249,15 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             cv2.putText(img, f"{d.score:.2f}", (int(d.x) + 4, int(d.y) - 6),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 180, 255), 1, cv2.LINE_AA)
 
-    # shot paths under the balls: the whole play's traces, cue in white
-    if play_paths:
-        _draw_play_paths(img, play_paths)
+    # shot paths under the balls: the whole play's traces, cue in white.
+    # After the table settles the traces linger 3s, then fade over ~1s.
+    if play_paths and paths_alpha > 0.0:
+        if paths_alpha >= 1.0:
+            _draw_play_paths(img, play_paths)
+        else:
+            base = img.copy()
+            _draw_play_paths(img, play_paths)
+            cv2.addWeighted(img, paths_alpha, base, 1.0 - paths_alpha, 0, dst=img)
 
     # balls — drawn at the KNOWN physical radius when fixed_radius is given, so the
     # overhead shows uniform regulation balls instead of the detector's per-frame wobble

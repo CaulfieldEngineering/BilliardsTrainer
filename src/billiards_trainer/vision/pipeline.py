@@ -83,6 +83,9 @@ class Pipeline:
         self._last_detections: list = []
         self._last_raw_dets: list = []
         self._frames_since_ingest = 0
+        self._impossible_streak = 0   # geometry-watchdog counter (see process)
+        self._paths_settle_t = None   # when the table last came to rest
+        self._paths_alpha = 1.0       # play-path opacity (fades after settle)
         # Play-path trails (broadcast look): every ball that moves during a
         # play leaves a persistent colored path — the cue ball's in white —
         # shown until the NEXT play begins. id -> {pts, bgr, cue}
@@ -298,12 +301,22 @@ class Pipeline:
             return
         self._apply_detections(raw_dets, calib, frame_shape)
 
-    def _update_play_paths(self, tracks, shot_state: str) -> None:
-        """Accumulate each moving ball's path for the CURRENT play. Paths stay
-        on screen through the settle (review the shot at a glance) and clear
-        the moment the next play starts."""
+    def _update_play_paths(self, tracks, shot_state: str, t: float) -> None:
+        """Accumulate each moving ball's path for the CURRENT play. Paths hold
+        through the settle for review, then FADE OUT starting 3s after all
+        table movement stops (Joe's spec); a new play clears them instantly."""
         if shot_state == "moving" and self._prev_shot_state != "moving":
             self._play_paths.clear()
+        if shot_state == "moving":
+            self._paths_settle_t = None
+            self._paths_alpha = 1.0
+        elif self._play_paths:
+            if self._paths_settle_t is None:
+                self._paths_settle_t = t
+            dt = t - self._paths_settle_t
+            self._paths_alpha = 1.0 if dt < 3.0 else max(0.0, 1.0 - (dt - 3.0))
+            if self._paths_alpha <= 0.0:
+                self._play_paths.clear()
         self._prev_shot_state = shot_state
         from .balls import pool_ball_bgr
         for tr in tracks:
@@ -578,7 +591,7 @@ class Pipeline:
             event = self.shots.update(tracks, calib.table, t, motion, evidence)
             res.shot_event = event
             res.shot_state = self.shots.state
-            self._update_play_paths(tracks, res.shot_state)
+            self._update_play_paths(tracks, res.shot_state, t)
             res.diag = dict(self.shots.last_diag)
             res.diag["ms"] = round(self._last_ms, 1)
             res.diag["fps"] = int(1000 / self._last_ms) if self._last_ms > 0.1 else 0
@@ -591,6 +604,24 @@ class Pipeline:
             if self.calib.deviated and self.settings.table.auto_relock:
                 log.info("Auto-relocking table after deviation")
                 self.request_recalibration()
+            # Impossible-geometry watchdog: a SETTLED ball resting beyond the
+            # cushion-nose bounds cannot physically exist — it means the table
+            # lock has drifted (seen live: the animation drew the cue ball
+            # inside the cushion while a fresh calibration placed it perfectly).
+            # Sustained impossibility -> relock.
+            tbl2 = calib.table
+            bad = sum(1 for tr in tracks
+                      if tr.misses == 0 and abs(tr.vx) + abs(tr.vy) < 1.0
+                      and not tbl2.on_table(tr.x, tr.y, margin=-2.0))
+            if bad:
+                self._impossible_streak += 1
+                if self._impossible_streak >= 4 and self.settings.table.auto_relock:
+                    log.info("Auto-relocking: %d settled ball(s) resting beyond the "
+                             "nose bounds — the lock has drifted", bad)
+                    self.request_recalibration()
+                    self._impossible_streak = 0
+            else:
+                self._impossible_streak = 0
         res.deviated = self.calib.deviated
         res.status = "deviated" if self.calib.deviated else "tracking"
 
@@ -608,6 +639,7 @@ class Pipeline:
             res.rect_bgr = render_schematic(
                 calib.table, vtracks, accent=ui.accent,
                 play_paths=self._play_paths if ui.show_trajectories else None,
+                paths_alpha=self._paths_alpha,
                 show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
                 debug=ui.debug_overlay, detections=detections, diag=res.diag,
                 measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
