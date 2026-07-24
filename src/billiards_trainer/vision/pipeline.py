@@ -308,10 +308,20 @@ class Pipeline:
         if shot_state == "moving" and self._prev_shot_state != "moving":
             self._play_paths.clear()
         # The fade clock starts only when the COMPLETE shot is over: every
-        # tracked ball at rest (not merely the state machine's settle call —
-        # a slow final roll must keep the trails alive). Any motion resets it.
+        # tracked ball at rest. "Movement" needs a REAL threshold — detection
+        # jitter keeps instantaneous velocity nonzero forever (which froze the
+        # fade entirely), so a ball counts as moving only if it actually
+        # DISPLACED over its recent history (~last half second), or the shot
+        # state machine says a strike is in progress.
+        def _really_moving(tr) -> bool:
+            hist = tr.history[-8:]
+            if len(hist) < 2:
+                return False
+            path = sum(abs(hist[i + 1][0] - hist[i][0]) + abs(hist[i + 1][1] - hist[i][1])
+                       for i in range(len(hist) - 1))
+            return path > 10.0
         any_motion = shot_state == "moving" or any(
-            tr.misses == 0 and (abs(tr.vx) + abs(tr.vy)) > 1.2 for tr in tracks)
+            tr.misses == 0 and _really_moving(tr) for tr in tracks)
         if any_motion:
             self._paths_settle_t = None
             self._paths_alpha = 1.0
