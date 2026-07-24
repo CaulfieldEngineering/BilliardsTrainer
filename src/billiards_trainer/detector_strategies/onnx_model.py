@@ -140,12 +140,18 @@ class OnnxModelStrategy(DetectorStrategy):
         return res
 
     @staticmethod
-    def _merge_boxes(boxes):
-        """Dedupe near-coincident boxes (the same ball seen by the full + far-rail
-        scans), keeping the higher-confidence one."""
+    def _merge_boxes(boxes, min_frac: float = 1.1):
+        """Dedupe near-coincident boxes (the same ball seen by both tiles),
+        keeping the higher-confidence one.
+
+        min_frac is in ball-radii: the two tiles see an overlap-band ball at
+        slightly different letterbox scales, so its two boxes can sit ~1 radius
+        apart — 0.7r let both through, spawning hundreds of phantom tentative
+        tracks per session (and visible position ping-pong). Two REAL touching
+        balls are 2r apart, so 1.1r still never merges neighbours."""
         kept = []
         for b in sorted(boxes, key=lambda t: t[3], reverse=True):
-            mind = 0.7 * max(b[2], 8.0)
+            mind = min_frac * max(b[2], 8.0)
             if all((b[0] - k[0]) ** 2 + (b[1] - k[1]) ** 2 > mind * mind for k in kept):
                 kept.append(b)
         return kept
