@@ -12,6 +12,8 @@ buffering recent frames for instant replay, and logging every shot event.
 
 import json
 import logging
+import queue
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -77,6 +79,7 @@ class PipelineController(QObject):
     failure_flagged = Signal(str)       # path to a staged debug bundle
     source_is_video = Signal(bool, int, float)  # (seekable video?, frame_count, fps)
     video_state = Signal(int, int, bool)  # (current frame, total frames, playing)
+    _detections_ready = Signal(object, object)  # (raw_dets, frame_shape) worker -> this thread
 
     def __init__(self, settings: Settings, repository: Repository):
         super().__init__()
@@ -130,6 +133,13 @@ class PipelineController(QObject):
         # Flow rule: a shot clock only makes sense while PLAYING — live camera
         # sources only. Reviewing a recorded video must never run a countdown.
         self._clock_allowed = False
+        # Async vision (live camera): one worker thread runs inference off the
+        # display path. Frames are offered via a 1-slot queue (busy worker =>
+        # the frame is display-only); results come back through a queued signal
+        # so ALL tracker/pipeline mutation stays on this controller thread.
+        self._det_queue: queue.Queue = queue.Queue(maxsize=1)
+        self._det_thread: threading.Thread | None = None
+        self._detections_ready.connect(self._on_detections_ready, Qt.QueuedConnection)
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
         self._speed = 1.0
@@ -692,15 +702,63 @@ class PipelineController(QObject):
                 self.error.emit("Source ended.")
             self.stop()
             return
-        # Detection cadence: a fast video at 2x/4x can't run detection on every
-        # frame, so display every frame but only DETECT every Nth (stride == round
-        # of playback speed). Step/seek/stop call _run_frame directly with detect
-        # forced on, so a paused/landed frame is always fully analysed.
         self._play_tick += 1
-        stride = max(1, round(self._speed)) if getattr(self._source, "is_video", False) else 1
-        self._run_frame(frame, detect=(self._play_tick % stride == 0))
+        if getattr(self._source, "is_video", False):
+            # Detection cadence: a fast video at 2x/4x can't run detection on
+            # every frame, so display every frame but only DETECT every Nth
+            # (stride == round of playback speed). Step/seek/stop call
+            # _run_frame directly with detect forced on, so a paused/landed
+            # frame is always fully analysed. Video replay stays SYNCHRONOUS —
+            # deterministic for the eval harness and tests.
+            stride = max(1, round(self._speed))
+            self._run_frame(frame, detect=(self._play_tick % stride == 0))
+        else:
+            # LIVE camera: async vision. The display path never runs inference
+            # (stays at camera rate); frames are handed to the detection worker
+            # whenever it's idle, and its results are ingested between ticks.
+            self._run_frame(frame, detect="async")
 
-    def _run_frame(self, frame: np.ndarray, detect: bool = True) -> None:
+    # --- async vision (live camera) ------------------------------------- #
+    def _submit_detection(self, frame: np.ndarray) -> None:
+        """Offer a frame to the detection worker. Non-blocking: if the worker
+        is mid-inference the frame is simply display-only."""
+        if (not self._detection_enabled or self._pipeline is None
+                or self._pipeline._strategy is None
+                or not self._pipeline.calib.is_calibrated):
+            return  # calibration/preview paths handle themselves synchronously
+        if self._det_thread is None:
+            self._det_thread = threading.Thread(
+                target=self._detect_worker, daemon=True, name="detect-worker")
+            self._det_thread.start()
+        try:
+            self._det_queue.put_nowait((frame, self._pipeline.calib.calib))
+        except queue.Full:
+            pass
+
+    def _detect_worker(self) -> None:
+        """Inference loop (worker thread). Only the strategy is touched here —
+        it has its own lock — and results go back via a queued signal."""
+        while True:
+            frame, calib = self._det_queue.get()
+            try:
+                raw = self._pipeline._strategy.detect(frame, calib)
+            except Exception:  # noqa: BLE001 - a bad frame must not kill the worker
+                raw = []
+            self._detections_ready.emit(raw, frame.shape)
+
+    @Slot(object, object)
+    def _on_detections_ready(self, raw_dets, frame_shape) -> None:
+        """Apply worker results (controller thread — the only mutator)."""
+        if (not self._running or self._pipeline is None
+                or not self._detection_enabled
+                or getattr(self._source, "is_video", False)):
+            return
+        try:
+            self._pipeline.ingest_raw_detections(raw_dets, frame_shape)
+        except Exception:  # noqa: BLE001
+            log.exception("async detection ingest failed")
+
+    def _run_frame(self, frame: np.ndarray, detect=True) -> None:
         """Process one frame through the pipeline and emit results. Shared by the
         live tick and the video transport (step/seek/stop)."""
         t_wall0 = time.perf_counter()
@@ -712,6 +770,12 @@ class PipelineController(QObject):
         # back in the orientation it was recorded in.
         if not getattr(self._source, "is_video", False):
             frame = preprocess_frame(frame, self._settings.camera)
+        if detect == "async":
+            # Live async vision: hand the (preprocessed) frame to the detection
+            # worker when it's idle; this display frame renders with the latest
+            # ingested tracks and never blocks on inference.
+            self._submit_detection(frame)
+            detect = False
         self._last_frame = frame
         if getattr(self._source, "is_video", False):
             self._video_pos = max(0, self._source.position() - 1)
@@ -752,6 +816,9 @@ class PipelineController(QObject):
         dt = time.perf_counter() - t_wall0
         inst = 1.0 / dt if dt > 0 else 0.0
         self._fps = 0.9 * self._fps + 0.1 * inst if self._fps else inst
+        if self._play_tick and self._play_tick % 900 == 0:
+            log.info("health: display %.1f fps, pipeline %.0f ms/frame",
+                     self._fps, getattr(self._pipeline, "_last_ms", 0.0))
 
         self.frame_ready.emit(FramePacket(
             perspective=res.frame_bgr, birdseye=res.rect_bgr, status=res.status,

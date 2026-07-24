@@ -80,6 +80,9 @@ class Pipeline:
         self._deviation_every = 30  # frames between watchdog checks
         self._tried_load = False
         self._prev_gray = None
+        self._last_detections: list = []
+        self._last_raw_dets: list = []
+        self._frames_since_ingest = 0
         self._bg = BackgroundModel()
         self._prev_small = None
         self._last_flow = 0.0
@@ -217,6 +220,83 @@ class Pipeline:
         if len(ring) < n:
             return frame
         return _median_frames(list(ring))
+
+    def _apply_detections(self, raw_dets, calib, frame_shape):
+        """Project raw-frame detections to rect space, run the sanity filters,
+        and update the tracker. Shared by the synchronous path (video replay,
+        seek/step, tests) and ingest_raw_detections (live async worker)."""
+        detections = self._project_raw_to_rect(raw_dets, calib, frame_shape)
+        # Physical-size prior: reject blobs whose radius is far from the known
+        # ball radius. Skipped for model-based detectors, which already
+        # validate ball-ness with high confidence.
+        if not getattr(self._strategy, "model_based", False):
+            exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
+            tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
+            if exp_r > 2.0 and tol > 0:
+                lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
+                detections = [d for d in detections if lo <= d.radius <= hi]
+        # Confidence floor. A trained model is well-calibrated and already
+        # thresholded in the strategy, so apply only the base confidence_floor.
+        # A heuristic (non-model) detector gets the stricter render_floor —
+        # "draw nothing rather than a wrong phantom".
+        det = self.settings.detection
+        if getattr(self._strategy, "model_based", False):
+            floor = det.confidence_floor
+        else:
+            floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
+        detections = [d for d in detections if d.score >= floor]
+        # Geometry sanity — the single-class ball-finder fires on things that
+        # aren't balls. Two safe rejects: (1) anything off the playing surface
+        # (floor/rail/hand beyond the bed); (2) an empty POCKET void, which is
+        # dark and gets mistaken for the 8-ball — a detection sitting in a
+        # pocket capture zone that reads as EIGHT/UNKNOWN is the pocket itself,
+        # not a ball. A genuinely potted 8 is transient, so dropping it here is
+        # harmless. Real balls on the bed (incl. near rails) are untouched.
+        tbl = calib.table
+        edge = tbl.pocket_radius * 0.5
+        kept = []
+        for d in detections:
+            if not tbl.on_table(d.x, d.y, margin=edge):
+                continue
+            if (d.cls in (BallClass.EIGHT, BallClass.UNKNOWN)
+                    and tbl.pocket_at(d.x, d.y, scale=0.9) is not None):
+                continue
+            kept.append(d)
+        detections = kept
+        tracks = self.tracker.update(
+            detections, calib.table.short_side,
+            bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),
+        )
+        self._last_detections = detections
+        self._last_raw_dets = list(raw_dets)
+        self._frames_since_ingest = 0
+        return tracks, detections
+
+    def ingest_raw_detections(self, raw_dets, frame_shape) -> None:
+        """Apply detector output produced OFF the display path (the live async
+        worker). Runs on the pipeline's own thread via a queued slot, so all
+        tracker/state mutation stays single-threaded."""
+        calib = self.calib.calib
+        if calib is None:
+            return
+        self._apply_detections(raw_dets, calib, frame_shape)
+
+    def view_tracks(self, tracks):
+        """Velocity-extrapolated copies for RENDERING between async detection
+        updates: detection lands ~10-14x/s while display runs at camera rate,
+        so rolling balls glide instead of stepping. Only clearly-moving,
+        currently-seen balls are extrapolated; the real tracks are untouched
+        (events/state consume those)."""
+        k = min(6, self._frames_since_ingest)
+        if k <= 0:
+            return tracks
+        from dataclasses import replace as _dc_replace
+        out = []
+        for tr in tracks:
+            if tr.misses == 0 and (abs(tr.vx) + abs(tr.vy)) > 1.0:
+                tr = _dc_replace(tr, x=tr.x + tr.vx * k, y=tr.y + tr.vy * k)
+            out.append(tr)
+        return out
 
     def _project_raw_to_rect(self, raw_dets, calib, frame_shape=None):
         """Map RAW-frame detections into the rectified plane (via calib.H) so the
@@ -382,9 +462,13 @@ class Pipeline:
         st["warp"] = (time.perf_counter() - t0) * 1000.0
 
         if not detect:
-            # Display-only frame (cadence): reuse the current tracks, don't re-detect.
+            # Display-only frame: reuse the current tracks, don't re-detect.
+            # (Live async mode lands here every frame — detections arrive via
+            # ingest_raw_detections from the worker thread's results.)
             tracks = self.tracker.tracks
-            detections = []
+            detections = self._last_detections
+            res.raw_dets = self._last_raw_dets   # labeller sees the async dets
+            self._frames_since_ingest += 1
         else:
             t0 = time.perf_counter()
             # Detect on the RAW frame, project results into the rectified plane so
@@ -396,53 +480,11 @@ class Pipeline:
                     log.debug("detector failed on a frame: %s", exc)
                     raw_dets = []
                 res.raw_dets = list(raw_dets)   # camera-coord, for the in-app labeller
-                detections = self._project_raw_to_rect(raw_dets, calib, frame.shape)
-                # Physical-size prior: reject blobs whose radius is far from the
-                # known ball radius (pocket-shadow "balls" too big, speckle too
-                # small). Skipped for model-based detectors, which already validate
-                # ball-ness with high confidence.
-                if not getattr(self._strategy, "model_based", False):
-                    exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
-                    tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
-                    if exp_r > 2.0 and tol > 0:
-                        lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
-                        detections = [d for d in detections if lo <= d.radius <= hi]
             else:
-                detections = []
-            # Confidence floor. A trained model is well-calibrated and already
-            # thresholded in the strategy, so apply only the base confidence_floor.
-            # A heuristic (non-model) detector gets the stricter render_floor —
-            # "draw nothing rather than a wrong phantom".
-            det = self.settings.detection
-            if getattr(self._strategy, "model_based", False):
-                floor = det.confidence_floor
-            else:
-                floor = max(det.confidence_floor, getattr(det, "render_floor", 0.0))
-            detections = [d for d in detections if d.score >= floor]
-            # Geometry sanity — the single-class ball-finder fires on things that
-            # aren't balls. Two safe rejects: (1) anything off the playing surface
-            # (floor/rail/hand beyond the bed); (2) an empty POCKET void, which is
-            # dark and gets mistaken for the 8-ball — a detection sitting in a
-            # pocket capture zone that reads as EIGHT/UNKNOWN is the pocket itself,
-            # not a ball. A genuinely potted 8 is transient, so dropping it here is
-            # harmless. Real balls on the bed (incl. near rails) are untouched.
-            tbl = calib.table
-            edge = tbl.pocket_radius * 0.5
-            kept = []
-            for d in detections:
-                if not tbl.on_table(d.x, d.y, margin=edge):
-                    continue
-                if (d.cls in (BallClass.EIGHT, BallClass.UNKNOWN)
-                        and tbl.pocket_at(d.x, d.y, scale=0.9) is not None):
-                    continue
-                kept.append(d)
-            detections = kept
+                raw_dets = []
             st["detect"] = (time.perf_counter() - t0) * 1000.0
             t0 = time.perf_counter()
-            tracks = self.tracker.update(
-                detections, calib.table.short_side,
-                bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),
-            )
+            tracks, detections = self._apply_detections(raw_dets, calib, frame.shape)
             st["track"] = (time.perf_counter() - t0) * 1000.0
         res.tracks = tracks
         res.detections = detections
@@ -515,16 +557,17 @@ class Pipeline:
         # Bird's-eye: a clean rendered schematic (proportional) by default, rather
         # than the warped/clipped camera image. Also used in Training/label mode
         # so both tabs share the same camera + animated-schematic layout.
+        vtracks = self.view_tracks(tracks)
         if ui.schematic_birdseye:
             res.rect_bgr = render_schematic(
-                calib.table, tracks, accent=ui.accent,
+                calib.table, vtracks, accent=ui.accent,
                 show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
                 debug=ui.debug_overlay, detections=detections, diag=res.diag,
                 measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
             )
         elif overlays:
             res.rect_bgr = draw_rectified(
-                rect, tracks, calib.table, show_traj=ui.show_trajectories,
+                rect, vtracks, calib.table, show_traj=ui.show_trajectories,
                 show_ids=ui.show_ball_ids, accent=ui.accent,
                 measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
             )
@@ -534,7 +577,7 @@ class Pipeline:
         # Live camera view keeps the real feed (with light overlay unless off).
         if overlays:
             res.frame_bgr = draw_perspective(
-                frame, calib.corners, tracks, calib.Hinv, accent=ui.accent,
+                frame, calib.corners, vtracks, calib.Hinv, accent=ui.accent,
                 table=calib.table,
             )
         else:

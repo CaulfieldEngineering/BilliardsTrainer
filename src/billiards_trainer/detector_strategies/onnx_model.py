@@ -53,8 +53,8 @@ class OnnxModelStrategy(DetectorStrategy):
     # Ball ID Trainer on the SAME strategy singleton — the reused canvas and
     # self._nc must never interleave between threads.
     _detect_lock = threading.Lock()
-    # Second inference pass over the (foreshortened) far-rail region. Recovers
-    # tiny far balls but doubles GPU cost; the pipeline wires this from
+    # High-recall two-pass TILED inference (top 60% + bottom 60% of the frame,
+    # merged). Doubles GPU cost per detection; the pipeline wires this from
     # settings.balls.far_rail_rescan so it can be tuned live.
     far_rail_rescan = True
 
@@ -160,24 +160,21 @@ class OnnxModelStrategy(DetectorStrategy):
 
     def _detect(self, frame_bgr, calib, rescan: bool | None = None):
         h, w = frame_bgr.shape[:2]
-        boxes = self._infer(frame_bgr)
-        # Far-rail recall: the far cushion is foreshortened, so balls there are tiny
-        # after the 640 downscale and often missed. Re-scan the top ~60% of the
-        # frame (where the far rail sits) upscaled, then merge — recovers small far
-        # balls without changing the model. Costs a second inference per frame;
-        # settings.balls.far_rail_rescan turns it off when the budget is tight.
+        # Two-pass TILED inference (the recall fix). A tall frame letterboxed
+        # into the 640px input leaves balls ~9px — at the model's floor, which
+        # is why detection was spotty (measured: misses 2-3 balls per frame).
+        # Two overlapping tiles (top 60% + bottom 60%) keep balls ~15px and
+        # find +20% more balls on real footage; _merge_boxes dedupes the
+        # overlap band. Costs a second inference — affordable now that
+        # detection runs off the display path.
+        do_tiled = self.far_rail_rescan if rescan is None else rescan
         th = int(h * 0.60)
-        do_rescan = self.far_rail_rescan if rescan is None else rescan
-        if do_rescan and rescan is None:
-            # The band pass costs a FULL second inference, which halved the live
-            # frame rate. Amortize it: every 3rd call on the live path. Rail
-            # balls are settled/position-locked between refreshes, so a slower
-            # top-band cadence loses nothing; explicit rescan=True callers (the
-            # offline labeller) still always get both passes.
-            self._rescan_tick = getattr(self, "_rescan_tick", -1) + 1
-            do_rescan = self._rescan_tick % 3 == 0
-        if th > 64 and do_rescan:
-            boxes = self._merge_boxes(boxes + self._infer(frame_bgr[0:th, 0:w]))
+        if do_tiled and th > 64:
+            boxes = self._merge_boxes(
+                self._infer(frame_bgr[0:th, :])
+                + self._infer(frame_bgr[h - th:, :], oy=h - th))
+        else:
+            boxes = self._merge_boxes(self._infer(frame_bgr))
         if not boxes:
             return []
         # No calibration => no polygon to test against; skip the mask entirely

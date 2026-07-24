@@ -98,6 +98,12 @@ def _draw_trail(img, history, color) -> None:
     """Fading comet tail: the smoothed path drawn in chunks that brighten and
     thicken toward the ball, so motion reads as a flowing stroke instead of a
     jagged wire."""
+    # A ball at rest must not keep wearing its old path: position history stays
+    # in the deque for ~64 frames, which left stale streaks across the table
+    # seconds after a shot. If the ball hasn't moved lately, draw no trail.
+    recent = np.asarray(history[-12:], np.float32)
+    if len(recent) >= 2 and np.abs(np.diff(recent, axis=0)).sum() < 6.0:
+        return
     p = _smooth_path(np.asarray(history, np.float32))
     n = len(p)
     if n < 2:
