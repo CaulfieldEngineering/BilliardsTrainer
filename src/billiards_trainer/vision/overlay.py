@@ -211,11 +211,29 @@ def _schematic_base(table: TableModel) -> np.ndarray:
     return img.copy()
 
 
+def _draw_play_paths(img, play_paths) -> None:
+    """Persistent per-play shot paths: white outlined stroke for the cue ball,
+    each object ball's path in its own colour — the broadcast trace."""
+    for e in play_paths.values():
+        pts = e.get("pts") or []
+        if len(pts) < 2:
+            continue
+        p = _smooth_path(np.asarray(pts, np.float32))
+        ip = np.round(p * _S).astype(np.int32).reshape(-1, 1, 2)
+        if e.get("cue"):
+            cv2.polylines(img, [ip], False, (25, 28, 32), 4, cv2.LINE_AA, shift=_SHIFT)
+            cv2.polylines(img, [ip], False, (250, 250, 250), 2, cv2.LINE_AA, shift=_SHIFT)
+        else:
+            col = tuple(int(v) for v in e.get("bgr", (200, 200, 200)))
+            cv2.polylines(img, [ip], False, col, 2, cv2.LINE_AA, shift=_SHIFT)
+
+
 def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DDC97",
                      show_traj: bool = True, show_ids: bool = True,
                      debug: bool = False, detections=None, diag=None,
                      measured_colors: bool = True,
-                     fixed_radius: float | None = None) -> np.ndarray:
+                     fixed_radius: float | None = None,
+                     play_paths: dict | None = None) -> np.ndarray:
     """Render a clean, proportional top-down table from the game state — felt,
     rails, pockets, diamonds, and balls as circles — instead of the warped camera
     image. Ball positions are the rectified (already-proportional) coordinates."""
@@ -230,6 +248,10 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             cv2.putText(img, f"{d.score:.2f}", (int(d.x) + 4, int(d.y) - 6),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 180, 255), 1, cv2.LINE_AA)
 
+    # shot paths under the balls: the whole play's traces, cue in white
+    if play_paths:
+        _draw_play_paths(img, play_paths)
+
     # balls — drawn at the KNOWN physical radius when fixed_radius is given, so the
     # overhead shows uniform regulation balls instead of the detector's per-frame wobble
     for tr in tracks:
@@ -238,7 +260,7 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
         cs = (int(round(tr.x * _S)), int(round(tr.y * _S)))
         r = max(6, int(fixed_radius if fixed_radius else tr.radius))
         rs = r * _S
-        if show_traj and len(tr.history) > 1:
+        if show_traj and play_paths is None and len(tr.history) > 1:
             _draw_trail(img, tr.history, acc)
         # sub-pixel centres: a ball whose track sits at x.5 no longer snaps
         # between neighbouring pixels frame to frame

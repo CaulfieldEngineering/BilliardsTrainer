@@ -32,6 +32,7 @@ class _Internal:
     still_count: int = 0       # consecutive ~stationary frames
     settled: bool = False      # confirmed AND has been still a while (a resting ball)
     committed_number: int = -1  # hysteresis: the held identity (resists flicker)
+    committed_cls: BallClass = BallClass.UNKNOWN  # sticky class for unnumbered balls
     cls_hist: deque = field(default_factory=lambda: deque(maxlen=15))
     num_hist: deque = field(default_factory=lambda: deque(maxlen=45))
     pos_hist: deque = field(default_factory=lambda: deque(maxlen=64))
@@ -56,8 +57,14 @@ class _Internal:
         if 9 <= n <= 15:
             return BallClass.STRIPE
         if not self.cls_hist:
-            return BallClass.UNKNOWN
-        return Counter(self.cls_hist).most_common(1)[0][0]
+            return self.committed_cls
+        vote = Counter(self.cls_hist).most_common(1)[0][0]
+        # Class is sticky too: a near-50/50 solid<->unknown vote must not strobe
+        # the rendered ball. Adopt a non-UNKNOWN majority; keep it until another
+        # non-UNKNOWN majority replaces it.
+        if vote != BallClass.UNKNOWN:
+            self.committed_cls = vote
+        return self.committed_cls
 
     @property
     def number(self) -> int:
@@ -126,7 +133,9 @@ class BallTracker:
 
     # ------------------------------------------------------------------ #
     def update(self, detections: list[Detection], short_side: float,
-               bounds: tuple[float, float, float, float] | None = None) -> list[Track]:
+               bounds: tuple[float, float, float, float] | None = None,
+               pockets: list[tuple[float, float]] | None = None,
+               pocket_r: float = 0.0) -> list[Track]:
         self._short_side = max(1.0, short_side)
         # Velocity-aware gate: a struck ball can cross more than the static gate
         # in one frame; letting the gate grow with track speed keeps the SAME
@@ -144,7 +153,14 @@ class BallTracker:
         # which also puts it next to the reappearing detection for re-matching.
         if bounds is not None:
             bx0, by0, bx1, by1 = bounds
+            capture_sq = (1.6 * pocket_r) ** 2 if pockets and pocket_r > 0 else 0.0
             for t in self._tracks:
+                # NO cushion at a pocket mouth: a ball coasting there must sail
+                # INTO the pocket (and age out), never bounce back onto the
+                # felt — that phantom rebound was visible in the animation.
+                if capture_sq and any((t.x - px) ** 2 + (t.y - py) ** 2 <= capture_sq
+                                      for px, py in pockets):
+                    continue
                 r = max(2.0, t.radius)
                 lo, hi = bx0 + r, bx1 - r
                 if lo < hi:
@@ -363,7 +379,12 @@ class BallTracker:
         else:
             a = 0.2 if t.confirmed else 0.5
             t.radius = a * d.radius + (1 - a) * t.radius
-        t.bgr = d.bgr
+        # Colour is STICKY: an UNKNOWN crop (occlusion, glare, a bad sample)
+        # must not paint an identified ball grey for a frame — that read as
+        # "balls flickering between colour and grey" live. Keep the last
+        # confidently-sampled colour until a new confident one arrives.
+        if d.cls != BallClass.UNKNOWN:
+            t.bgr = d.bgr
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
         t._commit_number()

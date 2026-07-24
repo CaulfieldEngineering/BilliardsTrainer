@@ -83,6 +83,11 @@ class Pipeline:
         self._last_detections: list = []
         self._last_raw_dets: list = []
         self._frames_since_ingest = 0
+        # Play-path trails (broadcast look): every ball that moves during a
+        # play leaves a persistent colored path — the cue ball's in white —
+        # shown until the NEXT play begins. id -> {pts, bgr, cue}
+        self._play_paths: dict[int, dict] = {}
+        self._prev_shot_state = "settled"
         self._bg = BackgroundModel()
         self._prev_small = None
         self._last_flow = 0.0
@@ -254,6 +259,12 @@ class Pipeline:
         # harmless. Real balls on the bed (incl. near rails) are untouched.
         tbl = calib.table
         edge = tbl.pocket_radius * 0.5
+        # Head/foot SPOT phantom: the felt marking detects as a ball and reads
+        # UNKNOWN (a grey '?' parked mid-table). An UNKNOWN detection centred
+        # on a spot is the spot, not a ball — a real ball there classifies.
+        cx = (tbl.x0 + tbl.x1) / 2.0
+        spots = [(cx, tbl.y0 + (tbl.y1 - tbl.y0) * f) for f in (0.25, 0.75)]
+        spot_r2 = (0.8 * expected_ball_radius_px(tbl, self.settings.table.size)) ** 2
         kept = []
         for d in detections:
             if not tbl.on_table(d.x, d.y, margin=edge):
@@ -261,11 +272,17 @@ class Pipeline:
             if (d.cls in (BallClass.EIGHT, BallClass.UNKNOWN)
                     and tbl.pocket_at(d.x, d.y, scale=0.9) is not None):
                 continue
+            if (d.cls == BallClass.UNKNOWN
+                    and any((d.x - sx) ** 2 + (d.y - sy) ** 2 <= spot_r2
+                            for sx, sy in spots)):
+                continue
             kept.append(d)
         detections = kept
         tracks = self.tracker.update(
             detections, calib.table.short_side,
             bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),
+            pockets=[(p.x, p.y) for p in tbl.pockets],
+            pocket_r=float(tbl.pocket_radius),
         )
         self._last_detections = detections
         self._last_raw_dets = list(raw_dets)
@@ -280,6 +297,34 @@ class Pipeline:
         if calib is None:
             return
         self._apply_detections(raw_dets, calib, frame_shape)
+
+    def _update_play_paths(self, tracks, shot_state: str) -> None:
+        """Accumulate each moving ball's path for the CURRENT play. Paths stay
+        on screen through the settle (review the shot at a glance) and clear
+        the moment the next play starts."""
+        if shot_state == "moving" and self._prev_shot_state != "moving":
+            self._play_paths.clear()
+        self._prev_shot_state = shot_state
+        from .balls import pool_ball_bgr
+        for tr in tracks:
+            if tr.misses > 0 or (abs(tr.vx) + abs(tr.vy)) < 1.2:
+                continue
+            e = self._play_paths.get(tr.id)
+            if e is None:
+                e = self._play_paths[tr.id] = {"pts": [], "bgr": (200, 200, 200),
+                                               "cue": False}
+            # identity can firm up mid-roll — keep colour/cue flag current
+            if tr.number == 0:
+                e["cue"], e["bgr"] = True, (250, 250, 250)
+            elif tr.number > 0:
+                e["bgr"] = pool_ball_bgr(tr.number)
+            elif not e["cue"]:
+                e["bgr"] = tuple(int(v) for v in tr.bgr)
+            pts = e["pts"]
+            q = (float(tr.x), float(tr.y))
+            if (not pts or abs(pts[-1][0] - q[0]) + abs(pts[-1][1] - q[1]) >= 1.5) \
+                    and len(pts) < 800:
+                pts.append(q)
 
     def view_tracks(self, tracks):
         """Velocity-extrapolated copies for RENDERING between async detection
@@ -533,6 +578,7 @@ class Pipeline:
             event = self.shots.update(tracks, calib.table, t, motion, evidence)
             res.shot_event = event
             res.shot_state = self.shots.state
+            self._update_play_paths(tracks, res.shot_state)
             res.diag = dict(self.shots.last_diag)
             res.diag["ms"] = round(self._last_ms, 1)
             res.diag["fps"] = int(1000 / self._last_ms) if self._last_ms > 0.1 else 0
@@ -561,6 +607,7 @@ class Pipeline:
         if ui.schematic_birdseye:
             res.rect_bgr = render_schematic(
                 calib.table, vtracks, accent=ui.accent,
+                play_paths=self._play_paths if ui.show_trajectories else None,
                 show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
                 debug=ui.debug_overlay, detections=detections, diag=res.diag,
                 measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,

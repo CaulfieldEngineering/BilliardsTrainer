@@ -107,6 +107,7 @@ class PipelineController(QObject):
         self._audio = None            # AudioRecorder (or None when not recording)
         self._audio_dir = None        # temp dir holding audio segments
         self._rec_crop = None         # (x0,y0,x1,y1) HDMI content box for this recording
+        self._recording_tmp = ""      # hidden .part path while a recording is open
         self._rec_frames = 0          # frames actually written this recording
         self._rec_fps = 0.0           # fps declared to the video writer
         self._rec_t0 = None           # start of current unpaused stretch
@@ -506,6 +507,10 @@ class PipelineController(QObject):
                 rec_dir.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             self._recording_path = str(rec_dir / f"session-{stamp}.mp4")
+            # Write under a hidden temp name and rename on finish: Dropbox was
+            # syncing the growing file and the audio-mux replacement raced it
+            # into "conflicted copy" duplicates.
+            self._recording_tmp = str(rec_dir / f".session-{stamp}.part.mp4")
             self._recorder = "pending"  # opened lazily on first frame (need size)
             self._recording_paused = False
             self._rec_frames = 0
@@ -539,10 +544,16 @@ class PipelineController(QObject):
                 if self._rec_frames > 30 and self._rec_elapsed > 1.0 and self._rec_fps > 0:
                     actual = self._rec_frames / self._rec_elapsed
                     scale = self._rec_fps / max(1e-6, actual)
-                self._audio.stop_and_mux(self._recording_path, ts_scale=scale)
+                self._audio.stop_and_mux(self._recording_tmp, ts_scale=scale)
                 self._audio = None
                 self._audio_dir = None
             if self._recording_path:
+                from pathlib import Path as _P
+                try:
+                    if _P(self._recording_tmp).is_file():
+                        _P(self._recording_tmp).replace(self._recording_path)
+                except OSError:
+                    log.exception("finalizing recording failed")
                 self.replay_saved.emit(self._recording_path)
 
     @Slot()
@@ -909,7 +920,7 @@ class PipelineController(QObject):
                 img = img[y0:y1 + 1, x0:x1 + 1]
             h, w = img.shape[:2]
             self._rec_fps = max(10.0, min(self._src_fps, 30))
-            self._recorder = open_writer(self._recording_path, self._rec_fps, (w, h))
+            self._recorder = open_writer(self._recording_tmp, self._rec_fps, (w, h))
         elif self._rec_crop is not None:
             x0, y0, x1, y1 = self._rec_crop
             img = img[y0:y1 + 1, x0:x1 + 1]
