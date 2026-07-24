@@ -307,7 +307,12 @@ class Pipeline:
         table movement stops (Joe's spec); a new play clears them instantly."""
         if shot_state == "moving" and self._prev_shot_state != "moving":
             self._play_paths.clear()
-        if shot_state == "moving":
+        # The fade clock starts only when the COMPLETE shot is over: every
+        # tracked ball at rest (not merely the state machine's settle call —
+        # a slow final roll must keep the trails alive). Any motion resets it.
+        any_motion = shot_state == "moving" or any(
+            tr.misses == 0 and (abs(tr.vx) + abs(tr.vy)) > 1.2 for tr in tracks)
+        if any_motion:
             self._paths_settle_t = None
             self._paths_alpha = 1.0
         elif self._play_paths:
