@@ -64,9 +64,11 @@ def test_preprocess_frame_noop_defaults_preserve_shape():
 
 
 # ---- overhead vision gates ----------------------------------------------- #
-def test_overhead_disables_parallax_and_far_rail():
-    # A default (overhead) Settings must route the pipeline away from the oblique
-    # parallax pose estimate — the fronto-parallel decomposition is degenerate.
+def test_overhead_uses_synthetic_center_pose():
+    # Overhead: the fronto-parallel homography can't recover the camera pose,
+    # but rail-ball parallax is real (measured: a cushion-resting ball at 0.77r
+    # from the nose). The pipeline substitutes a synthetic pose directly above
+    # the table centre at the configured lens height.
     import types
 
     from billiards_trainer.vision.geometry import TableModel
@@ -74,8 +76,14 @@ def test_overhead_disables_parallax_and_far_rail():
 
     s = Settings()
     assert s.camera.overhead is True
-    calib = types.SimpleNamespace(
-        H=np.eye(3), Hinv=np.eye(3),
-        table=TableModel.from_rect((567, 1053), 40, nose_inset_frac=0.055))
+    tbl = TableModel.from_rect((567, 1053), 40, nose_inset_frac=0.055)
+    calib = types.SimpleNamespace(H=np.eye(3), Hinv=np.eye(3), table=tbl)
     pipe = Pipeline(s, source="")
-    assert pipe._camera_position(calib, (1080, 1920, 3)) is None
+    cam = pipe._camera_position(calib, (1080, 1920, 3))
+    assert cam is not None
+    assert abs(cam[0] - (tbl.x0 + tbl.x1) / 2) < 1 and abs(cam[1] - (tbl.y0 + tbl.y1) / 2) < 1
+    assert cam[2] > 20 * 12  # a sane px height for a ~5-6ft mount
+
+    s.camera.height_in = 0.0   # explicit opt-out -> correction off
+    pipe2 = Pipeline(s, source="")
+    assert pipe2._camera_position(calib, (1080, 1920, 3)) is None

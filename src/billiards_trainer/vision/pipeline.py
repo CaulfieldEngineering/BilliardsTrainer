@@ -313,13 +313,15 @@ class Pipeline:
         # fade entirely), so a ball counts as moving only if it actually
         # DISPLACED over its recent history (~last half second), or the shot
         # state machine says a strike is in progress.
+        move_px = 1.2 * expected_ball_radius_px(  # ~0.6 ball diameters (Joe's spec)
+            self.calib.calib.table, self.settings.table.size) if self.calib.calib else 15.0
         def _really_moving(tr) -> bool:
             hist = tr.history[-8:]
             if len(hist) < 2:
                 return False
-            path = sum(abs(hist[i + 1][0] - hist[i][0]) + abs(hist[i + 1][1] - hist[i][1])
-                       for i in range(len(hist) - 1))
-            return path > 10.0
+            net = (abs(hist[-1][0] - hist[0][0]) ** 2
+                   + abs(hist[-1][1] - hist[0][1]) ** 2) ** 0.5
+            return net > move_px
         any_motion = shot_state == "moving" or any(
             tr.misses == 0 and _really_moving(tr) for tr in tracks)
         if any_motion:
@@ -406,11 +408,24 @@ class Pipeline:
         (degenerate pose, implausible height, or the feature flag is off)."""
         if not getattr(self.settings.balls, "parallax_correction", True):
             return None
-        # A directly-overhead camera has no oblique radial parallax: the pose
-        # decomposition is degenerate for a fronto-parallel homography and the
-        # correction collapses to a no-op, so skip it entirely when overhead.
+        # Overhead camera: homography pose decomposition is DEGENERATE for a
+        # fronto-parallel view, so the camera position can't be recovered — but
+        # parallax still exists (the lens is a point ~5-6ft up; rail balls are
+        # viewed obliquely and project ~0.25" outward, measured live: a
+        # cushion-resting ball at 0.77r instead of 1.0r). Use a synthetic pose:
+        # directly above the table centre at the configured lens height.
         if getattr(self.settings.camera, "overhead", False):
-            return None
+            calib_t = calib.table
+            h_in = float(getattr(self.settings.camera, "height_in", 0.0) or 0.0)
+            if h_in < 12.0:
+                return None
+            from ..config import _BED_SHORT_IN
+            bed_in = _BED_SHORT_IN.get(self.settings.table.size, 46.0)
+            px_per_in = calib_t.play_w / max(1.0, bed_in) if calib_t.play_w < calib_t.play_h \
+                else calib_t.play_h / max(1.0, bed_in)
+            cx = (calib_t.x0 + calib_t.x1) / 2.0
+            cy = (calib_t.y0 + calib_t.y1) / 2.0
+            return np.array([cx, cy, h_in * px_per_in])
         key = (calib.H.tobytes(), frame_shape[1], frame_shape[0])
         if self._cam_pose is not None and self._cam_pose[0] == key:
             return self._cam_pose[1]
@@ -625,9 +640,10 @@ class Pipeline:
             # inside the cushion while a fresh calibration placed it perfectly).
             # Sustained impossibility -> relock.
             tbl2 = calib.table
+            r_wd = expected_ball_radius_px(tbl2, self.settings.table.size)
             bad = sum(1 for tr in tracks
                       if tr.misses == 0 and abs(tr.vx) + abs(tr.vy) < 1.0
-                      and not tbl2.on_table(tr.x, tr.y, margin=-2.0))
+                      and not tbl2.on_table(tr.x, tr.y, margin=-0.4 * r_wd))
             if bad:
                 self._impossible_streak += 1
                 if self._impossible_streak >= 4 and self.settings.table.auto_relock:

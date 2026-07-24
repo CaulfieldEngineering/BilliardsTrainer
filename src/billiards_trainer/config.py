@@ -374,6 +374,11 @@ class CameraSettings:
     # the ceiling bracket faces the "wrong" way.
     flip_h: bool = False
     flip_v: bool = False
+    # Camera lens height above the table BED in inches (overhead mount). Drives
+    # the ball-height parallax correction: a ball's centre sits ~1.1" above the
+    # cloth, so even a directly-overhead camera sees rail balls displaced
+    # outward by ~r*d/H — enough to draw a cushion-resting ball inside the rail.
+    height_in: float = 66.0
     # True once the camera is mounted directly overhead. Disables the oblique-only
     # parallax + far-rail-rescan corrections and tightens the ball-size band, since
     # a top-down view has no foreshortening and balls are one constant size.
