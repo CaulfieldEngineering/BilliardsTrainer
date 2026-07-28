@@ -85,9 +85,12 @@ class SessionsSidebar(QFrame):
         # ANY video dropped into the recordings folder is a session — recorded
         # by the app (session-*.mp4) or copied in by hand.
         try:
+            # pathlib.glob matches dotfiles, so in-progress/aborted hidden
+            # ".session-*.part.mp4" files showed up in the list — skip them.
             clips = sorted(
                 (p for ext in ("*.mp4", "*.mov", "*.m4v", "*.avi", "*.mkv")
-                 for p in self.recordings_dir.glob(ext)),
+                 for p in self.recordings_dir.glob(ext)
+                 if not p.name.startswith(".")),
                 key=lambda p: p.stat().st_mtime, reverse=True)
         except OSError:
             clips = []
