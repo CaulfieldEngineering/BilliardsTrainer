@@ -590,7 +590,7 @@ class PipelineController(QObject):
         if not done and cap["seen"] % cap["stride"] == 0:
             # Full resolution (only lightly capped) — the auto-labeller needs the
             # detail to read each ball's colour + solid/stripe.
-            img = self._small(frame, max_w=1280) if frame.shape[1] > 1280 else frame
+            img = self._small(frame, max_w=1920) if frame.shape[1] > 1920 else frame
             path = cap["dir"] / "frames" / f"f{cap['saved']:05d}.jpg"
             try:
                 cv2.imwrite(str(path), img, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
@@ -906,7 +906,7 @@ class PipelineController(QObject):
         # Near-full resolution so one recording serves BOTH playback/testing and
         # training. Raw (unannotated) so replaying it re-runs the CURRENT analysis
         # over old footage — the app-testing use case.
-        img = self._small(frame, max_w=1280) if frame.shape[1] > 1280 else frame
+        img = self._small(frame, max_w=1920) if frame.shape[1] > 1920 else frame
         if self._recorder == "pending":
             # Crop the HDMI letterbox once per recording: the T3i's live feed
             # fills only ~63% of the 1080p frame, so recording the content box

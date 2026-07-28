@@ -229,6 +229,27 @@ class Pipeline:
             return frame
         return _median_frames(list(ring))
 
+    def _apply_alignment_grid(self, res) -> None:
+        """Rule-of-thirds grid over the camera view for squaring the physical
+        mount. Drawn on a COPY — the analysed/recorded frames stay clean."""
+        if not getattr(self.settings.ui, "alignment_grid", False):
+            return
+        img = res.frame_bgr
+        if img is None:
+            return
+        img = img.copy()
+        h, w = img.shape[:2]
+        for f in (1 / 3, 2 / 3):
+            x, y = int(w * f), int(h * f)
+            cv2.line(img, (x, 0), (x, h), (0, 0, 0), 3, cv2.LINE_AA)
+            cv2.line(img, (x, 0), (x, h), (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.line(img, (0, y), (w, y), (0, 0, 0), 3, cv2.LINE_AA)
+            cv2.line(img, (0, y), (w, y), (255, 255, 255), 1, cv2.LINE_AA)
+        c = (w // 2, h // 2)
+        cv2.drawMarker(img, c, (0, 0, 0), cv2.MARKER_CROSS, 44, 3, cv2.LINE_AA)
+        cv2.drawMarker(img, c, (255, 255, 255), cv2.MARKER_CROSS, 40, 1, cv2.LINE_AA)
+        res.frame_bgr = img
+
     def _apply_detections(self, raw_dets, calib, frame_shape):
         """Project raw-frame detections to rect space, run the sanity filters,
         and update the tracker. Shared by the synchronous path (video replay,
@@ -521,6 +542,7 @@ class Pipeline:
                     res.n_balls = len(raw_dets)
                     res.frame_bgr = self._draw_raw_dets(frame, raw_dets)
                     res.status = "detecting_nolock"
+                    self._apply_alignment_grid(res)
                     if self.settings.ui.schematic_birdseye:
                         res.rect_bgr = render_schematic(
                             self._default_preview_table(), [], accent=self.settings.ui.accent,
@@ -528,6 +550,7 @@ class Pipeline:
                 else:
                     res.status = "calibrating"
                     res.frame_bgr = frame
+                self._apply_alignment_grid(res)
                 self._last_ms = (time.perf_counter() - t_start) * 1000.0
                 return res
 
@@ -693,6 +716,7 @@ class Pipeline:
         else:
             res.frame_bgr = frame
         st["render"] = (time.perf_counter() - t0) * 1000.0
+        self._apply_alignment_grid(res)
         self._last_ms = (time.perf_counter() - t_start) * 1000.0
         self._last_stages = {k: round(v, 2) for k, v in st.items()}
         res.diag["stages"] = self._last_stages  # this frame's — for the bench

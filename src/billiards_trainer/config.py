@@ -262,6 +262,9 @@ class ShotClockSettings:
 
 @dataclass
 class UiSettings:
+    # Rule-of-thirds alignment grid over the live camera view (Settings toggle)
+    # — for squaring the physical camera mount to the table.
+    alignment_grid: bool = False
     theme: str = "dark"
     accent: str = "#3DDC97"      # mint/green — nods to the felt
     show_trajectories: bool = True
