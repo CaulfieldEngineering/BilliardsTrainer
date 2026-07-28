@@ -408,13 +408,14 @@ class SettingsPage(QWidget):
         if not self._loaded:
             return
         r = self._s.recording
-        dir_changed = r.directory != self._rec_dir.text().strip()
         r.directory = self._rec_dir.text().strip()
         r.audio = self._rec_audio.isChecked()
         r.audio_device = str(self._rec_device.currentData() or "default")
         self._s.save()
-        if dir_changed:
-            self.applied.emit()   # sidebar re-lists from the new folder
+        # Always apply: the audio METER must re-attach the moment a
+        # different mic is picked (it kept listening to the old device
+        # until an app restart — "the meter isn\'t live").
+        self.applied.emit()
 
     def _on_ai_changed(self) -> None:
         if not self._loaded:

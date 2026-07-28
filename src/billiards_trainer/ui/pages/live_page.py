@@ -209,6 +209,7 @@ class LivePage(QWidget):
             cap.addWidget(w)
         self._rec_time = QLabel("")
         self._rec_time.setObjectName("RecClock")
+        self._rec_time.setTextFormat(Qt.RichText)
         self._rec_time.setMinimumWidth(86)
         cap.addWidget(self._rec_time)
         lay.addWidget(self._rec_capsule)
@@ -1031,8 +1032,11 @@ class LivePage(QWidget):
         if paused:
             tag = "❚❚ PAUSED"
         else:
-            tag = "● REC" if secs % 2 == 0 else "  REC"   # blinking tally dot
-        self._rec_time.setText(f"{tag}  {secs // 60}:{secs % 60:02d}")
+            dot = PALETTE.danger if secs % 2 == 0 else "transparent"
+            # same glyph every tick, colour alternates -> metrics never change,
+            # so the transport row stops shifting on each blink
+            tag = f'<span style="color:{dot}">●</span> REC'
+        self._rec_time.setText(f"{tag}&nbsp;&nbsp;{secs // 60}:{secs % 60:02d}")
         if self._rec_time.property("paused") != paused:
             self._rec_time.setProperty("paused", paused)
             self._repolish(self._rec_time)
