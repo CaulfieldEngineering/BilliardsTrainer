@@ -38,7 +38,8 @@
       "Bash(.venv/bin/python -m pytest tests/test_camera_preprocess.py -q)",
       "Bash(killall -9 ptpcamerad mscamerad-xpc mscamerad)",
       "Bash(gphoto2 --summary)",
-      "Bash(/opt/homebrew/bin/brew install *)"
+      "Bash(/opt/homebrew/bin/brew install *)",
+      "Bash(BILLIARDS_TRAINER_NO_SAVE=1 .venv/bin/python tools/feedmeter.py --source 0 --headless 10 --label \"forced-1080i on Mac mini ceiling rig\")"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
