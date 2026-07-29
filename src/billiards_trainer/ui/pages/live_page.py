@@ -150,6 +150,14 @@ class LivePage(QWidget):
         self._persp_stack = QStackedWidget()
         self._persp = VideoView("Connecting to camera…")
         self._persp.clicked.connect(self._on_persp_click)
+        # Corner feed-stats chip (Joe's ask): resolution truth ON the video,
+        # not in the transport. Toggle: Settings -> Appearance.
+        self._feed_chip = QLabel("", self._persp)
+        self._feed_chip.setStyleSheet(
+            "background: rgba(0,0,0,0.55); color: #CFD8DC; border-radius: 4px;"
+            "padding: 2px 8px; font-size: 10px; font-weight: 600;"
+            "letter-spacing: 0.5px;")
+        self._feed_chip.hide()
         self._persp_stack.addWidget(self._persp)
         self._persp_stack.addWidget(self._camera_error_panel())
         persp_card.add(self._persp_stack)
@@ -965,6 +973,24 @@ class LivePage(QWidget):
             self._clock.update_clock(packet.clock_remaining,
                                      max(1.0, self._settings.shot_clock.seconds),
                                      packet.clock_warning, True)
+        info = getattr(packet, "feed_info", "")
+        if getattr(self._settings.ui, "feed_stats", True) and info and not self._is_video:
+            self._feed_chip.setText(info)
+            if getattr(packet, "feed_sd", False):
+                self._feed_chip.setStyleSheet(
+                    "background: rgba(120,80,0,0.75); color: #FFD54F;"
+                    "border-radius: 4px; padding: 2px 8px; font-size: 10px;"
+                    "font-weight: 700; letter-spacing: 0.5px;")
+            else:
+                self._feed_chip.setStyleSheet(
+                    "background: rgba(0,0,0,0.55); color: #CFD8DC;"
+                    "border-radius: 4px; padding: 2px 8px; font-size: 10px;"
+                    "font-weight: 600; letter-spacing: 0.5px;")
+            self._feed_chip.adjustSize()
+            self._feed_chip.move(self._persp.width() - self._feed_chip.width() - 10, 8)
+            self._feed_chip.show()
+        else:
+            self._feed_chip.hide()
         if getattr(packet, "feed_sd", False) and not self._is_video:
             # Camera fell back to 480p (ML forced-1080i lost after a power
             # cycle) — shout it BEFORE a degraded session gets recorded.

@@ -265,6 +265,9 @@ class UiSettings:
     # Rule-of-thirds alignment grid over the live camera view (Settings toggle)
     # — for squaring the physical camera mount to the table.
     alignment_grid: bool = False
+    # Small feed-stats chip in the corner of the camera view: container
+    # resolution, ACTIVE picture resolution (the HD-vs-480p truth), fps.
+    feed_stats: bool = True
     theme: str = "dark"
     accent: str = "#3DDC97"      # mint/green — nods to the felt
     show_trajectories: bool = True

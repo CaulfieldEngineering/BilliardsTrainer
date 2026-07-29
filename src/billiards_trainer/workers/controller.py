@@ -61,6 +61,7 @@ class FramePacket:
     tracks: list = field(default_factory=list)
     raw_dets: list = field(default_factory=list)   # camera-coord dets + guessed numbers (labelling)
     feed_sd: bool = False   # camera fell back to the 480p HDMI mode (re-arm ML)
+    feed_info: str = ""     # corner stats chip: container/active resolution + fps
 
 
 class PipelineController(QObject):
@@ -110,6 +111,7 @@ class PipelineController(QObject):
         self._rec_crop = None         # (x0,y0,x1,y1) HDMI content box for this recording
         self._feed_sd = False         # 480p-fallback watchdog state
         self._feed_check_tick = 0
+        self._feed_info = ""          # corner stats chip text (resolution/fps)
         self._recording_tmp = ""      # hidden .part path while a recording is open
         self._rec_frames = 0          # frames actually written this recording
         self._rec_fps = 0.0           # fps declared to the video writer
@@ -843,6 +845,11 @@ class PipelineController(QObject):
                 rw = (xs.max() - xs.min() + 1) / g.shape[1]
                 rh = (ys.max() - ys.min() + 1) / g.shape[0]
                 sd = min(rw, rh) < 0.78
+                aw = int(round((xs.max() - xs.min() + 1) * 8))
+                ah = int(round((ys.max() - ys.min() + 1) * 8))
+                self._feed_info = (f"{frame.shape[1]}\u00d7{frame.shape[0]} "
+                                   f"@{self._src_fps:.0f}  \u2022  active "
+                                   f"{aw}\u00d7{ah}")
                 if sd != self._feed_sd:
                     self._feed_sd = sd
                     if sd:
@@ -858,7 +865,7 @@ class PipelineController(QObject):
                      self._fps, getattr(self._pipeline, "_last_ms", 0.0))
 
         self.frame_ready.emit(FramePacket(
-            feed_sd=self._feed_sd,
+            feed_sd=self._feed_sd, feed_info=self._feed_info,
             perspective=res.frame_bgr, birdseye=res.rect_bgr, status=res.status,
             fps=self._fps, n_balls=res.n_balls, shot_state=res.shot_state,
             clock_remaining=self._clock.remaining(t),
