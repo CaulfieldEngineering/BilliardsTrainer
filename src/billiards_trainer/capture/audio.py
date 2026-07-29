@@ -62,10 +62,16 @@ class AudioRecorder:
             return False
         work_dir.mkdir(parents=True, exist_ok=True)
         self._work_dir = work_dir
-        seg = work_dir / f"audio-{len(self._segments):03d}.m4a"
+        seg = work_dir / f"audio-{len(self._segments):03d}.wav"
+        # -thread_queue_size: avfoundation drops input packets when the queue
+        # overruns (measured: a 202s session captured only 177s of samples, the
+        # PTS gaps then read as "audio early"/drifting). A big queue plus RAW
+        # PCM (no AAC encode inside the capture process, which competes with
+        # the app's GPU/CPU work) keeps capture real-time.
         cmd = [self._ffmpeg, "-hide_banner", "-loglevel", "error",
+               "-thread_queue_size", "4096",
                "-f", "avfoundation", "-i", f":{self._device}",
-               "-ac", "2", "-c:a", "aac", "-b:a", "128k", "-y", str(seg)]
+               "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", "-y", str(seg)]
         try:
             self._proc = subprocess.Popen(
                 cmd, stdin=subprocess.DEVNULL,
@@ -117,8 +123,15 @@ class AudioRecorder:
             cmd = [self._ffmpeg, "-hide_banner", "-loglevel", "error"]
             if abs(ts_scale - 1.0) > 0.02:
                 cmd += ["-itsscale", f"{ts_scale:.6f}"]
+            # aresample=async=1 INSERTS SILENCE wherever the capture dropped
+            # samples, so the audio timeline matches its (correct) wall-clock
+            # timestamps instead of sliding earlier and earlier. apad+shortest
+            # then makes the track span exactly the video's length.
             cmd += ["-i", str(video), "-i", str(audio),
-                    "-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                    "-map", "0:v:0", "-map", "1:a:0",
+                    "-af", "aresample=async=1:first_pts=0,apad",
+                    "-shortest",
+                    "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
                     "-movflags", "+faststart", "-y", str(muxed)]
             res = subprocess.run(cmd, capture_output=True, timeout=300)
             if res.returncode != 0 or not muxed.is_file() or muxed.stat().st_size == 0:
@@ -140,10 +153,10 @@ class AudioRecorder:
         listing = work / "audio-concat.txt"
         listing.write_text(
             "".join(f"file '{s.as_posix()}'\n" for s in segments), encoding="utf-8")
-        out = work / "audio-full.m4a"
+        out = work / "audio-full.wav"
         cmd = [self._ffmpeg, "-hide_banner", "-loglevel", "error",
                "-f", "concat", "-safe", "0", "-i", str(listing),
-               "-c", "copy", "-y", str(out)]
+               "-c:a", "pcm_s16le", "-y", str(out)]
         res = subprocess.run(cmd, capture_output=True, timeout=120)
         if res.returncode != 0:
             log.warning("audio concat failed: %s", res.stderr.decode(errors="replace")[-400:])
@@ -155,7 +168,7 @@ class AudioRecorder:
         for s in segments:
             s.unlink(missing_ok=True)
         if work is not None:
-            for name in ("audio-concat.txt", "audio-full.m4a"):
+            for name in ("audio-concat.txt", "audio-full.wav"):
                 (work / name).unlink(missing_ok=True)
             try:
                 work.rmdir()  # only if empty

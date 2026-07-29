@@ -451,9 +451,14 @@ class LivePage(QWidget):
             return
         from PySide6.QtMultimedia import QMediaPlayer
         target_ms = int(pos / max(1.0, self._video_fps) * 1000)
-        # Re-anchor only on real divergence (a seek, or analysis hitching) so
-        # normal playback isn't peppered with micro-seeks.
-        if abs(player.position() - target_ms) > 350:
+        # Re-anchor RARELY. Frequent setPosition() calls replay the same second
+        # over and over — that was the "1s echo" during playback. Only correct
+        # a big divergence (a real seek), and never more than once every 2s.
+        import time as _t
+        now = _t.monotonic()
+        if (abs(player.position() - target_ms) > 1000
+                and now - getattr(self, "_last_audio_anchor", 0.0) > 2.0):
+            self._last_audio_anchor = now
             player.setPosition(target_ms)
         if playing and player.playbackState() != QMediaPlayer.PlayingState:
             player.play()
