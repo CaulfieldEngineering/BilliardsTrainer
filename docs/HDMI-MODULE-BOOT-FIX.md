@@ -1,3 +1,12 @@
+> **SUPERSEDED 2026-07-29 — DO NOT IMPLEMENT.** The 480p reversions were NOT a
+> module defect. Root cause (found by Joe, bench-reproduced): ML's crash guard.
+> A hard power cut leaves `ML/MODULES/LOADING.LCK` behind, so the next boot
+> reads it as "a module crashed me" and skips module loading entirely — no
+> hdmi_out, no ROM hook, camera negotiates its default 480p. FIX (stock
+> setting, already applied + verified by battery-pull): Modules tab -> Modules
+> debug (Q) -> "Load modules after crash" = ON, then Prefs -> Config files ->
+> Save config now. See docs/STATE-2026-07-24.md. Kept below for history only.
+
 # hdmi_out.mo — make forced 1080i survive a camera power-cycle
 
 **Repo:** `CaulfieldEngineering/ml-hdmi-out-600d` (private, CI cross-build)

@@ -197,8 +197,21 @@ def log_row(label: str, med: dict, container: str, ufps: float, frame) -> None:
           f"active={med['active_w']:.0f}x{med['active_h']:.0f} "
           f"eff_lines={med['eff_lines']:.0f} eff_cols={med['eff_cols']:.0f} "
           f"sharp={med['sharpness']:.0f} comb={med['comb']:.2f}"
-          f"  [{'HD wire' if med['active_w'] > 1500 else 'SD/other wire'}]"
+          f"  [{_wire_verdict(med['active_w'], med['active_h'])}]"
           f"\n -> {png.name}")
+
+
+def _wire_verdict(aw: float, ah: float) -> str:
+    """HD vs degraded from the ACTIVE BOX ASPECT, not its width.
+
+    Width alone MISLABELS the 480p wire (1730x757) as HD. Measured on this rig
+    (docs/feedmeter-log.csv): healthy 1.50-1.78, degraded 1.95 (failed mode)
+    and 2.29 (480p). Nothing healthy exceeds the 16:9 container's own aspect.
+    """
+    if aw < 8 or ah < 8:
+        return "no picture"
+    a = aw / ah
+    return "HD wire" if a <= 1.85 else f"SD/degraded wire (aspect {a:.2f})"
 
 
 def main() -> int:

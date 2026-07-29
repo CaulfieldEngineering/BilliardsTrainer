@@ -842,15 +842,18 @@ class PipelineController(QObject):
                              cv2.COLOR_BGR2GRAY)
             ys, xs = np.where(g > 12)
             if len(xs) > 50:
-                rh = (ys.max() - ys.min() + 1) / g.shape[0]
-                # A healthy 1080i picture fills the container's FULL height
-                # (3:2 image pillarboxed inside 16:9 -> 1621x1080). Every
-                # degraded state seen so far is letterboxed vertically: the
-                # classic 480p fallback (1730x757) and the post-power-cycle
-                # intermediate (1710x875). Height-fill is the discriminator.
+                # HD-vs-degraded discriminator = the ACTIVE BOX ASPECT.
+                # Measured on this rig (docs/feedmeter-log.csv):
+                #   healthy  1633x928=1.76, 1633x946=1.73, 1603x1072=1.50,
+                #            1621x1080=1.50, 1920x1080=1.78 (menu, full frame)
+                #   degraded 1730x757=2.29 (480p wire), 1710x875=1.95
+                # Nothing healthy exceeds the container's own 16:9 (1.78): a
+                # wider active box means the picture is letterboxed beyond the
+                # container, which on this camera means an SD/failed mode.
+                # (Height-fill was WRONG — movie-mode HD is legitimately 928.)
                 aw = int(round((xs.max() - xs.min() + 1) * 8))
                 ah = int(round((ys.max() - ys.min() + 1) * 8))
-                sd = rh < 0.95
+                sd = (aw / max(1, ah)) > 1.85
                 self._feed_info = (f"{frame.shape[1]}\u00d7{frame.shape[0]} "
                                    f"@{self._src_fps:.0f}  \u2022  active "
                                    f"{aw}\u00d7{ah}")
