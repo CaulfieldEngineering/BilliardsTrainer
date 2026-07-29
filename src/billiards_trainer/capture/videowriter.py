@@ -79,6 +79,16 @@ class FfmpegWriter:
                             "scale=1080:-2:flags=lanczos,"
                             "unsharp=5:5:0.6:5:5:0.0")]
             bitrate = "14M"   # more pixels after the upscale deserve more bits
+        else:
+            # HD feed (the forced-1080i era): no upscale needed, but the source
+            # is still noisy (temporal sigma ~1.4-2.6 on static felt) and soft
+            # at ball scale — which is what makes the 9's yellow stripe hard to
+            # separate from its white body (measured: the COLOURS are already
+            # 164 saturation apart, so the limit is spatial detail, not colour).
+            # A light denoise + mild unsharp measured +35% frame detail
+            # (laplacian 48.5 -> 65.4) with no visible processing artefacts.
+            cmd += ["-vf", "hqdn3d=1:1:4:4,unsharp=5:5:0.3:5:5:0.0"]
+            bitrate = "14M"   # noise eats bits; give the encoder headroom
         cmd += ["-c:v", "h264_videotoolbox", "-b:v", bitrate,
                 # tag bt709 explicitly — untagged video renders washed-out on
                 # iPhones, which reads as further softness
