@@ -60,6 +60,7 @@ class FramePacket:
     deviated: bool = False
     tracks: list = field(default_factory=list)
     raw_dets: list = field(default_factory=list)   # camera-coord dets + guessed numbers (labelling)
+    feed_sd: bool = False   # camera fell back to the 480p HDMI mode (re-arm ML)
 
 
 class PipelineController(QObject):
@@ -107,6 +108,8 @@ class PipelineController(QObject):
         self._audio = None            # AudioRecorder (or None when not recording)
         self._audio_dir = None        # temp dir holding audio segments
         self._rec_crop = None         # (x0,y0,x1,y1) HDMI content box for this recording
+        self._feed_sd = False         # 480p-fallback watchdog state
+        self._feed_check_tick = 0
         self._recording_tmp = ""      # hidden .part path while a recording is open
         self._rec_frames = 0          # frames actually written this recording
         self._rec_fps = 0.0           # fps declared to the video writer
@@ -825,6 +828,28 @@ class PipelineController(QObject):
                 and self._last_frame is not None):
             self._write_recording(self._last_frame)
 
+        # 480p-fallback watchdog: the ML forced-1080i does not survive a camera
+        # power cycle, and a silent fallback means degraded recordings. The
+        # geometry is a fingerprint — the SD presentation fills only ~70% of
+        # the container's short axis, every verified HD mode fills >=84%.
+        self._feed_check_tick += 1
+        if (self._feed_check_tick % 150 == 0 and frame is not None
+                and not getattr(self._source, "is_video", False)):
+            g = cv2.cvtColor(cv2.resize(frame, (frame.shape[1] // 8,
+                                                frame.shape[0] // 8)),
+                             cv2.COLOR_BGR2GRAY)
+            ys, xs = np.where(g > 12)
+            if len(xs) > 50:
+                rw = (xs.max() - xs.min() + 1) / g.shape[1]
+                rh = (ys.max() - ys.min() + 1) / g.shape[0]
+                sd = min(rw, rh) < 0.78
+                if sd != self._feed_sd:
+                    self._feed_sd = sd
+                    if sd:
+                        log.warning("HDMI feed dropped to 480p geometry — "
+                                    "re-arm the ML HDMI output on the camera")
+                    else:
+                        log.info("HDMI feed back to HD geometry")
         dt = time.perf_counter() - t_wall0
         inst = 1.0 / dt if dt > 0 else 0.0
         self._fps = 0.9 * self._fps + 0.1 * inst if self._fps else inst
@@ -833,6 +858,7 @@ class PipelineController(QObject):
                      self._fps, getattr(self._pipeline, "_last_ms", 0.0))
 
         self.frame_ready.emit(FramePacket(
+            feed_sd=self._feed_sd,
             perspective=res.frame_bgr, birdseye=res.rect_bgr, status=res.status,
             fps=self._fps, n_balls=res.n_balls, shot_state=res.shot_state,
             clock_remaining=self._clock.remaining(t),
