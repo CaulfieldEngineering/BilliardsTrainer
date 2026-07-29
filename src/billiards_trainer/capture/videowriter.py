@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import threading
+import time
 
 import numpy as np
 
@@ -88,22 +90,83 @@ class FfmpegWriter:
             cmd, stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         log.info("H.264 recording via ffmpeg/videotoolbox %sx%s @ %s", w, h, bitrate)
+        # PACED writing (the OBS model): capture rate varies with load, but the
+        # encoder is fed at EXACTLY the declared fps on a wall-clock schedule —
+        # the freshest frame is duplicated when capture lags and extras are
+        # dropped when it bursts. Output is true CFR, so the audio track lines
+        # up at every instant (the old declared-vs-actual retiming only matched
+        # the endpoints; the middle drifted seconds under load swings).
+        self._latest: bytes | None = None
+        self._emitted = 0
+        self._lock = threading.Lock()
+        self._paused = False
+        self._stop = threading.Event()
+        self._interval = 1.0 / max(1.0, fps)
+        self._pacer = threading.Thread(target=self._pace, daemon=True,
+                                       name="rec-pacer")
+        self._pacer.start()
+
+    def _pace(self) -> None:
+        next_t = None
+        while not self._stop.is_set():
+            if next_t is None:
+                time.sleep(0.005)
+                with self._lock:
+                    ready = self._latest is not None and not self._paused
+                if ready:
+                    next_t = time.monotonic()
+                continue
+            now = time.monotonic()
+            if now < next_t:
+                time.sleep(min(self._interval, next_t - now))
+                continue
+            with self._lock:
+                buf, paused = self._latest, self._paused
+            if paused:
+                next_t = None      # pause stops the clock; resume restarts it
+                continue
+            if buf is not None and self._proc.poll() is None:
+                try:
+                    self._proc.stdin.write(buf)
+                    self._emitted += 1
+                except (BrokenPipeError, OSError):
+                    log.warning("recording encoder pipe closed early")
+                    return
+            next_t += self._interval
+            if next_t < time.monotonic() - 1.0:   # fell far behind; resync
+                next_t = time.monotonic()
 
     def isOpened(self) -> bool:  # noqa: N802 - cv2 surface
         return self._proc.poll() is None
 
     def write(self, frame: np.ndarray) -> None:
-        if self._proc.poll() is not None:
-            return
         h, w = frame.shape[:2]
         if (w, h) != self._size:
             return  # size changed mid-recording; drop rather than corrupt
-        try:
-            self._proc.stdin.write(frame.tobytes())
-        except (BrokenPipeError, OSError):
-            log.warning("recording encoder pipe closed early")
+        with self._lock:
+            self._latest = frame.tobytes()
+
+    def pause(self, on: bool) -> None:
+        with self._lock:
+            self._paused = on
+            if on:
+                self._latest = None   # never duplicate a stale frame on resume
 
     def release(self) -> None:
+        self._stop.set()
+        try:
+            self._pacer.join(timeout=2)
+        except RuntimeError:
+            pass
+        # A recording must never be EMPTY: if the pacer never got a wall-clock
+        # tick (ultra-short recording), flush the last frame once.
+        with self._lock:
+            buf = self._latest
+        if self._emitted == 0 and buf is not None and self._proc.poll() is None:
+            try:
+                self._proc.stdin.write(buf)
+            except (BrokenPipeError, OSError):
+                pass
         try:
             self._proc.stdin.close()
             self._proc.wait(timeout=30)

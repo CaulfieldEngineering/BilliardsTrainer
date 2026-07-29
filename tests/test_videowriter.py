@@ -38,11 +38,13 @@ def test_content_box_refuses_overcrop_on_dark_scene():
 def test_ffmpeg_writer_produces_h264(tmp_path):
     import subprocess
     path = str(tmp_path / "clip.mp4")
+    import time
     wtr = FfmpegWriter(path, 20.0, (320, 240), bitrate="1M")
     frame = np.zeros((240, 320, 3), np.uint8)
-    for i in range(30):
-        frame[:] = (i * 5) % 255
+    for i in range(12):                       # paced writer: give it wall time
+        frame[:] = (i * 20) % 255
         wtr.write(frame)
+        time.sleep(0.05)
     wtr.release()
     out = subprocess.run(
         [find_ffmpeg().replace("ffmpeg", "ffprobe"), "-v", "error",

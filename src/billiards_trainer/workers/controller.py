@@ -481,6 +481,8 @@ class PipelineController(QObject):
     def set_recording_paused(self, paused: bool) -> None:
         """Pause/resume writing frames to the active recording (session stays open)."""
         self._recording_paused = paused
+        if self._recorder is not None and hasattr(self._recorder, "pause"):
+            self._recorder.pause(paused)
         if self._recorder is None or self._audio is None:
             return
         # Audio must pause WITH the frames or the tracks drift apart: each
@@ -507,10 +509,13 @@ class PipelineController(QObject):
                 rec_dir.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             self._recording_path = str(rec_dir / f"session-{stamp}.mp4")
-            # Write under a hidden temp name and rename on finish: Dropbox was
-            # syncing the growing file and the audio-mux replacement raced it
-            # into "conflicted copy" duplicates.
-            self._recording_tmp = str(rec_dir / f".session-{stamp}.part.mp4")
+            # Stage the in-progress file OUTSIDE the synced folder entirely
+            # (Dropbox synced the growing hidden .part and re-materialized
+            # half-synced copies as unplayable ghost mp4s); it moves into the
+            # recordings folder only once finalized. Same APFS volume, so the
+            # final replace() is an atomic rename.
+            EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+            self._recording_tmp = str(EXPORTS_DIR / f".session-{stamp}.part.mp4")
             self._recorder = "pending"  # opened lazily on first frame (need size)
             self._recording_paused = False
             self._rec_frames = 0
@@ -518,7 +523,7 @@ class PipelineController(QObject):
             self._rec_elapsed = 0.0
             self._rec_crop = None
             self._audio = audio_mod.make_recorder(rec.audio, rec.audio_device)
-            self._audio_dir = rec_dir / f".audio-{stamp}"
+            self._audio_dir = EXPORTS_DIR / f".audio-{stamp}"
             self._audio.start(self._audio_dir)
             # Stats live and die with the recording: fresh session, zeroed count.
             self._session_id = self._repo.start_session(
@@ -538,13 +543,9 @@ class PipelineController(QObject):
                 self._rec_elapsed += audio_mod.elapsed_monotonic() - self._rec_t0
                 self._rec_t0 = None
             if self._audio is not None:
-                # Video timestamps are declared-fps but written at the pipeline's
-                # real rate; scale them so the audio stays in sync end to end.
-                scale = 1.0
-                if self._rec_frames > 30 and self._rec_elapsed > 1.0 and self._rec_fps > 0:
-                    actual = self._rec_frames / self._rec_elapsed
-                    scale = self._rec_fps / max(1e-6, actual)
-                self._audio.stop_and_mux(self._recording_tmp, ts_scale=scale)
+                # The paced writer emits true constant-frame-rate video on a
+                # wall-clock schedule, so no retiming is needed at mux.
+                self._audio.stop_and_mux(self._recording_tmp, ts_scale=1.0)
                 self._audio = None
                 self._audio_dir = None
             if self._recording_path:
