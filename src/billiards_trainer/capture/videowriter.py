@@ -94,7 +94,13 @@ class FfmpegWriter:
                 # iPhones, which reads as further softness
                 "-color_primaries", "bt709", "-color_trc", "bt709",
                 "-colorspace", "bt709",
-                "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                "-pix_fmt", "yuv420p",
+                # FRAGMENTED mp4 for the in-progress file: this Mac panics
+                # (SSD hardware fault) often enough that "the app died mid
+                # recording" is a normal event, and a plain mp4 with no moov
+                # atom is an unplayable brick. Fragments are watchable as far
+                # as they got. The finalizing mux re-containers with faststart.
+                "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
                 "-y", path]
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE,

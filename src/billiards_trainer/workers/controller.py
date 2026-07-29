@@ -246,6 +246,7 @@ class PipelineController(QObject):
         is_vid = bool(getattr(self._source, "is_video", False))
         self.source_is_video.emit(is_vid, getattr(self._source, "frame_count", 0) if is_vid else 0,
                                   self._src_fps)
+        self._recover_orphan_recordings()
         log.info("Started: source=%s mode=%s detect=%s video=%s", source_spec, mode,
                  self._detection_enabled, is_vid)
 
@@ -737,6 +738,32 @@ class PipelineController(QObject):
             # (stays at camera rate); frames are handed to the detection worker
             # whenever it's idle, and its results are ingested between ticks.
             self._run_frame(frame, detect="async")
+
+    def _recover_orphan_recordings(self) -> None:
+        """Rescue in-progress recordings abandoned by a crash.
+
+        The rig's SSD panics (hardware), so sessions do get cut mid-write. The
+        .part files are fragmented mp4 and therefore playable, so move anything
+        substantial into the recordings folder instead of leaving it hidden.
+        """
+        try:
+            rec_dir = self._settings.recording.resolved_dir()
+            rec_dir.mkdir(parents=True, exist_ok=True)
+            for part in sorted(EXPORTS_DIR.glob(".session-*.part.mp4")):
+                if part.stat().st_size < 2_000_000:      # < ~2MB: not worth it
+                    part.unlink(missing_ok=True)
+                    continue
+                stamp = part.name[len(".session-"):-len(".part.mp4")]
+                dest = rec_dir / f"session-{stamp}-recovered.mp4"
+                part.replace(dest)
+                log.info("recovered interrupted recording -> %s", dest.name)
+                self.replay_saved.emit(str(dest))
+            for d in sorted(EXPORTS_DIR.glob(".audio-*")):
+                for f in d.glob("*"):
+                    f.unlink(missing_ok=True)
+                d.rmdir()
+        except OSError:
+            log.exception("orphan-recording recovery failed")
 
     # --- async vision (live camera) ------------------------------------- #
     def _submit_detection(self, frame: np.ndarray) -> None:
