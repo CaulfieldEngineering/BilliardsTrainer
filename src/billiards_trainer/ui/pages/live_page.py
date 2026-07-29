@@ -994,7 +994,7 @@ class LivePage(QWidget):
         if getattr(packet, "feed_sd", False) and not self._is_video:
             # Camera fell back to 480p (ML forced-1080i lost after a power
             # cycle) — shout it BEFORE a degraded session gets recorded.
-            self._status_badge.set_text_color("LIVE • 480p FEED — RE-ARM CAMERA", PALETTE.warn)
+            self._status_badge.set_text_color("LIVE • DEGRADED FEED — CHECK CAMERA/CAPTURE", PALETTE.warn)
         elif packet.status == "preview":
             self._status_badge.set_text_color("PREVIEW", PALETTE.text_dim)
         elif packet.status == "detecting_nolock":

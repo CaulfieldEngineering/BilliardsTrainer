@@ -842,19 +842,25 @@ class PipelineController(QObject):
                              cv2.COLOR_BGR2GRAY)
             ys, xs = np.where(g > 12)
             if len(xs) > 50:
-                rw = (xs.max() - xs.min() + 1) / g.shape[1]
                 rh = (ys.max() - ys.min() + 1) / g.shape[0]
-                sd = min(rw, rh) < 0.78
+                # A healthy 1080i picture fills the container's FULL height
+                # (3:2 image pillarboxed inside 16:9 -> 1621x1080). Every
+                # degraded state seen so far is letterboxed vertically: the
+                # classic 480p fallback (1730x757) and the post-power-cycle
+                # intermediate (1710x875). Height-fill is the discriminator.
                 aw = int(round((xs.max() - xs.min() + 1) * 8))
                 ah = int(round((ys.max() - ys.min() + 1) * 8))
+                sd = rh < 0.95
                 self._feed_info = (f"{frame.shape[1]}\u00d7{frame.shape[0]} "
                                    f"@{self._src_fps:.0f}  \u2022  active "
                                    f"{aw}\u00d7{ah}")
                 if sd != self._feed_sd:
                     self._feed_sd = sd
                     if sd:
-                        log.warning("HDMI feed dropped to 480p geometry — "
-                                    "re-arm the ML HDMI output on the camera")
+                        log.warning("HDMI feed degraded (active %dx%d, not "
+                                    "full-height HD) — re-arm the camera "
+                                    "output or re-plug the capture device",
+                                    aw, ah)
                     else:
                         log.info("HDMI feed back to HD geometry")
         dt = time.perf_counter() - t_wall0
