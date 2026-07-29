@@ -529,6 +529,9 @@ class PipelineController(QObject):
             self._rec_crop = None
             self._audio = audio_mod.make_recorder(rec.audio, rec.audio_device)
             self._audio_dir = EXPORTS_DIR / f".audio-{stamp}"
+            # The mic's lead-in (device open latency) is corrected at MUX by
+            # measurement, not by gating here: ffmpeg buffers its WAV writes so
+            # there is no reliable "flowing yet?" signal to wait on.
             self._audio.start(self._audio_dir)
             # Stats live and die with the recording: fresh session, zeroed count.
             self._session_id = self._repo.start_session(

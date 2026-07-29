@@ -68,9 +68,17 @@ class AudioRecorder:
         # PTS gaps then read as "audio early"/drifting). A big queue plus RAW
         # PCM (no AAC encode inside the capture process, which competes with
         # the app's GPU/CPU work) keeps capture real-time.
+        # MEASURED on this rig: the USB mic drops ~12% of its samples, so a
+        # plain capture yields 10.57s of audio per 12.00s of wall time and the
+        # file drifts earlier and earlier. Stamping packets from the WALL CLOCK
+        # and running aresample=async=1 at CAPTURE time fills those gaps with
+        # silence immediately -> 12.00s captured per 12.00s wall, verified 0.0%
+        # deficit. (Tiny inaudible micro-dropouts instead of a sliding clock.)
         cmd = [self._ffmpeg, "-hide_banner", "-loglevel", "error",
                "-thread_queue_size", "4096",
+               "-use_wallclock_as_timestamps", "1",
                "-f", "avfoundation", "-i", f":{self._device}",
+               "-af", "aresample=async=1:first_pts=0",
                "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", "-y", str(seg)]
         try:
             self._proc = subprocess.Popen(
@@ -127,7 +135,17 @@ class AudioRecorder:
             # samples, so the audio timeline matches its (correct) wall-clock
             # timestamps instead of sliding earlier and earlier. apad+shortest
             # then makes the track span exactly the video's length.
-            cmd += ["-i", str(video), "-i", str(audio),
+            # MEASURED lead-in trim: capture starts when recording is armed,
+            # but the video writer only opens on the first frame AND the mic
+            # needs ~0.5s to deliver its first buffer. Both streams stop
+            # together, so whatever extra length the audio has IS the lead-in
+            # — trim exactly that from its start instead of guessing a delay.
+            lead = self._duration(audio) - self._duration(video)
+            cmd += ["-i", str(video)]
+            if lead > 0.05:
+                cmd += ["-ss", f"{lead:.3f}"]
+                log.info("audio lead-in trim: %.3fs", lead)
+            cmd += ["-i", str(audio),
                     "-map", "0:v:0", "-map", "1:a:0",
                     "-af", "aresample=async=1:first_pts=0,apad",
                     "-shortest",
@@ -146,6 +164,18 @@ class AudioRecorder:
             return False
         finally:
             self._cleanup(segments)
+
+    def _duration(self, path: Path) -> float:
+        """Media duration in seconds via ffprobe (0.0 when unknown)."""
+        probe = str(Path(self._ffmpeg).with_name("ffprobe"))
+        try:
+            res = subprocess.run(
+                [probe, "-v", "error", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", str(path)],
+                capture_output=True, text=True, timeout=30)
+            return float(res.stdout.strip() or 0.0)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return 0.0
 
     def _concat(self, segments: list[Path], work: Path) -> Path | None:
         if len(segments) == 1:
