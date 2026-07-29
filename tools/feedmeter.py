@@ -90,6 +90,14 @@ def spectral_cutoff(gray_crop: np.ndarray, axis: int) -> float:
 def measure_frame(frame: np.ndarray) -> dict:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     x, y, w, h = active_bbox(gray)
+    # Degenerate feed (camera off/booting, dongle showing nothing, LV not
+    # started): report it as BLANK instead of computing meaningless spectra on
+    # a handful of noise pixels.
+    if w < 64 or h < 64 or int(gray.max()) < 16:
+        return {"active_w": w, "active_h": h, "cut_v": 0.0, "cut_h": 0.0,
+                "eff_lines": 0.0, "eff_cols": 0.0, "sharpness": 0.0,
+                "comb": 0.0, "luma_lo": int(gray.min()), "luma_hi": int(gray.max()),
+                "blank": 1.0}
     crop = gray[y:y + h, x:x + w]
     # centre crop (75%) avoids letterbox edges polluting the spectrum
     cy, cx = crop.shape[0] // 8, crop.shape[1] // 8
@@ -109,6 +117,7 @@ def measure_frame(frame: np.ndarray) -> dict:
         "eff_lines": cut_v * h, "eff_cols": cut_h * w,
         "sharpness": lap, "comb": comb,
         "luma_lo": int(gray.min()), "luma_hi": int(gray.max()),
+        "blank": 0.0,
     }
 
 
@@ -178,10 +187,18 @@ def log_row(label: str, med: dict, container: str, ufps: float, frame) -> None:
                        f"{med['luma_lo']:.0f}-{med['luma_hi']:.0f}"])
     png = SNAP_DIR / f"{stamp}-{''.join(c if c.isalnum() else '_' for c in label)[:40]}.png"
     cv2.imwrite(str(png), frame)
+    if med.get("blank"):
+        print(f"\nLOGGED [{label}] container={container} — BLANK FEED "
+              f"(no picture: camera off/booting, liveview not started, or "
+              f"dongle idle). luma {med['luma_lo']:.0f}-{med['luma_hi']:.0f}"
+              f"\n -> {png.name}")
+        return
     print(f"\nLOGGED [{label}] container={container} unique_fps={ufps:.1f} "
           f"active={med['active_w']:.0f}x{med['active_h']:.0f} "
           f"eff_lines={med['eff_lines']:.0f} eff_cols={med['eff_cols']:.0f} "
-          f"sharp={med['sharpness']:.0f} comb={med['comb']:.2f}\n -> {png.name}")
+          f"sharp={med['sharpness']:.0f} comb={med['comb']:.2f}"
+          f"  [{'HD wire' if med['active_w'] > 1500 else 'SD/other wire'}]"
+          f"\n -> {png.name}")
 
 
 def main() -> int:
