@@ -16,3 +16,4 @@ stamp,label,container,unique_fps,active,eff_lines,eff_cols,cut_v,cut_h,sharpness
 20260728-225028,PC1 step1c menu after fresh-battery boot,1920x1080@60,0.0,1920x980,245,323,0.250,0.168,247,1.50,0-254
 20260728-231113,"PC2 after ignore-crashes ON, pre-cut",1920x1080@60,0.0,1603x1072,333,656,0.310,0.409,521,1.50,0-255
 20260728-231210,PC2 AFTER HARD CUT (ignore-crashes ON),1920x1080@60,18.5,1633x928,101,168,0.109,0.103,26,1.50,0-255
+20260728-231437,USB test A: HDMI only (baseline),1920x1080@60,17.5,1633x928,93,133,0.101,0.082,20,1.50,0-255
