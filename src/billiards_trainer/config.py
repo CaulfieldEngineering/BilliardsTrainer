@@ -436,7 +436,9 @@ class RecordingSettings:
     # them. NOTE: the Canon T3i does NOT send live audio over HDMI, so with no
     # separate mic attached the track will be silence.
     audio: bool = True
-    # avfoundation audio device name; "default" = the system default input.
+    # Capture device name: a DirectShow device on Windows (see
+    # capture.audio.list_audio_devices), an avfoundation one on macOS.
+    # "default" = first device found / the system default input.
     audio_device: str = "default"
 
     def resolved_dir(self) -> Path:

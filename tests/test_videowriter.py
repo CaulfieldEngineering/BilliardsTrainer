@@ -1,10 +1,16 @@
 """Session recording quality: H.264 writer + HDMI letterbox crop."""
 
+import subprocess
+
 import numpy as np
 import pytest
 
-from billiards_trainer.capture.audio import find_ffmpeg
-from billiards_trainer.capture.videowriter import FfmpegWriter, content_box
+from billiards_trainer.capture.audio import find_ffmpeg, find_ffprobe
+from billiards_trainer.capture.videowriter import (
+    FfmpegWriter,
+    content_box,
+    pick_h264_encoder,
+)
 
 
 def _letterboxed(w=640, h=360, box=(60, 40, 579, 319)):
@@ -36,7 +42,6 @@ def test_content_box_refuses_overcrop_on_dark_scene():
 
 @pytest.mark.skipif(find_ffmpeg() is None, reason="ffmpeg not installed")
 def test_ffmpeg_writer_produces_h264(tmp_path):
-    import subprocess
     path = str(tmp_path / "clip.mp4")
     import time
     wtr = FfmpegWriter(path, 20.0, (320, 240), bitrate="1M")
@@ -47,7 +52,17 @@ def test_ffmpeg_writer_produces_h264(tmp_path):
         time.sleep(0.05)
     wtr.release()
     out = subprocess.run(
-        [find_ffmpeg().replace("ffmpeg", "ffprobe"), "-v", "error",
+        [find_ffprobe(), "-v", "error",
          "-show_entries", "stream=codec_name", "-of", "csv=p=0", path],
         capture_output=True, text=True, timeout=30)
     assert "h264" in out.stdout
+
+
+@pytest.mark.skipif(find_ffmpeg() is None, reason="ffmpeg not installed")
+def test_picked_encoder_exists_on_this_platform():
+    """The encoder must be one THIS ffmpeg build has — asking for a missing one
+    (h264_videotoolbox off Apple) makes ffmpeg exit and silently write nothing."""
+    encoder, _ = pick_h264_encoder(find_ffmpeg())
+    listed = subprocess.run([find_ffmpeg(), "-hide_banner", "-encoders"],
+                            capture_output=True, text=True, timeout=30).stdout
+    assert encoder in listed

@@ -3,8 +3,12 @@
 OpenCV's VideoWriter only offers ancient codecs (mp4v = MPEG-4 part 2) at a
 low fixed bitrate — recordings looked like security-camera footage. When
 ffmpeg is available (it ships with the audio feature), frames are piped to a
-hardware H.264 encoder (VideoToolbox on Apple silicon) at a proper bitrate
-instead; otherwise we fall back to the old writer so recording never breaks.
+hardware H.264 encoder at a proper bitrate instead; otherwise we fall back to
+the old writer so recording never breaks.
+
+The encoder is PROBED, not assumed (see ``pick_h264_encoder``): AMF on the
+Radeon rig PC, VideoToolbox on Apple, NVENC/QSV elsewhere, libx264 as the
+always-present tail.
 
 Also detects the active image box: the T3i's live-view HDMI feed fills only
 ~63% of the 1080p frame (the picture floats in black bars). Recording just the
@@ -13,16 +17,71 @@ content box makes the clip all image, no letterbox.
 
 from __future__ import annotations
 
+import collections
 import logging
 import subprocess
+import sys
 import threading
 import time
+from functools import lru_cache
 
 import numpy as np
 
 from .audio import find_ffmpeg
 
 log = logging.getLogger("capture.videowriter")
+
+# H.264 encoder preference, per platform, best first. Hardware encoders come
+# first because they cost almost no CPU — and the same box is simultaneously
+# running two inference passes per frame, so a software encoder competes
+# directly with detection. There is always a software tail (libx264) so the
+# list can never come up empty.
+_H264_PREFERENCE = {
+    "darwin": ("h264_videotoolbox", "libx264"),
+    # AMF is AMD's encoder (the Radeon 780M in the rig PC); the others cover
+    # NVIDIA / Intel / any-GPU-via-MediaFoundation boxes.
+    "win32": ("h264_amf", "h264_nvenc", "h264_qsv", "h264_mf", "libx264"),
+}
+_H264_FALLBACK_ORDER = ("h264_nvenc", "h264_vaapi", "libx264")
+
+# Extra flags an encoder needs to behave in a REAL-TIME pipe.
+_ENCODER_ARGS = {
+    # x264's default preset ("medium") cannot keep up with a live feed while
+    # the GPU is busy detecting; veryfast holds the rate at our bitrate.
+    "libx264": ("-preset", "veryfast"),
+}
+
+
+@lru_cache(maxsize=4)
+def _available_encoders(ffmpeg: str) -> frozenset[str]:
+    """Encoder names this ffmpeg build actually has (cached — it forks a proc)."""
+    try:
+        res = subprocess.run([ffmpeg, "-hide_banner", "-encoders"],
+                             capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError) as exc:
+        log.warning("could not enumerate ffmpeg encoders: %s", exc)
+        return frozenset()
+    names = set()
+    for line in res.stdout.splitlines():
+        # rows look like " V....D h264_amf   AMD AMF H.264 Encoder (codec h264)"
+        parts = line.split()
+        if len(parts) >= 2 and parts[0].startswith("V"):
+            names.add(parts[1])
+    return frozenset(names)
+
+
+def pick_h264_encoder(ffmpeg: str) -> tuple[str, tuple[str, ...]]:
+    """(encoder name, extra flags) — the best H.264 encoder this build offers.
+
+    Probing beats hardcoding: h264_videotoolbox exists only on Apple builds, and
+    asking for a missing encoder makes ffmpeg exit immediately, which used to
+    produce a silently empty recording.
+    """
+    available = _available_encoders(ffmpeg)
+    for name in _H264_PREFERENCE.get(sys.platform, _H264_FALLBACK_ORDER):
+        if name in available:
+            return name, _ENCODER_ARGS.get(name, ())
+    return "libx264", _ENCODER_ARGS["libx264"]
 
 
 def content_box(frame: np.ndarray, thresh: int = 12
@@ -75,9 +134,9 @@ class FfmpegWriter:
             # sharpen — it amplifies into grain), Lanczos up to a standard
             # 1080 width, then a stronger unsharp than noise would otherwise
             # allow. No invented detail, but markedly crisper on phones.
-            cmd += ["-vf", ("hqdn3d=1.5:1.5:6:6,"
-                            "scale=1080:-2:flags=lanczos,"
-                            "unsharp=5:5:0.6:5:5:0.0")]
+            vf = ["hqdn3d=1.5:1.5:6:6",
+                  "scale=1080:-2:flags=lanczos",
+                  "unsharp=5:5:0.6:5:5:0.0"]
             bitrate = "14M"   # more pixels after the upscale deserve more bits
         else:
             # HD feed (the forced-1080i era): no upscale needed, but the source
@@ -87,9 +146,18 @@ class FfmpegWriter:
             # 164 saturation apart, so the limit is spatial detail, not colour).
             # A light denoise + mild unsharp measured +35% frame detail
             # (laplacian 48.5 -> 65.4) with no visible processing artefacts.
-            cmd += ["-vf", "hqdn3d=1:1:4:4,unsharp=5:5:0.3:5:5:0.0"]
+            vf = ["hqdn3d=1:1:4:4", "unsharp=5:5:0.3:5:5:0.0"]
             bitrate = "14M"   # noise eats bits; give the encoder headroom
-        cmd += ["-c:v", "h264_videotoolbox", "-b:v", bitrate,
+        # Force EVEN dimensions, always. yuv420p subsamples chroma 2x2, so an
+        # odd width/height is invalid H.264 — and AMD's AMF encoder rejects it
+        # outright ("SubmitInput() failed with error 29") leaving a 0-byte file,
+        # where VideoToolbox had quietly tolerated it. The active-picture box
+        # is odd often enough to matter (1633x928 is a real measured feed), and
+        # this costs at most one row/column.
+        vf.append("crop=trunc(iw/2)*2:trunc(ih/2)*2")
+        cmd += ["-vf", ",".join(vf)]
+        encoder, enc_args = pick_h264_encoder(ffmpeg)
+        cmd += ["-c:v", encoder, *enc_args, "-b:v", bitrate,
                 # tag bt709 explicitly — untagged video renders washed-out on
                 # iPhones, which reads as further softness
                 "-color_primaries", "bt709", "-color_trc", "bt709",
@@ -104,8 +172,15 @@ class FfmpegWriter:
                 "-y", path]
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        log.info("H.264 recording via ffmpeg/videotoolbox %sx%s @ %s", w, h, bitrate)
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        # Keep the tail of ffmpeg's stderr. This used to be DEVNULL, which meant
+        # a refused encoder produced an empty file and NO message anywhere —
+        # the failure mode that hid h264_videotoolbox being Apple-only.
+        self._errlog: collections.deque[str] = collections.deque(maxlen=20)
+        self._errpump = threading.Thread(target=self._drain_stderr, daemon=True,
+                                         name="rec-stderr")
+        self._errpump.start()
+        log.info("H.264 recording via ffmpeg/%s %sx%s @ %s", encoder, w, h, bitrate)
         # PACED writing (the OBS model): capture rate varies with load, but the
         # encoder is fed at EXACTLY the declared fps on a wall-clock schedule —
         # the freshest frame is duplicated when capture lags and extras are
@@ -121,6 +196,20 @@ class FfmpegWriter:
         self._pacer = threading.Thread(target=self._pace, daemon=True,
                                        name="rec-pacer")
         self._pacer.start()
+
+    def _drain_stderr(self) -> None:
+        """Consume ffmpeg's stderr so the pipe can't fill and wedge the encoder,
+        keeping the last few lines to explain a failure."""
+        stream = self._proc.stderr
+        if stream is None:
+            return
+        try:
+            for raw in stream:
+                line = raw.decode("utf-8", "replace").strip()
+                if line:
+                    self._errlog.append(line)
+        except (OSError, ValueError):
+            pass
 
     def _pace(self) -> None:
         next_t = None
@@ -188,6 +277,10 @@ class FfmpegWriter:
             self._proc.wait(timeout=30)
         except (OSError, subprocess.TimeoutExpired):
             self._proc.kill()
+        self._errpump.join(timeout=2)
+        if self._proc.returncode:
+            log.error("recording encoder exited %s: %s", self._proc.returncode,
+                      " | ".join(self._errlog) or "(no output)")
 
 
 def open_writer(path: str, fps: float, size: tuple[int, int]):
