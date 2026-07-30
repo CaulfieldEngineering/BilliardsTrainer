@@ -20,7 +20,12 @@ import numpy as np
 from ..config import MODELS_DIR as USER_MODELS_DIR
 from ..vision.balls import classify_pool_ball, number_to_class, pool_ball_bgr
 from ..vision.types import BallClass, Detection
-from . import DetectorStrategy, ball_radius_raw, table_polygon_mask
+from . import (
+    DetectorStrategy,
+    ball_radius_raw,
+    table_crop_rect,
+    table_polygon_mask,
+)
 
 log = logging.getLogger("detector.onnx")
 
@@ -169,18 +174,29 @@ class OnnxModelStrategy(DetectorStrategy):
         # Two-pass TILED inference (the recall fix). A tall frame letterboxed
         # into the 640px input leaves balls ~9px — at the model's floor, which
         # is why detection was spotty (measured: misses 2-3 balls per frame).
-        # Two overlapping tiles (top 60% + bottom 60%) keep balls ~15px and
+        # Two overlapping tiles (top 60% + bottom 60%) keep balls ~16px and
         # find +20% more balls on real footage; _merge_boxes dedupes the
         # overlap band. Costs a second inference — affordable now that
         # detection runs off the display path.
+        # ...and the tiles cover only the TABLE, not the whole room. Everything
+        # below works in full-frame coords, so the crop origin is handed to
+        # _infer as (ox, oy) and detections come back already un-offset.
+        crop = table_crop_rect(frame_bgr.shape, calib)
+        if crop is not None:
+            cx0, cy0, cx1, cy1 = crop
+            region = frame_bgr[cy0:cy1, cx0:cx1]
+        else:
+            cx0, cy0 = 0, 0
+            region = frame_bgr
+        rh = region.shape[0]
         do_tiled = self.far_rail_rescan if rescan is None else rescan
-        th = int(h * 0.60)
+        th = int(rh * 0.60)
         if do_tiled and th > 64:
             boxes = self._merge_boxes(
-                self._infer(frame_bgr[0:th, :])
-                + self._infer(frame_bgr[h - th:, :], oy=h - th))
+                self._infer(region[0:th, :], ox=cx0, oy=cy0)
+                + self._infer(region[rh - th:, :], ox=cx0, oy=cy0 + rh - th))
         else:
-            boxes = self._merge_boxes(self._infer(frame_bgr))
+            boxes = self._merge_boxes(self._infer(region, ox=cx0, oy=cy0))
         if not boxes:
             return []
         # No calibration => no polygon to test against; skip the mask entirely

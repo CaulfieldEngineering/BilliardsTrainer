@@ -66,6 +66,35 @@ def table_polygon_mask(shape, calib) -> np.ndarray:
     return mask
 
 
+def table_crop_rect(shape, calib, margin_balls: float = 3.0):
+    """(x0, y0, x1, y1) region worth running detection on, or None.
+
+    The ceiling camera frames the ROOM, not the table: on the rig footage the
+    playing area is 58% of the frame width and 73% of its height, so 57% of
+    every inference pass was spent on carpet, the floor and the player. Cropping
+    to the table before the letterbox is free and buys back that budget as
+    RESOLUTION — measured on session-20260729: 16.0 px per ball -> ~23 px, well
+    clear of the model's ~9 px floor. It also removes hands/cue/cap from the
+    input entirely, which is a whole class of false positives.
+
+    ``margin_balls`` pads the playing polygon so balls sitting in the pocket
+    jaws — outside the felt corners — are still seen. Returns None when there is
+    no lock to crop to, so callers fall back to the full frame.
+    """
+    if calib is None or getattr(calib, "corners", None) is None:
+        return None
+    h, w = shape[:2]
+    c = np.asarray(calib.corners, np.float64).reshape(-1, 2)
+    pad = margin_balls * ball_radius_raw(calib, shape)
+    x0 = int(max(0, np.floor(c[:, 0].min() - pad)))
+    y0 = int(max(0, np.floor(c[:, 1].min() - pad)))
+    x1 = int(min(w, np.ceil(c[:, 0].max() + pad)))
+    y1 = int(min(h, np.ceil(c[:, 1].max() + pad)))
+    if x1 - x0 < 64 or y1 - y0 < 64:
+        return None            # implausible lock — don't starve the detector
+    return (x0, y0, x1, y1)
+
+
 def felt_mask_raw(frame_bgr, calib) -> np.ndarray:
     """HSV felt mask on the RAW frame using calib.felt (handles hue wrap)."""
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
