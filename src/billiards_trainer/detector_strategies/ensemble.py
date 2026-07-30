@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 
+from ..vision.balls import pool_ball_bgr, stripe_reading
+from ..vision.types import BallClass
 from . import DetectorStrategy, onnx_model
 
 log = logging.getLogger("detector.ensemble")
@@ -77,7 +79,40 @@ class FindIdEnsemble(DetectorStrategy):
             src = self._last_ids[di]
             f = found[fi]
             f.number, f.cls, f.bgr = src.number, src.cls, src.bgr
+            self._fix_stripe_bit(frame_bgr, f)
         return found
+
+    @staticmethod
+    def _fix_stripe_bit(frame_bgr, f) -> None:
+        """Repair the one bit the identity model reliably gets wrong.
+
+        Measured on session-20260729: the model reads the purple 4 as the 12 and
+        the yellow 9 as the 1 — HUE correct, stripe/solid inverted, once in each
+        direction. Since stripe == solid + 8, a confident pixel reading of the
+        crop fixes the number outright. stripe_reading() abstains when the crop
+        is ambiguous, so this only ever overrides a clear disagreement.
+
+        The cue (0) and the 8 are excluded: neither has a +/-8 partner, and the
+        cue is all-white so it would always read as a stripe.
+        """
+        n = f.number
+        if n is None or n <= 0 or n > 15 or n == 8:
+            return
+        rr = max(2, int(round(f.radius)))
+        y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
+        crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
+        if crop.size == 0:
+            return
+        reads_stripe = stripe_reading(crop)
+        if reads_stripe is None:
+            return
+        if reads_stripe and n <= 7:
+            f.number, f.cls = n + 8, BallClass.STRIPE
+        elif not reads_stripe and n >= 9:
+            f.number, f.cls = n - 8, BallClass.SOLID
+        else:
+            return
+        f.bgr = pool_ball_bgr(f.number)
 
 
 def _build():

@@ -110,6 +110,48 @@ def _hue_to_base(hue: float, val: float) -> int:
     return best
 
 
+def _inner_disc(patch_bgr, mask):
+    """Boolean selection of the ball's inner 62% — dodges felt and neighbours."""
+    h, w = patch_bgr.shape[:2]
+    if mask is not None and np.any(mask > 0):
+        return mask > 0
+    yy, xx = np.ogrid[:h, :w]
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
+    rr = 0.62 * min(h, w) / 2.0
+    return (xx - cx) ** 2 + (yy - cy) ** 2 <= rr * rr
+
+
+def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
+                   solid_below: float = 0.20, stripe_above: float = 0.45):
+    """Is this crop a STRIPE (True), a SOLID (False), or too close to call (None)?
+
+    Deliberately abstains in the middle. The 16-class model gets a ball's HUE
+    right and its stripe bit wrong (measured on session-20260729: the purple 4
+    read as the 12, the yellow 9 read as the 1 — one error in each direction),
+    and stripe == solid + 8, so a confident pixel reading repairs the number by
+    +/-8. Abstaining between the thresholds means an ambiguous crop never
+    OVERWRITES a model answer that may well be right.
+
+    Top-down, a stripe shows a lot of white — the poles are white and the
+    colour band only crosses the middle — while a solid is saturated except for
+    its small number circle and a glare spot.
+    """
+    if patch_bgr is None or patch_bgr.size == 0:
+        return None
+    sel = _inner_disc(patch_bgr, mask)
+    if not np.any(sel):
+        return None
+    hsv = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2HSV)
+    s = hsv[:, :, 1][sel].astype(np.float32)
+    v = hsv[:, :, 2][sel].astype(np.float32)
+    white_frac = float(np.mean((s < 60) & (v > 150)))
+    if white_frac < solid_below:
+        return False
+    if white_frac > stripe_above:
+        return True
+    return None
+
+
 def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
                        felt_hsv: tuple[int, int, int] | None = None
                        ) -> tuple[BallClass, int, tuple[int, int, int]]:
@@ -124,15 +166,8 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
     """
     if patch_bgr is None or patch_bgr.size == 0:
         return BallClass.UNKNOWN, -1, (200, 200, 200)
-    h, w = patch_bgr.shape[:2]
     hsv = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2HSV)
-    if mask is not None and np.any(mask > 0):
-        sel = mask > 0
-    else:
-        yy, xx = np.ogrid[:h, :w]
-        cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
-        rr = 0.62 * min(h, w) / 2.0          # inner 62% — dodge edges/neighbours
-        sel = (xx - cx) ** 2 + (yy - cy) ** 2 <= rr * rr
+    sel = _inner_disc(patch_bgr, mask)   # inner 62% — dodge edges/neighbours
     if not np.any(sel):
         return BallClass.UNKNOWN, -1, (200, 200, 200)
     s = hsv[:, :, 1][sel].astype(np.float32)
