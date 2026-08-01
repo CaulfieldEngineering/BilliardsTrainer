@@ -144,10 +144,24 @@ class Pipeline:
 
     @staticmethod
     def _resolve_auto(strategies: dict):
-        """Pick the best detector: the best trained pool/ball YOLO model first,
-        then the cue-ball heuristic, then any blob. Models are SCORED by name so a
+        """Pick the best detector: the find+identify ENSEMBLE when both of its
+        models are present, else the best trained pool/ball YOLO model, then the
+        cue-ball heuristic, then any blob. Models are SCORED by name so a
         purpose-built pool model wins over a generic 'ball' model and a 'pocket'
-        model is never chosen as the ball detector."""
+        model is never chosen as the ball detector.
+
+        The ensemble is checked FIRST and by name, because the onnx_ scoring
+        below can't see it: it is registered as ``ensemble_findid``, so a
+        prefix filter of "onnx_" skipped it entirely and 'auto' silently fell
+        back to the position-only finder — balls detected but never NUMBERED.
+        That only stayed hidden because the setting was pinned explicitly on
+        the old machine; a fresh install got no identities at all.
+        """
+        ens = next((s for n, s in strategies.items() if n.startswith("ensemble_")), None)
+        if ens is not None:
+            log.info("auto detector -> %s (find+identify ensemble)", ens.name)
+            return ens
+
         def score(name: str) -> int:
             if "pocket" in name:
                 return -1  # a pocket detector is not a ball detector
