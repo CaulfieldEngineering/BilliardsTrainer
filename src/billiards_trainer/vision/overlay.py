@@ -276,13 +276,17 @@ def _cushion_quads(table: TableModel, ss: int):
     cy = (y0 + y1) / 2.0
     rc = table.pocket_radius * ss
     cw = table.short_side * ss * 0.028        # visible width of the cushion band
-    # Facing cuts, measured off the rig's table (live frame, 4x crops):
-    # CORNER — the cushion's BACK edge reaches further toward the pocket than
-    # its nose, so the mouth is WIDEST at the nose and tapers going back.
-    # SIDE — the opposite, and much shallower: the nose creeps slightly further
-    # into the mouth than the back, giving an almost square-ended cushion.
-    cn, cb = rc * 2.00, rc * 1.30             # corner: nose cut back further
-    sn, sb = rc * 1.10, rc * 1.50             # side: nose reaches further in
+    # Facing cuts, MEASURED off the rig's table by scanning where the cloth stops
+    # as it approaches each pocket (tools were throwaway; numbers are in the
+    # commit message):
+    #   SIDE   — mouth is 61px at the nose and 59px at the back across the full
+    #            45px band: slopes -0.03 / +0.05 px per px, i.e. ZERO. The side
+    #            cushions are cut SQUARE. Any flare here reads as "backwards".
+    #   CORNER — the end moves 10px laterally across that same 45px band
+    #            (-0.34 px/px), with the BACK reaching further toward the pocket.
+    #            So the mouth is widest at the nose, but only gently.
+    cn, cb = rc * 1.55, rc * 1.22             # corner: 0.33r of gentle flare
+    sn = sb = rc * 1.00                       # side: square, half-mouth = r
     quads = []
     # top / bottom rails (horizontal runs, uninterrupted between the corners)
     for yn, yb in ((y0, y0 - cw), (y1, y1 + cw)):
@@ -312,12 +316,17 @@ def _draw_cushions(img: np.ndarray, table: TableModel, ss: int) -> None:
     x0, y0 = int(table.x0 * ss), int(table.y0 * ss)
     x1, y1 = int(table.x1 * ss), int(table.y1 * ss)
     cw = int(table.short_side * ss * 0.028)
-    shadowed = tuple(int(v) for v in base * 0.66)
+    # BED brightness, not cushion shade. Where a run is cut away the bed keeps
+    # going into the mouth, exactly as the real table does — and because it is
+    # brighter than the cushion body drawn on top, the angled facing actually
+    # READS as an edge. Filling this with the cushion colour (as before) meant
+    # the same blue continued past the cut, so the cut was invisible.
+    mouth_felt = tuple(int(v) for v in base * 0.86)
     for a, b in (((x0 - cw, y0 - cw), (x1 + cw, y0)),      # bands only, never
                  ((x0 - cw, y1), (x1 + cw, y1 + cw)),      # the bed interior —
                  ((x0 - cw, y0), (x0, y1)),                # a filled rect here
                  ((x1, y0), (x1 + cw, y1))):               # would erase the bed
-        cv2.rectangle(img, a, b, shadowed, -1, cv2.LINE_AA)
+        cv2.rectangle(img, a, b, mouth_felt, -1, cv2.LINE_AA)
     for q in _cushion_quads(table, ss):
         poly = np.array(q, np.float32)
         cv2.fillConvexPoly(img, poly.astype(np.int32), body, cv2.LINE_AA)
@@ -395,19 +404,28 @@ def _schematic_base(table: TableModel) -> np.ndarray:
     # circle centred on the nose line put half a disc out on the playing
     # surface, which is not a thing any table does. Corner pockets genuinely do
     # open into the bed on the diagonal, so they are left unclipped.
+    # The opening is the straight-sided THROAT cut through the cushion band
+    # (bounded by the facings), with the round basket sitting behind it. Drawing
+    # only a circle made the mouth perfectly round exactly where the cushions
+    # meet it — the one place on a real table that it is not.
     lip = int(table.pocket_radius * ss * 0.22)      # how far a side basket peeks
     for p in table.pockets:
         pc = (int(p.x * ss), int(p.y * ss))
         pr = int(table.pocket_radius * ss * (0.95 if p.is_side else 1.12))
         rim = pr + max(1, ss)
-        # draw into a scratch ROI so a side pocket can be clipped to the rail
-        rx0, ry0 = max(0, pc[0] - rim - 2), max(0, pc[1] - rim - 2)
-        rx1, ry1 = min(bw, pc[0] + rim + 2), min(bh, pc[1] + rim + 2)
+        # the basket sits BEHIND the nose line, not centred on it
+        off = table.pocket_radius * ss * (0.55 if p.is_side else 0.30)
+        ox = int(pc[0] + (off if abs(pc[0] - x1) < abs(pc[0] - x0) else -off))
+        oy = pc[1] if p.is_side else int(
+            pc[1] + (off if abs(pc[1] - y1) < abs(pc[1] - y0) else -off))
+        pad = int(rim + off + 4)
+        rx0, ry0 = max(0, pc[0] - pad), max(0, pc[1] - pad)
+        rx1, ry1 = min(bw, pc[0] + pad), min(bh, pc[1] + pad)
         if rx1 <= rx0 or ry1 <= ry0:
             continue
         roi = img[ry0:ry1, rx0:rx1]
         scratch = roi.copy()
-        c = (pc[0] - rx0, pc[1] - ry0)
+        c = (ox - rx0, oy - ry0)
         cv2.circle(scratch, c, rim, (26, 34, 46), -1, cv2.LINE_AA)   # leather rim
         for i in range(pr, 0, -1):
             t = i / pr
@@ -415,6 +433,16 @@ def _schematic_base(table: TableModel) -> np.ndarray:
                                        int(9 + 16 * t)), -1, cv2.LINE_AA)
         m = np.zeros(roi.shape[:2], np.uint8)
         cv2.circle(m, c, rim, 255, -1, cv2.LINE_AA)
+        # CLIP THE BASKET AGAINST THE CUSHIONS. Where a pocket meets a cushion
+        # its edge is the straight FACING, not an arc — a circle drawn over the
+        # cushion is round exactly where a real pocket never is. Subtracting the
+        # cushion runs leaves felt in the mouth (the ring beneath is bed-bright,
+        # as on the real table) with the basket set back behind it.
+        for q in _cushion_quads(table, ss):
+            cv2.fillConvexPoly(
+                m, (np.array(q, np.float32)
+                    - np.array([rx0, ry0], np.float32)).astype(np.int32),
+                0, cv2.LINE_AA)
         if p.is_side:
             cv2.rectangle(m, (x0 + lip - rx0, y0 + lip - ry0),
                           (x1 - lip - rx0, y1 - lip - ry0), 0, -1)
