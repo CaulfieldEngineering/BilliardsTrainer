@@ -66,6 +66,8 @@ class _StreamingTrainWorker(QThread):
     def run(self) -> None:
         import re
         import subprocess
+
+        from ..capture.audio import NO_WINDOW
         root = Path(__file__).resolve().parents[3]
         tail: list[str] = []
         try:
@@ -73,7 +75,8 @@ class _StreamingTrainWorker(QThread):
                 [self._py, str(root / "tools" / "finetune_ballid.py"),
                  "--data", self._data, "--out", self._out],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1)
+                text=True, bufsize=1,
+                creationflags=NO_WINDOW)
             epoch_re = re.compile(r"(\d+)/(\d+)")
             for line in proc.stdout:
                 line = line.strip()

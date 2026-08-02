@@ -25,6 +25,12 @@ from .types import BallClass, Detection, Track
 
 log = logging.getLogger("vision.pipeline")
 
+# Impossible-geometry watchdog budget. Each relock destroys tracker and shot
+# state, so a watchdog that can't fix its own trigger must stop trying.
+_MAX_FRUITLESS_RELOCKS = 2
+# Clean watchdog checks required before the relock budget is handed back.
+_IMPOSSIBLE_REARM = 20
+
 
 def _median_frames(frames: list[np.ndarray]) -> np.ndarray:
     """Per-pixel median of a small frame list. The common 3-frame case uses the
@@ -84,6 +90,9 @@ class Pipeline:
         self._last_raw_dets: list = []
         self._frames_since_ingest = 0
         self._impossible_streak = 0   # geometry-watchdog counter (see process)
+        self._impossible_relocks = 0  # relocks spent on the CURRENT impossibility
+        self._impossible_clear = 0    # consecutive clean checks (re-arms the budget)
+        self._impossible_gave_up = False
         self._paths_settle_t = None   # when the table last came to rest
         self._paths_alpha = 1.0       # play-path opacity (fades after settle)
         # Play-path trails (broadcast look): every ball that moves during a
@@ -682,14 +691,39 @@ class Pipeline:
                       if tr.misses == 0 and abs(tr.vx) + abs(tr.vy) < 1.0
                       and not tbl2.on_table(tr.x, tr.y, margin=-0.4 * r_wd))
             if bad:
+                self._impossible_clear = 0
                 self._impossible_streak += 1
                 if self._impossible_streak >= 4 and self.settings.table.auto_relock:
-                    log.info("Auto-relocking: %d settled ball(s) resting beyond the "
-                             "nose bounds — the lock has drifted", bad)
-                    self.request_recalibration()
                     self._impossible_streak = 0
+                    # BOUNDED. Relocking cannot move a real ball: one resting on
+                    # a rail or in a pocket jaw is beyond the nose bounds no
+                    # matter how well the table is locked, so an unbounded
+                    # watchdog relocks forever (seen on the rig: every ~4.2s,
+                    # and each relock wipes tracker + shot state). After a
+                    # couple of fruitless attempts, conclude the geometry is
+                    # right and the BALL is genuinely off the playing surface.
+                    if self._impossible_relocks >= _MAX_FRUITLESS_RELOCKS:
+                        if not self._impossible_gave_up:
+                            log.warning(
+                                "%d settled ball(s) beyond the nose bounds after "
+                                "%d relocks — leaving the lock alone (a ball is "
+                                "probably resting on a rail or in a jaw)",
+                                bad, self._impossible_relocks)
+                            self._impossible_gave_up = True
+                    else:
+                        self._impossible_relocks += 1
+                        log.info("Auto-relocking (%d/%d): %d settled ball(s) resting "
+                                 "beyond the nose bounds — the lock has drifted",
+                                 self._impossible_relocks, _MAX_FRUITLESS_RELOCKS, bad)
+                        self.request_recalibration()
             else:
                 self._impossible_streak = 0
+                # Only a sustained clean stretch re-arms the watchdog, so a ball
+                # briefly leaving view can't reset the budget and restart the loop.
+                self._impossible_clear += 1
+                if self._impossible_clear >= _IMPOSSIBLE_REARM:
+                    self._impossible_relocks = 0
+                    self._impossible_gave_up = False
         res.deviated = self.calib.deviated
         res.status = "deviated" if self.calib.deviated else "tracking"
 

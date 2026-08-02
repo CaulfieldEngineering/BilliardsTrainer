@@ -30,6 +30,13 @@ log = logging.getLogger("capture.audio")
 
 _FFMPEG_FALLBACKS = ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg")
 
+# A GUI build has NO console of its own (pythonw, or PyInstaller's windowed
+# bootloader), so on Windows every ffmpeg/ffprobe child is given a brand new
+# one — black terminal windows popping up on the table display at each record
+# start/stop, and again on every device probe. CREATE_NO_WINDOW suppresses
+# them. Zero elsewhere, where the flag doesn't exist and isn't needed.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+
 
 def find_ffmpeg() -> str | None:
     """Path of an ffmpeg binary, or None. Homebrew paths are checked explicitly
@@ -75,7 +82,8 @@ def list_audio_devices() -> list[str]:
         res = subprocess.run(
             [ff, "-hide_banner", "-list_devices", "true", "-f", "dshow",
              "-i", "dummy"],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, timeout=30,
+            creationflags=NO_WINDOW)
     except (OSError, subprocess.SubprocessError) as exc:
         log.warning("could not enumerate audio devices: %s", exc)
         return []
@@ -159,7 +167,8 @@ class AudioRecorder:
                 # stop is writing "q" to ffmpeg's stdin (see _stop_proc).
                 stdin=subprocess.PIPE if sys.platform == "win32"
                 else subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=NO_WINDOW)
         except OSError as exc:
             log.warning("audio capture failed to start: %s", exc)
             return False
@@ -237,7 +246,8 @@ class AudioRecorder:
                     "-shortest",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
                     "-movflags", "+faststart", "-y", str(muxed)]
-            res = subprocess.run(cmd, capture_output=True, timeout=300)
+            res = subprocess.run(cmd, capture_output=True, timeout=300,
+                                 creationflags=NO_WINDOW)
             if res.returncode != 0 or not muxed.is_file() or muxed.stat().st_size == 0:
                 log.warning("audio mux failed: %s", res.stderr.decode(errors="replace")[-400:])
                 muxed.unlink(missing_ok=True)
@@ -260,7 +270,8 @@ class AudioRecorder:
             res = subprocess.run(
                 [probe, "-v", "error", "-show_entries", "format=duration",
                  "-of", "csv=p=0", str(path)],
-                capture_output=True, text=True, timeout=30)
+                capture_output=True, text=True, timeout=30,
+                creationflags=NO_WINDOW)
             return float(res.stdout.strip() or 0.0)
         except (OSError, ValueError, subprocess.SubprocessError):
             return 0.0
@@ -275,7 +286,8 @@ class AudioRecorder:
         cmd = [self._ffmpeg, "-hide_banner", "-loglevel", "error",
                "-f", "concat", "-safe", "0", "-i", str(listing),
                "-c:a", "pcm_s16le", "-y", str(out)]
-        res = subprocess.run(cmd, capture_output=True, timeout=120)
+        res = subprocess.run(cmd, capture_output=True, timeout=120,
+                             creationflags=NO_WINDOW)
         if res.returncode != 0:
             log.warning("audio concat failed: %s", res.stderr.decode(errors="replace")[-400:])
             return None

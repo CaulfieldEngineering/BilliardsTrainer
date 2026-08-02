@@ -213,6 +213,16 @@ def discover(params: dict | None = None) -> dict:
 # classical blob "strategy zoo" (classical/simple_blob/felt_mask_hough) and the
 # torch-based ultralytics_pt were removed: a trained model beats them all and they
 # only added the "which detector?" confusion.
-from . import cue_ball_white, onnx_model  # noqa: E402
+# ensemble MUST be imported after onnx_model: its module-level _build() reads
+# onnx_model.STRATEGIES to pair the finder with the identifier. It also has to be
+# in the static core — being discoverable only via iter_modules meant the
+# find+identify ensemble did not exist in ANY frozen build (verified on the rig:
+# "auto detector -> onnx_pool_yolo11"), so shipped installs detected balls but
+# never numbered them.
+from . import (  # noqa: E402
+    cue_ball_white,
+    ensemble,  # noqa: E402
+    onnx_model,
+)
 
-_CORE_MODULES = (cue_ball_white, onnx_model)
+_CORE_MODULES = (cue_ball_white, onnx_model, ensemble)

@@ -139,12 +139,13 @@ class SessionsSidebar(QFrame):
             return   # LIVE row / empty area: nothing to reveal
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
-        reveal = menu.addAction("Show in Finder")
+        from ..reveal import reveal_label
+        reveal_act = menu.addAction(reveal_label())
         delete = menu.addAction("Delete recording…")
         chosen = menu.exec(self._list.mapToGlobal(pos))
-        if chosen is reveal:
-            import subprocess
-            subprocess.run(["open", "-R", path])
+        if chosen is reveal_act:
+            from ..reveal import reveal
+            reveal(path)
         elif chosen is delete:
             from PySide6.QtWidgets import QMessageBox
             if QMessageBox.question(

@@ -27,7 +27,7 @@ from functools import lru_cache
 
 import numpy as np
 
-from .audio import find_ffmpeg
+from .audio import NO_WINDOW, find_ffmpeg
 
 log = logging.getLogger("capture.videowriter")
 
@@ -57,7 +57,8 @@ def _available_encoders(ffmpeg: str) -> frozenset[str]:
     """Encoder names this ffmpeg build actually has (cached — it forks a proc)."""
     try:
         res = subprocess.run([ffmpeg, "-hide_banner", "-encoders"],
-                             capture_output=True, text=True, timeout=20)
+                             capture_output=True, text=True, timeout=20,
+                             creationflags=NO_WINDOW)
     except (OSError, subprocess.SubprocessError) as exc:
         log.warning("could not enumerate ffmpeg encoders: %s", exc)
         return frozenset()
@@ -172,7 +173,8 @@ class FfmpegWriter:
                 "-y", path]
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            creationflags=NO_WINDOW)
         # Keep the tail of ffmpeg's stderr. This used to be DEVNULL, which meant
         # a refused encoder produced an empty file and NO message anywhere —
         # the failure mode that hid h264_videotoolbox being Apple-only.

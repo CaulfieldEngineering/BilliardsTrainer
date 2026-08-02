@@ -2,7 +2,6 @@
 integrity check tripped). Explains the likely cause (antivirus quarantining the
 unsigned download) and offers concrete recovery actions."""
 
-import sys
 import webbrowser
 
 from PySide6.QtCore import Qt
@@ -83,15 +82,10 @@ class RecoveryDialog(QDialog):
         root.addLayout(buttons)
 
     def _open_folder(self) -> None:
-        try:
-            if sys.platform == "win32":
-                import os
-                os.startfile(self._dir)  # type: ignore[attr-defined]
-            else:
-                import subprocess
-                subprocess.Popen(["xdg-open", self._dir])
-        except OSError:
-            pass
+        # Was xdg-open on every non-Windows platform, which is Linux-only and
+        # silently did nothing on macOS.
+        from ..reveal import reveal
+        reveal(self._dir)
 
     def _copy_exclusion(self) -> None:
         cmd = f'Add-MpPreference -ExclusionPath "{self._dir}"'

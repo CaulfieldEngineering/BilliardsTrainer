@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ...capture.audio import NO_WINDOW
 from ...config import APP_DIR, MODELS_DIR, Settings
 from ...train import TrainingStore
 from ...train.store import LabeledBall
@@ -49,7 +50,8 @@ class _TrainWorker(QThread):
             p = subprocess.run(
                 [self._py, str(root / "tools" / "finetune_ballid.py"),
                  "--data", self._data, "--out", self._out],
-                capture_output=True, text=True, timeout=3 * 3600)
+                capture_output=True, text=True, timeout=3 * 3600,
+                creationflags=NO_WINDOW)
             ok = p.returncode == 0 and "FINETUNE_OK" in (p.stdout or "")
             self.done.emit(ok, (p.stdout or "")[-400:] + (p.stderr or "")[-400:])
         except Exception as exc:  # noqa: BLE001
