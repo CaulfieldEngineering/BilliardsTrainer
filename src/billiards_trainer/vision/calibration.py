@@ -38,6 +38,23 @@ class Calibration:
     felt: FeltSettings  # effective felt colour key (possibly auto-estimated)
 
 
+# Billiard cloth is strongly saturated; the things that get laid over a table
+# are not. Measured on the rig: felt S=184, the grey vinyl table cover S=61
+# (p90 68). 90 sits clear of both.
+_CLOTH_MIN_SAT = 90
+
+
+def cloth_saturation(frame: np.ndarray, mask: np.ndarray | None) -> float:
+    """Median HSV saturation of the region a felt detection claims is cloth."""
+    if frame is None or frame.size == 0 or mask is None or mask.size == 0:
+        return 0.0
+    sel = mask > 0
+    if not np.any(sel):
+        return 0.0
+    sat = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)[:, :, 1]
+    return float(np.median(sat[sel]))
+
+
 class CalibrationManager:
     def __init__(self, deviation_px: float = 30.0, deviation_frames: int = 12,
                  settle_px: float = 12.0, corner_ema: float = 0.06):
@@ -84,6 +101,18 @@ class CalibrationManager:
                 felt, felt_settings = felt_est, est
         if not felt.has_corners:
             log.info("Calibration failed: no felt corners")
+            return False
+        # A COVERED TABLE still detects "a big flat quadrilateral", and because
+        # the felt colour is auto-estimated from the frame it happily estimates
+        # "grey cloth" and locks onto the cover — then SAVES that over a lock
+        # that was correct all day. Seen twice on the rig. Cloth is saturated and
+        # covers are not, so refuse anything that isn't cloth-coloured and keep
+        # whatever lock we already had.
+        sat = cloth_saturation(frame, felt.mask)
+        if sat < _CLOTH_MIN_SAT:
+            log.info("Calibration refused: region is not cloth (median "
+                     "saturation %.0f < %d) — table covered or lights off?",
+                     sat, _CLOTH_MIN_SAT)
             return False
 
         corners = self._consensus(felt.corners, settings)
@@ -175,8 +204,11 @@ class CalibrationManager:
             return 0.0
         felt = detect_felt(frame, self.calib.felt)
         # Occlusion guard: no/weak felt this frame => something's over the table.
-        # Keep the lock, don't count it, don't average garbage in.
-        if not felt.has_corners or felt.area_ratio < 0.04:
+        # Keep the lock, don't count it, don't average garbage in. The saturation
+        # test covers the whole-table case (a cover laid over it), which detects
+        # perfectly well as a quadrilateral and would otherwise drag the corners.
+        if (not felt.has_corners or felt.area_ratio < 0.04
+                or cloth_saturation(frame, felt.mask) < _CLOTH_MIN_SAT):
             self._consecutive = max(0, self._consecutive - 1)
             return 0.0
         dist = np.linalg.norm(felt.corners - self.calib.corners, axis=1)
