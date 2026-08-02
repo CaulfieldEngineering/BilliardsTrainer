@@ -120,7 +120,7 @@ class FfmpegWriter:
     """cv2.VideoWriter-compatible surface over an ffmpeg H.264 pipe."""
 
     def __init__(self, path: str, fps: float, size: tuple[int, int],
-                 bitrate: str = "10M"):
+                 bitrate: str = "10M", raw: bool = False):
         self._size = size  # (w, h)
         w, h = size
         ffmpeg = find_ffmpeg()
@@ -129,7 +129,15 @@ class FfmpegWriter:
         cmd = [ffmpeg, "-hide_banner", "-loglevel", "error",
                "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}",
                "-r", f"{fps:.3f}", "-i", "-"]
-        if w < 1000:
+        if raw:
+            # RAW SOURCE capture (the priority path): a faithful encode of the
+            # frames the camera delivered — NO denoise / sharpen / upscale, so
+            # nothing is invented or scrubbed out of the source. The only filter
+            # is the mandatory even-dimension crop (yuv420p needs it). A high
+            # bitrate keeps the encode visually lossless on real footage.
+            vf = []
+            bitrate = "16M"
+        elif w < 1000:
             # The T3i's live feed is ~760 real columns AND noisy. Recipe:
             # light temporal denoise FIRST (noise caps how hard you can
             # sharpen — it amplifies into grain), Lanczos up to a standard
@@ -285,10 +293,14 @@ class FfmpegWriter:
                       " | ".join(self._errlog) or "(no output)")
 
 
-def open_writer(path: str, fps: float, size: tuple[int, int]):
-    """Best available session writer: H.264 via ffmpeg, else cv2 mp4v."""
+def open_writer(path: str, fps: float, size: tuple[int, int], raw: bool = False):
+    """Best available session writer: H.264 via ffmpeg, else cv2 mp4v.
+
+    ``raw=True`` records a faithful encode of the source (no denoise/sharpen/
+    upscale) — used by the real-time raw-capture path.
+    """
     try:
-        return FfmpegWriter(path, fps, size)
+        return FfmpegWriter(path, fps, size, raw=raw)
     except (RuntimeError, OSError) as exc:
         log.warning("H.264 writer unavailable (%s) — falling back to mp4v", exc)
         import cv2

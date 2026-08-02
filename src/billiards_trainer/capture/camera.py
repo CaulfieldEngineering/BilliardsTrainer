@@ -141,6 +141,12 @@ class ThreadedCameraSource(CameraSource):
         self._latest: np.ndarray | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Optional real-time frame sink. When set, the grab thread hands EVERY
+        # raw frame to this callback the instant it arrives — the recording path
+        # uses it to capture the source at true camera cadence, decoupled from
+        # the (slower, variable) CV tick. Assignment is atomic in CPython, so no
+        # lock is needed to publish/clear it.
+        self._sink = None
         # Cache everything queried later BEFORE the grab thread starts —
         # VideoCapture calls are not safe concurrently with read() on another
         # thread (opened/fps are read by the controller after construction).
@@ -163,6 +169,12 @@ class ThreadedCameraSource(CameraSource):
     def fps(self) -> float:
         return self._fps
 
+    def set_frame_sink(self, callback) -> None:
+        """Register (or clear, with ``None``) a callback the grab thread invokes
+        with every raw frame, at true camera cadence. Used by the recorder to
+        capture the source in real time without riding the CV tick."""
+        self._sink = callback
+
     def _grab_loop(self) -> None:
         try:
             while not self._stop.is_set():
@@ -178,6 +190,15 @@ class ThreadedCameraSource(CameraSource):
                     continue
                 with self._lock:
                     self._latest = frame
+                # Feed the recording sink OUTSIDE the lock (it copies the frame
+                # with tobytes(); never hold the capture lock across it) and
+                # never let a sink error kill the grab loop / camera handle.
+                sink = self._sink
+                if sink is not None:
+                    try:
+                        sink(frame)
+                    except Exception:  # noqa: BLE001 - recording must not crash capture
+                        log.exception("frame sink raised; dropping this frame")
         finally:
             # The grab thread OWNS the capture handle: releasing it here (only
             # after the loop exits) guarantees the handle is freed exactly once
