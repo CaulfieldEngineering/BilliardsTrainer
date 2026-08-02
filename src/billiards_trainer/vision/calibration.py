@@ -179,8 +179,13 @@ class CalibrationManager:
         if not felt.has_corners or felt.area_ratio < 0.04:
             self._consecutive = max(0, self._consecutive - 1)
             return 0.0
-        rmse = float(np.sqrt(np.mean(np.sum((felt.corners - self.calib.corners) ** 2, axis=1))))
-        if rmse <= self._settle_px:
+        dist = np.linalg.norm(felt.corners - self.calib.corners, axis=1)
+        rmse = float(np.sqrt(np.mean(dist ** 2)))
+        # RMSE over four corners HIDES a single badly-placed one: a rail mis-fitted
+        # by 33px alongside three good corners averages down to RMSE ~17. Judge
+        # agreement on the WORST corner, escalation on the RMSE.
+        worst = float(dist.max())
+        if worst <= self._settle_px:
             # agrees with the lock -> gently average the corners toward it
             self._consecutive = 0
             self.deviated = False
@@ -191,22 +196,32 @@ class CalibrationManager:
             # instead of 12 — the user shouldn't watch a wrong overlay for 12 s
             self._consecutive += 3 if rmse > 4 * self._deviation_px else 1
         else:
-            # moderate disagreement (likely partial occlusion) -> decay, don't trip
+            # THE DEAD BAND — too far to average in, not far enough to relock.
+            # This used to do nothing at all, so a lock wrong by ~30px on ONE
+            # corner sat there forever: "stable, but wrong". Measured on the rig,
+            # a top-right corner 33px inside the cushion gave RMSE 17, landing
+            # squarely between settle (12) and deviation (30) and freezing.
+            # Ease toward the re-detect at half rate: it converges over a few
+            # seconds without the twitchiness a full-rate correction would bring.
             self._consecutive = max(0, self._consecutive - 1)
+            self._ema_corners(felt.corners, settings, rate=self._corner_ema * 0.5)
         if self._consecutive >= self._deviation_frames:
             if not self.deviated:
                 log.info("Calibration deviated (table moved?): RMSE %.1f px", rmse)
             self.deviated = True
         return rmse
 
-    def _ema_corners(self, detected: np.ndarray, settings: Settings) -> None:
+    def _ema_corners(self, detected: np.ndarray, settings: Settings,
+                     rate: float | None = None) -> None:
         """Ease the locked corners toward a trusted re-detection and recompute the
         homography. Slow (corner_ema) so the lock is stable; the dst rectangle is
-        unchanged, so the table model/size stay put."""
+        unchanged, so the table model/size stay put. ``rate`` overrides the EMA
+        weight — the dead-band caller uses a slower one."""
+        k = self._corner_ema if rate is None else rate
         try:
             old = np.asarray(self.calib.corners, np.float32)
-            new = ((1.0 - self._corner_ema) * old
-                   + self._corner_ema * np.asarray(detected, np.float32)).astype(np.float32)
+            new = ((1.0 - k) * old
+                   + k * np.asarray(detected, np.float32)).astype(np.float32)
             w, h = self.calib.dst_size
             p = float(settings.rectify.pad_px)
             dst_quad = np.array([[p, p], [w - 1 - p, p],

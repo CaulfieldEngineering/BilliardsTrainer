@@ -66,6 +66,14 @@ class _SeekSlider(QSlider):
         super().mousePressEvent(ev)
 
 
+# Every label each pill can show. The pills size themselves to the widest, so
+# adding a longer string here is all it takes to keep the row from clipping.
+_MODE_TEXTS = ("LIVE", "PREVIEW", "PLAYBACK", "IDLE", "TRAINING", "NO CAMERA")
+_ALERT_TEXTS = ("DEGRADED FEED — CHECK CAPTURE", "NO TABLE LOCK",
+                "RELOCKING TABLE", "FINDING TABLE", "SHOT IN PLAY",
+                "REPLAY SAVED", "LABEL THE BALLS")
+
+
 class _StatusPill(QLabel):
     """Broadcast-style status bug: a coloured dot + spaced uppercase label on a
     dark pill — the LIVE/PLAYBACK indicator you'd see on a stream deck, not a
@@ -76,11 +84,17 @@ class _StatusPill(QLabel):
     state change — disorienting when you're reaching for Record without looking.
     """
 
-    def __init__(self, width: int, parent=None):
+    def __init__(self, texts, parent=None):
+        """``texts`` is every label this pill can ever show. Its width is
+        MEASURED from the widest of them: a fixed width that is too small
+        silently truncates (QLabel elides rather than growing), which is how the
+        record clock once rendered as "RE"."""
         super().__init__(parent)
         self.setTextFormat(Qt.RichText)
-        self.setFixedWidth(width)
         self.setAlignment(Qt.AlignCenter)
+        fm = self.fontMetrics()
+        widest = max(fm.horizontalAdvance(t) for t in texts)
+        self.setFixedWidth(widest + 52)          # dot + gap + pill padding
         self._blank()
 
     def _blank(self) -> None:
@@ -211,7 +225,7 @@ class LivePage(QWidget):
         # "what is the app doing", and must never be commandeered by a passing
         # condition (a shot in play, a table relock). Those go to the alert pill
         # at the far right of this bar.
-        self._status_badge = _StatusPill(150)
+        self._status_badge = _StatusPill(_MODE_TEXTS)
         lay.addWidget(self._status_badge)
         lay.addWidget(self._vsep())
 
@@ -237,9 +251,13 @@ class LivePage(QWidget):
         self._rec_time = QLabel("")
         self._rec_time.setObjectName("RecClock")
         self._rec_time.setTextFormat(Qt.RichText)
-        # FIXED, not minimum: the clock counts up through 0:00 -> 1:23:45 and a
-        # minimum width still lets it grow, nudging the whole capsule sideways.
-        self._rec_time.setFixedWidth(96)
+        # FIXED, not minimum: the clock counts up and a minimum width still lets
+        # it grow, nudging the whole capsule sideways. The width is MEASURED
+        # from the worst-case string rather than guessed — a hardcoded 96px
+        # clipped "❚❚ PAUSED 125:30" down to "RE", because QLabel truncates
+        # instead of growing once the width is fixed.
+        self._rec_time.setFixedWidth(
+            self._rec_time.fontMetrics().horizontalAdvance("❚❚ PAUSED   000:00") + 18)
         self._rec_time.setAlignment(Qt.AlignCenter)
         cap.addWidget(self._rec_time)
         lay.addWidget(self._rec_capsule)
@@ -280,8 +298,10 @@ class LivePage(QWidget):
         self._time_lbl = QLabel("0:00 / 0:00")
         self._time_lbl.setObjectName("Faint")
         # Fixed so scrubbing (0:00 -> 21:48 -> 1:02:33) can't shuffle the speed
-        # selector and Train AI button around under the cursor.
-        self._time_lbl.setFixedWidth(120)
+        # selector and Train AI button around under the cursor — measured, so a
+        # long session can't truncate it.
+        self._time_lbl.setFixedWidth(
+            self._time_lbl.fontMetrics().horizontalAdvance("0:00:00 / 0:00:00") + 16)
         self._time_lbl.setAlignment(Qt.AlignCenter)
         lay.addWidget(self._time_lbl)
         self._speed_combo = QComboBox()
@@ -303,7 +323,7 @@ class LivePage(QWidget):
         # row so nothing sits downstream of them. Fixed width, blank when there
         # is nothing to say.
         lay.addWidget(self._vsep())
-        self._alert_badge = _StatusPill(260)
+        self._alert_badge = _StatusPill(_ALERT_TEXTS)
         lay.addWidget(self._alert_badge)
 
         self._playback_widgets = [self._play_btn, pb_stop, back_btn, fwd_btn,
