@@ -69,12 +69,24 @@ class _SeekSlider(QSlider):
 class _StatusPill(QLabel):
     """Broadcast-style status bug: a coloured dot + spaced uppercase label on a
     dark pill — the LIVE/PLAYBACK indicator you'd see on a stream deck, not a
-    generic badge."""
+    generic badge.
 
-    def __init__(self, parent=None):
+    FIXED WIDTH, always. These sit in the transport row, and a label that
+    resizes with its text drags every button beside it to a new position on each
+    state change — disorienting when you're reaching for Record without looking.
+    """
+
+    def __init__(self, width: int, parent=None):
         super().__init__(parent)
         self.setTextFormat(Qt.RichText)
-        self.set_text_color("IDLE", PALETTE.text_faint)
+        self.setFixedWidth(width)
+        self.setAlignment(Qt.AlignCenter)
+        self._blank()
+
+    def _blank(self) -> None:
+        self.setText("")
+        self.setStyleSheet("background: transparent; border-radius: 5px;"
+                           "padding: 4px 12px;")
 
     def set_text_color(self, text: str, color: str) -> None:
         self.setText(f'<span style="color:{color}; font-size:10px;">●</span>'
@@ -83,6 +95,10 @@ class _StatusPill(QLabel):
             "background: rgba(0,0,0,0.35); border-radius: 5px;"
             "padding: 4px 12px; font-size: 11px; font-weight: 800;"
             f"letter-spacing: 1.5px; color: {PALETTE.text};")
+
+    def clear_status(self) -> None:
+        """Nothing to report — keeps its footprint so the row never shifts."""
+        self._blank()
 
 
 class LivePage(QWidget):
@@ -191,8 +207,11 @@ class LivePage(QWidget):
         lay.setContentsMargins(14, 8, 14, 8)
         lay.setSpacing(8)
 
-        # Broadcast bug: ● LIVE / ▶ PLAYBACK / table states.
-        self._status_badge = _StatusPill()
+        # Broadcast bug: ● LIVE / PREVIEW / PLAYBACK. MODE ONLY — this answers
+        # "what is the app doing", and must never be commandeered by a passing
+        # condition (a shot in play, a table relock). Those go to the alert pill
+        # at the far right of this bar.
+        self._status_badge = _StatusPill(150)
         lay.addWidget(self._status_badge)
         lay.addWidget(self._vsep())
 
@@ -218,7 +237,10 @@ class LivePage(QWidget):
         self._rec_time = QLabel("")
         self._rec_time.setObjectName("RecClock")
         self._rec_time.setTextFormat(Qt.RichText)
-        self._rec_time.setMinimumWidth(86)
+        # FIXED, not minimum: the clock counts up through 0:00 -> 1:23:45 and a
+        # minimum width still lets it grow, nudging the whole capsule sideways.
+        self._rec_time.setFixedWidth(96)
+        self._rec_time.setAlignment(Qt.AlignCenter)
         cap.addWidget(self._rec_time)
         lay.addWidget(self._rec_capsule)
         # Mic level meter: proves the audio path end-to-end at a glance (the
@@ -257,6 +279,10 @@ class LivePage(QWidget):
         lay.addWidget(self._seek, 1)
         self._time_lbl = QLabel("0:00 / 0:00")
         self._time_lbl.setObjectName("Faint")
+        # Fixed so scrubbing (0:00 -> 21:48 -> 1:02:33) can't shuffle the speed
+        # selector and Train AI button around under the cursor.
+        self._time_lbl.setFixedWidth(120)
+        self._time_lbl.setAlignment(Qt.AlignCenter)
         lay.addWidget(self._time_lbl)
         self._speed_combo = QComboBox()
         self._speed_combo.addItems(["0.25×", "0.5×", "1×", "2×", "4×"])
@@ -272,6 +298,13 @@ class LivePage(QWidget):
                                         "numbers on this frame")
         self._fix_labels_btn.toggled.connect(self.set_training)
         lay.addWidget(self._fix_labels_btn)
+
+        # Transient CONDITIONS live here, apart from the mode bug and last in the
+        # row so nothing sits downstream of them. Fixed width, blank when there
+        # is nothing to say.
+        lay.addWidget(self._vsep())
+        self._alert_badge = _StatusPill(260)
+        lay.addWidget(self._alert_badge)
 
         self._playback_widgets = [self._play_btn, pb_stop, back_btn, fwd_btn,
                                   self._seek, self._time_lbl, self._speed_combo,
@@ -815,7 +848,10 @@ class LivePage(QWidget):
             self._persp.set_overlay([])   # clear labelling markers
         self.label_mode_toggled.emit(on)
         if on:
-            self._status_badge.set_text_color("TRAINING — label the balls", PALETTE.info)
+            # Mode pill is fixed-width: keep it to the MODE, and put the
+            # instruction in the alert pill where there is room for it.
+            self._status_badge.set_text_color("TRAINING", PALETTE.info)
+            self._alert_badge.set_text_color("LABEL THE BALLS", PALETTE.info)
             # Label the frame already on screen (e.g. a paused video) right away,
             # showing the model's current guess on each ball — don't wait for a
             # next frame. The controller also re-emits a raw frame momentarily.
@@ -1010,24 +1046,30 @@ class LivePage(QWidget):
             self._feed_chip.show()
         else:
             self._feed_chip.hide()
-        if getattr(packet, "feed_sd", False) and not self._is_video:
-            # Camera fell back to 480p (ML forced-1080i lost after a power
-            # cycle) — shout it BEFORE a degraded session gets recorded.
-            self._status_badge.set_text_color("LIVE • DEGRADED FEED — CHECK CAMERA/CAPTURE", PALETTE.warn)
-        elif packet.status == "preview":
+        # MODE — what the app is doing. Independent of any condition below, so
+        # "LIVE" stays "LIVE" while a shot is in play or the table is relocking.
+        if packet.status == "preview":
             self._status_badge.set_text_color("PREVIEW", PALETTE.text_dim)
-        elif packet.status == "detecting_nolock":
-            self._status_badge.set_text_color("DETECTING (NO TABLE LOCK)", PALETTE.warn)
-        elif packet.deviated:
-            self._status_badge.set_text_color("RELOCKING TABLE", PALETTE.warn)
-        elif packet.status == "calibrating":
-            self._status_badge.set_text_color("FINDING TABLE", PALETTE.info)
-        elif packet.shot_state == "moving":
-            self._status_badge.set_text_color("SHOT IN PLAY", PALETTE.accent)
         elif self._is_video:
             self._status_badge.set_text_color("PLAYBACK", PALETTE.info)
         else:
             self._status_badge.set_text_color("LIVE", PALETTE.danger)
+
+        # CONDITION — transient, most severe first, blank when all is well.
+        if getattr(packet, "feed_sd", False) and not self._is_video:
+            # Camera fell back to 480p (ML forced-1080i lost after a power
+            # cycle) — shout it BEFORE a degraded session gets recorded.
+            self._alert_badge.set_text_color("DEGRADED FEED — CHECK CAPTURE", PALETTE.warn)
+        elif packet.status == "detecting_nolock":
+            self._alert_badge.set_text_color("NO TABLE LOCK", PALETTE.warn)
+        elif packet.deviated:
+            self._alert_badge.set_text_color("RELOCKING TABLE", PALETTE.warn)
+        elif packet.status == "calibrating":
+            self._alert_badge.set_text_color("FINDING TABLE", PALETTE.info)
+        elif packet.shot_state == "moving":
+            self._alert_badge.set_text_color("SHOT IN PLAY", PALETTE.accent)
+        else:
+            self._alert_badge.clear_status()
 
     def on_stats(self, summary: dict) -> None:
         if not self._stats_active:
@@ -1097,4 +1139,5 @@ class LivePage(QWidget):
             self.set_running(False)
 
     def on_replay_saved(self, path: str) -> None:
-        self._status_badge.set_text_color("REPLAY SAVED", PALETTE.success)
+        # A passing notification, not a mode — it must not evict "LIVE".
+        self._alert_badge.set_text_color("REPLAY SAVED", PALETTE.success)

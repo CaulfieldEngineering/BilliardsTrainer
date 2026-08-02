@@ -685,11 +685,21 @@ class Pipeline:
             # lock has drifted (seen live: the animation drew the cue ball
             # inside the cushion while a fresh calibration placed it perfectly).
             # Sustained impossibility -> relock.
+            #
+            # EXCEPT in a pocket. A ball sitting in a jaw IS legitimately beyond
+            # the nose bounds, so counting it as "impossible" made a perfectly
+            # good lock look drifted: measured on the rig, one jawed ball fired
+            # this every 3-6 minutes, and each relock clears the lock for ~0.75s
+            # (request_recalibration -> calib.clear) before the new one lands —
+            # which is the "table not detected" flicker. Calibration itself never
+            # failed once. Pocket zones are generous (2x radius) because a jawed
+            # ball straddles the boundary by definition.
             tbl2 = calib.table
             r_wd = expected_ball_radius_px(tbl2, self.settings.table.size)
             bad = sum(1 for tr in tracks
                       if tr.misses == 0 and abs(tr.vx) + abs(tr.vy) < 1.0
-                      and not tbl2.on_table(tr.x, tr.y, margin=-0.4 * r_wd))
+                      and not tbl2.on_table(tr.x, tr.y, margin=-0.4 * r_wd)
+                      and tbl2.pocket_at(tr.x, tr.y, scale=2.0) is None)
             if bad:
                 self._impossible_clear = 0
                 self._impossible_streak += 1

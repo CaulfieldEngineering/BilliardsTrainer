@@ -175,10 +175,20 @@ def _mute(bgr, amt: float = 0.30, dim: float = 0.88) -> tuple[float, float, floa
 
 
 def _cloth(pw: int, ph: int) -> np.ndarray:
-    """Muted slate-blue cloth: a soft top-lit gradient, a gentle edge vignette,
-    and a faint woven texture — returns a float BGR (ph, pw, 3)."""
-    top = np.array([132, 100, 60], float)      # BGR of a muted slate-blue (lit)
-    bot = np.array([96, 72, 42], float)          # darker toward the foot rail
+    """Turquoise cloth matching the rig's real table: a soft top-lit gradient, a
+    gentle edge vignette, and a faint woven texture — float BGR (ph, pw, 3).
+
+    Colour is MEASURED, not picked: the median of table-interior pixels across
+    three points of session-20260802 reads BGR [251, 221, 87] (#57DDFB, hue 95)
+    — a bright turquoise, where this used to be a muted slate-blue of a quite
+    different hue. The measured value is a lit camera reading pinned near the
+    top of the range (V=251), so it is scaled down for the bed: at full
+    brightness the cloth glares and the balls stop reading against it. Hue and
+    saturation are preserved, so it stays recognisably Joe's cloth.
+    """
+    measured = np.array([251, 221, 87], float)   # BGR sampled off the real table
+    top = measured * 0.85                        # lit end (head rail)
+    bot = measured * 0.60                        # falls off toward the foot rail
     grad = np.linspace(0, 1, ph)[:, None]
     felt = np.tile((top * (1 - grad) + bot * grad)[:, None, :], (1, pw, 1))
     yy, xx = np.mgrid[0:ph, 0:pw].astype(np.float32)
@@ -249,7 +259,7 @@ def _stripe(img, cx: float, cy: float, r: float, bgr) -> None:
 
 
 def _schematic_base(table: TableModel) -> np.ndarray:
-    """The static part of the schematic (rail, tournament-blue cloth with a
+    """The static part of the schematic (rail, turquoise cloth with a
     top-lit gradient + woven texture, inlaid diamonds, recessed pockets). Built
     once at 2x and downscaled for crisp edges, then cached — render_schematic
     copies it and adds only the dynamic ball layer."""
