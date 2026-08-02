@@ -39,7 +39,17 @@
       "Bash(killall -9 ptpcamerad mscamerad-xpc mscamerad)",
       "Bash(gphoto2 --summary)",
       "Bash(/opt/homebrew/bin/brew install *)",
-      "Bash(BILLIARDS_TRAINER_NO_SAVE=1 .venv/bin/python tools/feedmeter.py --source 0 --headless 10 --label \"forced-1080i on Mac mini ceiling rig\")"
+      "Bash(BILLIARDS_TRAINER_NO_SAVE=1 .venv/bin/python tools/feedmeter.py --source 0 --headless 10 --label \"forced-1080i on Mac mini ceiling rig\")",
+      "PowerShell(Write-Output \"--- python ---\"; try { python --version } catch { \"no python\" }; try { py -0p } catch {}; Write-Output \"--- venv ---\"; Test-Path .venv; Write-Output \"--- ffmpeg ---\"; try { \\(Get-Command ffmpeg -ErrorAction Stop\\).Source } catch { \"no ffmpeg\" }; Write-Output \"--- git ---\"; git --version; Write-Output \"--- appdata ---\"; Test-Path \"$env:LOCALAPPDATA\\\\BilliardsTrainer\")",
+      "PowerShell(winget install --id Python.Python.3.12 -e --accept-package-agreements --accept-source-agreements --disable-interactivity)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\Joe\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Joe-Documents-GitHub-BilliardsTrainer\\\\3b1cd652-ea12-49ea-a5ac-97248d95851f\\\\scratchpad\\\\fetch_model.py\")",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe \"C:\\\\Users\\\\Joe\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Joe-Documents-GitHub-BilliardsTrainer\\\\3b1cd652-ea12-49ea-a5ac-97248d95851f\\\\scratchpad\\\\check_ort.py\")",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe tools\\\\bench_pipeline.py --video \"tests\\\\fixtures\\\\eval\\\\demo_clip.mp4\" --start-s 0 --frames 240 --strategy ensemble_findid)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe tools\\\\bench_pipeline.py --video \"tests\\\\fixtures\\\\eval\\\\demo_clip.mp4\" --start-s 0 --frames 240 --strategy ensemble_findid --no-rescan)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe tools\\\\bench_pipeline.py --video \"tests\\\\fixtures\\\\eval\\\\demo_clip.mp4\" --start-s 0 --frames 240 --no-rescan)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe tools\\\\bench_pipeline.py --video $V --frames 300 --strategy ensemble_findid)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe tools\\\\bench_pipeline.py --video $V --frames 300 --strategy ensemble_findid --no-rescan)",
+      "PowerShell($V = \"C:\\\\Users\\\\Joe\\\\Dropbox\\\\Billiards\\\\BilliardsTrainer\\\\session-20260723-215012.mp4\")"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
