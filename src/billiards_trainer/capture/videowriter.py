@@ -116,6 +116,79 @@ def content_box(frame: np.ndarray, thresh: int = 12
     return (x0, y0, x1, y1)
 
 
+class _CfrRetimer:
+    """VFR→CFR retiming driven by capture timestamps, not a wall-clock sampler.
+
+    Each arriving frame is assigned the output slot its timestamp falls in
+    (``slot = round((ts - t0) * fps)``) and ``advance`` returns how many copies
+    to write: 0 when the slot is already filled (drop), 1 in the steady state,
+    >1 to fill a real capture gap with duplicates.
+
+    Why this and not a fixed-rate pacer: a pacer samples "the latest frame" at
+    rigid wall-clock instants, so ANY drift between the camera's frame clock
+    and the OS timer — or arrival jitter comparable to the frame period —
+    periodically lands as a duplicated or dropped frame, which plays back as a
+    barely-perceptible stutter. Slot assignment from the frame's own timestamp
+    absorbs jitter up to ~half a slot and never beats against a second clock,
+    while output remains exactly ``fps`` frames per wall-clock second, so the
+    audio track still lines up at every instant.
+    """
+
+    # A capture gap longer than this many seconds is not bridged with frozen
+    # duplicates; the timeline is resynced instead (matches the old pacer's
+    # fell-far-behind behaviour, and bounds a burst into the encoder pipe).
+    MAX_GAP_S = 2.0
+    # Slow phase servo: each frame nudges the epoch toward centring arrivals
+    # mid-slot. Absorbs the first frame's arbitrary phase and tracks slow
+    # camera-clock skew, so neither ever parks arrivals on a slot boundary
+    # (where jitter would flip frames between slots = dup/drop pairs).
+    ALPHA = 0.05
+    # Host-clock drift clamp: video duration is kept within this many slots of
+    # real elapsed time, so tracking the camera clock can never walk the audio
+    # out of sync — a genuinely fast/slow camera costs a rare single-frame
+    # slip instead of accumulating A/V drift.
+    DRIFT_SLOTS = 3
+
+    def __init__(self, fps: float):
+        self.fps = float(fps)
+        self.t0: float | None = None
+        self._start: float | None = None
+        self.emitted = 0
+
+    def advance(self, ts: float) -> int:
+        """Number of copies of the frame stamped ``ts`` to emit (0 = drop)."""
+        if self.t0 is None:
+            self.t0 = self._start = ts
+            self.emitted = 1
+            return 1
+        pos = (ts - self.t0) * self.fps
+        slot = int(round(pos))
+        self.t0 += (pos - slot) * self.ALPHA / self.fps   # phase-centre arrivals
+        need = slot + 1 - self.emitted
+        drift = self.emitted / self.fps - (ts - self._start)  # video vs real time
+        if need <= 0:
+            return 0
+        if drift > self.DRIFT_SLOTS / self.fps:
+            need -= 1              # video ahead of real time: skip one slot
+        elif drift < -self.DRIFT_SLOTS / self.fps:
+            need += 1              # video behind real time: emit one extra
+        cap = max(1, int(self.MAX_GAP_S * self.fps))
+        if need > cap:
+            self.t0 += (need - cap) / self.fps  # drop the dead time instead
+            need = cap
+        if need <= 0:
+            return 0
+        self.emitted += need
+        return need
+
+    def shift(self, dt: float) -> None:
+        """Move the epoch forward by ``dt`` seconds (a paused stretch)."""
+        if self.t0 is not None:
+            self.t0 += dt
+        if self._start is not None:
+            self._start += dt
+
+
 class FfmpegWriter:
     """cv2.VideoWriter-compatible surface over an ffmpeg H.264 pipe."""
 
@@ -183,21 +256,20 @@ class FfmpegWriter:
                                          name="rec-stderr")
         self._errpump.start()
         log.info("H.264 recording via ffmpeg/%s %sx%s @ %s", encoder, w, h, bitrate)
-        # PACED writing (the OBS model): capture rate varies with load, but the
-        # encoder is fed at EXACTLY the declared fps on a wall-clock schedule —
-        # the freshest frame is duplicated when capture lags and extras are
-        # dropped when it bursts. Output is true CFR, so the audio track lines
-        # up at every instant (the old declared-vs-actual retiming only matched
-        # the endpoints; the middle drifted seconds under load swings).
-        self._latest: bytes | None = None
-        self._emitted = 0
+        # ARRIVAL-DRIVEN CFR (see _CfrRetimer): each captured frame is written
+        # into the output slot its own timestamp lands in. Output is still
+        # exactly `fps` frames per second of wall time (audio stays aligned at
+        # every instant), but emission is driven by frame arrivals — a steady
+        # camera maps 1:1 with ZERO dup/drop. The previous rigid wall-clock
+        # pacer sampled 'latest frame' at fixed instants, so any drift between
+        # the camera clock and the OS timer (or arrival jitter under load)
+        # showed up as periodic duplicate/dropped frames — the recorded
+        # micro-stutter Joe kept seeing.
+        self._retimer = _CfrRetimer(max(1.0, fps))
+        self._last_buf: bytes | None = None
         self._lock = threading.Lock()
         self._paused = False
-        self._stop = threading.Event()
-        self._interval = 1.0 / max(1.0, fps)
-        self._pacer = threading.Thread(target=self._pace, daemon=True,
-                                       name="rec-pacer")
-        self._pacer.start()
+        self._pause_t: float | None = None
 
     def _drain_stderr(self) -> None:
         """Consume ffmpeg's stderr so the pipe can't fill and wedge the encoder,
@@ -213,65 +285,56 @@ class FfmpegWriter:
         except (OSError, ValueError):
             pass
 
-    def _pace(self) -> None:
-        next_t = None
-        while not self._stop.is_set():
-            if next_t is None:
-                time.sleep(0.005)
-                with self._lock:
-                    ready = self._latest is not None and not self._paused
-                if ready:
-                    next_t = time.monotonic()
-                continue
-            now = time.monotonic()
-            if now < next_t:
-                time.sleep(min(self._interval, next_t - now))
-                continue
-            with self._lock:
-                buf, paused = self._latest, self._paused
-            if paused:
-                next_t = None      # pause stops the clock; resume restarts it
-                continue
-            if buf is not None and self._proc.poll() is None:
-                try:
-                    self._proc.stdin.write(buf)
-                    self._emitted += 1
-                except (BrokenPipeError, OSError):
-                    log.warning("recording encoder pipe closed early")
-                    return
-            next_t += self._interval
-            if next_t < time.monotonic() - 1.0:   # fell far behind; resync
-                next_t = time.monotonic()
-
     def isOpened(self) -> bool:  # noqa: N802 - cv2 surface
         return self._proc.poll() is None
 
-    def write(self, frame: np.ndarray) -> None:
+    def write(self, frame: np.ndarray, ts: float | None = None) -> None:
+        """Write one captured frame, retimed into CFR output slots.
+
+        ``ts`` is the frame's capture timestamp (time.monotonic()); omitted, the
+        arrival time is used. Runs on the recording worker thread — the stdin
+        write may block briefly on an encoder stall, which is why this must
+        never be called from the camera grab thread directly.
+        """
         h, w = frame.shape[:2]
         if (w, h) != self._size:
             return  # size changed mid-recording; drop rather than corrupt
+        if ts is None:
+            ts = time.monotonic()
         with self._lock:
-            self._latest = frame.tobytes()
+            if self._paused:
+                return
+            n = self._retimer.advance(ts)
+        if n <= 0:
+            return
+        buf = frame.tobytes()
+        self._last_buf = buf
+        if self._proc.poll() is not None:
+            return
+        try:
+            for _ in range(n):
+                self._proc.stdin.write(buf)
+        except (BrokenPipeError, OSError):
+            log.warning("recording encoder pipe closed early")
 
     def pause(self, on: bool) -> None:
         with self._lock:
+            if on and not self._paused:
+                self._pause_t = time.monotonic()
+            elif not on and self._paused and self._pause_t is not None:
+                # resume: the paused stretch never existed on the output clock
+                self._retimer.shift(time.monotonic() - self._pause_t)
+                self._pause_t = None
             self._paused = on
-            if on:
-                self._latest = None   # never duplicate a stale frame on resume
 
     def release(self) -> None:
-        self._stop.set()
-        try:
-            self._pacer.join(timeout=2)
-        except RuntimeError:
-            pass
-        # A recording must never be EMPTY: if the pacer never got a wall-clock
-        # tick (ultra-short recording), flush the last frame once.
-        with self._lock:
-            buf = self._latest
-        if self._emitted == 0 and buf is not None and self._proc.poll() is None:
+        # A recording must never be EMPTY: an ultra-short recording whose only
+        # frame landed in slot 0 already wrote it, but if nothing was ever
+        # emitted (e.g. paused throughout), flush the last frame once.
+        if self._retimer.emitted == 0 and self._last_buf is not None \
+                and self._proc.poll() is None:
             try:
-                self._proc.stdin.write(buf)
+                self._proc.stdin.write(self._last_buf)
             except (BrokenPipeError, OSError):
                 pass
         try:

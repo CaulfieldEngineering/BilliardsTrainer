@@ -106,13 +106,17 @@ class PipelineController(QObject):
         self._recorder = None
         self._recording_path = ""
         self._recording_paused = False
-        # Recording runs on the camera GRAB thread (real-time capture at true
-        # camera cadence), while start/stop/pause run on this controller thread —
-        # so recorder state is shared across threads and guarded by this lock.
-        # _live_recording is True while the grab-thread sink owns the writing
+        # Live recording: the camera grab thread only ENQUEUES (frame, capture
+        # timestamp) — a dedicated worker thread does the preprocess + encoder
+        # write, so capture is never slowed by recording work and an encoder
+        # stall can never stall the camera. Recorder state is shared across the
+        # rec worker + this controller thread, guarded by this lock.
+        # _live_recording is True while the grab-thread sink owns the feed
         # (live camera); non-live sources fall back to the CV-tick-fed path.
         self._rec_lock = threading.Lock()
         self._live_recording = False
+        self._rec_queue: queue.Queue | None = None
+        self._rec_thread: threading.Thread | None = None
         self._audio = None            # AudioRecorder (or None when not recording)
         self._audio_dir = None        # temp dir holding audio segments
         self._rec_crop = None         # (x0,y0,x1,y1) HDMI content box for this recording
@@ -538,12 +542,19 @@ class PipelineController(QObject):
             self._rec_elapsed = 0.0
             self._rec_crop = None
             # REAL-TIME CAPTURE (priority path): if the source exposes a frame
-            # sink (the threaded live camera), record straight off its grab
-            # thread at true camera cadence — decoupled from the CV tick so a
-            # busy pipeline can never starve the recording into micro-stutter.
-            # Sources without a sink (video review, demo) keep the tick-fed path.
+            # sink (the threaded live camera), record at true camera cadence —
+            # decoupled from the CV tick so a busy pipeline can never starve
+            # the recording into micro-stutter. The grab thread only enqueues;
+            # a worker thread does preprocess + the (possibly blocking) encoder
+            # write. Sources without a sink (video review, demo) keep the
+            # tick-fed path.
             self._live_recording = hasattr(self._source, "set_frame_sink")
             if self._live_recording:
+                self._rec_queue = queue.Queue(maxsize=8)
+                self._rec_thread = threading.Thread(
+                    target=self._rec_worker, args=(self._rec_queue,),
+                    daemon=True, name="rec-writer")
+                self._rec_thread.start()
                 self._source.set_frame_sink(self._record_frame_live)
             self._audio = audio_mod.make_recorder(rec.audio, rec.audio_device)
             self._audio_dir = EXPORTS_DIR / f".audio-{stamp}"
@@ -558,11 +569,17 @@ class PipelineController(QObject):
             self.stats_updated.emit(self._repo.session_summary(self._session_id))
             self.recording_changed.emit(True)
         elif not on and self._recorder is not None:
-            # Detach the grab-thread sink FIRST so no raw frame lands mid-teardown,
-            # then release the writer. The lock makes the swap atomic against a
-            # frame the grab thread may be writing right now.
+            # Teardown order matters: detach the grab-thread sink so no new
+            # frame enqueues, drain/stop the rec worker (sentinel + join) so no
+            # write is in flight, THEN release the writer.
             if self._live_recording and hasattr(self._source, "set_frame_sink"):
                 self._source.set_frame_sink(None)
+            q, t = self._rec_queue, self._rec_thread
+            self._rec_queue, self._rec_thread = None, None
+            if q is not None:
+                q.put(None)                      # sentinel: finish then exit
+            if t is not None:
+                t.join(timeout=5.0)
             with self._rec_lock:
                 recorder, self._recorder = self._recorder, None
                 self._live_recording = False
@@ -1002,26 +1019,41 @@ class PipelineController(QObject):
         return cv2.resize(frame, (max_w, int(h * scale)))
 
     def _record_frame_live(self, frame: np.ndarray) -> None:
-        """Camera grab-thread sink: encode ONE source frame to the recording, in
-        real time. Runs OFF the CV tick, so the recording keeps true camera
-        cadence no matter how busy detection/rendering is — this is the whole
-        frame-rate fix. Must stay lean and never raise (a throw here propagates
-        into the capture loop).
+        """Camera grab-thread sink: hand ONE source frame to the recording
+        worker, stamped with its capture time. Deliberately does NOTHING else —
+        no preprocess, no encoding — so the grab thread's cadence (and CV's
+        frame supply) is never disturbed by recording work. Never raises (a
+        throw here propagates into the capture loop).
 
-        The frame is preprocessed (rotation/flip/colour) exactly as the CV tick
-        would, so the recording looks identical to before — only its *timing*
-        source changed. The heavy denoise/sharpen/upscale runs inside ffmpeg
-        (the writer's filter graph), not here, so this stays cheap.
+        The capture timestamp is the whole point: the writer retimes frames
+        into CFR slots from it, so playback cadence mirrors real capture
+        cadence instead of beating against a wall-clock pacer.
         """
-        with self._rec_lock:
-            if self._recorder is None or self._recording_paused:
-                return
-            try:
-                self._write_recording(preprocess_frame(frame, self._settings.camera))
-            except Exception:  # noqa: BLE001 - a write hiccup must not kill capture
-                pass
+        q = self._rec_queue
+        if q is None or self._recording_paused:
+            return
+        try:
+            q.put_nowait((frame, time.monotonic()))
+        except queue.Full:
+            pass  # encoder stalled >~250ms; the retimer bridges the gap
 
-    def _write_recording(self, frame: np.ndarray) -> None:
+    def _rec_worker(self, q: queue.Queue) -> None:
+        """Recording worker: preprocess (rotation/flip/colour, matching the live
+        view) + feed the encoder. Blocking stdin writes are fine HERE — the
+        queue absorbs brief encoder stalls while capture continues untouched.
+        Holds its own queue reference so teardown can drain it to the sentinel."""
+        while True:
+            item = q.get()
+            if item is None:
+                return
+            frame, ts = item
+            try:
+                self._write_recording(
+                    preprocess_frame(frame, self._settings.camera), ts)
+            except Exception:  # noqa: BLE001 - one bad frame must not end recording
+                log.exception("recording write failed; frame skipped")
+
+    def _write_recording(self, frame: np.ndarray, ts: float | None = None) -> None:
         # Near-full resolution so one recording serves BOTH playback/testing and
         # training. Raw (unannotated) so replaying it re-runs the CURRENT analysis
         # over old footage — the app-testing use case.
@@ -1046,7 +1078,12 @@ class PipelineController(QObject):
         if self._rec_t0 is None:
             self._rec_t0 = audio_mod.elapsed_monotonic()
         try:
-            self._recorder.write(img)
+            # FfmpegWriter retimes from the capture timestamp; the cv2 fallback
+            # writer only takes the frame.
+            try:
+                self._recorder.write(img, ts)
+            except TypeError:
+                self._recorder.write(img)
             self._rec_frames += 1
         except Exception:  # noqa: BLE001
             pass

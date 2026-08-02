@@ -15,7 +15,7 @@ import pytest
 
 import billiards_trainer.capture.camera as cam
 from billiards_trainer.capture.audio import find_ffmpeg
-from billiards_trainer.capture.videowriter import FfmpegWriter
+from billiards_trainer.capture.videowriter import FfmpegWriter, _CfrRetimer
 
 
 class _FakeCap:
@@ -83,6 +83,67 @@ def test_sink_exception_never_kills_capture(monkeypatch):
         assert src.read() is not None
     finally:
         src.release()
+
+
+# --------------------------------------------------------------------------- #
+# CFR retiming — the actual frame-rate-jitter fix. A rigid wall-clock pacer
+# beats against the camera clock and periodically dups/drops a frame (visible
+# micro-stutter); slot assignment from capture timestamps must not.
+# --------------------------------------------------------------------------- #
+
+def test_retimer_steady_source_with_jitter_never_dups_or_drops():
+    """30fps arrivals with ±40% frame-period jitter (a loaded USB dongle) must
+    map 1:1 — once the phase servo has centred (first ~2s), every frame is
+    emitted exactly once: no periodic beat, no micro-stutter."""
+    fps = 30.0
+    rt = _CfrRetimer(fps)
+    rng = np.random.default_rng(3)
+    anomalies_after_settle = 0
+    for k in range(3000):   # 100 seconds
+        ts = k / fps + float(rng.uniform(-0.4, 0.4)) / fps
+        n = rt.advance(ts)
+        if k >= 100 and n != 1:
+            anomalies_after_settle += 1
+    assert anomalies_after_settle == 0
+    assert abs(rt.emitted - 3000) <= 3   # servo convergence may slip a frame or two
+
+
+def test_retimer_clock_skew_does_not_beat():
+    """A camera clock 0.1% fast vs the declared fps (typical crystal drift)
+    causes at most the ~3 genuinely surplus frames over 100s — not a periodic
+    stutter. (The old pacer turned any skew into regular dup/drop pairs.)"""
+    fps = 30.0
+    rt = _CfrRetimer(fps)
+    drops = sum(1 for k in range(3000) if rt.advance(k / (fps * 1.001)) == 0)
+    assert drops <= 4  # only the true rate surplus, nothing periodic
+
+
+def test_retimer_bridges_real_gap_with_duplicates():
+    fps = 30.0
+    rt = _CfrRetimer(fps)
+    for k in range(30):
+        assert rt.advance(k / fps) == 1
+    # capture stalls 0.5s, then resumes: the gap is filled so audio stays synced
+    n = rt.advance(30 / fps + 0.5)
+    assert 14 <= n <= 17
+
+
+def test_retimer_caps_runaway_gap_fill():
+    """A gap longer than MAX_GAP_S resyncs the timeline instead of flooding the
+    encoder with seconds of frozen duplicates."""
+    fps = 30.0
+    rt = _CfrRetimer(fps)
+    rt.advance(0.0)
+    n = rt.advance(10.0)   # 10s dead air
+    assert n <= int(_CfrRetimer.MAX_GAP_S * fps)
+
+
+def test_retimer_drops_same_slot_burst():
+    fps = 30.0
+    rt = _CfrRetimer(fps)
+    assert rt.advance(0.0) == 1
+    assert rt.advance(0.001) == 0     # second frame in the same slot: dropped
+    assert rt.advance(1 / fps) == 1   # next slot proceeds normally
 
 
 @pytest.mark.skipif(find_ffmpeg() is None, reason="ffmpeg not installed")
