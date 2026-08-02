@@ -106,13 +106,13 @@ class PipelineController(QObject):
         self._recorder = None
         self._recording_path = ""
         self._recording_paused = False
-        # Recording runs on the camera GRAB thread (real-time raw capture),
-        # while start/stop/pause run on this controller thread — so recorder
-        # state is shared across threads and guarded by this lock. _raw_recording
-        # is True while the grab-thread sink owns the writing (live camera);
-        # non-live sources fall back to the CV-tick-fed path.
+        # Recording runs on the camera GRAB thread (real-time capture at true
+        # camera cadence), while start/stop/pause run on this controller thread —
+        # so recorder state is shared across threads and guarded by this lock.
+        # _live_recording is True while the grab-thread sink owns the writing
+        # (live camera); non-live sources fall back to the CV-tick-fed path.
         self._rec_lock = threading.Lock()
-        self._raw_recording = False
+        self._live_recording = False
         self._audio = None            # AudioRecorder (or None when not recording)
         self._audio_dir = None        # temp dir holding audio segments
         self._rec_crop = None         # (x0,y0,x1,y1) HDMI content box for this recording
@@ -537,14 +537,14 @@ class PipelineController(QObject):
             self._rec_t0 = None
             self._rec_elapsed = 0.0
             self._rec_crop = None
-            # RAW REAL-TIME CAPTURE (priority path): if the source exposes a
-            # frame sink (the threaded live camera), record straight off its
-            # grab thread at true camera cadence — decoupled from the CV tick so
-            # a busy pipeline can never starve the recording into micro-stutter.
+            # REAL-TIME CAPTURE (priority path): if the source exposes a frame
+            # sink (the threaded live camera), record straight off its grab
+            # thread at true camera cadence — decoupled from the CV tick so a
+            # busy pipeline can never starve the recording into micro-stutter.
             # Sources without a sink (video review, demo) keep the tick-fed path.
-            self._raw_recording = hasattr(self._source, "set_frame_sink")
-            if self._raw_recording:
-                self._source.set_frame_sink(self._record_raw_frame)
+            self._live_recording = hasattr(self._source, "set_frame_sink")
+            if self._live_recording:
+                self._source.set_frame_sink(self._record_frame_live)
             self._audio = audio_mod.make_recorder(rec.audio, rec.audio_device)
             self._audio_dir = EXPORTS_DIR / f".audio-{stamp}"
             # The mic's lead-in (device open latency) is corrected at MUX by
@@ -561,11 +561,11 @@ class PipelineController(QObject):
             # Detach the grab-thread sink FIRST so no raw frame lands mid-teardown,
             # then release the writer. The lock makes the swap atomic against a
             # frame the grab thread may be writing right now.
-            if self._raw_recording and hasattr(self._source, "set_frame_sink"):
+            if self._live_recording and hasattr(self._source, "set_frame_sink"):
                 self._source.set_frame_sink(None)
             with self._rec_lock:
                 recorder, self._recorder = self._recorder, None
-                self._raw_recording = False
+                self._live_recording = False
             if hasattr(recorder, "release"):
                 recorder.release()
             if self._session_id is not None:
@@ -881,9 +881,9 @@ class PipelineController(QObject):
         # recording mode: write the RAW (unannotated) frame — replayable through
         # the pipeline for testing, and reusable as training data. Only for the
         # tick-fed fallback (video review / demo); a live camera records off its
-        # grab thread via _record_raw_frame, so we must NOT also write here.
+        # grab thread via _record_frame_live, so we must NOT also write here.
         if (self._recorder is not None and not self._recording_paused
-                and not self._raw_recording and self._last_frame is not None):
+                and not self._live_recording and self._last_frame is not None):
             self._write_recording(self._last_frame)
 
         # 480p-fallback watchdog: the ML forced-1080i does not survive a camera
@@ -1001,34 +1001,23 @@ class PipelineController(QObject):
         scale = max_w / w
         return cv2.resize(frame, (max_w, int(h * scale)))
 
-    def _record_raw_frame(self, frame: np.ndarray) -> None:
-        """Camera grab-thread sink: write ONE raw source frame to the recording,
-        in real time. Runs OFF the CV tick, so recording keeps true camera
-        cadence no matter how busy detection/rendering is. Must stay lean and
-        never raise (a throw here would propagate into the capture loop).
+    def _record_frame_live(self, frame: np.ndarray) -> None:
+        """Camera grab-thread sink: encode ONE source frame to the recording, in
+        real time. Runs OFF the CV tick, so the recording keeps true camera
+        cadence no matter how busy detection/rendering is — this is the whole
+        frame-rate fix. Must stay lean and never raise (a throw here propagates
+        into the capture loop).
 
-        The frame is the untouched source (no rotation/colour/crop/denoise) —
-        a faithful capture of exactly what the camera delivered.
+        The frame is preprocessed (rotation/flip/colour) exactly as the CV tick
+        would, so the recording looks identical to before — only its *timing*
+        source changed. The heavy denoise/sharpen/upscale runs inside ffmpeg
+        (the writer's filter graph), not here, so this stays cheap.
         """
         with self._rec_lock:
-            rec = self._recorder
-            if rec is None or self._recording_paused:
+            if self._recorder is None or self._recording_paused:
                 return
             try:
-                # Only cap absurdly large sources (>1080p-ish); a 1080 feed is
-                # recorded untouched. tobytes() inside write() copies immediately,
-                # so handing over the shared grab buffer is safe.
-                img = self._small(frame, max_w=1920) if frame.shape[1] > 1920 else frame
-                if rec == "pending":
-                    from ..capture.videowriter import open_writer
-                    h, w = img.shape[:2]
-                    self._rec_fps = max(10.0, min(self._src_fps, 30))
-                    rec = open_writer(self._recording_tmp, self._rec_fps, (w, h), raw=True)
-                    self._recorder = rec
-                if self._rec_t0 is None:
-                    self._rec_t0 = audio_mod.elapsed_monotonic()
-                rec.write(img)
-                self._rec_frames += 1
+                self._write_recording(preprocess_frame(frame, self._settings.camera))
             except Exception:  # noqa: BLE001 - a write hiccup must not kill capture
                 pass
 

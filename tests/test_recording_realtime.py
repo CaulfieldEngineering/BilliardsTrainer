@@ -1,9 +1,11 @@
-"""Real-time raw recording: the camera grab thread feeds the recorder directly,
-decoupled from the CV tick, so a busy pipeline can't starve the capture.
+"""Real-time recording: the camera grab thread feeds the recorder directly,
+decoupled from the CV tick, so a busy pipeline can't starve the capture into
+frame-rate stutter. The recording's visual processing is unchanged — only its
+timing source moved off the CV loop.
 
-These cover the two new mechanisms without needing a camera:
+Covered without needing a camera:
   * ThreadedCameraSource's frame sink (grab-thread → recorder tap).
-  * FfmpegWriter(raw=True) records a faithful source (no denoise/sharpen/upscale).
+  * The writer still applies its denoise/sharpen quality chain (regression).
 """
 
 import time
@@ -84,24 +86,10 @@ def test_sink_exception_never_kills_capture(monkeypatch):
 
 
 @pytest.mark.skipif(find_ffmpeg() is None, reason="ffmpeg not installed")
-def test_raw_writer_applies_no_quality_filters():
-    """raw=True must be a faithful encode: only the mandatory even-dimension
-    crop, never denoise/sharpen/upscale that would alter the source pixels."""
-    w = FfmpegWriter("/dev/null", 20.0, (320, 240), raw=True)
-    try:
-        args = w._proc.args
-        vf = args[args.index("-vf") + 1] if "-vf" in args else ""
-        assert "crop=" in vf
-        for banned in ("hqdn3d", "unsharp", "scale="):
-            assert banned not in vf, f"raw recording must not {banned}"
-    finally:
-        w.release()
-
-
-@pytest.mark.skipif(find_ffmpeg() is None, reason="ffmpeg not installed")
-def test_processed_writer_still_filters():
-    """The non-raw path keeps its quality chain (regression guard)."""
-    w = FfmpegWriter("/dev/null", 20.0, (1920, 1080), raw=False)
+def test_writer_keeps_quality_chain():
+    """Recording quality is unchanged by the frame-rate fix: the writer still
+    denoises + sharpens (the visual appearance Joe is happy with)."""
+    w = FfmpegWriter("/dev/null", 20.0, (1920, 1080))
     try:
         args = w._proc.args
         vf = args[args.index("-vf") + 1] if "-vf" in args else ""
