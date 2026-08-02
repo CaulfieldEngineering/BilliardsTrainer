@@ -33,21 +33,6 @@ def _ball_label(tr) -> str:
     return ""
 
 
-def _contrast_text(bgr) -> tuple[int, int, int]:
-    """Black or white text, whichever reads on the given fill colour."""
-    b, g, r = bgr
-    lum = 0.114 * b + 0.587 * g + 0.299 * r
-    return (20, 20, 20) if lum > 140 else (245, 245, 245)
-
-
-def _draw_centered(img, text, c, fill_bgr, r) -> None:
-    scale = max(0.32, r / 20.0)
-    col = _contrast_text(fill_bgr)
-    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
-    cv2.putText(img, text, (c[0] - tw // 2, c[1] + th // 2),
-                cv2.FONT_HERSHEY_SIMPLEX, scale, col, 1, cv2.LINE_AA)
-
-
 def ball_color(tr, measured: bool = True) -> tuple[tuple[int, int, int], bool]:
     """Return (BGR, uncertain) for a tracked ball.
 
@@ -168,45 +153,122 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
 
 
 _SCHEM_BASE: tuple | None = None  # (key, image) — static table art, cached
+_BUILD_SS = 2                       # supersample the static art at build time only
+
+
+def _rounded(img, x0, y0, x1, y1, r, color) -> None:
+    r = int(r)
+    cv2.rectangle(img, (x0 + r, y0), (x1 - r, y1), color, -1, cv2.LINE_AA)
+    cv2.rectangle(img, (x0, y0 + r), (x1, y1 - r), color, -1, cv2.LINE_AA)
+    for cx, cy in ((x0 + r, y0 + r), (x1 - r, y0 + r), (x0 + r, y1 - r), (x1 - r, y1 - r)):
+        cv2.circle(img, (cx, cy), r, color, -1, cv2.LINE_AA)
+
+
+def _cloth(pw: int, ph: int) -> np.ndarray:
+    """Tournament-blue cloth: a top-lit vertical gradient, a soft radial edge
+    vignette, and a faint woven texture — returns a float BGR (ph, pw, 3)."""
+    top = np.array([168, 108, 46], float)      # BGR of a lit tournament blue
+    bot = np.array([120, 66, 24], float)         # darker toward the foot rail
+    grad = np.linspace(0, 1, ph)[:, None]
+    felt = np.tile((top * (1 - grad) + bot * grad)[:, None, :], (1, pw, 1))
+    yy, xx = np.mgrid[0:ph, 0:pw].astype(np.float32)
+    cx, cy = pw / 2.0, ph / 2.0
+    d = np.sqrt(((xx - cx) / cx) ** 2 + ((yy - cy) / cy) ** 2)
+    felt *= np.clip(1.0 - 0.30 * np.clip(d - 0.35, 0, 1.4), 0.58, 1.0)[:, :, None]
+    weave = (np.sin(xx * 0.9) + np.sin(yy * 0.9)) * 2.0
+    grain = np.random.default_rng(7).standard_normal((ph, pw)).astype(np.float32) * 2.4
+    felt += (weave + grain)[:, :, None]
+    return felt
+
+
+def _sphere(img, cx: float, cy: float, r: float, bgr) -> None:
+    """A glossy shaded sphere: a dark-rim→lit-centre radial gradient built from
+    concentric circles offset toward the light (top-left)."""
+    bgr = np.array(bgr, float)
+    dark = np.clip(bgr * 0.40, 0, 255)
+    light = np.clip(bgr * 1.32 + 42, 0, 255)
+    steps = 22
+    for i in range(steps):
+        t = i / (steps - 1)
+        col = (dark * (1 - t) + light * t).tolist()
+        rr = r * (1.0 - 0.9 * t)
+        off = r * 0.32 * t
+        cv2.circle(img, (int(round((cx - off) * _S)), int(round((cy - off) * _S))),
+                   max(1, int(round(rr * _S))), col, -1, cv2.LINE_AA, shift=_SHIFT)
+
+
+def _highlight(img, cx: float, cy: float, r: float) -> None:
+    cv2.circle(img, (int(round((cx - r * 0.34) * _S)), int(round((cy - r * 0.42) * _S))),
+               max(1, int(round(r * 0.20 * _S))), (255, 255, 255), -1, cv2.LINE_AA, shift=_SHIFT)
+
+
+def _stripe(img, cx: float, cy: float, r: float, bgr) -> None:
+    """A white ball with a coloured equatorial band, both keeping sphere shading."""
+    pad = int(r) + 2
+    x0, y0, x1, y1 = int(cx) - pad, int(cy) - pad, int(cx) + pad, int(cy) + pad
+    ih, iw = img.shape[:2]
+    if x0 < 0 or y0 < 0 or x1 > iw or y1 > ih:
+        _sphere(img, cx, cy, r, bgr)
+        return
+    lcx, lcy = cx - x0, cy - y0
+    white = img[y0:y1, x0:x1].copy()
+    colour = white.copy()
+    _sphere(white, lcx, lcy, r, (240, 240, 242))
+    _sphere(colour, lcx, lcy, r, bgr)
+    band = r * 0.66
+    mask = np.zeros(white.shape[:2], np.float32)
+    mask[max(0, int(lcy - band)):int(lcy + band), :] = 1.0
+    mask = cv2.GaussianBlur(mask, (0, 0), 0.8)[:, :, None]
+    img[y0:y1, x0:x1] = (white * (1 - mask) + colour * mask).astype(np.uint8)
 
 
 def _schematic_base(table: TableModel) -> np.ndarray:
-    """The static part of the schematic (rails, felt, gradient, spots, diamonds,
-    pockets). Identical every frame for a locked table, so it's drawn once and
-    cached; render_schematic copies it and adds only the dynamic layer."""
+    """The static part of the schematic (rail, tournament-blue cloth with a
+    top-lit gradient + woven texture, inlaid diamonds, recessed pockets). Built
+    once at 2x and downscaled for crisp edges, then cached — render_schematic
+    copies it and adds only the dynamic ball layer."""
     global _SCHEM_BASE
     h, w = table.height, table.width
-    # exact-float key: any geometry change, however small, must redraw the base
     key = (w, h, table.x0, table.y0, table.x1, table.y1, table.pocket_radius)
     if _SCHEM_BASE is not None and _SCHEM_BASE[0] == key:
         return _SCHEM_BASE[1].copy()
 
-    img = np.full((h, w, 3), (34, 38, 44), np.uint8)        # slate "rails"/frame
-    x0, y0, x1, y1 = int(table.x0), int(table.y0), int(table.x1), int(table.y1)
-    # felt with a soft inner gradient for depth
-    cv2.rectangle(img, (x0, y0), (x1, y1), (58, 120, 72), -1, cv2.LINE_AA)
-    inner = img[y0:y1, x0:x1]
-    if inner.size:
-        vign = np.zeros_like(inner)
-        cv2.rectangle(vign, (0, 0), (inner.shape[1], inner.shape[0]), (16, 30, 18), -1)
-        cv2.rectangle(vign, (12, 12), (inner.shape[1] - 12, inner.shape[0] - 12), (0, 0, 0), -1)
-        img[y0:y1, x0:x1] = cv2.subtract(inner, vign)
-    cv2.rectangle(img, (x0, y0), (x1, y1), (40, 80, 50), 2, cv2.LINE_AA)
+    ss = _BUILD_SS
+    bw, bh = w * ss, h * ss
+    x0, y0 = int(table.x0 * ss), int(table.y0 * ss)
+    x1, y1 = int(table.x1 * ss), int(table.y1 * ss)
+    img = np.full((bh, bw, 3), (30, 26, 24), np.uint8)
 
-    # head/foot spots (subtle)
-    cx = (x0 + x1) // 2
-    for fy in (0.25, 0.75):
-        sy = int(y0 + (y1 - y0) * fy)
-        cv2.circle(img, (cx, sy), 3, (90, 150, 105), -1, cv2.LINE_AA)
+    m = int(table.pad * ss * 0.30)
+    _rounded(img, m, m, bw - m, bh - m, table.pad * ss * 0.95, (40, 36, 34))       # rail
+    _rounded(img, m, m, bw - m, (y0 + y1) // 2, table.pad * ss * 0.95, (50, 45, 42))  # top bevel
+    _rounded(img, x0 - 4 * ss, y0 - 4 * ss, x1 + 4 * ss, y1 + 4 * ss, 7 * ss, (22, 19, 18))  # inner shadow
 
-    # diamonds
+    if x1 > x0 and y1 > y0:
+        img[y0:y1, x0:x1] = np.clip(_cloth(x1 - x0, y1 - y0), 0, 255).astype(np.uint8)
+    cv2.rectangle(img, (x0, y0), (x1, y1), (150, 96, 40), 3 * ss, cv2.LINE_AA)      # cushion shade
+    cv2.rectangle(img, (x0, y0), (x1, y1), (200, 150, 96), max(1, ss), cv2.LINE_AA)  # nose highlight
+
+    cxm = (x0 + x1) // 2
+    cv2.circle(img, (cxm, int(y0 + (y1 - y0) * 0.75)), int(3 * ss), (180, 150, 110), -1, cv2.LINE_AA)
+
+    dsz = table.short_side * ss * 0.017
     for (dx, dy) in table.diamonds():
-        cv2.circle(img, (int(dx), int(dy)), 3, (210, 215, 180), -1, cv2.LINE_AA)
+        c = np.array([dx * ss, dy * ss])
+        quad = np.array([[0, -dsz], [dsz, 0], [0, dsz], [-dsz, 0]], np.float32)
+        cv2.fillConvexPoly(img, (c + quad + [0, ss]).astype(np.int32), (14, 12, 11), cv2.LINE_AA)
+        cv2.fillConvexPoly(img, (c + quad).astype(np.int32), (232, 226, 214), cv2.LINE_AA)
 
-    # pockets
     for p in table.pockets:
-        cv2.circle(img, (int(p.x), int(p.y)), int(table.pocket_radius), (12, 14, 16), -1, cv2.LINE_AA)
-        cv2.circle(img, (int(p.x), int(p.y)), int(table.pocket_radius), (70, 78, 86), 1, cv2.LINE_AA)
+        pc = (int(p.x * ss), int(p.y * ss))
+        pr = int(table.pocket_radius * ss * 1.08)
+        for i in range(pr, 0, -1):
+            t = i / pr
+            cv2.circle(img, pc, i, (int(12 + 26 * t), int(11 + 22 * t), int(10 + 20 * t)),
+                       -1, cv2.LINE_AA)
+        cv2.circle(img, pc, pr, (96, 86, 80), max(1, ss), cv2.LINE_AA)
+
+    img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
     _SCHEM_BASE = (key, img)
     return img.copy()
 
@@ -235,9 +297,10 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
                      fixed_radius: float | None = None,
                      play_paths: dict | None = None,
                      paths_alpha: float = 1.0) -> np.ndarray:
-    """Render a clean, proportional top-down table from the game state — felt,
-    rails, pockets, diamonds, and balls as circles — instead of the warped camera
-    image. Ball positions are the rectified (already-proportional) coordinates."""
+    """Render a clean, modern top-down table from the game state — tournament-blue
+    cloth, rail, pockets, diamonds, and balls as glossy shaded spheres — instead of
+    the warped camera image. Ball positions are the rectified (proportional)
+    coordinates; identity reads from colour + stripe, never numbers."""
     h = table.height
     img = _schematic_base(table)
     acc = _accent_bgr(accent)
@@ -259,43 +322,37 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
             _draw_play_paths(img, play_paths)
             cv2.addWeighted(img, paths_alpha, base, 1.0 - paths_alpha, 0, dst=img)
 
-    # balls — drawn at the KNOWN physical radius when fixed_radius is given, so the
-    # overhead shows uniform regulation balls instead of the detector's per-frame wobble
+    # soft contact shadows for every ball — one blurred pass multiplied into the
+    # felt, so the balls read as sitting ON the cloth (depth) instead of pasted on.
+    if tracks:
+        shadow = np.zeros(img.shape[:2], np.float32)
+        for tr in tracks:
+            r = max(6, int(fixed_radius if fixed_radius else tr.radius))
+            cv2.circle(shadow, (int(tr.x + r * 0.16), int(tr.y + r * 0.26)),
+                       int(r * 1.03), 1.0, -1, cv2.LINE_AA)
+        shadow = cv2.GaussianBlur(shadow, (0, 0), max(1.5, (fixed_radius or 10) * 0.28))
+        img = (img.astype(np.float32) * (1.0 - 0.45 * shadow[:, :, None])).astype(np.uint8)
+
+    # balls — glossy shaded spheres at the KNOWN physical radius (uniform overhead,
+    # not the detector's per-frame wobble). Identity is COLOUR-only: a solid is a
+    # full colour sphere, a stripe is a white ball with a coloured band, the cue is
+    # white and the 8 is black. No numbers — deliberately clean and legible.
     for tr in tracks:
-        color, uncertain = ball_color(tr, measured_colors)
-        c = (int(tr.x), int(tr.y))
-        cs = (int(round(tr.x * _S)), int(round(tr.y * _S)))
+        color, _uncertain = ball_color(tr, measured_colors)
+        cx, cy = tr.x, tr.y
         r = max(6, int(fixed_radius if fixed_radius else tr.radius))
-        rs = r * _S
         if show_traj and play_paths is None and len(tr.history) > 1:
             _draw_trail(img, tr.history, acc)
-        # sub-pixel centres: a ball whose track sits at x.5 no longer snaps
-        # between neighbouring pixels frame to frame
-        cv2.circle(img, cs, rs, color, -1, cv2.LINE_AA, shift=_SHIFT)
-        # Stripe: a white equatorial band over the base colour, so 9..15 read as
-        # stripes at a glance (the base colour still identifies the number).
         if tr.cls == BallClass.STRIPE:
-            band_h = max(2 * _S, int(rs * 0.55))
-            cv2.rectangle(img, (cs[0] - rs, cs[1] - band_h // 2),
-                          (cs[0] + rs, cs[1] + band_h // 2),
-                          (245, 245, 245), -1, cv2.LINE_AA, shift=_SHIFT)
-            cv2.circle(img, cs, rs, color, 2, cv2.LINE_AA, shift=_SHIFT)  # restore rim
-        cv2.circle(img, cs, rs, (20, 22, 26), 1, cv2.LINE_AA, shift=_SHIFT)
-        label = _ball_label(tr)
-        if uncertain and not label:
-            cv2.putText(img, "?", (c[0] - r // 2, c[1] + r // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, max(0.3, r / 18.0), (40, 40, 40), 1,
-                        cv2.LINE_AA)
-        elif show_ids and label:
-            # the ball NUMBER, centred on the ball (white-band centre for stripes)
-            _draw_centered(img, label, c,
-                           (245, 245, 245) if tr.cls == BallClass.STRIPE else color, r)
-        elif not uncertain:
-            cv2.circle(img, (cs[0] - rs // 3, cs[1] - rs // 3), max(2 * _S, rs // 4),
-                       (255, 255, 255), -1, cv2.LINE_AA, shift=_SHIFT)
+            _stripe(img, cx, cy, r, color)
+        else:
+            _sphere(img, cx, cy, r, color)
+        _highlight(img, cx, cy, r)
+        cv2.circle(img, (int(round(cx * _S)), int(round(cy * _S))), int(round(r * _S)),
+                   (16, 15, 14), 1, cv2.LINE_AA, shift=_SHIFT)
         if tr.speed > 2.0:
-            tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
-            cv2.arrowedLine(img, c, tip, acc, 1, cv2.LINE_AA, tipLength=0.3)
+            tip = (int(cx + tr.vx * 3), int(cy + tr.vy * 3))
+            cv2.arrowedLine(img, (int(cx), int(cy)), tip, acc, 2, cv2.LINE_AA, tipLength=0.3)
 
     if debug and diag:
         line1 = (f"state={diag.get('state')} cue={diag.get('cue')} "
