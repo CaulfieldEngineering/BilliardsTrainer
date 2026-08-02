@@ -164,42 +164,68 @@ def _rounded(img, x0, y0, x1, y1, r, color) -> None:
         cv2.circle(img, (cx, cy), r, color, -1, cv2.LINE_AA)
 
 
+def _mute(bgr, amt: float = 0.30, dim: float = 0.88) -> tuple[float, float, float]:
+    """Desaturate a ball colour toward its own luma and dim it slightly, for a
+    matted, muted look instead of a saturated, whimsical one."""
+    b, g, r = float(bgr[0]), float(bgr[1]), float(bgr[2])
+    y = 0.114 * b + 0.587 * g + 0.299 * r
+    return ((b * (1 - amt) + y * amt) * dim,
+            (g * (1 - amt) + y * amt) * dim,
+            (r * (1 - amt) + y * amt) * dim)
+
+
 def _cloth(pw: int, ph: int) -> np.ndarray:
-    """Tournament-blue cloth: a top-lit vertical gradient, a soft radial edge
-    vignette, and a faint woven texture — returns a float BGR (ph, pw, 3)."""
-    top = np.array([168, 108, 46], float)      # BGR of a lit tournament blue
-    bot = np.array([120, 66, 24], float)         # darker toward the foot rail
+    """Muted slate-blue cloth: a soft top-lit gradient, a gentle edge vignette,
+    and a faint woven texture — returns a float BGR (ph, pw, 3)."""
+    top = np.array([132, 100, 60], float)      # BGR of a muted slate-blue (lit)
+    bot = np.array([96, 72, 42], float)          # darker toward the foot rail
     grad = np.linspace(0, 1, ph)[:, None]
     felt = np.tile((top * (1 - grad) + bot * grad)[:, None, :], (1, pw, 1))
     yy, xx = np.mgrid[0:ph, 0:pw].astype(np.float32)
     cx, cy = pw / 2.0, ph / 2.0
     d = np.sqrt(((xx - cx) / cx) ** 2 + ((yy - cy) / cy) ** 2)
-    felt *= np.clip(1.0 - 0.30 * np.clip(d - 0.35, 0, 1.4), 0.58, 1.0)[:, :, None]
-    weave = (np.sin(xx * 0.9) + np.sin(yy * 0.9)) * 2.0
-    grain = np.random.default_rng(7).standard_normal((ph, pw)).astype(np.float32) * 2.4
+    felt *= np.clip(1.0 - 0.26 * np.clip(d - 0.35, 0, 1.4), 0.62, 1.0)[:, :, None]
+    weave = (np.sin(xx * 0.9) + np.sin(yy * 0.9)) * 1.6
+    grain = np.random.default_rng(7).standard_normal((ph, pw)).astype(np.float32) * 2.0
     felt += (weave + grain)[:, :, None]
     return felt
 
 
+def _wood(pw: int, ph: int) -> np.ndarray:
+    """Brown wood rail: a warm walnut base with a lengthwise grain (streaks +
+    fine noise) and a slight top-lit gradient — float BGR (ph, pw, 3)."""
+    base = np.array([46, 74, 116], float)        # BGR warm walnut (RGB ~116,74,46)
+    grad = np.linspace(1.06, 0.86, ph)[:, None]
+    wood = np.tile(base[None, None, :], (ph, pw, 1)) * grad[:, :, None]
+    xx = np.arange(pw, dtype=np.float32)
+    streak = (np.sin(xx * 0.35) * 4.0 + np.sin(xx * 1.7 + 1.0) * 2.5
+              + np.sin(xx * 0.11) * 5.0)[None, :]
+    grain = np.random.default_rng(11).standard_normal((ph, pw)).astype(np.float32) * 3.0
+    wood += (streak + grain)[:, :, None]
+    return wood
+
+
 def _sphere(img, cx: float, cy: float, r: float, bgr) -> None:
-    """A glossy shaded sphere: a dark-rim→lit-centre radial gradient built from
-    concentric circles offset toward the light (top-left)."""
+    """A matte shaded sphere: a soft dark-rim→lit-centre radial gradient built
+    from concentric circles offset toward the light. A gentle (not glossy)
+    range keeps it muted."""
     bgr = np.array(bgr, float)
-    dark = np.clip(bgr * 0.40, 0, 255)
-    light = np.clip(bgr * 1.32 + 42, 0, 255)
+    dark = np.clip(bgr * 0.55, 0, 255)
+    light = np.clip(bgr * 1.12 + 16, 0, 255)
     steps = 22
     for i in range(steps):
         t = i / (steps - 1)
         col = (dark * (1 - t) + light * t).tolist()
         rr = r * (1.0 - 0.9 * t)
-        off = r * 0.32 * t
+        off = r * 0.26 * t
         cv2.circle(img, (int(round((cx - off) * _S)), int(round((cy - off) * _S))),
                    max(1, int(round(rr * _S))), col, -1, cv2.LINE_AA, shift=_SHIFT)
 
 
 def _highlight(img, cx: float, cy: float, r: float) -> None:
-    cv2.circle(img, (int(round((cx - r * 0.34) * _S)), int(round((cy - r * 0.42) * _S))),
-               max(1, int(round(r * 0.20 * _S))), (255, 255, 255), -1, cv2.LINE_AA, shift=_SHIFT)
+    """A soft, low-contrast sheen (matte), not a hot specular dot."""
+    cv2.circle(img, (int(round((cx - r * 0.30) * _S)), int(round((cy - r * 0.38) * _S))),
+               max(1, int(round(r * 0.15 * _S))), (216, 216, 220), -1, cv2.LINE_AA, shift=_SHIFT)
 
 
 def _stripe(img, cx: float, cy: float, r: float, bgr) -> None:
@@ -237,36 +263,56 @@ def _schematic_base(table: TableModel) -> np.ndarray:
     bw, bh = w * ss, h * ss
     x0, y0 = int(table.x0 * ss), int(table.y0 * ss)
     x1, y1 = int(table.x1 * ss), int(table.y1 * ss)
-    img = np.full((bh, bw, 3), (30, 26, 24), np.uint8)
 
-    m = int(table.pad * ss * 0.30)
-    _rounded(img, m, m, bw - m, bh - m, table.pad * ss * 0.95, (40, 36, 34))       # rail
-    _rounded(img, m, m, bw - m, (y0 + y1) // 2, table.pad * ss * 0.95, (50, 45, 42))  # top bevel
-    _rounded(img, x0 - 4 * ss, y0 - 4 * ss, x1 + 4 * ss, y1 + 4 * ss, 7 * ss, (22, 19, 18))  # inner shadow
+    # --- brown WOOD rail fills the whole frame; the felt is inset into it ---
+    img = np.clip(_wood(bw, bh), 0, 255).astype(np.uint8)
+    bez = max(2, int(2 * ss))                                  # thin outer bezel
+    cv2.rectangle(img, (0, 0), (bw - 1, bh - 1), (20, 26, 34), bez, cv2.LINE_AA)
 
+    # --- felt bed inset inside the rail (x0..y1 is the cushion nose line) ---
     if x1 > x0 and y1 > y0:
         img[y0:y1, x0:x1] = np.clip(_cloth(x1 - x0, y1 - y0), 0, 255).astype(np.uint8)
-    cv2.rectangle(img, (x0, y0), (x1, y1), (150, 96, 40), 3 * ss, cv2.LINE_AA)      # cushion shade
-    cv2.rectangle(img, (x0, y0), (x1, y1), (200, 150, 96), max(1, ss), cv2.LINE_AA)  # nose highlight
+    # rail inner edge catching light (just OUTSIDE the felt, on the wood)
+    cv2.rectangle(img, (x0 - 2 * ss, y0 - 2 * ss), (x1 + 2 * ss, y1 + 2 * ss),
+                  (70, 104, 150), max(1, ss), cv2.LINE_AA)
+    # cushion nose: a dark felt/rail seam + a soft inner shadow onto the bed
+    cv2.rectangle(img, (x0, y0), (x1, y1), (22, 30, 40), max(2, 2 * ss), cv2.LINE_AA)
+    cush = int(table.short_side * ss * 0.022)
+    if x1 - x0 > 2 * cush and y1 - y0 > 2 * cush:
+        inner = img[y0:y1, x0:x1].astype(np.float32)
+        ih, iw = inner.shape[:2]
+        yy, xx = np.mgrid[0:ih, 0:iw]
+        edge = np.minimum.reduce([xx, iw - 1 - xx, yy, ih - 1 - yy]).astype(np.float32)
+        sh = np.clip(edge / max(1, cush), 0, 1) * 0.28 + 0.72   # darker at the nose
+        img[y0:y1, x0:x1] = (inner * sh[:, :, None]).astype(np.uint8)
 
-    cxm = (x0 + x1) // 2
-    cv2.circle(img, (cxm, int(y0 + (y1 - y0) * 0.75)), int(3 * ss), (180, 150, 110), -1, cv2.LINE_AA)
+    # --- sight diamonds INLAID ON THE WOOD (centred in each rail band) ---
+    dsz = table.short_side * ss * 0.016
+    xL, xR = x0 * 0.5, (x1 + bw) * 0.5          # centre of the left / right wood band
+    yT, yB = y0 * 0.5, (y1 + bh) * 0.5          # centre of the top / bottom wood band
+    spots = []
+    for frac in (1, 2, 3, 5, 6, 7):             # long rails: 6 sights
+        yy = y0 + (y1 - y0) * frac / 8.0
+        spots += [(xL, yy), (xR, yy)]
+    for frac in (1, 2, 3):                       # short rails: 3 sights
+        xx = x0 + (x1 - x0) * frac / 4.0
+        spots += [(xx, yT), (xx, yB)]
+    for (dx, dy) in spots:
+        c = np.array([dx, dy])
+        quad = np.array([[0, -dsz], [dsz * 0.7, 0], [0, dsz], [-dsz * 0.7, 0]], np.float32)
+        cv2.fillConvexPoly(img, (c + quad + [0, 1.2 * ss]).astype(np.int32), (18, 24, 32), cv2.LINE_AA)  # shadow
+        cv2.fillConvexPoly(img, (c + quad).astype(np.int32), (196, 200, 208), cv2.LINE_AA)                # inlay
+        cv2.fillConvexPoly(img, (c + quad * 0.5 - [0, dsz * 0.2]).astype(np.int32), (222, 226, 232), cv2.LINE_AA)  # bevel
 
-    dsz = table.short_side * ss * 0.017
-    for (dx, dy) in table.diamonds():
-        c = np.array([dx * ss, dy * ss])
-        quad = np.array([[0, -dsz], [dsz, 0], [0, dsz], [-dsz, 0]], np.float32)
-        cv2.fillConvexPoly(img, (c + quad + [0, ss]).astype(np.int32), (14, 12, 11), cv2.LINE_AA)
-        cv2.fillConvexPoly(img, (c + quad).astype(np.int32), (232, 226, 214), cv2.LINE_AA)
-
+    # --- pockets: leather-rimmed dark wells at the rail corners / side mids ---
     for p in table.pockets:
         pc = (int(p.x * ss), int(p.y * ss))
-        pr = int(table.pocket_radius * ss * 1.08)
+        pr = int(table.pocket_radius * ss * 1.12)
+        cv2.circle(img, pc, pr + max(1, ss), (26, 34, 46), -1, cv2.LINE_AA)   # leather rim
         for i in range(pr, 0, -1):
             t = i / pr
-            cv2.circle(img, pc, i, (int(12 + 26 * t), int(11 + 22 * t), int(10 + 20 * t)),
+            cv2.circle(img, pc, i, (int(10 + 20 * t), int(10 + 18 * t), int(9 + 16 * t)),
                        -1, cv2.LINE_AA)
-        cv2.circle(img, pc, pr, (96, 86, 80), max(1, ss), cv2.LINE_AA)
 
     img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
     _SCHEM_BASE = (key, img)
@@ -333,12 +379,15 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
         shadow = cv2.GaussianBlur(shadow, (0, 0), max(1.5, (fixed_radius or 10) * 0.28))
         img = (img.astype(np.float32) * (1.0 - 0.45 * shadow[:, :, None])).astype(np.uint8)
 
-    # balls — glossy shaded spheres at the KNOWN physical radius (uniform overhead,
+    # balls — matte shaded spheres at the KNOWN physical radius (uniform overhead,
     # not the detector's per-frame wobble). Identity is COLOUR-only: a solid is a
     # full colour sphere, a stripe is a white ball with a coloured band, the cue is
     # white and the 8 is black. No numbers — deliberately clean and legible.
     for tr in tracks:
         color, _uncertain = ball_color(tr, measured_colors)
+        # matte/muted palette for the colour balls (cue/8/unknown stay canonical)
+        if tr.cls in (BallClass.SOLID, BallClass.STRIPE):
+            color = _mute(color)
         cx, cy = tr.x, tr.y
         r = max(6, int(fixed_radius if fixed_radius else tr.radius))
         if show_traj and play_paths is None and len(tr.history) > 1:

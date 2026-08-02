@@ -6,7 +6,7 @@ reference to the current ndarray so its buffer stays alive while Qt paints it.
 
 
 import numpy as np
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -25,10 +25,13 @@ class VideoView(QWidget):
         self._placeholder = placeholder
         self._draw_rect: QRectF | None = None  # where the image is painted
         self._overlay: list = []   # [(x, y, r, text, selected)] in image px (Qt-drawn)
+        self._balls: list = []     # [(x, y, r, label)] in image px — hover-to-reveal
+        self._mouse_pos: QPointF | None = None
         self._pickable = False
         self.setMinimumSize(160, 120)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        self.setMouseTracking(True)   # hover events without a pressed button
 
     def set_pickable(self, on: bool) -> None:
         self._pickable = on
@@ -42,6 +45,28 @@ class VideoView(QWidget):
                 yf = (pos.y() - self._draw_rect.y()) / self._draw_rect.height()
                 self.clicked.emit(float(xf), float(yf))
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        # Only the schematic bird's-eye sets balls; elsewhere this is a no-op.
+        if self._balls:
+            self._mouse_pos = event.position()
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        if self._mouse_pos is not None:
+            self._mouse_pos = None
+            self.update()
+        super().leaveEvent(event)
+
+    def set_balls(self, balls: list) -> None:
+        """Ball markers for hover-to-reveal: [(x, y, r, label)] in image pixels.
+        Hovering a ball shows its number in a small chip (numbers are deliberately
+        off the balls themselves)."""
+        self._balls = balls or []
+        if not self._balls and self._mouse_pos is not None:
+            self._mouse_pos = None
+        # no forced repaint here — set_frame() already drives the per-frame update
 
     def set_frame(self, frame: np.ndarray) -> None:
         if frame is None or frame.size == 0:
@@ -75,6 +100,8 @@ class VideoView(QWidget):
         self._buf = None
         self._pixmap = None
         self._overlay = []
+        self._balls = []
+        self._mouse_pos = None
         self.update()
 
     def paintEvent(self, _event) -> None:
@@ -107,4 +134,44 @@ class VideoView(QWidget):
                     p.setFont(QFont("Arial", max(8, int(rr)), QFont.Bold))
                     p.drawText(QRectF(cx - rr, cy - rr - 22, 2 * rr + 60, 20),
                                Qt.AlignLeft | Qt.AlignVCenter, text)
+        self._draw_hover_label(p, rect)
         p.end()
+
+    def _draw_hover_label(self, p: QPainter, rect) -> None:
+        """If the cursor is over a ball, reveal its number in a small chip above it."""
+        if not (self._balls and self._mouse_pos is not None
+                and self._draw_rect is not None and self._pixmap is not None):
+            return
+        pw = max(1, self._pixmap.width())
+        ph = max(1, self._pixmap.height())
+        sx = self._draw_rect.width() / pw
+        sy = self._draw_rect.height() / ph
+        mx, my = self._mouse_pos.x(), self._mouse_pos.y()
+        best, best_d = None, 1e18
+        for (bx, by, br, label) in self._balls:
+            wx = self._draw_rect.x() + bx * sx
+            wy = self._draw_rect.y() + by * sy
+            d = ((wx - mx) ** 2 + (wy - my) ** 2) ** 0.5
+            if d <= max(12.0, br * sx * 1.4) and d < best_d:
+                best, best_d = (wx, wy, br * sx, str(label)), d
+        if best is None:
+            return
+        wx, wy, wr, label = best
+        # marker ring on the hovered ball
+        p.setPen(QPen(QColor(255, 255, 255, 200), 2))
+        p.setBrush(Qt.NoBrush)
+        p.drawEllipse(QPointF(wx, wy), max(6.0, wr), max(6.0, wr))
+        # chip above the ball
+        p.setFont(QFont("Arial", 11, QFont.Bold))
+        fm = p.fontMetrics()
+        tw = fm.horizontalAdvance(label)
+        ch = fm.height() + 8
+        cw = tw + 16
+        cx = min(max(2.0, wx - cw / 2), rect.width() - cw - 2)
+        cy = max(2.0, wy - max(14.0, wr) - ch - 6)
+        chip = QRectF(cx, cy, cw, ch)
+        p.setBrush(QColor(18, 22, 28, 235))
+        p.setPen(QPen(QColor(120, 150, 175), 1))
+        p.drawRoundedRect(chip, 6, 6)
+        p.setPen(QColor(240, 244, 250))
+        p.drawText(chip, Qt.AlignCenter, label)

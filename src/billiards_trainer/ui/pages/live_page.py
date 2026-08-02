@@ -961,6 +961,19 @@ class LivePage(QWidget):
         """Track the controller's auto-detection state (toggle lives in Settings)."""
         self._detect_on = on
 
+    @staticmethod
+    def _ball_markers(packet) -> list:
+        """Hover-reveal markers for the bird's-eye: (x, y, r, number-label) in
+        rectified pixels — the same space the schematic balls are drawn in.
+        Numbers live here (on hover) instead of on the balls themselves."""
+        out = []
+        for tr in getattr(packet, "tracks", None) or []:
+            n = getattr(tr, "number", -1)
+            label = "Cue" if n == 0 else (str(n) if n and n > 0 else "?")
+            out.append((float(tr.x), float(tr.y),
+                        float(getattr(tr, "radius", 8.0) or 8.0), label))
+        return out
+
     def on_frame(self, packet) -> None:
         self._last_packet = packet
         if packet.perspective is not None:
@@ -973,6 +986,7 @@ class LivePage(QWidget):
                 self._persp.set_frame(packet.perspective)
         if packet.birdseye is not None:
             self._bird.set_frame(packet.birdseye)
+            self._bird.set_balls(self._ball_markers(packet))
         self._clock_holder.setVisible(packet.clock_enabled)
         if packet.clock_enabled:
             self._clock.update_clock(packet.clock_remaining,
