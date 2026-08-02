@@ -276,8 +276,13 @@ def _cushion_quads(table: TableModel, ss: int):
     cy = (y0 + y1) / 2.0
     rc = table.pocket_radius * ss
     cw = table.short_side * ss * 0.028        # visible width of the cushion band
-    cn, cb = rc * 1.30, rc * 2.00             # corner facing: nose cut, back cut
-    sn, sb = rc * 1.10, rc * 1.50             # side facing: shallower
+    # Facing cuts, measured off the rig's table (live frame, 4x crops):
+    # CORNER — the cushion's BACK edge reaches further toward the pocket than
+    # its nose, so the mouth is WIDEST at the nose and tapers going back.
+    # SIDE — the opposite, and much shallower: the nose creeps slightly further
+    # into the mouth than the back, giving an almost square-ended cushion.
+    cn, cb = rc * 2.00, rc * 1.30             # corner: nose cut back further
+    sn, sb = rc * 1.10, rc * 1.50             # side: nose reaches further in
     quads = []
     # top / bottom rails (horizontal runs, uninterrupted between the corners)
     for yn, yb in ((y0, y0 - cw), (y1, y1 + cw)):
@@ -300,6 +305,19 @@ def _draw_cushions(img: np.ndarray, table: TableModel, ss: int) -> None:
     body = tuple(int(v) for v in base * 0.62)
     lip = tuple(int(v) for v in base * 0.76)   # faint crown where cloth wraps
     seam = (22, 30, 40)
+    # Lay cloth across the WHOLE cushion band first. Where a run is cut away for
+    # a pocket the bed keeps going underneath — on a real table the felt runs
+    # into the mouth. Without this, the cut-away wedge exposed bare wood at every
+    # pocket, which read as a notch in the rail rather than an opening.
+    x0, y0 = int(table.x0 * ss), int(table.y0 * ss)
+    x1, y1 = int(table.x1 * ss), int(table.y1 * ss)
+    cw = int(table.short_side * ss * 0.028)
+    shadowed = tuple(int(v) for v in base * 0.66)
+    for a, b in (((x0 - cw, y0 - cw), (x1 + cw, y0)),      # bands only, never
+                 ((x0 - cw, y1), (x1 + cw, y1 + cw)),      # the bed interior —
+                 ((x0 - cw, y0), (x0, y1)),                # a filled rect here
+                 ((x1, y0), (x1 + cw, y1))):               # would erase the bed
+        cv2.rectangle(img, a, b, shadowed, -1, cv2.LINE_AA)
     for q in _cushion_quads(table, ss):
         poly = np.array(q, np.float32)
         cv2.fillConvexPoly(img, poly.astype(np.int32), body, cv2.LINE_AA)
@@ -372,14 +390,35 @@ def _schematic_base(table: TableModel) -> np.ndarray:
         cv2.fillConvexPoly(img, (c + quad * 0.5 - [0, dsz * 0.2]).astype(np.int32), (222, 226, 232), cv2.LINE_AA)  # bevel
 
     # --- pockets: leather-rimmed dark wells at the rail corners / side mids ---
+    # A SIDE pocket is a NOTCH IN THE RAIL, flush with the cushion line — on the
+    # real table its basket only dips a hair past the nose. Drawing it as a full
+    # circle centred on the nose line put half a disc out on the playing
+    # surface, which is not a thing any table does. Corner pockets genuinely do
+    # open into the bed on the diagonal, so they are left unclipped.
+    lip = int(table.pocket_radius * ss * 0.22)      # how far a side basket peeks
     for p in table.pockets:
         pc = (int(p.x * ss), int(p.y * ss))
-        pr = int(table.pocket_radius * ss * 1.12)
-        cv2.circle(img, pc, pr + max(1, ss), (26, 34, 46), -1, cv2.LINE_AA)   # leather rim
+        pr = int(table.pocket_radius * ss * (0.95 if p.is_side else 1.12))
+        rim = pr + max(1, ss)
+        # draw into a scratch ROI so a side pocket can be clipped to the rail
+        rx0, ry0 = max(0, pc[0] - rim - 2), max(0, pc[1] - rim - 2)
+        rx1, ry1 = min(bw, pc[0] + rim + 2), min(bh, pc[1] + rim + 2)
+        if rx1 <= rx0 or ry1 <= ry0:
+            continue
+        roi = img[ry0:ry1, rx0:rx1]
+        scratch = roi.copy()
+        c = (pc[0] - rx0, pc[1] - ry0)
+        cv2.circle(scratch, c, rim, (26, 34, 46), -1, cv2.LINE_AA)   # leather rim
         for i in range(pr, 0, -1):
             t = i / pr
-            cv2.circle(img, pc, i, (int(10 + 20 * t), int(10 + 18 * t), int(9 + 16 * t)),
-                       -1, cv2.LINE_AA)
+            cv2.circle(scratch, c, i, (int(10 + 20 * t), int(10 + 18 * t),
+                                       int(9 + 16 * t)), -1, cv2.LINE_AA)
+        m = np.zeros(roi.shape[:2], np.uint8)
+        cv2.circle(m, c, rim, 255, -1, cv2.LINE_AA)
+        if p.is_side:
+            cv2.rectangle(m, (x0 + lip - rx0, y0 + lip - ry0),
+                          (x1 - lip - rx0, y1 - lip - ry0), 0, -1)
+        roi[m > 0] = scratch[m > 0]
 
     img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
     _SCHEM_BASE = (key, img)
