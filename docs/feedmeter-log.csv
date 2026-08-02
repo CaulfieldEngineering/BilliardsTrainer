@@ -27,3 +27,4 @@ stamp,label,container,unique_fps,active,eff_lines,eff_cols,cut_v,cut_h,sharpness
 20260728-231437,USB test A: HDMI only (baseline),1920x1080@60,17.5,1633x928,93,133,0.101,0.082,20,1.50,0-255
 20260729-165752,post crash-guard fix (Mac ceiling rig),1920x1080@60,21.0,1633x928,141,184,0.152,0.113,24,1.50,0-255
 20260729-170017,verdict rule check (healthy HD must NOT flag),1920x1080@60,21.5,1633x928,235,344,0.253,0.211,40,1.50,0-255
+20260802-123451,post-fix check 2026-08-02,1920x1080@60,25.0,1633x928,352,147,0.379,0.090,35,1.50,0-252

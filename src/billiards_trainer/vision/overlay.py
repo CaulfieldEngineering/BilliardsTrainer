@@ -258,6 +258,63 @@ def _stripe(img, cx: float, cy: float, r: float, bgr) -> None:
     img[y0:y1, x0:x1] = (white * (1 - mask) + colour * mask).astype(np.uint8)
 
 
+def _cushion_quads(table: TableModel, ss: int):
+    """The six cushion runs as (nose_a, nose_b, back_b, back_a) quads.
+
+    A real table's cushions do NOT run into the pockets: each run stops short and
+    is cut away on an angled FACING, and the gap between two facings is the
+    pocket mouth. The facing opens outward — the mouth is narrowest at the nose
+    and widens toward the back of the pocket — which is exactly the geometry that
+    decides whether a ball near the rail can drop. Corner facings are cut back
+    harder than side facings (a corner mouth accepts a ball arriving along the
+    rail; a side mouth does not), which is why they look so different overhead.
+
+    Returns quads in supersampled pixel coords, outward-normal first.
+    """
+    x0, y0 = table.x0 * ss, table.y0 * ss
+    x1, y1 = table.x1 * ss, table.y1 * ss
+    cy = (y0 + y1) / 2.0
+    rc = table.pocket_radius * ss
+    cw = table.short_side * ss * 0.028        # visible width of the cushion band
+    cn, cb = rc * 1.30, rc * 2.00             # corner facing: nose cut, back cut
+    sn, sb = rc * 1.10, rc * 1.50             # side facing: shallower
+    quads = []
+    # top / bottom rails (horizontal runs, uninterrupted between the corners)
+    for yn, yb in ((y0, y0 - cw), (y1, y1 + cw)):
+        quads.append(([x0 + cn, yn], [x1 - cn, yn], [x1 - cb, yb], [x0 + cb, yb]))
+    # left / right rails, each split in two by its side pocket
+    for xn, xb in ((x0, x0 - cw), (x1, x1 + cw)):
+        quads.append(([xn, y0 + cn], [xn, cy - sn], [xb, cy - sb], [xb, y0 + cb]))
+        quads.append(([xn, cy + sn], [xn, y1 - cn], [xb, y1 - cb], [xb, cy + sb]))
+    return quads
+
+
+def _draw_cushions(img: np.ndarray, table: TableModel, ss: int) -> None:
+    """Cloth-covered cushions inset between the wood rail and the bed."""
+    base = np.array([251, 221, 87], float)     # same measured cloth as the bed
+    # The cushion is the SAME cloth as the bed, just angled away from the light —
+    # on the real table it reads as a slightly darker band, not a bright lip.
+    # Kept clearly darker than the bed: the bed carries an edge vignette, so a
+    # near-equal cushion actually reads LIGHTER than the cloth it borders, which
+    # inverts how the real table looks from above.
+    body = tuple(int(v) for v in base * 0.62)
+    lip = tuple(int(v) for v in base * 0.76)   # faint crown where cloth wraps
+    seam = (22, 30, 40)
+    for q in _cushion_quads(table, ss):
+        poly = np.array(q, np.float32)
+        cv2.fillConvexPoly(img, poly.astype(np.int32), body, cv2.LINE_AA)
+        # highlight along the BACK edge (crown of the cushion, nearest the rail)
+        cv2.line(img, tuple(poly[2].astype(int)), tuple(poly[3].astype(int)),
+                 lip, max(1, ss // 2), cv2.LINE_AA)
+        # dark seam along the NOSE edge only — never across a pocket mouth
+        cv2.line(img, tuple(poly[0].astype(int)), tuple(poly[1].astype(int)),
+                 seam, max(2, 2 * ss), cv2.LINE_AA)
+        # the angled facings, which are what make the pocket cut legible
+        for a, b in ((poly[1], poly[2]), (poly[3], poly[0])):
+            cv2.line(img, tuple(a.astype(int)), tuple(b.astype(int)),
+                     seam, max(1, ss), cv2.LINE_AA)
+
+
 def _schematic_base(table: TableModel) -> np.ndarray:
     """The static part of the schematic (rail, turquoise cloth with a
     top-lit gradient + woven texture, inlaid diamonds, recessed pockets). Built
@@ -282,11 +339,11 @@ def _schematic_base(table: TableModel) -> np.ndarray:
     # --- felt bed inset inside the rail (x0..y1 is the cushion nose line) ---
     if x1 > x0 and y1 > y0:
         img[y0:y1, x0:x1] = np.clip(_cloth(x1 - x0, y1 - y0), 0, 255).astype(np.uint8)
-    # rail inner edge catching light (just OUTSIDE the felt, on the wood)
-    cv2.rectangle(img, (x0 - 2 * ss, y0 - 2 * ss), (x1 + 2 * ss, y1 + 2 * ss),
-                  (70, 104, 150), max(1, ss), cv2.LINE_AA)
-    # cushion nose: a dark felt/rail seam + a soft inner shadow onto the bed
-    cv2.rectangle(img, (x0, y0), (x1, y1), (22, 30, 40), max(2, 2 * ss), cv2.LINE_AA)
+    # --- CUSHIONS: cloth-covered runs inset between wood and bed, cut away on
+    # angled facings at every pocket. Drawn per-run, not as one rectangle: a
+    # rectangle draws a nose straight ACROSS each pocket mouth, which is why the
+    # old schematic had no visible pocket cut at all.
+    _draw_cushions(img, table, ss)
     cush = int(table.short_side * ss * 0.022)
     if x1 - x0 > 2 * cush and y1 - y0 > 2 * cush:
         inner = img[y0:y1, x0:x1].astype(np.float32)
