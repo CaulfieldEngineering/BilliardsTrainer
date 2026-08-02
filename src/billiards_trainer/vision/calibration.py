@@ -72,6 +72,7 @@ class CalibrationManager:
         self._corner_ema = corner_ema            # how fast locked corners ease over
         self._consecutive = 0
         self._pending: list[np.ndarray] = []     # corner sets gathering consensus
+        self._refused_not_cloth = False          # log the cover transition once
 
     @property
     def is_calibrated(self) -> bool:
@@ -110,10 +111,17 @@ class CalibrationManager:
         # whatever lock we already had.
         sat = cloth_saturation(frame, felt.mask)
         if sat < _CLOTH_MIN_SAT:
-            log.info("Calibration refused: region is not cloth (median "
-                     "saturation %.0f < %d) — table covered or lights off?",
-                     sat, _CLOTH_MIN_SAT)
+            # Log the TRANSITION only. calibrate() is retried every frame while
+            # unlocked, so logging per-frame buried the log at ~9 lines/second.
+            if not self._refused_not_cloth:
+                log.info("Calibration refused: region is not cloth (median "
+                         "saturation %.0f < %d) — table covered or lights off?",
+                         sat, _CLOTH_MIN_SAT)
+                self._refused_not_cloth = True
             return False
+        if self._refused_not_cloth:
+            log.info("Cloth is visible again (saturation %.0f) — calibrating", sat)
+            self._refused_not_cloth = False
 
         corners = self._consensus(felt.corners, settings)
         if corners is None:
