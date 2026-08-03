@@ -73,6 +73,7 @@ class CalibrationManager:
         self._consecutive = 0
         self._pending: list[np.ndarray] = []     # corner sets gathering consensus
         self._refused_not_cloth = False          # log the cover transition once
+        self._last_est_hue: int | None = None    # log felt auto-estimate on change
 
     @property
     def is_calibrated(self) -> bool:
@@ -97,8 +98,14 @@ class CalibrationManager:
             est = estimate_felt_settings(frame, settings.felt)
             felt_est = detect_felt(frame, est)
             if felt_est.has_corners and felt_est.area_ratio > felt.area_ratio:
-                log.info("Auto-estimated felt colour (hue~%d); area %.3f -> %.3f",
-                         est.picked_hsv[0], felt.area_ratio, felt_est.area_ratio)
+                # Log only when the estimate CHANGES. calibrate() is retried
+                # every frame while unlocked, so an unchanging estimate logged
+                # per-frame — ~9 lines/second for as long as the table stays
+                # unlockable (e.g. covered).
+                if est.picked_hsv[0] != self._last_est_hue:
+                    log.info("Auto-estimated felt colour (hue~%d); area %.3f -> %.3f",
+                             est.picked_hsv[0], felt.area_ratio, felt_est.area_ratio)
+                    self._last_est_hue = est.picked_hsv[0]
                 felt, felt_settings = felt_est, est
         if not felt.has_corners:
             log.info("Calibration failed: no felt corners")
