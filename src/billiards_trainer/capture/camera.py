@@ -148,6 +148,7 @@ class ThreadedCameraSource(CameraSource):
         # the (slower, variable) CV tick. Assignment is atomic in CPython, so no
         # lock is needed to publish/clear it.
         self._sink = None
+        self._sink_lock = threading.Lock()    # guards sink attach/detach/invoke
         self._sink_sig: bytes | None = None   # last picture handed to the sink
         self._sink_last = 0.0
         # Cache everything queried later BEFORE the grab thread starts —
@@ -174,9 +175,18 @@ class ThreadedCameraSource(CameraSource):
 
     def set_frame_sink(self, callback) -> None:
         """Register (or clear, with ``None``) a callback the grab thread invokes
-        with every raw frame, at true camera cadence. Used by the recorder to
-        capture the source in real time without riding the CV tick."""
-        self._sink = callback
+        with every FRESH raw frame, at true camera cadence. Used by the recorder
+        to capture the source in real time without riding the CV tick.
+
+        Taking the lock makes detach synchronous: once this returns with None,
+        no further call is in flight. The freshness signature is reset too, so a
+        new recording never skips its own first frame just because it happens to
+        match the last frame of the previous one.
+        """
+        with self._sink_lock:
+            self._sink = callback
+            self._sink_sig = None
+            self._sink_last = 0.0
 
     # A capture backend re-serves the SAME picture when polled faster than the
     # camera produces: measured on the rig, read() returns 50/s while the feed
@@ -228,12 +238,18 @@ class ThreadedCameraSource(CameraSource):
                 # Feed the recording sink OUTSIDE the lock (it copies the frame
                 # with tobytes(); never hold the capture lock across it) and
                 # never let a sink error kill the grab loop / camera handle.
-                sink = self._sink
-                if sink is not None and self._is_fresh(frame):
-                    try:
-                        sink(frame)
-                    except Exception:  # noqa: BLE001 - recording must not crash capture
-                        log.exception("frame sink raised; dropping this frame")
+                # Held across the call so a sink can NEVER fire after
+                # set_frame_sink(None) returns — the detach contract the
+                # recorder teardown relies on. Safe because the sink only
+                # enqueues; it is a different lock from the frame lock, so
+                # read() is never blocked by it.
+                with self._sink_lock:
+                    sink = self._sink
+                    if sink is not None and self._is_fresh(frame):
+                        try:
+                            sink(frame)
+                        except Exception:  # noqa: BLE001 - recording must not crash capture
+                            log.exception("frame sink raised; dropping this frame")
         finally:
             # The grab thread OWNS the capture handle: releasing it here (only
             # after the loop exits) guarantees the handle is freed exactly once
