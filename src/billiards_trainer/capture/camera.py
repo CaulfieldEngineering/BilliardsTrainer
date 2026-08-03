@@ -18,6 +18,7 @@ A ``FrameSource`` yields BGR frames via ``read()``. Four kinds:
 import logging
 import sys
 import threading
+import time
 from pathlib import Path
 
 import cv2
@@ -147,6 +148,8 @@ class ThreadedCameraSource(CameraSource):
         # the (slower, variable) CV tick. Assignment is atomic in CPython, so no
         # lock is needed to publish/clear it.
         self._sink = None
+        self._sink_sig: bytes | None = None   # last picture handed to the sink
+        self._sink_last = 0.0
         # Cache everything queried later BEFORE the grab thread starts —
         # VideoCapture calls are not safe concurrently with read() on another
         # thread (opened/fps are read by the controller after construction).
@@ -175,6 +178,38 @@ class ThreadedCameraSource(CameraSource):
         capture the source in real time without riding the CV tick."""
         self._sink = callback
 
+    # A capture backend re-serves the SAME picture when polled faster than the
+    # camera produces: measured on the rig, read() returns 50/s while the feed
+    # carries 30 unique pictures/s, so 40% of reads are stale repeats. The
+    # recorder's CFR retimer slots frames by TIMESTAMP and cannot see that, so
+    # it emitted whichever copy happened to land first in each slot. Replaying
+    # the real capture log through it: 17.4% of written frames repeated the
+    # previous picture while 17.2% of the camera's fresh pictures were thrown
+    # away — one frame in six, which is exactly the residual micro-stutter.
+    # Skipping stale reads here takes that to 0.44%.
+    _SINK_STRIDE = 32        # subsample compared to decide "same picture"
+    _SINK_KEEPALIVE_S = 0.5  # forward anyway if the feed genuinely freezes
+
+    def _is_fresh(self, frame) -> bool:
+        """True when this frame differs from the last one handed to the sink.
+
+        Compares a strided subsample, which is decisive on a live sensor (noise
+        dithers every pixel) and costs a few KB per frame. A genuinely frozen
+        feed still forwards on the keepalive, so the retimer's timeline never
+        stalls and a stuck camera is still recorded as stuck rather than as
+        nothing at all.
+        """
+        sig = frame[::self._SINK_STRIDE, ::self._SINK_STRIDE].tobytes()
+        now = time.monotonic()
+        if sig != self._sink_sig:
+            self._sink_sig = sig
+            self._sink_last = now
+            return True
+        if now - self._sink_last >= self._SINK_KEEPALIVE_S:
+            self._sink_last = now
+            return True
+        return False
+
     def _grab_loop(self) -> None:
         try:
             while not self._stop.is_set():
@@ -194,7 +229,7 @@ class ThreadedCameraSource(CameraSource):
                 # with tobytes(); never hold the capture lock across it) and
                 # never let a sink error kill the grab loop / camera handle.
                 sink = self._sink
-                if sink is not None:
+                if sink is not None and self._is_fresh(frame):
                     try:
                         sink(frame)
                     except Exception:  # noqa: BLE001 - recording must not crash capture
