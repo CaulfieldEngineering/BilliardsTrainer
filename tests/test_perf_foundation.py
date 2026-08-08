@@ -79,8 +79,12 @@ def test_threaded_camera_release_without_frames(monkeypatch):
 
 
 def test_open_source_uses_threaded_camera(monkeypatch):
+    """The OpenCV fallback must still be the THREADED source, never a blocking
+    one. _ffmpeg_camera is stubbed out so this never touches real hardware —
+    open_source now prefers an ffmpeg-owned device where one is present."""
     from billiards_trainer.capture import camera as cam
 
+    monkeypatch.setattr(cam, "_ffmpeg_camera", lambda *a, **k: None)
     monkeypatch.setattr(cam.cv2, "VideoCapture", lambda *a, **k: _FakeCap())
     src = cam.open_source("0")
     try:
@@ -88,6 +92,16 @@ def test_open_source_uses_threaded_camera(monkeypatch):
         assert src.is_live
     finally:
         src.release()
+
+
+def test_open_source_prefers_ffmpeg_owned_device(monkeypatch):
+    """When a device can be owned by ffmpeg, the live camera goes through it —
+    that is what keeps the RECORDING out of Python's timing entirely."""
+    from billiards_trainer.capture import camera as cam
+
+    sentinel = object()
+    monkeypatch.setattr(cam, "_ffmpeg_camera", lambda *a, **k: sentinel)
+    assert cam.open_source("0") is sentinel
 
 
 # --------------------------------------------------------------------------- #

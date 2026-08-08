@@ -415,6 +415,38 @@ class DemoSource(FrameSource):
         return tuple(home), (0.0, 0.0), False        # settle, object gone until loop
 
 
+def _ffmpeg_camera(index: int, cam: CameraSettings | None):
+    """An ffmpeg-owned capture source, or None to fall back to OpenCV.
+
+    Preferred on Windows because it lets the RECORDING be written straight from
+    the device, in ffmpeg's own process, with the mic muxed natively — so
+    nothing the analysis pipeline does can show up in the saved video. The
+    device is exclusive, so one process has to own it and serve both needs.
+    """
+    if sys.platform != "win32":
+        return None
+    try:
+        from .audio import find_ffmpeg, list_audio_devices
+        from .devices import list_cameras
+        from .ffmpeg_source import FfmpegCameraSource
+        if find_ffmpeg() is None:
+            return None
+        cams = list_cameras()
+        name = next((c.name for c in cams if c.index == index), "")
+        if not name:
+            return None
+        mic = None
+        if cam is not None and getattr(cam, "record_audio_device", None):
+            mic = cam.record_audio_device
+        if mic in (None, "", "default"):
+            found = list_audio_devices()
+            mic = found[0] if found else None
+        return FfmpegCameraSource(name, audio_device=mic, cam=cam)
+    except Exception as exc:  # noqa: BLE001 - any failure => use the OpenCV path
+        log.warning("ffmpeg capture unavailable (%s); using OpenCV", exc)
+        return None
+
+
 def open_source(spec: str, *, demo_size=(1280, 720),
                 cam: CameraSettings | None = None) -> FrameSource:
     spec = (spec or "0").strip()
@@ -427,7 +459,8 @@ def open_source(spec: str, *, demo_size=(1280, 720),
         from .tether import GphotoSource
         return GphotoSource(cam.tether if cam else TetherSettings())
     if spec.isdigit():
-        return ThreadedCameraSource(int(spec), cam)
+        src = _ffmpeg_camera(int(spec), cam)
+        return src if src is not None else ThreadedCameraSource(int(spec), cam)
     ext = Path(spec).suffix.lower()
     if ext in _VIDEO_EXT:
         return VideoSource(spec)

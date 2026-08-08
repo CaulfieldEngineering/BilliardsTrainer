@@ -497,6 +497,12 @@ class PipelineController(QObject):
     @Slot(bool)
     def set_recording_paused(self, paused: bool) -> None:
         """Pause/resume writing frames to the active recording (session stays open)."""
+        if self._recorder == "device":
+            # ffmpeg writes one continuous file from the device and cannot be
+            # paused mid-stream. Say so rather than leaving a button that looks
+            # like it worked; stop/start makes separate files instead.
+            log.warning("pause is not available while recording from the device")
+            return
         self._recording_paused = paused
         if self._recorder is not None and hasattr(self._recorder, "pause"):
             self._recorder.pause(paused)
@@ -535,12 +541,30 @@ class PipelineController(QObject):
             # final replace() is an atomic rename.
             EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
             self._recording_tmp = str(EXPORTS_DIR / f".session-{stamp}.part.mp4")
-            self._recorder = "pending"  # opened lazily on first frame (need size)
             self._recording_paused = False
             self._rec_frames = 0
             self._rec_t0 = None
             self._rec_elapsed = 0.0
             self._rec_crop = None
+            # DEVICE-OWNED RECORDING (preferred). When the source is owned by
+            # ffmpeg, the file is written inside ffmpeg straight from the device
+            # — its own timestamps, its own encoder, the mic muxed natively — so
+            # NOTHING the analysis pipeline does can appear in the saved video.
+            # Verified by stalling the analysis reader 1.2s every 3s mid-record:
+            # the file came out byte-identical. Frame-pumping paths below can
+            # never offer that, because the recording inherits Python's timing.
+            if hasattr(self._source, "start_recording"):
+                self._recorder = "device"
+                self._source.start_recording(
+                    self._recording_tmp, filters=self._device_rec_filters())
+                self._rec_t0 = audio_mod.elapsed_monotonic()
+                self._session_id = self._repo.start_session(
+                    mode=self._mode, drill_key=None, drill_target=0,
+                    table_size=self._settings.table.size)
+                self.stats_updated.emit(self._repo.session_summary(self._session_id))
+                self.recording_changed.emit(True)
+                return
+            self._recorder = "pending"  # opened lazily on first frame (need size)
             # REAL-TIME CAPTURE (priority path): if the source exposes a frame
             # sink (the threaded live camera), record at true camera cadence —
             # decoupled from the CV tick so a busy pipeline can never starve
@@ -568,6 +592,20 @@ class PipelineController(QObject):
                 table_size=self._settings.table.size)
             self.stats_updated.emit(self._repo.session_summary(self._session_id))
             self.recording_changed.emit(True)
+        elif not on and self._recorder == "device":
+            # Device-owned: ffmpeg finalises the mp4 itself (audio already muxed
+            # in-process), so there is no writer to release and no audio track to
+            # splice afterwards.
+            self._recorder = None
+            self._source.stop_recording()
+            if self._rec_t0 is not None:
+                self._rec_elapsed += audio_mod.elapsed_monotonic() - self._rec_t0
+                self._rec_t0 = None
+            if self._session_id is not None:
+                self._repo.end_session(self._session_id)
+                self._session_id = None
+            self.recording_changed.emit(False)
+            self._finalize_recording_file()
         elif not on and self._recorder is not None:
             # Teardown order matters: detach the grab-thread sink so no new
             # frame enqueues, drain/stop the rec worker (sentinel + join) so no
@@ -598,14 +636,49 @@ class PipelineController(QObject):
                 self._audio.stop_and_mux(self._recording_tmp, ts_scale=1.0)
                 self._audio = None
                 self._audio_dir = None
-            if self._recording_path:
-                from pathlib import Path as _P
-                try:
-                    if _P(self._recording_tmp).is_file():
-                        _P(self._recording_tmp).replace(self._recording_path)
-                except OSError:
-                    log.exception("finalizing recording failed")
-                self.replay_saved.emit(self._recording_path)
+            self._finalize_recording_file()
+
+    def _device_rec_filters(self) -> str:
+        """The -vf chain for a DEVICE-OWNED recording.
+
+        Mirrors what the frame-pumping path applied in Python (orientation from
+        the camera settings, then the measured denoise + mild sharpen), but runs
+        inside ffmpeg so no frame ever crosses into our process to be recorded.
+        Output is forced to 30fps CFR from a 60fps container.
+        """
+        cam = self._settings.camera
+        parts = ["fps=30"]
+        rot = int(getattr(cam, "rotation", 0)) % 360
+        if rot == 90:
+            parts.append("transpose=1")
+        elif rot == 180:
+            parts.append("transpose=1,transpose=1")
+        elif rot == 270:
+            parts.append("transpose=2")
+        if getattr(cam, "flip_h", False):
+            parts.append("hflip")
+        if getattr(cam, "flip_v", False):
+            parts.append("vflip")
+        # Measured on the HD feed: light denoise + mild unsharp gave +35% frame
+        # detail (laplacian 48.5 -> 65.4) with no visible processing artefacts.
+        parts.append("hqdn3d=1:1:4:4")
+        parts.append("unsharp=5:5:0.3:5:5:0.0")
+        # yuv420p subsamples chroma 2x2, so odd dimensions are invalid H.264 and
+        # AMD's encoder refuses them outright.
+        parts.append("crop=trunc(iw/2)*2:trunc(ih/2)*2")
+        return ",".join(parts)
+
+    def _finalize_recording_file(self) -> None:
+        """Move the finished in-progress file into the recordings folder."""
+        if not self._recording_path:
+            return
+        from pathlib import Path as _P
+        try:
+            if _P(self._recording_tmp).is_file():
+                _P(self._recording_tmp).replace(self._recording_path)
+        except OSError:
+            log.exception("finalizing recording failed")
+        self.replay_saved.emit(self._recording_path)
 
     @Slot()
     def start_analysis_capture(self, seconds: float = 150.0) -> None:
