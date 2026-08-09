@@ -666,6 +666,13 @@ class PipelineController(QObject):
         # yuv420p subsamples chroma 2x2, so odd dimensions are invalid H.264 and
         # AMD's encoder refuses them outright.
         parts.append("crop=trunc(iw/2)*2:trunc(ih/2)*2")
+        # SQUARE PIXELS, forced. The Cam Link declares its 1920x1080 MJPEG as
+        # "SAR 1920:1080 DAR 256:81" — a 16:9 pixel aspect on an already-16:9
+        # frame, which is nonsense; square pixels are SAR 1:1. transpose then
+        # inverts that lie to 9:16 and every player renders the result squashed.
+        # OpenCV never showed this because it ignores aspect metadata and hands
+        # over raw pixels; ffmpeg honours it.
+        parts.append("setsar=1")
         return ",".join(parts)
 
     def _finalize_recording_file(self) -> None:
