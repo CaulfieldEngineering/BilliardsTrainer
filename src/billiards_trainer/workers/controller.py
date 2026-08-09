@@ -638,6 +638,25 @@ class PipelineController(QObject):
                 self._audio_dir = None
             self._finalize_recording_file()
 
+    def _content_box_now(self):
+        """The active-picture box, remembered across recordings.
+
+        A single dark or dropped frame at the instant Record is pressed would
+        otherwise silently give a session framed in black bars, so the last
+        good box is reused when the current frame can't be measured. Sampling a
+        couple of frames costs a few ms and avoids that on a momentary glitch.
+        """
+        from ..capture.videowriter import content_box
+        for _ in range(3):
+            frame = self._source.read() if self._source is not None else None
+            if frame is not None:
+                box = content_box(frame)
+                if box is not None:
+                    self._last_content_box = box
+                    return box
+            time.sleep(0.05)
+        return getattr(self, "_last_content_box", None)
+
     def _device_rec_filters(self) -> str:
         """The -vf chain for a DEVICE-OWNED recording.
 
@@ -648,6 +667,18 @@ class PipelineController(QObject):
         """
         cam = self._settings.camera
         parts = ["fps=30"]
+        # LETTERBOX CROP, first and in the SOURCE orientation. The T3i's live
+        # HDMI fills only ~63% of the 1080p frame — the picture floats in black
+        # bars — so recording the raw frame gives a video framed in black. The
+        # analysis stream is the same un-rotated frame ffmpeg is recording, so
+        # the box measured here maps straight onto the recording.
+        box = self._content_box_now()
+        if box is not None:
+            x0, y0, x1, y1 = box
+            self._rec_crop = box
+            parts.append(f"crop={x1 - x0 + 1}:{y1 - y0 + 1}:{x0}:{y0}")
+        else:
+            log.warning("no letterbox detected — recording the full frame")
         rot = int(getattr(cam, "rotation", 0)) % 360
         if rot == 90:
             parts.append("transpose=1")
