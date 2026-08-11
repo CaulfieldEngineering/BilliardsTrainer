@@ -53,6 +53,7 @@ class SettingsPage(QWidget):
     recalibrate_requested = Signal()  # re-detect the table now
     train_balls_requested = Signal()  # open the in-app Ball ID Trainer
     cue_diagnostics_requested = Signal()  # open the cue-sensor waveform dialog
+    cue_pair_requested = Signal()         # open the Bluetooth scan/connect picker
 
     def __init__(self, settings: Settings, parent=None):
         super().__init__(parent)
@@ -691,6 +692,13 @@ class SettingsPage(QWidget):
                                    "count as a shot. Lower finds softer pokes; the "
                                    "validated hit signature filters the noise.")
         form.addRow("Impact floor", self._cue_floor)
+        pair = QPushButton("  Scan &amp; connect…")
+        pair.setObjectName("Accent")
+        pair.setCursor(Qt.PointingHandCursor)
+        pair.setToolTip("Find the sensor over Bluetooth and choose it by hand — "
+                        "needed the first time, before it has ever been paired")
+        pair.clicked.connect(self.cue_pair_requested.emit)
+        form.addRow("", pair)
         diag = QPushButton("  Sensor diagnostics…")
         diag.setObjectName("Ghost")
         diag.setCursor(Qt.PointingHandCursor)

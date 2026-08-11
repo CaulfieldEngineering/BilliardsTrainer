@@ -41,6 +41,10 @@ class CueSensorWorker(QObject):
     impact = Signal(object)               # confirmed hit (immediate): peak_g etc.
     metrics = Signal(object)              # full stroke metrics, ~2.6 s after the hit
     address_resolved = Signal(str)        # sensor MAC discovered (persist for UX)
+    # Every device a discovery pass saw, for the pairing UI: a list of
+    # {address, name, rssi, is_sensor}. Emitted only when a scan was REQUESTED,
+    # so the normal connect loop stays quiet.
+    devices_found = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -58,6 +62,7 @@ class CueSensorWorker(QObject):
         self._buffer = bytearray()
         self._prev_hit_t: float | None = None
         self._state = "disabled"
+        self._scan_req = False       # one-shot: emit devices_found next pass
 
     # ------------------------------------------------------------------ #
     # Public API (call from any thread)
@@ -85,6 +90,43 @@ class CueSensorWorker(QObject):
                 pass  # loop already closed (shutdown race)
         elif not want:
             self._emit_status("disabled", None)
+
+    def request_scan(self) -> None:
+        """Ask for one discovery pass and emit everything it sees.
+
+        Runs on the worker's OWN BLE thread rather than opening a second radio
+        session from the UI — two concurrent scans is exactly the kind of thing
+        that works on one Windows Bluetooth stack and fails on another. Works
+        while DISABLED too, so a sensor can be found and chosen before the
+        feature is switched on: the idle wait is released for the pass and
+        re-entered afterwards.
+        """
+        if self._thread is None:
+            self._start_thread()
+        if self._loop is None:
+            return
+
+        def _req():
+            self._scan_req = True
+            self._enabled_evt.set()   # break the idle wait for one pass
+            self._wake.set()          # cut short any backoff sleep
+        try:
+            self._loop.call_soon_threadsafe(_req)
+        except RuntimeError:
+            pass
+
+    def select_device(self, address: str) -> None:
+        """Pin the sensor to ``address`` and (re)connect to it now."""
+        self._saved_address = address or ""
+        if self._loop is None:
+            return
+
+        def _sel():
+            self._wake.set()          # abandon any wait; reconnect immediately
+        try:
+            self._loop.call_soon_threadsafe(_sel)
+        except RuntimeError:
+            pass
 
     @property
     def state(self) -> str:
@@ -140,7 +182,9 @@ class CueSensorWorker(QObject):
     # ------------------------------------------------------------------ #
     async def _main(self) -> None:
         while not self._closing:
-            if not self._enabled:
+            # A requested scan runs even while disabled, so the sensor can be
+            # found and picked before the feature is switched on.
+            if not self._enabled and not self._scan_req:
                 self._enabled_evt.clear()
                 await self._enabled_evt.wait()
                 continue
@@ -159,8 +203,16 @@ class CueSensorWorker(QObject):
                                                     return_adv=True)
             except Exception as exc:  # noqa: BLE001 - radio off/absent, WinRT errors
                 self._emit_status("bluetooth_off", f"{type(exc).__name__}: {exc}")
+                if self._scan_req:
+                    self._scan_req = False
+                    self.devices_found.emit([])
                 await self._sleep(_RADIO_WAIT)
                 continue
+            if self._scan_req:
+                self._scan_req = False
+                self.devices_found.emit(self._describe(found))
+                if not self._enabled:
+                    continue          # scan-only pass: back to idle
             device, adv = self._pick(found)
             if device is None:
                 self._emit_status("no_sensor", None)
@@ -205,6 +257,31 @@ class CueSensorWorker(QObject):
             if self._enabled and not self._closing:
                 self._emit_status("reconnecting", None)
                 await self._sleep(_RECONNECT_WAIT)
+
+    @staticmethod
+    def _describe(found: dict) -> list:
+        """Flatten a discovery into rows for the pairing UI, strongest first.
+
+        Everything is listed, not just recognised sensors: this exists precisely
+        for the case where the device ISN'T recognised — a sensor that has never
+        been paired, advertises an unhelpful hex name, and would otherwise be
+        invisible to an auto-picker.
+        """
+        rows = []
+        for device, adv in found.values():
+            name = (getattr(adv, "local_name", None)
+                    or getattr(device, "name", "") or "")
+            uuids = [u.lower() for u in (adv.service_uuids or [])]
+            rows.append({
+                "address": device.address,
+                "name": name,
+                "rssi": getattr(adv, "rssi", None),
+                "is_sensor": protocol.looks_like_sensor(name, uuids),
+                "uuids": uuids,
+            })
+        rows.sort(key=lambda r: (not r["is_sensor"],
+                                 -(r["rssi"] if r["rssi"] is not None else -999)))
+        return rows
 
     def _pick(self, found: dict):
         """Choose the sensor from a scan: saved address first, else identity."""

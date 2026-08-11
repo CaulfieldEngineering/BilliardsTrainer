@@ -244,6 +244,7 @@ class MainWindow(QMainWindow):
         self._cue.metrics.connect(self._controller.on_stroke_metrics, q)
         self._cue.address_resolved.connect(self._on_cue_address)
         self._settings_page.cue_diagnostics_requested.connect(self._open_cue_diagnostics)
+        self._settings_page.cue_pair_requested.connect(self._open_cue_pair)
         # Zero-restart camera ownership: when tethered control is enabled, a
         # resident keeper claims the DSLR the instant it appears on USB (app
         # launch / power event), holds its one-per-power-on session, and turns
@@ -564,6 +565,14 @@ class MainWindow(QMainWindow):
         from .dialogs.cue_diagnostics_dialog import CueDiagnosticsDialog
         dlg = CueDiagnosticsDialog(self._cue, self)
         dlg.exec()
+
+    def _open_cue_pair(self) -> None:
+        from .dialogs.cue_pair_dialog import CuePairDialog
+        dlg = CuePairDialog(self._cue, self._settings, self)
+        dlg.exec()
+        # The dialog may have saved a new address / enabled the sensor.
+        self._settings_page.reload()
+        self._live.set_cue_enabled(self._settings.cue.enabled)
 
     def _open_feedback(self) -> None:
         from .dialogs.feedback_dialog import FeedbackDialog
