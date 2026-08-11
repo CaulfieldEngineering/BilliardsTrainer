@@ -499,8 +499,21 @@ class Settings:
     def load(cls, path: Path | None = None) -> "Settings":
         path = path or SETTINGS_PATH
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            # utf-8-sig tolerates a byte-order mark. Plain utf-8 does not, and a
+            # BOM is exactly what most Windows editors (and PowerShell's
+            # Set-Content -Encoding utf8) prepend — the file looks perfect and
+            # parses nowhere.
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except OSError:
+            return cls()            # no file yet: first run, defaults are right
+        except json.JSONDecodeError as exc:
+            # NEVER silently. Falling back to defaults here discards the user's
+            # entire configuration — recording directory, camera rotation,
+            # encoder quality — and the app carries on looking healthy. Seen for
+            # real: one BOM reset every setting and nothing said a word.
+            log.error("settings file is not valid JSON (%s) — RUNNING ON "
+                      "DEFAULTS, existing settings left untouched at %s",
+                      exc, path)
             return cls()
         s = cls.from_dict(data)
         if _migrate_settings(s):

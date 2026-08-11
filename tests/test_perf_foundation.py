@@ -203,3 +203,36 @@ def test_schematic_base_cache_isolated():
     assert c.any(), "cached base was corrupted by a caller mutation"
     assert np.array_equal(b, c), "identical inputs must render identically"
     assert a.shape == (table.height, table.width, 3)
+
+
+def test_settings_survive_a_utf8_bom(tmp_path):
+    """A BOM must not wipe the user's configuration.
+
+    Windows editors and PowerShell's `Set-Content -Encoding utf8` both prepend
+    one. Plain utf-8 decoding rejects it, and the loader used to answer that by
+    silently returning defaults — losing the recording directory, camera
+    rotation and encoder quality while the app looked perfectly healthy.
+    """
+    from billiards_trainer.config import Settings
+
+    p = tmp_path / "settings.json"
+    s = Settings()
+    s.camera.rotation = 270
+    s.save(p)
+    p.write_bytes(b"\xef\xbb\xbf" + p.read_bytes())      # prepend a BOM
+
+    assert Settings.load(p).camera.rotation == 270
+
+
+def test_settings_report_a_corrupt_file(tmp_path, caplog):
+    """Falling back to defaults is acceptable; doing it SILENTLY is not."""
+    import logging
+
+    from billiards_trainer.config import Settings
+
+    p = tmp_path / "settings.json"
+    p.write_text("{ this is not json", encoding="utf-8")
+    with caplog.at_level(logging.ERROR):
+        Settings.load(p)
+    assert any("DEFAULTS" in r.message or "not valid JSON" in r.message
+               for r in caplog.records), "a corrupt settings file must be reported"
