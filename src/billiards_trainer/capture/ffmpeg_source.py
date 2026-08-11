@@ -37,7 +37,7 @@ import numpy as np
 
 from ..config import CameraSettings
 from .audio import NO_WINDOW, find_ffmpeg
-from .videowriter import pick_h264_encoder
+from .videowriter import pick_h264_encoder, quality_args
 
 log = logging.getLogger("capture.ffmpeg_source")
 
@@ -60,12 +60,13 @@ class FfmpegCameraSource:
 
     def __init__(self, video_device: str, width: int = 1920, height: int = 1080,
                  in_fps: int = 60, audio_device: str | None = None,
-                 cam: CameraSettings | None = None):
+                 cam: CameraSettings | None = None, qp: int = 20):
         self._video = video_device
         self._audio = audio_device
         self._w, self._h = width, height
         self._in_fps = in_fps
         self._cam = cam
+        self._qp = int(qp)
         self._proc: subprocess.Popen | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -103,7 +104,8 @@ class FfmpegCameraSource:
             cmd += ["-map", "0:v"]
             if self._audio:
                 cmd += ["-map", "0:a"]
-            cmd += ["-vf", vf, "-c:v", enc, *extra, "-b:v", "14M",
+            cmd += ["-vf", vf, "-c:v", enc, *extra,
+                    *quality_args(enc, self._qp),
                     "-color_primaries", "bt709", "-color_trc", "bt709",
                     "-colorspace", "bt709", "-pix_fmt", "yuv420p",
                     # fragmented while in progress: a crash leaves a playable

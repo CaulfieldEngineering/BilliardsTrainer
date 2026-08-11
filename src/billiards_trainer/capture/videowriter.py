@@ -85,6 +85,36 @@ def pick_h264_encoder(ffmpeg: str) -> tuple[str, tuple[str, ...]]:
     return "libx264", _ENCODER_ARGS["libx264"]
 
 
+def quality_args(encoder: str, qp: int) -> list[str]:
+    """Rate-control flags targeting a QUALITY level rather than a bitrate.
+
+    A fixed bitrate is badly wrong for this footage: a pool table is motionless
+    most of the time, and 14Mbps CBR spent the same bits on a still table as on
+    a break. Measured on a real 60s segment (924x1630@30), against the 14Mbps
+    original at 7.31 GB/hour:
+
+        h264 QP16   3.09 GB/hr   PSNR 48.2   SSIM 0.990
+        h264 QP20   0.97 GB/hr   PSNR 46.5   SSIM 0.986   <- default
+        h264 QP24   0.35 GB/hr   PSNR 45.1   SSIM 0.982
+        hevc QP20   0.66 GB/hr   PSNR 46.7   SSIM 0.986
+
+    H.264 over HEVC despite HEVC being ~30% smaller at equal quality: these get
+    watched back in Dropbox, whose preview is dependable for H.264 and patchy
+    for HEVC. AV1 was rejected outright — av1_amf pads to its own alignment
+    (924x1630 came back as 960x1632), which would shift the geometry on replay.
+    """
+    if encoder.endswith("_amf"):
+        return ["-rc", "cqp", "-qp_i", str(qp), "-qp_p", str(qp), "-quality", "0"]
+    if encoder.endswith("_nvenc"):
+        return ["-rc", "constqp", "-qp", str(qp), "-preset", "p5"]
+    if encoder.endswith("_qsv"):
+        return ["-global_quality", str(qp)]
+    if encoder.endswith("videotoolbox"):
+        # VideoToolbox has no QP mode; -q:v is 0-100, roughly inverse of QP
+        return ["-q:v", str(max(1, min(100, 100 - qp * 2)))]
+    return ["-crf", str(qp)]        # libx264 and friends
+
+
 def content_box(frame: np.ndarray, thresh: int = 12
                 ) -> tuple[int, int, int, int] | None:
     """(x0, y0, x1, y1) of the non-black active image, or None to keep all.

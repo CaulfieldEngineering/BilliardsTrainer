@@ -440,6 +440,16 @@ class RecordingSettings:
     # capture.audio.list_audio_devices), an avfoundation one on macOS.
     # "default" = first device found / the system default input.
     audio_device: str = "default"
+    # Encoder quality (QP/CRF): LOWER is better quality and a bigger file.
+    # Measured on a real 60s segment at 924x1630@30, against the old 14Mbps
+    # constant-bitrate setting which cost 7.31 GB/hour:
+    #     16 -> 3.09 GB/hr  SSIM 0.990 (visually transparent)
+    #     20 -> 0.97 GB/hr  SSIM 0.986 (excellent)      <- default
+    #     24 -> 0.35 GB/hr  SSIM 0.982 (very good)
+    # A pool table is motionless most of the time, so a fixed bitrate spent the
+    # same bits on a still table as on a break; targeting quality instead is
+    # what buys the ~7x saving at no visible cost.
+    video_qp: int = 20
 
     def resolved_dir(self) -> Path:
         d = self.directory.strip()

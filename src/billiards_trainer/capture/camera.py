@@ -441,7 +441,13 @@ def _ffmpeg_camera(index: int, cam: CameraSettings | None):
         if mic in (None, "", "default"):
             found = list_audio_devices()
             mic = found[0] if found else None
-        return FfmpegCameraSource(name, audio_device=mic, cam=cam)
+        qp = 20
+        try:
+            from ..config import Settings
+            qp = int(Settings.load().recording.video_qp)
+        except Exception:  # noqa: BLE001 - a bad/missing setting must not block capture
+            pass
+        return FfmpegCameraSource(name, audio_device=mic, cam=cam, qp=qp)
     except Exception as exc:  # noqa: BLE001 - any failure => use the OpenCV path
         log.warning("ffmpeg capture unavailable (%s); using OpenCV", exc)
         return None
