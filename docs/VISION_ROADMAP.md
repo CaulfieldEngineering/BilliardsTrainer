@@ -1,0 +1,103 @@
+# Vision & Analytics Roadmap
+
+Joe's mandate (2026-08-12, verbatim intent): *"I do not want to be the
+technical director of this product, I just want to use it, be amazed by it,
+and for it to work well. Take the reins. Self-iterating, self-evolving,
+without derailing what works."* The vision/AI/analysis side may be tweaked,
+blasted, or overwritten freely. The recording pipeline works — do not derail
+it. Reference points he named: DrillRoom (drills, per-attempt stats,
+success-rate heatmaps, percentile trends), Railbird (session recording →
+per-shot analysis, make/miss, sharing).
+
+## The operating principle
+
+**No vision change ships without a before/after score on real footage.**
+The scorer is `billiards_trainer.eval.invariants` — physical laws of pool
+checked label-free — run by `tools/score_session.py` (one clip) and
+`tools/score_corpus.py` (every session, unattended, resumable). A change
+that raises impossible-violation rates or drops coverage does not ship.
+This exists because the stack was unmeasurable for years and quality
+random-walked; that is over.
+
+Key data facts learned from footage (do not relearn these):
+- Joe's felt carries **drill position markers** (donut stickers, chalk dots).
+  The model detects them as balls; the size prior (`model_size_lo/hi`, band
+  [0.72, 1.55] × geometric radius) is what kills them. Markers ≤0.66×,
+  real balls ≥0.89× (measured session-20260812).
+- Ball ≈ 30 px diameter at native 936×1640; printed numbers are ~8-10 px —
+  too small to read reliably. Identity must come from **colour + solid/stripe**
+  (the colour code: 1 yellow, 2 blue, 3 red, 4 purple, 5 orange, 6 green,
+  7 maroon, 8 black; 9-15 repeat as stripes). Specular glare from the
+  overhead light sits on every ball and fools naive stripe detection.
+- `out_of_game_number` (stripes 10-15 claimed in 9-ball) is the identifier
+  model misreading — fixing it needs retraining, not tracker heuristics.
+
+## Phases
+
+### Phase 1 — Measurement (DONE, keep green)
+- [x] Invariant scorer + degenerate-detector guards (`eval/invariants.py`)
+- [x] Session scorer, corpus runner, violation-frame dumper
+- [x] Baseline frozen: `_eval/corpus/post_marker_fix/`
+- [x] First fixes proven: marker phantoms, cue uniqueness, settled-identity lock
+
+### Phase 2 — Detection & ID rebuilt against the metric (NEXT)
+The identifier misreads stripes; the finder misses jaw balls and fires on
+glare. The loop that fixes both without hand-labelling:
+1. Mine hard examples automatically: every invariant violation names a frame
+   and a place — crop it. (`vanished_mid_table` = missed detection;
+   `out_of_game_number` = misread; `duplicate_number` = one of the two crops
+   is wrong.)
+2. Auto-label with the VLM path that exists (`train/autolabel.py`, needs the
+   backend configured) + colour-code priors as a cross-check. Discard
+   disagreements — never train on a guess.
+3. Fine-tune the finder (`pool_yolo11.onnx`) and identifier
+   (`pool_ballid_r2.onnx`) on Joe's-table crops; export ONNX.
+4. Score corpus before/after; ship only on improvement. Keep the old model
+   file — rollback is a file copy.
+Add a `marker` class so drill stickers become a *feature* (drill zones)
+instead of a rejected nuisance.
+
+### Phase 3 — Event layer (the keystone)
+Everything a user loves in Railbird/DrillRoom sits on one primitive: the
+**shot**. Segment sessions into shots; detect pots.
+- Vision: settled → cue accelerates → balls scatter → settle = one shot.
+  A ball vanishing near a pocket during the shot = pot (already have
+  pocket geometry + vanish detection in the scorer).
+- The BLE cue sensor (JINOU JO-BEC12-2, `cue/`) provides the hardware
+  impact timestamp — a ground-truth "shot happened NOW" trigger plus stroke
+  mechanics (backswing, pause, acceleration, straightness). Camera-only
+  competitors cannot do this; it is the differentiator. SAFETY: never write
+  to the device (B3A2 absent by design — a write bricked unit #1).
+- Persist shots to the DB layer (`db/`): time span, balls moved, pots,
+  cue-ball start/end, stroke metrics when the sensor is on.
+
+### Phase 4 — Analytics on top of shots
+- Per-session: shots, pots, success %, session timeline you can scrub.
+- Heatmaps: make % by cue-ball position / object-ball position (DrillRoom's
+  most-loved view).
+- Trends across sessions; streaks; time-of-day.
+- Stroke ↔ outcome correlation (sensor): "your misses have 2.3× the lateral
+  jerk of your makes" — the thing Joe explicitly asked to see.
+
+### Phase 5 — UI worthy of it
+Joe: current UI "screams python". Design system pass: dark, spacious,
+typographic hierarchy, animated transitions, live-updating cards. The
+schematic view is already close; the chrome around it is not. Do not touch
+the recording controls' behaviour (hard-won stability).
+
+### Phase 6 — The self-iterating loop (runs unattended)
+Nightly (Task Scheduler or on-demand):
+1. `score_corpus.py` over new sessions → append to trend log
+2. Mine violations → crops → auto-label → grow the training set
+3. Retrain when the set has grown enough; score challenger vs champion on
+   the frozen corpus; promote only on strict improvement; keep rollback.
+4. Write a one-paragraph plain-English report Joe can read with coffee.
+Guard-rails: promotion gate is the corpus score (impossible-rate must not
+rise, coverage must not fall); champions are files, rollback is trivial;
+the recording path is never touched by this loop.
+
+## Session log
+- 2026-08-12: Phase 1 built. Baseline: coverage 10.92 vs 6 real balls,
+  stability 32.1%, impossible 4.06/1k. After marker/cue/identity fixes:
+  9.49 / 41.0% / 1.14 (session-20260812); 14.54 → 0.69/1k impossible on
+  session-20260808. Corpus sweep running: `_eval/corpus/post_marker_fix/`.
