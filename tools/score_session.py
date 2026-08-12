@@ -73,7 +73,6 @@ def main() -> int:
     if not cap.isOpened():
         print(f"could not open {video}", file=sys.stderr)
         return 2
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     if args.start > 0:
         cap.set(cv2.CAP_PROP_POS_MSEC, args.start * 1000.0)
 
