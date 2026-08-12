@@ -107,3 +107,4 @@ _train/
 *.pt
 .trainvenv/
 docs/feedmeter-snaps/
+_eval/
