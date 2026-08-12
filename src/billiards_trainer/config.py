@@ -187,6 +187,14 @@ class BallSettings:
     # kill real balls. Tighten in the tuning sandbox once detector radius is
     # calibrated. (Rendering uses the true geometric size regardless.)
     size_prior_tol: float = 0.55
+    # Size prior for MODEL detectors, as fractions of the geometric ball radius.
+    # Model boxes are tight, so the band can be far tighter than size_prior_tol —
+    # and it has to be: Joe's felt carries drill position markers (donut stickers,
+    # chalk dots) that the model confidently detects as balls. Measured on
+    # session-20260812: markers project to <=0.66x the geometric radius, real
+    # balls to >=0.89x. The band splits the two populations down the middle.
+    model_size_lo: float = 0.72
+    model_size_hi: float = 1.55
     detect_param2: int = 18         # Hough accumulator threshold (lower => more circles)
     cue_speed_strike: float = 14.0  # px/frame on rectified view that counts as a strike
     stop_speed: float = 1.2         # px/frame below which a ball is "stopped"

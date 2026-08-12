@@ -84,7 +84,12 @@ class _Internal:
         if self.committed_number < 0 or top == self.committed_number:
             self.committed_number = top
         elif topn >= cnt.get(self.committed_number, 0) + 5:
-            self.committed_number = top   # challenger clearly won — switch
+            # A ball at rest cannot become a different ball — physics, not
+            # preference. While settled, identity is FROZEN: challenger votes
+            # (glare, a neighbour's edge in the crop) accumulate but cannot
+            # flip it. The re-vote happens when the ball actually moves.
+            if not self.settled:
+                self.committed_number = top   # challenger clearly won — switch
 
 
 class BallTracker:
@@ -405,13 +410,27 @@ class BallTracker:
         self._tracks.append(t)
 
     def _public(self) -> list[Track]:
+        # One cue ball per table. Number arbitration alone doesn't guarantee it:
+        # a track stripped of number 0 falls back to its class-vote history,
+        # which is still full of CUE votes, so two tracks can both RENDER as
+        # cue. Rank cue claimants by evidence; everyone else shows as unknown.
+        claimants = [t for t in self._tracks if t.confirmed and t.cls == BallClass.CUE]
+        cue_id = None
+        if claimants:
+            cue_id = max(claimants, key=lambda t: (
+                t.committed_number == 0,
+                sum(1 for c in t.cls_hist if c == BallClass.CUE),
+                t.hits, -t.misses)).id
         out = []
         for t in self._tracks:
             if not t.confirmed:
                 continue
+            cls, num = t.cls, t.number
+            if cls == BallClass.CUE and t.id != cue_id:
+                cls, num = BallClass.UNKNOWN, -1
             tr = Track(
                 id=t.id, x=t.x, y=t.y, radius=t.radius, vx=t.vx, vy=t.vy,
-                cls=t.cls, number=t.number, bgr=t.bgr, age=t.age, hits=t.hits,
+                cls=cls, number=num, bgr=t.bgr, age=t.age, hits=t.hits,
                 misses=t.misses, active=(t.misses == 0), history=list(t.pos_hist),
             )
             out.append(tr)

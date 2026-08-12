@@ -278,15 +278,49 @@ class Pipeline:
         and update the tracker. Shared by the synchronous path (video replay,
         seek/step, tests) and ingest_raw_detections (live async worker)."""
         detections = self._project_raw_to_rect(raw_dets, calib, frame_shape)
-        # Physical-size prior: reject blobs whose radius is far from the known
-        # ball radius. Skipped for model-based detectors, which already
-        # validate ball-ness with high confidence.
-        if not getattr(self._strategy, "model_based", False):
-            exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
+        # Physical-size prior: reject detections whose radius is far from the
+        # known ball radius. This used to be skipped for model-based detectors
+        # on the assumption that a model "already validates ball-ness" — which
+        # session footage disproved: the model detects the drill position
+        # markers stuck to the felt (donut stickers, chalk dots) as balls, some
+        # at 0.88 confidence, and being static they confirm, settle, and live
+        # nearly forever in the tracker. Markers project to well under 0.7x the
+        # geometric ball radius while real balls stay above it, so the size
+        # prior — with a band matched to each detector's radius behaviour — is
+        # exactly the right knife. (One day the markers become a feature:
+        # detect them as a marker class for DrillRoom-style drills.)
+        exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
+        if getattr(self._strategy, "model_based", False):
+            lo_f = getattr(self.settings.balls, "model_size_lo", 0.72)
+            hi_f = getattr(self.settings.balls, "model_size_hi", 1.55)
+            if exp_r > 2.0 and lo_f > 0:
+                lo, hi = exp_r * lo_f, exp_r * hi_f
+                detections = [d for d in detections if lo <= d.radius <= hi]
+        else:
             tol = getattr(self.settings.balls, "size_prior_tol", 0.25)
             if exp_r > 2.0 and tol > 0:
                 lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
                 detections = [d for d in detections if lo <= d.radius <= hi]
+        # Uniqueness at the source: one cue ball, one of each number, per frame.
+        # When two detections claim the same identity the weaker one is either a
+        # phantom or a misread — either way its CLAIM is wrong. Demote the claim
+        # (not the detection: the ball may be real, just mislabelled) so a
+        # sticker or glare blob can never outvote the real ball downstream.
+        # This is the frame-level complement of the tracker's _arbitrate_numbers.
+        best_by_num: dict[int, Detection] = {}
+        for d in detections:
+            if d.number >= 0:
+                cur = best_by_num.get(d.number)
+                if cur is None or d.score > cur.score:
+                    best_by_num[d.number] = d
+        cues = [d for d in detections if d.cls == BallClass.CUE]
+        best_cue = max(cues, key=lambda d: d.score) if cues else None
+        for d in detections:
+            if d.number >= 0 and best_by_num.get(d.number) is not d:
+                d.number = -1
+            if d.cls == BallClass.CUE and d is not best_cue:
+                d.cls = BallClass.UNKNOWN
+                d.number = -1
         # Confidence floor. A trained model is well-calibrated and already
         # thresholded in the strategy, so apply only the base confidence_floor.
         # A heuristic (non-model) detector gets the stricter render_floor —
