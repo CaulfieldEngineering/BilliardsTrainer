@@ -118,3 +118,37 @@ def test_install_and_relaunch_spawns_hidden_with_devnull(monkeypatch, tmp_path):
     assert kw["stdin"] is sp.DEVNULL
     assert kw["stdout"] is sp.DEVNULL
     assert kw["stderr"] is sp.DEVNULL
+
+
+# --------------------------------------------------------------------------- #
+# No update nagging from a source checkout
+#
+# The source tree carries the placeholder __version__ ("0.1.0" — CI stamps the
+# real one), so EVERY published release compares as newer and the launch prompt
+# fired on every start. It also had nothing to offer: a running interpreter
+# can't be swapped by install_and_relaunch, and the machine this runs on blocks
+# unsigned exes anyway.
+# --------------------------------------------------------------------------- #
+def test_can_self_update_false_from_source(monkeypatch):
+    import sys as _sys
+    monkeypatch.delattr(_sys, "frozen", raising=False)
+    assert updater.can_self_update() is False
+
+
+def test_can_self_update_true_when_frozen(monkeypatch):
+    import sys as _sys
+    monkeypatch.setattr(_sys, "frozen", True, raising=False)
+    assert updater.can_self_update() is True
+
+
+def test_source_version_would_otherwise_look_stale():
+    """Guards the actual mechanism of the bug: the placeholder version loses to
+    any real release, which is exactly why the gate can't be a version compare."""
+    from billiards_trainer.version import __version__
+    if __version__ == "0.1.0":                       # unstamped source tree
+        assert updater.is_newer("0.2.91", __version__)
+
+
+def test_auto_check_defaults_off():
+    from billiards_trainer.config import UpdateSettings
+    assert UpdateSettings().auto_check is False

@@ -102,6 +102,20 @@ def fetch_manifest(url: str = UPDATE_MANIFEST_URL, timeout: float = 6.0) -> Upda
     return None
 
 
+def can_self_update() -> bool:
+    """True only for a frozen build, which is the only thing that can replace
+    itself.
+
+    A source checkout (``python -m billiards_trainer``) reports the placeholder
+    ``__version__`` of "0.1.0" — CI stamps the real version at build time — so
+    every published release compares as newer and the app nags on every single
+    launch. Worse, there is nothing useful to offer: ``install_and_relaunch``
+    can't swap a running interpreter, and a source tree is updated with git.
+    Gate the whole feature on this rather than relying on the version compare.
+    """
+    return bool(getattr(sys, "frozen", False))
+
+
 def check_for_update(current: str = __version__,
                      url: str = UPDATE_MANIFEST_URL) -> UpdateInfo | None:
     """Return UpdateInfo if a newer release is available, else None."""

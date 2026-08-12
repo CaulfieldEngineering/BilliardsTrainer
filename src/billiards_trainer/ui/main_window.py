@@ -445,6 +445,10 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ #
     def _maybe_check_updates(self) -> None:
+        from ..update.updater import can_self_update
+        if not can_self_update():
+            log.info("Running from source — no update check (git manages this tree)")
+            return
         if self._settings.updates.auto_check:
             log.info("Auto update-check on launch (current v%s)", __version__)
             self._run_update_check(forced=False)
@@ -470,6 +474,14 @@ class MainWindow(QMainWindow):
             if self._update_forced:
                 self._settings_page.set_update_status(
                     f"You're on the latest version (v{__version__}).")
+            return
+        from ..update.updater import can_self_update
+        if not can_self_update():
+            # Nothing to offer: a source tree updates with git, and the download
+            # flow ends in an exe this checkout would never run.
+            self._settings_page.set_update_status(
+                f"Version {info.version} is published. This is a source checkout "
+                "(v{}) — update it with git pull.".format(__version__))
             return
         if self._update_forced:
             self._settings_page.set_update_status(f"Version {info.version} is available.")

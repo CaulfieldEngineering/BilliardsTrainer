@@ -291,7 +291,11 @@ class UiSettings:
 
 @dataclass
 class UpdateSettings:
-    auto_check: bool = True
+    """In-app updater. Off by default: the launch prompt is an interruption on a
+    dedicated machine, and it only ever had one useful moment — a frozen build
+    with a newer release out. Check on demand from Settings instead."""
+
+    auto_check: bool = False
     last_check_iso: str = ""
     skip_version: str = ""
 

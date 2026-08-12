@@ -607,6 +607,19 @@ class SettingsPage(QWidget):
         form.addRow("", ver)
         self._auto_check = QCheckBox("Check for updates on launch")
         form.addRow("", self._auto_check)
+        # A source checkout can't replace itself and reports the placeholder
+        # version, so it would flag every release as newer. Say so plainly
+        # instead of leaving a toggle that silently does nothing.
+        from ...update.updater import can_self_update
+        if not can_self_update():
+            self._auto_check.setEnabled(False)
+            self._auto_check.setToolTip(
+                "Running from source — update this tree with git pull.")
+            src = QLabel("Running from source; the in-app updater is off. "
+                         "Use <b>git pull</b> to update.")
+            src.setObjectName("Faint")
+            src.setWordWrap(True)
+            form.addRow("", src)
 
         self._check_btn = QPushButton("  Check for updates now")
         self._check_btn.setObjectName("Accent")
