@@ -101,3 +101,13 @@ the recording path is never touched by this loop.
   stability 32.1%, impossible 4.06/1k. After marker/cue/identity fixes:
   9.49 / 41.0% / 1.14 (session-20260812); 14.54 → 0.69/1k impossible on
   session-20260808. Corpus sweep running: `_eval/corpus/post_marker_fix/`.
+- 2026-08-12 (later): Full-corpus champion baseline frozen:
+  `_eval/corpus/post_marker_fix/aggregate.json` — 18 sessions, 197,477
+  ball-frames, **4.86 impossible/1k**, 0 failed, 0 degenerate. Spread is
+  30×: best sessions 0.44-0.78/1k; three outliers 13-22/1k dominated by
+  `overlapping_balls` (93-139 each — double-detections, NOT markers). Both
+  daytime sessions (2026-07-24) are outliers → sunlight implicated.
+  session-20260723 shows 3,248 `out_of_game_number` (stripe misreads) yet
+  only 0.44/1k impossible — confirms identifier vs detector are separate
+  failure axes. Diagnosis workflow dispatched (outlier frame forensics +
+  toolchain audit for Phase 2).
