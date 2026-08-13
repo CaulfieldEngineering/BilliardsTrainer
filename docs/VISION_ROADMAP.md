@@ -111,3 +111,20 @@ the recording path is never touched by this loop.
   only 0.44/1k impossible — confirms identifier vs detector are separate
   failure axes. Diagnosis workflow dispatched (outlier frame forensics +
   toolchain audit for Phase 2).
+- 2026-08-12 (evening): Outliers diagnosed by parallel frame forensics and
+  fixed (573cc68): pocketed balls in the basket (class-gated void filter),
+  tile-seam truncated boxes, shadow-fused touching pairs (fixed by
+  constraint projection to touching). Re-scored: 22.33→0.43, 15.28→1.59,
+  13.17→0.70 impossible/1k. Corpus re-baseline running
+  (`_eval/corpus/post_overlap_fix/`). Phase 2 bootstrap: `.trainvenv`
+  install running; Claude-as-VLM labelling path VALIDATED end to end on
+  session-20260812 — 12 layouts, 59 balls labelled, dataset built
+  (`_train/autolabel/dataset`). First identity metric: live heuristic
+  agrees with vision labels on 50/59 (84.7%). Learned: montage stride 12
+  collapses layouts to single frames (propagation +0) — next labelling
+  round needs denser stride for a real training set; finder systematically
+  MISSES the purple 4 and green 6 (they appear only as un-boxed slivers) —
+  finder recall is a separate axis from identifier accuracy; the felt
+  markers are where Joe spots balls for drills, so marker and ball
+  routinely share coordinates. NO projector exists — white lines on the
+  felt are physical tape/drawn guides.
