@@ -86,7 +86,7 @@ def main() -> int:
     # id switches: count transitions where the cue id changes between consecutive
     # PRESENT frames (a drop-then-reappear with a new id counts as a switch).
     ids = [r[4] for r in present]
-    switches = sum(1 for a, b in zip(ids, ids[1:]) if a != b)
+    switches = sum(1 for a, b in zip(ids, ids[1:], strict=False) if a != b)
     distinct_ids = len(set(ids))
 
     # stationary jitter: over sliding windows where the cue moves little, the

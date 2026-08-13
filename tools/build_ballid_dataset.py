@@ -82,7 +82,7 @@ def remap_split(ds: str, mapper, split: str, counts: dict) -> None:
         shutil.copy2(img, out_img / (stem + img.suffix))
         (out_lbl / (stem + ".txt")).write_text("\n".join(new_lines))
         counts[split] = counts.get(split, 0) + 1
-        for ln in new_lines:
+        for _ln in new_lines:
             counts["boxes"] = counts.get("boxes", 0) + 1
 
 

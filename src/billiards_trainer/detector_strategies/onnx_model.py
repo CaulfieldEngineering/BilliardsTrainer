@@ -145,7 +145,7 @@ class OnnxModelStrategy(DetectorStrategy):
         return res
 
     @staticmethod
-    def _merge_boxes(boxes, min_frac: float = 1.1):
+    def _merge_boxes(boxes, min_frac: float = 1.25):
         """Dedupe near-coincident boxes (the same ball seen by both tiles),
         keeping the higher-confidence one.
 
@@ -153,13 +153,34 @@ class OnnxModelStrategy(DetectorStrategy):
         slightly different letterbox scales, so its two boxes can sit ~1 radius
         apart — 0.7r let both through, spawning hundreds of phantom tentative
         tracks per session (and visible position ping-pong). Two REAL touching
-        balls are 2r apart, so 1.1r still never merges neighbours."""
+        balls are 2r apart in truth, and no closer than ~1.3r measured (soft
+        daylight shadow between them pulls both centroids inward), so 1.25r
+        never merges neighbours. The distance is measured against the LARGER of
+        the two radii: the old candidate-only measure let a deflated truncated
+        box shrink its own merge zone and survive next to the real one — the
+        invariant scorer caught the survivors as overlapping_balls violations
+        (two tracks under 0.8 diameters apart) concentrated where balls cross
+        the tile seam."""
         kept = []
         for b in sorted(boxes, key=lambda t: t[3], reverse=True):
-            mind = min_frac * max(b[2], 8.0)
-            if all((b[0] - k[0]) ** 2 + (b[1] - k[1]) ** 2 > mind * mind for k in kept):
+            if all((b[0] - k[0]) ** 2 + (b[1] - k[1]) ** 2
+                   > (min_frac * max(b[2], k[2], 8.0)) ** 2 for k in kept):
                 kept.append(b)
         return kept
+
+    @staticmethod
+    def _drop_seam_truncated(boxes, seam_y: float, side: str, margin: float = 2.0):
+        """Remove boxes clipped by a tile's INTERIOR seam edge.
+
+        A ball straddling the seam is truncated in one tile — centre shifted
+        toward the visible half, radius deflated — but fully visible in the
+        OTHER tile (the tiles overlap by 20% of the region, several ball
+        diameters). The truncated copy is pure liability: its bad geometry can
+        sit past every distance-based dedupe. ``side`` names which side of
+        ``seam_y`` this tile actually covers ("above" = top tile)."""
+        if side == "above":
+            return [b for b in boxes if b[1] + b[2] < seam_y - margin]
+        return [b for b in boxes if b[1] - b[2] > seam_y + margin]
 
     def detect(self, frame_bgr, calib, rescan: bool | None = None):
         """``rescan`` overrides the instance's far_rail_rescan for THIS call —
@@ -192,9 +213,17 @@ class OnnxModelStrategy(DetectorStrategy):
         do_tiled = self.far_rail_rescan if rescan is None else rescan
         th = int(rh * 0.60)
         if do_tiled and th > 64:
+            # Interior seam edges in full-frame coords: the top tile ends at
+            # cy0+th, the bottom tile starts at cy0+rh-th. Boxes clipped by
+            # those edges are truncated duplicates of a ball the other tile
+            # sees whole — drop them before the distance-based merge.
             boxes = self._merge_boxes(
-                self._infer(region[0:th, :], ox=cx0, oy=cy0)
-                + self._infer(region[rh - th:, :], ox=cx0, oy=cy0 + rh - th))
+                self._drop_seam_truncated(
+                    self._infer(region[0:th, :], ox=cx0, oy=cy0),
+                    seam_y=cy0 + th, side="above")
+                + self._drop_seam_truncated(
+                    self._infer(region[rh - th:, :], ox=cx0, oy=cy0 + rh - th),
+                    seam_y=cy0 + rh - th, side="below"))
         else:
             boxes = self._merge_boxes(self._infer(region, ox=cx0, oy=cy0))
         if not boxes:

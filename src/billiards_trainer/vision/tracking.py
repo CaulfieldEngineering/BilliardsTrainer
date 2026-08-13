@@ -307,6 +307,20 @@ class BallTracker:
         # picked up — let it age out fast.
         self._tracks = [t for t in self._tracks
                         if t.misses <= (self.occluded_budget if t.settled else self.max_misses)]
+        # A track that came to rest PAST the cushion line inside a pocket zone
+        # is a ball lying in the basket — pocketed, done. Without this the
+        # occlusion budget keeps it as a ghost for another minute after the
+        # ingestion filter stops feeding it (and before that filter existed, a
+        # basket pair sat as settled tracks for 40+ s firing impossible-overlap
+        # violations every frame).
+        if bounds is not None and pockets and pocket_r > 0:
+            bx0, by0, bx1, by1 = bounds
+            cap_sq = (1.4 * pocket_r) ** 2
+            self._tracks = [
+                t for t in self._tracks
+                if (bx0 <= t.x <= bx1 and by0 <= t.y <= by1)
+                or not any((t.x - px) ** 2 + (t.y - py) ** 2 <= cap_sq
+                           for px, py in pockets)]
         self._arbitrate_numbers()
         return self._public()
 

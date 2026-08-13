@@ -7,6 +7,7 @@ touch Qt or the DB — those are wired in the controller, keeping this testable.
 """
 
 import logging
+import math
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -301,6 +302,35 @@ class Pipeline:
             if exp_r > 2.0 and tol > 0:
                 lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
                 detections = [d for d in detections if lo <= d.radius <= hi]
+        # Rigid-body repair: two balls cannot interpenetrate, so when two
+        # ball-sized detections sit closer than one diameter the truth is that
+        # they are TOUCHING and both centroids were pulled inward (measured in
+        # daylight footage: the soft shadow bridging touching rack balls drags
+        # both centres 10-35% together). Project onto the feasible set — push
+        # the pair apart along its axis to exactly one diameter. This is state
+        # estimation, not cosmetics: contact/pot geometry downstream needs
+        # centres that obey physics. Iterated because a repair can re-tighten a
+        # neighbouring pair in a chain (a rack); convergence is geometric and
+        # n <= 16, so the worst case is still microseconds.
+        if exp_r > 2.0 and len(detections) >= 2:
+            target = 2.0 * exp_r
+            for _ in range(8):
+                moved = False
+                for i in range(len(detections)):
+                    for j in range(i + 1, len(detections)):
+                        a, b = detections[i], detections[j]
+                        dx, dy = b.x - a.x, b.y - a.y
+                        d = math.hypot(dx, dy)
+                        if d < 1.0 or d >= target:
+                            continue
+                        push = 0.5 * (target - d) / d
+                        a.x -= dx * push
+                        a.y -= dy * push
+                        b.x += dx * push
+                        b.y += dy * push
+                        moved = True
+                if not moved:
+                    break
         # Uniqueness at the source: one cue ball, one of each number, per frame.
         # When two detections claim the same identity the weaker one is either a
         # phantom or a misread — either way its CLAIM is wrong. Demote the claim
@@ -349,6 +379,17 @@ class Pipeline:
         kept = []
         for d in detections:
             if not tbl.on_table(d.x, d.y, margin=edge):
+                continue
+            # A pocketed ball resting in the basket is visible from overhead —
+            # past the cushion line, inside a pocket zone — and classifies
+            # confidently (it IS a real ball), so the class-gated void check
+            # below never rejected it. Measured on session-20260729: a #5/#6
+            # pair sat in the side-pocket basket for 40+ seconds as settled
+            # tracks, firing overlapping_balls every frame. Off the bed AND in
+            # a pocket zone = pocketed, whatever the class says. Balls hanging
+            # at the jaw sit ON the bed side of the nose line and are kept.
+            in_bed = tbl.x0 <= d.x <= tbl.x1 and tbl.y0 <= d.y <= tbl.y1
+            if not in_bed and tbl.pocket_at(d.x, d.y, scale=1.4) is not None:
                 continue
             if (d.cls in (BallClass.EIGHT, BallClass.UNKNOWN)
                     and tbl.pocket_at(d.x, d.y, scale=0.9) is not None):
