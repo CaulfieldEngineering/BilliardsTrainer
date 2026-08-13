@@ -156,7 +156,11 @@ def stage_montages(args) -> int:
     print(f"{len(settled)} settled, {len(layouts)} distinct layouts")
 
     det = _detector()
-    manifest = {"session": str(args.session), "layouts": []}
+    # The stride is part of the data: frame_index values below are positions in
+    # THIS sampling. The build stage must re-load at the same stride or its
+    # propagation bases land on entirely different moments of the session (the
+    # bug that silently produced "+0 propagated frames" everywhere).
+    manifest = {"session": str(args.session), "stride": args.stride, "layouts": []}
     for li, fi in enumerate(layouts):
         frame = frames[fi]
         raw = det.detect(frame, None)
@@ -201,9 +205,14 @@ def stage_build(args) -> int:
     # multiplying labelled images ~Nx with zero extra labelling effort.
     prop_frames: list = []
     if args.propagate and manifest.get("session"):
+        # frame_index in the manifest is a position in the MONTAGE-stage
+        # sampling, so frames must be re-loaded at that same stride — older
+        # manifests didn't record it, in which case trust --stride and accept
+        # that a mismatch quietly disables propagation via the motion gate.
+        stride = int(manifest.get("stride") or args.stride)
         tmp: list = []
         try:
-            prop_frames = [f for f in load_frames(Path(manifest["session"]), args.stride, tmp)
+            prop_frames = [f for f in load_frames(Path(manifest["session"]), stride, tmp)
                            if f is not None]
         finally:
             for d in tmp:
