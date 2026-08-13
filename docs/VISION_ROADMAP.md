@@ -128,3 +128,20 @@ the recording path is never touched by this loop.
   markers are where Joe spots balls for drills, so marker and ball
   routinely share coordinates. NO projector exists — white lines on the
   felt are physical tape/drawn guides.
+- 2026-08-12 (night): The loop worked exactly as designed — the corpus
+  caught MY regression before it shipped (aggregate improved 4.86 → 3.55
+  impossible/1k, but one session went 7.68 → 22.60). Root causes fixed
+  (3a5506e): unconditional rigid-body repair laundered duplicate detections
+  into legal pairs → repair is now identity-gated (distinct numbers = push
+  apart; same/unknown = merge); the settled-lock froze track pairs at
+  impossible positions → the published tracks get the same projection; and
+  NEITHER diameter ruler is trustworthy alone (boxes run ~25% large on some
+  sessions, geometry inherits table-lock error ~25% the other way on
+  session-20260802-173553, whose lock includes rail margin — KNOWN ISSUE,
+  felt-detection defect) → scorer now uses box-median clamped to ±20% of
+  geometric, and score_session judges with the pipeline's own calibration.
+  Verified: 33.11 → 0.54/1k on the regressed window, controls unchanged.
+  Phase 2 assets: challenger c2 trained (35 imgs/152 balls, all 16 classes,
+  smoke-tested); champion/challenger gate tool ready; champion_v3 corpus
+  baseline running. Gate c2 when it lands: expect c2 to LOSE (thin data) —
+  the point is the loop; c3 gets denser-stride labels + more sessions.
