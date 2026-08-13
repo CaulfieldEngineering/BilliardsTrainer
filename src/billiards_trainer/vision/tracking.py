@@ -140,7 +140,8 @@ class BallTracker:
     def update(self, detections: list[Detection], short_side: float,
                bounds: tuple[float, float, float, float] | None = None,
                pockets: list[tuple[float, float]] | None = None,
-               pocket_r: float = 0.0) -> list[Track]:
+               pocket_r: float = 0.0,
+               ball_r: float = 0.0) -> list[Track]:
         self._short_side = max(1.0, short_side)
         # Velocity-aware gate: a struck ball can cross more than the static gate
         # in one frame; letting the gate grow with track speed keeps the SAME
@@ -288,7 +289,13 @@ class BallTracker:
         # this frame (it sits on the real detection); drop the stale coaster. This
         # kills the "two cue balls / duplicate ball" artefact on bounces.
         if len(self._tracks) > 1:
-            merge_dist = 0.035 * self._short_side
+            # Align the duplicate threshold with physics: two tracks closer
+            # than 0.8 ball diameters are impossible, so merge them. The old
+            # 0.035*short fraction worked out to 0.776 diameters — leaving a
+            # 2.4% sliver where a starved duplicate could ride the settled
+            # occlusion budget for a minute, parked inside a real ball (the
+            # dedupe already prefers the detection-backed track of a pair).
+            merge_dist = max(0.035 * self._short_side, 1.6 * ball_r)
             order = sorted(range(len(self._tracks)),
                            key=lambda i: (self._tracks[i].misses == 0, self._tracks[i].hits),
                            reverse=True)

@@ -303,34 +303,52 @@ class Pipeline:
                 lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
                 detections = [d for d in detections if lo <= d.radius <= hi]
         # Rigid-body repair: two balls cannot interpenetrate, so when two
-        # ball-sized detections sit closer than one diameter the truth is that
-        # they are TOUCHING and both centroids were pulled inward (measured in
-        # daylight footage: the soft shadow bridging touching rack balls drags
-        # both centres 10-35% together). Project onto the feasible set — push
-        # the pair apart along its axis to exactly one diameter. This is state
-        # estimation, not cosmetics: contact/pot geometry downstream needs
-        # centres that obey physics. Iterated because a repair can re-tighten a
-        # neighbouring pair in a chain (a rack); convergence is geometric and
-        # n <= 16, so the worst case is still microseconds.
+        # ball-sized detections sit closer than one diameter, either they are
+        # two REAL touching balls whose centroids were pulled inward (daylight
+        # shadow bridging a rack pair drags both centres 10-35% together), or
+        # they are ONE ball detected twice. The two cases demand opposite
+        # treatment, and the first corpus run after unconditional push-apart
+        # proved it: repairing duplicates LAUNDERS them into legal-looking
+        # pairs (phantom tracks, stripe misreads — 22.6/1k on one session).
+        # Identity is the discriminator: two DISTINCT confident numbers is
+        # evidence of two real balls -> push apart to touching. Same number or
+        # unknown -> the ensemble numbers only one box per physical ball, so
+        # treat as a duplicate and keep the stronger. Iterated because a
+        # repair can re-tighten a neighbouring pair in a chain (a rack).
         if exp_r > 2.0 and len(detections) >= 2:
             target = 2.0 * exp_r
+            drop: set[int] = set()
             for _ in range(8):
                 moved = False
                 for i in range(len(detections)):
+                    if i in drop:
+                        continue
                     for j in range(i + 1, len(detections)):
+                        if j in drop:
+                            continue
                         a, b = detections[i], detections[j]
                         dx, dy = b.x - a.x, b.y - a.y
                         d = math.hypot(dx, dy)
-                        if d < 1.0 or d >= target:
+                        if d >= target:
                             continue
-                        push = 0.5 * (target - d) / d
-                        a.x -= dx * push
-                        a.y -= dy * push
-                        b.x += dx * push
-                        b.y += dy * push
-                        moved = True
+                        distinct = (a.number >= 0 and b.number >= 0
+                                    and a.number != b.number)
+                        if distinct and d >= 1.0:
+                            push = 0.5 * (target - d) / d
+                            a.x -= dx * push
+                            a.y -= dy * push
+                            b.x += dx * push
+                            b.y += dy * push
+                            moved = True
+                        else:
+                            loser = j if a.score >= b.score else i
+                            drop.add(loser)
+                            if loser == i:
+                                break   # a is gone; stop comparing against it
                 if not moved:
                     break
+            if drop:
+                detections = [d for k, d in enumerate(detections) if k not in drop]
         # Uniqueness at the source: one cue ball, one of each number, per frame.
         # When two detections claim the same identity the weaker one is either a
         # phantom or a misread — either way its CLAIM is wrong. Demote the claim
@@ -405,7 +423,38 @@ class Pipeline:
             bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),
             pockets=[(p.x, p.y) for p in tbl.pockets],
             pocket_r=float(tbl.pocket_radius),
+            ball_r=float(exp_r),
         )
+        # The PUBLISHED state must obey physics too. The detection-level repair
+        # moves interpenetrating pairs apart, but a settled track's anti-shimmer
+        # lock swallows that few-pixel correction as jitter, so the track pair
+        # can stay frozen at impossible positions indefinitely (measured: two
+        # balls parked touching in a pocket jaw during drills, flagged every
+        # frame). Apply the same identity-gated projection to the track copies
+        # we hand out — the tracker's internal state is untouched, so matching
+        # behaviour doesn't change.
+        if exp_r > 2.0 and len(tracks) >= 2:
+            target = 2.0 * exp_r
+            for _ in range(4):
+                moved = False
+                for i in range(len(tracks)):
+                    for j in range(i + 1, len(tracks)):
+                        a, b = tracks[i], tracks[j]
+                        if not (a.number >= 0 and b.number >= 0
+                                and a.number != b.number):
+                            continue
+                        dx, dy = b.x - a.x, b.y - a.y
+                        d = math.hypot(dx, dy)
+                        if d < 1.0 or d >= target:
+                            continue
+                        push = 0.5 * (target - d) / d
+                        a.x -= dx * push
+                        a.y -= dy * push
+                        b.x += dx * push
+                        b.y += dy * push
+                        moved = True
+                if not moved:
+                    break
         self._last_detections = detections
         self._last_raw_dets = list(raw_dets)
         self._frames_since_ingest = 0

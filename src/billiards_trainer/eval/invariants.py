@@ -197,15 +197,18 @@ def _median_diameter(tracks: list[Track]) -> float:
 
 def check_frame(tracks: list[Track], frame: int,
                 bed: tuple[float, float, float, float] | None = None,
-                max_number: int | None = None) -> list[Violation]:
+                max_number: int | None = None,
+                diameter: float | None = None) -> list[Violation]:
     """Spatial laws that hold within a single frame.
 
     ``bed`` is ``(x0, y0, x1, y1)`` of the playing surface in track coordinates
     (rectified space), or None to skip containment checks. ``max_number``
     rejects balls that cannot be in play — in 9-ball, anything above 9.
+    ``diameter`` is the known ball diameter (see SequenceScorer); when absent
+    it is estimated from the tracks' own radii.
     """
     out: list[Violation] = []
-    diam = _median_diameter(tracks)
+    diam = diameter if diameter and diameter > 0 else _median_diameter(tracks)
 
     # -- identity uniqueness: there is one 3-ball, and one cue ball ---------- #
     by_number: dict[int, list[Track]] = {}
@@ -245,7 +248,10 @@ def check_frame(tracks: list[Track], frame: int,
                 if d < floor:
                     out.append(Violation(
                         "overlapping_balls", frame,
-                        f"tracks {a.id}/{b.id} centres {d / diam:.2f} diameters apart",
+                        f"tracks {a.id}(#{a.number},m{a.misses})/"
+                        f"{b.id}(#{b.number},m{b.misses}) centres "
+                        f"{d / diam:.2f} diameters apart at "
+                        f"({a.x:.0f},{a.y:.0f})/({b.x:.0f},{b.y:.0f})",
                         track_ids=(a.id, b.id)))
 
     # -- containment: balls stay on the bed --------------------------------- #
@@ -273,13 +279,33 @@ class SequenceScorer:
 
     def __init__(self, bed: tuple[float, float, float, float] | None = None,
                  max_number: int | None = None,
-                 pockets: list[tuple[float, float]] | None = None):
+                 pockets: list[tuple[float, float]] | None = None,
+                 diameter: float | None = None):
+        """``diameter`` is the geometric ball diameter in track units (from
+        table calibration). Neither ruler is trustworthy alone: the detector's
+        box sizes run up to ~25% large on some sessions (touching balls then
+        read 0.79 diameters and flip to violations on box drift), while the
+        geometric estimate inherits any table-lock error (one session's lock
+        includes rail margin, inflating it ~25% the other way). The effective
+        ruler is therefore the per-frame box median CLAMPED to +-20% of the
+        geometric diameter — box bias is capped by geometry, and bounded
+        miscalibration is absorbed by the boxes."""
         self.report = InvariantReport()
         self._bed = bed
         self._max_number = max_number
         self._pockets = pockets or []
+        self._diameter = diameter if diameter and diameter > 0 else None
         self._prev: dict[int, Track] = {}
         self._prev_diam = 0.0
+
+    def _effective_diameter(self, tracks: list[Track]) -> float:
+        measured = _median_diameter(tracks)
+        geo = self._diameter
+        if geo is None:
+            return measured or self._prev_diam
+        if measured <= 0:
+            return self._prev_diam or geo
+        return max(0.8 * geo, min(1.2 * geo, measured))
 
     # -- ingest ------------------------------------------------------------- #
     def add(self, tracks: list[Track], frame: int, tracking: bool = True) -> None:
@@ -294,9 +320,9 @@ class SequenceScorer:
         rep.ball_frames += len(tracks)
         rep.ball_counts.append(len(tracks))
 
-        rep.violations.extend(check_frame(tracks, frame, self._bed, self._max_number))
-
-        diam = _median_diameter(tracks) or self._prev_diam
+        diam = self._effective_diameter(tracks)
+        rep.violations.extend(check_frame(tracks, frame, self._bed, self._max_number,
+                                          diameter=diam or None))
         if diam > 0:
             rep.violations.extend(self._temporal(tracks, frame, diam))
             self._prev_diam = diam

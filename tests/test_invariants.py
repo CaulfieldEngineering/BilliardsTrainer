@@ -205,3 +205,29 @@ class TestReport:
         a, b = check_sequence(scene(1.0)), check_sequence(scene(2.0))
         assert len(a.violations) == len(b.violations) == 0
         assert math.isclose(a.coverage, b.coverage)
+
+
+class TestKnownDiameter:
+    def test_known_diameter_overrides_biased_boxes(self):
+        """Inflated box radii must not turn legitimately-touching balls into
+        violations when the true diameter is supplied."""
+        true_d = 30.0
+        # boxes report r=19 (1.27x true) but centres sit exactly 1 true
+        # diameter apart — touching, legal
+        frames = [[Track(id=1, x=100, y=100, radius=19.0, number=1),
+                   Track(id=2, x=100 + true_d, y=100, radius=19.0, number=2)]
+                  for _ in range(10)]
+        biased = check_sequence(frames)                       # box-derived ruler
+        s = SequenceScorer(diameter=true_d)                   # honest ruler
+        for i, tr in enumerate(frames):
+            s.add(tr, i)
+        assert any(v.kind == "overlapping_balls" for v in biased.violations), \
+            "sanity: the biased ruler flags this"
+        assert not any(v.kind == "overlapping_balls" for v in s.report.violations)
+
+    def test_zero_or_none_diameter_falls_back(self):
+        frames = [[Track(id=1, x=100, y=100, radius=15.0, number=1)]]
+        for d in (None, 0.0):
+            s = SequenceScorer(diameter=d)
+            s.add(frames[0], 0)
+            assert s.report.frames == 1

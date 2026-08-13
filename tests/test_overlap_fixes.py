@@ -208,3 +208,121 @@ class TestRigidBodyRepair:
             for j in range(i + 1, 3):
                 d = m.hypot(dets[i].x - dets[j].x, dets[i].y - dets[j].y)
                 assert d >= 2 * exp - 1.0, f"pair {i},{j} at {d / (2 * exp):.2f} diam"
+
+
+class TestIdentityGatedRepair:
+    def test_duplicate_without_distinct_ids_merged_not_pushed(self):
+        """One ball detected twice (only one box gets a number): the pair must
+        MERGE, not be pushed apart into a fake touching pair — unconditional
+        push-apart laundered duplicates into phantom tracks (caught by the
+        corpus: 7.68 -> 22.60 impossible/1k on session-20260802-173553)."""
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FS:
+            model_based = True
+        p._strategy = FS()
+        calib = _fake_calib()
+        tbl = calib.table
+        exp = expected_ball_radius_px(tbl, s.table.size)
+        cx, cy = (tbl.x0 + tbl.x1) / 2, (tbl.y0 + tbl.y1) / 2
+        raw = [Detection(cx, cy, exp, cls=BallClass.SOLID, number=3, score=0.9),
+               Detection(cx + 1.4 * exp, cy, exp, cls=BallClass.UNKNOWN,
+                         number=-1, score=0.55)]
+        dets = _apply(p, calib, raw)
+        assert len(dets) == 1, "duplicate must merge"
+        assert dets[0].number == 3, "the identified det must win"
+
+    def test_same_number_pair_merges_keeping_stronger(self):
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FS:
+            model_based = True
+        p._strategy = FS()
+        calib = _fake_calib()
+        tbl = calib.table
+        exp = expected_ball_radius_px(tbl, s.table.size)
+        cx, cy = (tbl.x0 + tbl.x1) / 2, (tbl.y0 + tbl.y1) / 2
+        raw = [Detection(cx, cy, exp, cls=BallClass.SOLID, number=2, score=0.6),
+               Detection(cx + 1.3 * exp, cy, exp, cls=BallClass.SOLID,
+                         number=2, score=0.9)]
+        dets = _apply(p, calib, raw)
+        assert len(dets) == 1
+        assert dets[0].score == 0.9
+
+
+class TestPublishedTracksObeyPhysics:
+    def test_settled_interpenetrating_pair_projected_apart(self):
+        """The anti-shimmer lock swallows the det-level repair (a few px is
+        'jitter'), freezing track pairs at impossible positions — the
+        published copies must be projected apart when identities are
+        distinct."""
+        import math as m
+
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FS:
+            model_based = True
+        p._strategy = FS()
+        calib = _fake_calib()
+        tbl = calib.table
+        exp = expected_ball_radius_px(tbl, s.table.size)
+        cx, cy = (tbl.x0 + tbl.x1) / 2, (tbl.y0 + tbl.y1) / 2
+        # Let two distinct balls settle at an interpenetrating separation by
+        # feeding identical frames; dets get repaired, but settled tracks lock.
+        raw = [Detection(cx, cy, exp, cls=BallClass.SOLID, number=1, score=0.9),
+               Detection(cx + 1.6 * exp, cy, exp, cls=BallClass.SOLID,
+                         number=5, score=0.9)]
+        tracks = None
+        for _ in range(20):
+            tracks = p._apply_detections(
+                [Detection(d.x, d.y, d.radius, cls=d.cls, number=d.number,
+                           score=d.score) for d in raw],
+                calib, (1271, 675, 3))[0]
+        pair = [t for t in tracks if t.number in (1, 5)]
+        assert len(pair) == 2
+        d = m.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y)
+        assert d >= 2 * exp - 1.0, \
+            f"published pair at {d / (2 * exp):.2f} diam — must be >= touching"
+
+
+class TestGhostRetirement:
+    def test_duplicate_track_in_physics_gap_merged(self):
+        """Tracks 0.79 diameters apart sat in the sliver between the old
+        merge threshold (0.776 diam) and the physics floor (0.8 diam) and
+        rode the occlusion budget for a minute. With ball_r supplied, the
+        merge threshold is aligned to physics and the detection-backed
+        track of the pair wins."""
+        tr = BallTracker(min_hits=2, still_frames=3)
+        real = Detection(300, 300, 15, cls=BallClass.SOLID, number=3, score=0.9)
+        ghost = Detection(324, 300, 15, cls=BallClass.UNKNOWN, score=0.6)
+        # 24px apart = 0.79 diam for ball_r=15.2: survived the old threshold
+        for _ in range(8):
+            tr.update([real, ghost], short_side=675.0, ball_r=15.2)
+        assert len(tr.tracks) == 1, "physics-gap duplicate must merge"
+
+    def test_without_ball_r_old_threshold_preserved(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        a = Detection(300, 300, 15, cls=BallClass.SOLID, number=3, score=0.9)
+        b = Detection(324, 300, 15, cls=BallClass.SOLID, number=5, score=0.9)
+        for _ in range(8):
+            tr.update([a, b], short_side=675.0)      # no ball_r
+        assert len(tr.tracks) == 2
+
+    def test_hand_occluded_ball_still_survives(self):
+        """The occlusion budget must keep working when nothing else stands on
+        the covered ball's spot."""
+        tr = BallTracker(min_hits=2, still_frames=3)
+        a = Detection(300, 300, 15, cls=BallClass.SOLID, number=3, score=0.9)
+        b = Detection(600, 600, 15, cls=BallClass.SOLID, number=5, score=0.9)
+        for _ in range(8):
+            tr.update([a, b], short_side=675.0, ball_r=15.2)
+        for _ in range(30):                    # a hand covers ball 3
+            tr.update([b], short_side=675.0, ball_r=15.2)
+        nums = sorted(t.number for t in tr.tracks)
+        assert nums == [3, 5], f"occluded ball must survive, got {nums}"

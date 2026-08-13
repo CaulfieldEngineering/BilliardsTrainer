@@ -101,9 +101,23 @@ def main() -> int:
         n_proc += 1
 
         if scorer is None and res.rect_bgr is not None:
-            h, w = res.rect_bgr.shape[:2]
-            bed, pockets = bed_and_pockets(float(w), float(h))
-            scorer = SequenceScorer(bed=bed, max_number=max_number, pockets=pockets)
+            # Judge with the SAME geometry the pipeline plays by: bed, pockets
+            # and ball size from its calibration — not re-derived from the
+            # frame (the rect frame is bed + margin, so a frame-derived ruler
+            # over-measures whenever the lock includes any rail).
+            from billiards_trainer.vision.geometry import expected_ball_radius_px
+            calib = getattr(pipeline.calib, "calib", None)
+            if calib is not None:
+                tbl = calib.table
+                bed = (float(tbl.x0), float(tbl.y0), float(tbl.x1), float(tbl.y1))
+                pockets = [(float(pk.x), float(pk.y)) for pk in tbl.pockets]
+                diam = 2.0 * expected_ball_radius_px(tbl, settings.table.size)
+            else:
+                h, w = res.rect_bgr.shape[:2]
+                bed, pockets = bed_and_pockets(float(w), float(h))
+                diam = None
+            scorer = SequenceScorer(bed=bed, max_number=max_number,
+                                    pockets=pockets, diameter=diam)
         if scorer is not None:
             before = len(scorer.report.violations)
             scorer.add(res.tracks, n_read - 1, tracking=(res.status == "tracking"))
