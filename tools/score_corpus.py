@@ -88,9 +88,12 @@ def main() -> int:
         "total_ball_frames": sum(d.get("ball_frames", 0) for d in rows),
         "total_impossible": sum(d.get("impossible", 0) for d in rows),
         "sessions_detail": [
-            {k: d.get(k) for k in ("video", "failed", "degenerate", "coverage",
-                                   "count_stability", "impossible",
-                                   "rate_impossible", "ball_frames")}
+            {**{k: d.get(k) for k in ("video", "failed", "degenerate", "coverage",
+                                      "count_stability", "impossible",
+                                      "rate_impossible", "ball_frames")},
+             # identifier-quality signal for the challenger gate: stripe
+             # misreads show up here, not in the impossible rate
+             "out_of_game": (d.get("counts") or {}).get("out_of_game_number", 0)}
             for d in rows],
     }
     bf = agg["total_ball_frames"]
