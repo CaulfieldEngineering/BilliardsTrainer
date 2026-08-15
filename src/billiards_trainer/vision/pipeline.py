@@ -626,6 +626,56 @@ class Pipeline:
         T = np.array([[1.0, 0.0, -x0], [0.0, 1.0, -y0], [0.0, 0.0, 1.0]])
         return cv2.warpPerspective(gray, T @ calib.H, (w, h), flags=cv2.INTER_LINEAR)
 
+    def _foreign_state(self, frame: np.ndarray, calib) -> tuple[float, object, float, float, float]:
+        """(fraction, mask, scale, x0, y0) of foreign coverage on the bed.
+
+        Computed on a TINY dedicated colour warp (~160px wide, scale composed
+        into H) so it costs well under a millisecond and works on the
+        schematic path, which never builds a full colour warp. Cached every
+        3rd frame — presence is a slow signal. The mask geometry maps a
+        rectified point (x, y) to mask pixel ((x - x0) * scale, (y - y0) * scale).
+        """
+        self._arm_tick = (getattr(self, "_arm_tick", 0) + 1) % 3
+        if self._arm_tick != 1 and hasattr(self, "_foreign_last"):
+            return self._foreign_last
+        from .foreign import foreign_mask
+        tbl = calib.table
+        x0, y0 = tbl.x0, tbl.y0
+        w, h = tbl.x1 - x0, tbl.y1 - y0
+        if w <= 0 or h <= 0:
+            self._foreign_last = (0.0, None, 1.0, 0.0, 0.0)
+            return self._foreign_last
+        s = 160.0 / w
+        S = np.array([[s, 0.0, -x0 * s], [0.0, s, -y0 * s], [0.0, 0.0, 1.0]])
+        tiny = cv2.warpPerspective(frame, S @ calib.H, (160, max(1, int(h * s))),
+                                   flags=cv2.INTER_LINEAR)
+        frac, mask = foreign_mask(tiny, None)
+        self._foreign_last = (frac, mask, s, x0, y0)
+        return self._foreign_last
+
+    def _carried_ids(self, tracks, foreign) -> set[int]:
+        """Track ids currently adjacent to a foreign blob (hand/arm/stick).
+
+        A carried ball moves WITH the hand, so it is foreign-adjacent for its
+        whole displacement; a struck ball leaves the stick within a frame or
+        two. The shot detector counts only non-adjacent motion, which is what
+        finally separates drills' ball-gathering from actual shots."""
+        frac, mask, s, x0, y0 = foreign
+        if mask is None or frac <= 0.0:
+            return set()
+        H, W = mask.shape[:2]
+        out = set()
+        for tr in tracks:
+            mx = int((tr.x - x0) * s)
+            my = int((tr.y - y0) * s)
+            # neighbourhood ~1.5 ball radii at mask scale
+            r = max(1, int(tr.radius * s * 1.5))
+            x_lo, x_hi = max(0, mx - r), min(W, mx + r + 1)
+            y_lo, y_hi = max(0, my - r), min(H, my + r + 1)
+            if x_lo < x_hi and y_lo < y_hi and mask[y_lo:y_hi, x_lo:x_hi].any():
+                out.add(tr.id)
+        return out
+
     def _draw_raw_dets(self, frame, dets):
         """Draw detection circles straight onto the live (raw) frame — used when
         there's no homography to project into the bird's-eye."""
@@ -773,7 +823,9 @@ class Pipeline:
         # (MOG2 + Farneback) are the heaviest per-frame ops and feed ONLY shot
         # detection, so they run only when fusion is enabled — off by default
         # while cue-ball tracking (M2) is the focus, freeing the real-time budget.
-        evidence = {"motion": motion}
+        foreign = self._foreign_state(frame, calib)
+        evidence = {"motion": motion, "arm": foreign[0],
+                    "carried_ids": self._carried_ids(tracks, foreign)}
         if self.settings.detection.use_fusion and roi is not None:
             small = downscale(roi)
             fg = self._bg.update(small)
@@ -781,7 +833,8 @@ class Pipeline:
             if self._frame_idx % 2 == 0:
                 self._last_flow = flow_activity(self._prev_small, small)
             self._prev_small = small
-            evidence = {"motion": motion, "flow": self._last_flow * 100.0, "fg": fg * 100.0}
+            evidence["flow"] = self._last_flow * 100.0
+            evidence["fg"] = fg * 100.0
 
         if self.paused:
             # keep showing video + tracking, but never count shots while paused

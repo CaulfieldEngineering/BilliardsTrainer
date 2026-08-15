@@ -18,7 +18,6 @@ signals for the debug overlay.
 """
 
 import logging
-import math
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -93,6 +92,9 @@ class ShotDetector:
         self._active_run = 0
         self._quiet_run = 0
         self._shot_frames = 0
+        self._arm_frames = 0
+        self._free_frames: dict[int, int] = {}
+        self._free_travel: dict[int, float] = {}
         self._start_t = 0.0
         self._max_travel = 0.0
         self._motion = 0.0
@@ -152,8 +154,32 @@ class ShotDetector:
                 self._begin_shot(t)
         else:  # MOVING
             self._shot_frames += 1
+            if self._evidence.get("arm", 0.0) >= 0.010:
+                self._arm_frames += 1          # diagnostics only
+            # Carried-ball discrimination: a hand-moved ball is adjacent to a
+            # foreign blob (hand/arm/stick) for its WHOLE displacement; a
+            # struck ball leaves the stick within a frame or two. Only free
+            # (non-adjacent) motion counts toward travel and pocket credit —
+            # this is what separates drill ball-gathering from actual shots.
+            # (A first attempt used whole-table arm DWELL and failed both
+            # ways: the cue stick hovers over the felt through every real
+            # shot, and a placing hand is too small to move the fraction.)
+            carried = self._evidence.get("carried_ids") or set()
+            for tr in tracks:
+                if tr.id not in carried and tr.speed > 1.0:
+                    self._free_frames[tr.id] = self._free_frames.get(tr.id, 0) + 1
+                    # Travel is speed INTEGRATED over free frames — not
+                    # displacement from rest. A hand-carried ball ends up far
+                    # from its rest spot (displacement large) but never moves
+                    # freely (integral ~0); a placed ball wobbles freely for a
+                    # few slow frames (integral ~20px); a struck ball rolls
+                    # fast and free (integral hundreds of px). One number
+                    # separates all three.
+                    ft = self._free_travel.get(tr.id, 0.0) + tr.speed
+                    self._free_travel[tr.id] = ft
+                    if ft > self._max_travel:
+                        self._max_travel = ft
             self._accumulate(by_id, table)
-            self._track_travel(tracks)
             if self._quiet_run >= self.settle_frames and self._shot_frames >= self.min_shot_frames:
                 self._finalize_pockets(by_id, table, t)
                 event = self._resolve(t)
@@ -188,6 +214,9 @@ class ShotDetector:
         self._shot_cls = {}
         self._quiet_run = 0
         self._shot_frames = 0
+        self._arm_frames = 0
+        self._free_frames = {}
+        self._free_travel = {}
         self._start_t = t
         self._max_travel = 0.0
         log.debug("Shot started @ %.2f (motion %.1f)", t, self._motion)
@@ -214,17 +243,14 @@ class ShotDetector:
         for tid in self._shot_ids:
             if tid in active or self._already(tid):
                 continue
+            # A ball that never moved freely was picked up, not potted.
+            if self._free_frames.get(tid, 0) < 5:
+                continue
             dist, name = self._min_pdist.get(tid, (1e9, ""))
             if dist < gate and name:
                 cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
                 self._pocketed.append(PocketedBall(tid, cls, name, t))
                 log.debug("Ball %d dropped into %s (closest %.0fpx)", tid, name, dist)
-
-    def _track_travel(self, tracks: list[Track]) -> None:
-        for tr in tracks:
-            rest = self._rest.get(tr.id)
-            if rest is not None:
-                self._max_travel = max(self._max_travel, math.hypot(tr.x - rest[0], tr.y - rest[1]))
 
     def _already(self, tid: int) -> bool:
         return any(p.track_id == tid for p in self._pocketed)
@@ -272,6 +298,7 @@ class ShotDetector:
             "fg": round(self._evidence.get("fg", 0.0), 1),
             "fused": round(self._fused, 2),
             "active_run": self._active_run,
+            "arm": round(self._evidence.get("arm", 0.0), 3),
             "travel": round(self._max_travel, 0),
             "warming": warming,
             "cooling": cooling,
