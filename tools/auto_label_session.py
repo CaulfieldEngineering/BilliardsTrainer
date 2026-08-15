@@ -71,28 +71,87 @@ def load_frames(src: Path, stride: int, tmp: list) -> list[np.ndarray]:
     raise SystemExit(f"unsupported session source: {src}")
 
 
+class FrameStore:
+    """Sampled-frame access without holding a session in RAM.
+
+    The old path loaded EVERY sampled frame full-res into a list, which capped
+    the tool at short clips (an hour of 936x1640 at stride 12 is ~40 GB) and
+    silently excluded the daylight sessions — exactly the footage the
+    identifier is worst on. Videos now decode once into 160x90 proxies (what
+    ``motion()`` reduces to anyway, so every threshold keeps its meaning) and
+    full frames are fetched on demand by seeking. Directories and zips keep
+    the in-RAM path — they are small.
+    """
+
+    def __init__(self, src: Path, stride: int, tmp: list):
+        self._video = src.suffix.lower() in _VID_EXT
+        self._stride = max(1, stride)
+        if not self._video:
+            self._frames = [f for f in load_frames(src, stride, tmp) if f is not None]
+            self._small = [cv2.resize(f, (160, 90)) for f in self._frames]
+            return
+        self._path = str(src)
+        self._small = []
+        cap = cv2.VideoCapture(self._path)
+        i = 0
+        while True:
+            ok, f = cap.read()
+            if not ok:
+                break
+            if i % self._stride == 0:
+                self._small.append(cv2.resize(f, (160, 90)))
+            i += 1
+        cap.release()
+        self._cap = cv2.VideoCapture(self._path)
+        self._cache: dict[int, np.ndarray] = {}
+
+    def __len__(self) -> int:
+        return len(self._small)
+
+    def small(self, i: int) -> np.ndarray:
+        return self._small[i]
+
+    def full(self, i: int) -> np.ndarray | None:
+        if not self._video:
+            return self._frames[i]
+        if i in self._cache:
+            return self._cache[i]
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, i * self._stride)
+        ok, f = self._cap.read()
+        if not ok:
+            return None
+        if len(self._cache) > 64:      # bounded: propagation revisits neighbours
+            self._cache.clear()
+        self._cache[i] = f
+        return f
+
+    def close(self) -> None:
+        if self._video:
+            self._cap.release()
+
+
 def motion(a: np.ndarray, b: np.ndarray) -> float:
     ga = cv2.cvtColor(cv2.resize(a, (160, 90)), cv2.COLOR_BGR2GRAY)
     gb = cv2.cvtColor(cv2.resize(b, (160, 90)), cv2.COLOR_BGR2GRAY)
     return float(cv2.absdiff(ga, gb).mean())
 
 
-def settled_frames(frames: list[np.ndarray], quiet: float = 2.0) -> list[int]:
+def settled_frames(store: FrameStore, quiet: float = 2.0) -> list[int]:
     """Indices of frames that are ~identical to the next one (balls at rest)."""
     out = []
-    for i in range(len(frames) - 1):
-        if motion(frames[i], frames[i + 1]) < quiet:
+    for i in range(len(store) - 1):
+        if motion(store.small(i), store.small(i + 1)) < quiet:
             out.append(i)
     return out
 
 
-def dedupe_layouts(frames: list[np.ndarray], idxs: list[int],
+def dedupe_layouts(store: FrameStore, idxs: list[int],
                    min_change: float = 6.0, max_layouts: int = 12) -> list[int]:
     """Keep settled frames that differ enough from the last kept one — distinct
     ball arrangements, not 900 copies of the same rack."""
     kept: list[int] = []
     for i in idxs:
-        if not kept or motion(frames[kept[-1]], frames[i]) > min_change:
+        if not kept or motion(store.small(kept[-1]), store.small(i)) > min_change:
             kept.append(i)
         if len(kept) >= max_layouts:
             break
@@ -142,17 +201,17 @@ def stage_montages(args) -> int:
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
     tmp: list = []
+    store = FrameStore(Path(args.session), args.stride, tmp)
     try:
-        frames = [f for f in load_frames(Path(args.session), args.stride, tmp) if f is not None]
+        if not len(store):
+            raise SystemExit("no frames loaded from session")
+        print(f"sampled {len(store)} frames")
+        settled = settled_frames(store)
+        layouts = dedupe_layouts(store, settled or list(range(0, len(store), max(1, len(store)//10))),
+                                 max_layouts=args.max_layouts)
     finally:
         for d in tmp:
             shutil.rmtree(d, ignore_errors=True)
-    if not frames:
-        raise SystemExit("no frames loaded from session")
-    print(f"loaded {len(frames)} frames")
-    settled = settled_frames(frames)
-    layouts = dedupe_layouts(frames, settled or list(range(0, len(frames), max(1, len(frames)//10))),
-                             max_layouts=args.max_layouts)
     print(f"{len(settled)} settled, {len(layouts)} distinct layouts")
 
     det = _detector()
@@ -162,7 +221,10 @@ def stage_montages(args) -> int:
     # bug that silently produced "+0 propagated frames" everywhere).
     manifest = {"session": str(args.session), "stride": args.stride, "layouts": []}
     for li, fi in enumerate(layouts):
-        frame = frames[fi]
+        frame = store.full(fi)
+        if frame is None:
+            print(f"layout {li}: frame {fi} unreadable, skipped")
+            continue
         raw = det.detect(frame, None)
         entry = {"frame_index": fi, "shape": list(frame.shape[:2]), "dets": []}
         montage = frame.copy()
@@ -203,21 +265,15 @@ def stage_build(args) -> int:
     # Optional propagation: spread each labelled layout's numbers to nearby
     # settled frames of the SAME arrangement (balls at rest -> same positions),
     # multiplying labelled images ~Nx with zero extra labelling effort.
-    prop_frames: list = []
+    store = None
     if args.propagate and manifest.get("session"):
         # frame_index in the manifest is a position in the MONTAGE-stage
         # sampling, so frames must be re-loaded at that same stride — older
         # manifests didn't record it, in which case trust --stride and accept
         # that a mismatch quietly disables propagation via the motion gate.
         stride = int(manifest.get("stride") or args.stride)
-        tmp: list = []
-        try:
-            prop_frames = [f for f in load_frames(Path(manifest["session"]), stride, tmp)
-                           if f is not None]
-        finally:
-            for d in tmp:
-                shutil.rmtree(d, ignore_errors=True)
-    det = _detector() if prop_frames else None
+        store = FrameStore(Path(manifest["session"]), stride, [])
+    det = _detector() if store is not None else None
 
     def write_sample(name: str, frame, lines: list[str]) -> None:
         cv2.imwrite(str(out / "images" / f"{name}.jpg"), frame,
@@ -252,16 +308,17 @@ def stage_build(args) -> int:
         n_imgs += 1
 
         # Propagate to neighbouring settled frames of this layout.
-        if prop_frames and labeled_pts:
+        if store is not None and labeled_pts:
             fi = entry["frame_index"]
-            base = prop_frames[fi]
             added = 0
             for off in range(-30, 31, 5):
                 j = fi + off
-                if off == 0 or not (0 <= j < len(prop_frames)):
+                if off == 0 or not (0 <= j < len(store)):
                     continue
-                cand = prop_frames[j]
-                if motion(base, cand) > 2.0:      # same arrangement only
+                if motion(store.small(fi), store.small(j)) > 2.0:  # same arrangement only
+                    continue
+                cand = store.full(j)
+                if cand is None:
                     continue
                 raw = det.detect(cand, None)
                 plines = []
