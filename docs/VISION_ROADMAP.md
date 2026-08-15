@@ -156,3 +156,14 @@ the recording path is never touched by this loop.
   Challenger c3 training on the 3-session merge (night 9-ball + night
   15-ball + daylight). Gate c3 with:
   `--exclude session-20260812-221333,session-20260723-215012,session-20260724-133950`.
+- 2026-08-15: c3 gated held-out and DECLINED: formal gates pass (tolerance
+  bands) but out-of-game went 67.5 → 71.6/1k, coverage 7.23 → 7.15 —
+  nothing improved. Champion file verified restored byte-intact.
+  CONCLUSION: 47 labelled frames cannot beat a champion trained on far
+  more data; challengers become competitive at roughly 10× the dataset.
+  The labelling loop is proven and cheap (~15 min per session of vision
+  labelling, montage tooling handles any session length now) — label 6-8
+  more sessions at stride 6 before training c4, or configure the
+  OpenRouter key to automate labelling entirely. ALSO: gate runs swap the
+  live model file — never run concurrently with app restarts or other
+  scoring; the nightly orchestrator must serialize these.
