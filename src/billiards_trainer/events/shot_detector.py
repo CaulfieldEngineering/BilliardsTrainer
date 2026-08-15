@@ -18,6 +18,7 @@ signals for the debug overlay.
 """
 
 import logging
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -95,6 +96,7 @@ class ShotDetector:
         self._arm_frames = 0
         self._free_frames: dict[int, int] = {}
         self._free_travel: dict[int, float] = {}
+        self._pending_free: dict[int, tuple] = {}
         self._start_t = 0.0
         self._max_travel = 0.0
         self._motion = 0.0
@@ -146,6 +148,23 @@ class ShotDetector:
         if self._state == _State.SETTLED and quiet:
             for tr in tracks:
                 self._rest[tr.id] = (tr.x, tr.y)
+        # Pre-shot motion bank: while strike_frames counts up, the struck ball
+        # is already moving — without banking those steps a fast pot loses its
+        # first (and sometimes only) tracked frames of free motion and gets
+        # denied pocket credit. Seeded into the shot at _begin_shot.
+        if self._state == _State.SETTLED:
+            if active:
+                carried_pre = self._evidence.get("carried_ids") or set()
+                for tr in tracks:
+                    if tr.id in carried_pre:
+                        continue
+                    prev = self._prev.get(tr.id)
+                    step = math.hypot(tr.x - prev.x, tr.y - prev.y) if prev else 0.0
+                    if step > 1.0:
+                        f, d = self._pending_free.get(tr.id, (0, 0.0))
+                        self._pending_free[tr.id] = (f + 1, d + step)
+            else:
+                self._pending_free = {}
 
         event: ShotEvent | None = None
         if self._state == _State.SETTLED:
@@ -166,16 +185,23 @@ class ShotDetector:
             # shot, and a placing hand is too small to move the fraction.)
             carried = self._evidence.get("carried_ids") or set()
             for tr in tracks:
-                if tr.id not in carried and tr.speed > 1.0:
+                if tr.id in carried:
+                    continue
+                # Observed per-frame displacement, not the tracker's velocity
+                # estimate — the EMA lags a fresh strike and is zeroed by the
+                # settled lock, while position deltas are direct truth.
+                prev = self._prev.get(tr.id)
+                step = math.hypot(tr.x - prev.x, tr.y - prev.y) if prev else 0.0
+                if step > 1.0:
                     self._free_frames[tr.id] = self._free_frames.get(tr.id, 0) + 1
-                    # Travel is speed INTEGRATED over free frames — not
+                    # Travel is displacement INTEGRATED over free frames — not
                     # displacement from rest. A hand-carried ball ends up far
                     # from its rest spot (displacement large) but never moves
                     # freely (integral ~0); a placed ball wobbles freely for a
                     # few slow frames (integral ~20px); a struck ball rolls
                     # fast and free (integral hundreds of px). One number
                     # separates all three.
-                    ft = self._free_travel.get(tr.id, 0.0) + tr.speed
+                    ft = self._free_travel.get(tr.id, 0.0) + step
                     self._free_travel[tr.id] = ft
                     if ft > self._max_travel:
                         self._max_travel = ft
@@ -215,10 +241,11 @@ class ShotDetector:
         self._quiet_run = 0
         self._shot_frames = 0
         self._arm_frames = 0
-        self._free_frames = {}
-        self._free_travel = {}
+        self._free_frames = {tid: f for tid, (f, _d) in self._pending_free.items()}
+        self._free_travel = {tid: d for tid, (_f, d) in self._pending_free.items()}
+        self._max_travel = max(self._free_travel.values(), default=0.0)
+        self._pending_free = {}
         self._start_t = t
-        self._max_travel = 0.0
         log.debug("Shot started @ %.2f (motion %.1f)", t, self._motion)
 
     def _accumulate(self, by_id: dict, table: TableModel) -> None:
@@ -243,8 +270,10 @@ class ShotDetector:
         for tid in self._shot_ids:
             if tid in active or self._already(tid):
                 continue
-            # A ball that never moved freely was picked up, not potted.
-            if self._free_frames.get(tid, 0) < 5:
+            # A ball that never moved freely was picked up, not potted. A
+            # fast pot can reach the pocket in 3-4 tracked frames; a lifted
+            # ball wobbles for 0-2. Three is the floor between them.
+            if self._free_frames.get(tid, 0) < 3:
                 continue
             dist, name = self._min_pdist.get(tid, (1e9, ""))
             if dist < gate and name:
