@@ -145,3 +145,14 @@ the recording path is never touched by this loop.
   smoke-tested); champion/challenger gate tool ready; champion_v3 corpus
   baseline running. Gate c2 when it lands: expect c2 to LOSE (thin data) —
   the point is the loop; c3 gets denser-stride labels + more sessions.
+- 2026-08-13/14: **champion_v3 frozen: 1.07 impossible/1k** (was 4.86 at
+  first measurement — 4.5× in one day), every session ≤3.44, 0 failed.
+  Challenger c2 gated: formal gates said PROMOTABLE but held-out analysis
+  (it trained on 2 of 18 corpus sessions) showed a tie — DECLINED, and the
+  gate now takes --exclude so train-on-test can't flatter a challenger
+  again. Labelling tool now STREAMS video (FrameStore proxies + on-demand
+  seek), unlocking the big daylight sessions the identifier is worst on;
+  first daylight session labelled (85 balls, heuristic truth 82.4%).
+  Challenger c3 training on the 3-session merge (night 9-ball + night
+  15-ball + daylight). Gate c3 with:
+  `--exclude session-20260812-221333,session-20260723-215012,session-20260724-133950`.
