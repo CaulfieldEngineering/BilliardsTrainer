@@ -51,6 +51,11 @@ def main() -> int:
     ap.add_argument("--out", default="", help="output corpus dir for the challenger run")
     ap.add_argument("--stride", type=int, default=5)
     ap.add_argument("--max-seconds", type=float, default=300.0)
+    ap.add_argument("--exclude", default="",
+                    help="comma-separated session stems the challenger TRAINED on — "
+                    "excluded from the verdict so train-on-test overlap can't "
+                    "flatter it (c2 trained on 2 of 18 corpus sessions and the "
+                    "unfiltered gate called a memorisation-assisted tie PROMOTABLE)")
     args = ap.parse_args()
 
     challenger = Path(args.model)
@@ -99,6 +104,11 @@ def main() -> int:
     chall_agg = json.loads(chall_agg_path.read_text(encoding="utf-8"))
 
     # ---- the gates ------------------------------------------------------- #
+    excluded = {s.strip() for s in args.exclude.split(",") if s.strip()}
+    if excluded:
+        champ_agg = _drop_sessions(champ_agg, excluded)
+        chall_agg = _drop_sessions(chall_agg, excluded)
+        print(f"\nheld-out verdict: {len(excluded)} training session(s) excluded")
     champ_imp = champ_agg.get("rate_impossible") or float("inf")
     chall_imp = chall_agg.get("rate_impossible") or float("inf")
     champ_cov = _mean_coverage(champ_agg)
@@ -134,6 +144,21 @@ def _mean_coverage(agg: dict) -> float:
     rows = [d for d in agg.get("sessions_detail", [])
             if not d.get("failed") and d.get("coverage") is not None]
     return sum(d["coverage"] for d in rows) / len(rows) if rows else 0.0
+
+
+def _drop_sessions(agg: dict, stems: set[str]) -> dict:
+    """Aggregate recomputed without the named sessions (held-out verdict)."""
+    rows = [d for d in agg.get("sessions_detail", [])
+            if not any(s in (d.get("video") or "") for s in stems)]
+    bf = sum(d.get("ball_frames") or 0 for d in rows if not d.get("failed"))
+    imp = sum(d.get("impossible") or 0 for d in rows if not d.get("failed"))
+    return {
+        "sessions_detail": rows,
+        "total_ball_frames": bf,
+        "rate_impossible": (1000.0 * imp / bf) if bf else float("inf"),
+        "failed": sum(1 for d in rows if d.get("failed")),
+        "degenerate": any(d.get("degenerate") for d in rows),
+    }
 
 
 if __name__ == "__main__":
