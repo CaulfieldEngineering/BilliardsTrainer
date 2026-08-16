@@ -105,14 +105,15 @@ def main() -> int:
     from .ui.main_window import MainWindow
 
     window = MainWindow(settings)
-    window.show()
-
-    # Center on the primary screen at a comfortable default size.
+    # Size/centre FIRST so "restore down" lands somewhere sane, then start
+    # maximized (Joe's ask — the old post-show move computed against a rect Qt
+    # hadn't settled yet and could park the title bar above the screen top).
     screen = QGuiApplication.primaryScreen()
     if screen:
         geo = screen.availableGeometry()
         window.resize(min(1480, int(geo.width() * 0.9)), min(940, int(geo.height() * 0.9)))
         window.move(geo.center() - window.rect().center())
+    window.showMaximized()
 
     # macOS camera permission: request it on the MAIN thread once the event loop
     # is live (the only context where macOS shows the prompt for a bundled app).
