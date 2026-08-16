@@ -889,6 +889,13 @@ class PipelineController(QObject):
             # their own (deterministic) cadence.
             stride = max(4, round(self._speed))
             self._run_frame(frame, detect=(self._play_tick % stride == 0))
+            import time as _time
+            now = _time.perf_counter()
+            if now - getattr(self, "_pb_log_t", 0.0) >= 5.0:
+                n = self._play_tick - getattr(self, "_pb_log_n", 0)
+                if getattr(self, "_pb_log_t", 0.0) > 0:
+                    log.info("playback worker: %.1f fps produced", n / (now - self._pb_log_t))
+                self._pb_log_t, self._pb_log_n = now, self._play_tick
         else:
             # LIVE camera: async vision. The display path never runs inference
             # (stays at camera rate); frames are handed to the detection worker

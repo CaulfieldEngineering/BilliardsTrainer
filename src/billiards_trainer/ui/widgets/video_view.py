@@ -76,6 +76,19 @@ class VideoView(QWidget):
         # next frame after becoming visible repaints; nothing is lost.
         if not self.isVisible():
             return
+        # Downscale ONCE here (SIMD INTER_AREA, ~3ms) instead of letting every
+        # repaint smooth-scale the full-res pixmap on the CPU raster engine
+        # (~20ms per view per frame — THE UI-thread wall once the worker got
+        # fast; measured as Joe's "suuuuper laggy" playback). Conversion and
+        # paint then work on ~quarter the pixels.
+        h0, w0 = frame.shape[:2]
+        rw, rh = max(1, self.width()), max(1, self.height())
+        if w0 > 1.25 * rw and h0 > 1.25 * rh:
+            import cv2
+            scale = min(rw / w0, rh / h0)
+            frame = cv2.resize(frame, (max(1, int(w0 * scale)),
+                                       max(1, int(h0 * scale))),
+                               interpolation=cv2.INTER_AREA)
         buf = np.ascontiguousarray(frame)
         self._buf = buf  # keep buffer alive
         h, w = buf.shape[:2]

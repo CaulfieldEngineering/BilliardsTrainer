@@ -1138,6 +1138,8 @@ class LivePage(QWidget):
         return out
 
     def on_frame(self, packet) -> None:
+        import time as _time
+        _t0 = _time.perf_counter()
         self._last_packet = packet
         if packet.perspective is not None:
             self._clear_camera_error()  # a frame means the camera is alive
@@ -1150,6 +1152,16 @@ class LivePage(QWidget):
         if packet.birdseye is not None:
             self._bird.set_frame(packet.birdseye)
             self._bird.set_balls(self._ball_markers(packet))
+        # Throttled perf truth: UI-thread cost per frame + delivered rate.
+        # This is what settles "is it the worker or the paint" from a log.
+        self._ui_ms_acc = getattr(self, "_ui_ms_acc", 0.0) + (_time.perf_counter() - _t0) * 1000.0
+        self._ui_n = getattr(self, "_ui_n", 0) + 1
+        now = _time.perf_counter()
+        if now - getattr(self, "_ui_log_t", 0.0) >= 5.0 and self._ui_n:
+            log.info("ui frame handler: %.1f ms avg over %d frames (%.1f fps delivered)",
+                     self._ui_ms_acc / self._ui_n, self._ui_n,
+                     self._ui_n / (now - getattr(self, "_ui_log_t", now - 5.0)))
+            self._ui_log_t, self._ui_ms_acc, self._ui_n = now, 0.0, 0
         self._clock_fold.setVisible(packet.clock_enabled)
         if packet.clock_enabled:
             self._clock.update_clock(packet.clock_remaining,
@@ -1251,6 +1263,9 @@ class LivePage(QWidget):
             import time
             self._rec_t0 = time.monotonic()
             self._rec_time.show()
+            # the lane becomes a rolling capture timeline while recording
+            self._timeline.clear()
+            self._timeline.follow_window_s = 120.0
             self._tick_rec_time()
             timer.start()
         else:
@@ -1259,10 +1274,12 @@ class LivePage(QWidget):
             self._rec_pause_btn.setIcon(icon("rec-pause", PALETTE.text_dim, size=26))
             self._rec_time.setText("")
             self._rec_time.hide()   # an empty fixed-width clock is a dead gap
+            self._timeline.follow_window_s = 0.0   # back to show-everything
 
     def _tick_rec_time(self) -> None:
         import time
         secs = int(time.monotonic() - getattr(self, "_rec_t0", time.monotonic()))
+        self._timeline.set_live_clock(float(secs))
         paused = self._rec_pause_btn.isChecked()
         if paused:
             tag = "❚❚ PAUSED"
