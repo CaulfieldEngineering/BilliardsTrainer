@@ -26,7 +26,7 @@ colour-lookalike vector (a blanked ball painted a twin colour) is closed
 by measured-colour assignment; the audit re-runs each loop cycle as the
 regression tripwire.
 
-## G2 — Red-family confusion (3/7, 4/7) under 5%
+## G2 — Red-family confusion (3/7, 4/7) under 5%  ✅ MET 2026-08-16 (caveat)
 The single most visible misread class on Joe's table (dim warm light makes
 purple/maroon/red converge).
 **Done when:** on my hand-labelled ground truth (all labelled sessions),
@@ -140,3 +140,12 @@ Rounds continue with Joe's visual feedback as the gate.
   library (including two sessions Joe recorded live on the
   exclusive-assignment code). Labelled session 6 (s-20260728, blurrier
   footage: 54 balls incl. touching clusters) toward c5; dataset built.
+- 2026-08-16 (loop 5): G2 INSTRUMENT built (tools/measure_class_accuracy):
+  live stack vs 90 hand-labelled frames. DARK CLUSTER 3/4/7/8 = 95.1% —
+  target met (caveat: colour refs were built from these crops, so the 4/7
+  correction is partly tested on its own sources; the detector model is
+  held-out). NEW WORST PROBLEM, quantified: the STRIPE BIT — 9-as-1 x31,
+  9-as-13 x11, 14-as-6 x10, 5-as-13 x9; stripes ~62% vs solids 97-100%.
+  Successor goal G2b: stripe accuracy >=90% (stripe_reading tuning +
+  stripe-heavy labels for c5). Also 0-as-15 x5 (cue misread!) worth a
+  look at the cue-guard path.
