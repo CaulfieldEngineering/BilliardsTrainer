@@ -71,6 +71,11 @@ class VideoView(QWidget):
     def set_frame(self, frame: np.ndarray) -> None:
         if frame is None or frame.size == 0:
             return
+        # A hidden view converting full-res frames 30x/second is pure UI-thread
+        # tax (mouse events queue behind paint work — felt as cursor lag). The
+        # next frame after becoming visible repaints; nothing is lost.
+        if not self.isVisible():
+            return
         buf = np.ascontiguousarray(frame)
         self._buf = buf  # keep buffer alive
         h, w = buf.shape[:2]

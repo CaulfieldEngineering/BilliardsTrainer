@@ -447,9 +447,33 @@ class LivePage(QWidget):
         s = frames / max(1.0, self._video_fps)
         return f"{int(s // 60)}:{int(s % 60):02d}"
 
+    def _apply_compact(self) -> None:
+        """Narrow-window chrome policy, re-applied on resize AND mode change.
+
+        The bar's children are fixed-width, so when narrow something must
+        yield — and the honest candidates are the controls that are dead
+        weight in the CURRENT mode: playback transport while live, the record
+        capsule while in playback. Hiding by context (instead of clipping)
+        is what stops the record capsule's clock being cut off mid-recording.
+        """
+        w = self.width()
+        compact = w < 1000
+        if hasattr(self, "_bar_optional"):
+            for x in self._bar_optional:
+                x.setVisible(not compact)
+        if hasattr(self, "_playback_widgets"):
+            for x in self._playback_widgets:
+                x.setVisible(not compact or self._is_video)
+        if hasattr(self, "_rec_capsule"):
+            self._rec_capsule.setVisible(not compact or not self._is_video)
+        if hasattr(self, "_bird"):
+            # narrowest tier: the camera IS the app; the bird's-eye yields
+            self._bird.parentWidget().setVisible(w >= 640)
+
     def set_video_mode(self, is_video: bool, total: int, fps: float) -> None:
         self._video_fps = fps or 30.0
         self._is_video = is_video   # badge shows PLAYBACK instead of LIVE
+        self._apply_compact()       # bar chrome follows the mode when narrow
         self._update_stats_active()
         for w in self._playback_widgets:
             w.setEnabled(is_video)
@@ -1179,17 +1203,10 @@ class LivePage(QWidget):
         # Tier thresholds must sit ABOVE the floor the previous tier enforces,
         # or the window jams: it cannot shrink past a minimum whose reduction
         # requires shrinking past it (measured: a 900px tier behind a 924px
-        # floor was unreachable by dragging).
-        w = self.width()
-        compact = w < 1000
-        if hasattr(self, "_rail_stack"):
-            self._rail_stack.setVisible(not compact)
-        if hasattr(self, "_bar_optional"):
-            for x in self._bar_optional:
-                x.setVisible(not compact)
-        if hasattr(self, "_bird"):
-            # narrowest tier: the camera IS the app; the bird's-eye yields
-            self._bird.parentWidget().setVisible(w >= 640)
+        # floor was unreachable by dragging). The stats rail is exempt from
+        # hiding — Joe wants makes/misses visible at every width, and with no
+        # minimum it compresses instead.
+        self._apply_compact()
         super().resizeEvent(ev)
 
     def on_status(self, status: str) -> None:

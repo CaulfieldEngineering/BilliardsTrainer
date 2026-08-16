@@ -120,11 +120,22 @@ class MiniView(QWidget):
     def on_frame(self, packet) -> None:
         if not self.isVisible():
             return
+        # Half the feed rate and bounded pixels: this is a glance monitor, not
+        # an editing surface. Full-res frames at 30fps into a ~380px window
+        # measurably lagged the mouse — all of it lands on the UI thread.
+        self._tick = getattr(self, "_tick", 0) + 1
+        if self._tick % 2:
+            return
         img = packet.birdseye if (self._show_birdseye
                                   and packet.birdseye is not None) \
             else packet.perspective
         if img is None:
             return
+        if img.shape[1] > 2 * self.width():
+            import cv2
+            scale = 2 * self.width() / img.shape[1]
+            img = cv2.resize(img, None, fx=scale, fy=scale,
+                             interpolation=cv2.INTER_AREA)
         h, w = img.shape[:2]
         if h > 0 and w > 0:
             aspect = w / h

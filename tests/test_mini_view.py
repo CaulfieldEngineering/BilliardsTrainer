@@ -70,8 +70,10 @@ class TestMiniView:
         m = MiniView()
         m.show()
         m.resize(400, 400)
-        # a 2:1 portrait-ish frame (h=200, w=400 -> aspect 2.0)
-        m.on_frame(_Packet(persp=np.zeros((200, 400, 3), np.uint8)))
+        # a 2:1 frame (h=200, w=400); two sends — the paint throttle
+        # (every 2nd frame) is part of the contract now
+        for _ in range(2):
+            m.on_frame(_Packet(persp=np.zeros((200, 400, 3), np.uint8)))
         assert abs(m.width() / m.height() - 2.0) < 0.1
         m.close()
 
@@ -93,7 +95,8 @@ class TestMiniView:
         bird = np.full((10, 10, 3), 200, np.uint8)
         assert m._show_birdseye is False
         m._show_birdseye = True                      # what the double-click flips
-        m.on_frame(_Packet(persp=persp, bird=bird))
+        for _ in range(2):                           # paint throttle passes 2nd
+            m.on_frame(_Packet(persp=persp, bird=bird))
         # birdseye variant painted: pixmap exists
         assert m._video._pixmap is not None
         m.close()
@@ -105,14 +108,31 @@ class TestNarrowMode:
         s = Settings()
         assert hasattr(s.ui, "mini_geometry")
 
-    def test_live_page_rail_hides_when_narrow(self, app):
+    def test_narrow_mode_keeps_stats_hides_bar_chrome(self, app):
+        """Joe: stats must survive narrowing. The bar sheds context-dead
+        controls instead (playback transport while live)."""
         from billiards_trainer.config import Settings
         from billiards_trainer.ui.pages.live_page import LivePage
         page = LivePage(Settings())
         page.show()                # hidden widgets defer resize events
         page.resize(700, 600)
         app.processEvents()
-        assert not page._rail_stack.isVisibleTo(page)
+        assert page._rail_stack.isVisibleTo(page), "stats rail must survive"
+        assert not page._alert_badge.isVisibleTo(page)
+        assert not page._seek.isVisibleTo(page), "transport is dead weight live"
+        assert page._rec_capsule.isVisibleTo(page), "record must stay while live"
         page.resize(1200, 700)
         app.processEvents()
-        assert page._rail_stack.isVisibleTo(page)
+        assert page._alert_badge.isVisibleTo(page)
+        assert page._seek.isVisibleTo(page)
+
+    def test_compact_playback_keeps_transport_drops_record(self, app):
+        from billiards_trainer.config import Settings
+        from billiards_trainer.ui.pages.live_page import LivePage
+        page = LivePage(Settings())
+        page.show()
+        page.resize(700, 600)
+        page.set_video_mode(True, total=100, fps=30.0)
+        app.processEvents()
+        assert page._seek.isVisibleTo(page), "transport is the point in playback"
+        assert not page._rec_capsule.isVisibleTo(page), "cannot record playback"
