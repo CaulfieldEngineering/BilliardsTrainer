@@ -116,3 +116,12 @@ Rounds continue with Joe's visual feedback as the gate.
   clock, duration; click/Prev/Next seek to routine start), fed by the
   same sidecar as the timeline lane. Next: per-shot correction channel ->
   training store; exclusive-assignment identity layer.
+- 2026-08-16 (loop 2): GLOBAL EXCLUSIVE ASSIGNMENT shipped — identities
+  decided jointly each frame (vote evidence + measured colour + stickiness;
+  settled commitments are hard constraints; greedy one-of-each). Replaces
+  pairwise arbitration + colour fallback in one principled pass, per the
+  prior-art research (Pool-Aid mutual exclusion / PoolLiveAid bipartite).
+  Verified on 3 sessions: impossible 0.80->0.60, 0.72->0.51, 0.37;
+  duplicate-number violations structurally zero; id_flicker <=0.2/1k. All
+  70 identity tests pass unchanged. oog unchanged (that is G3 retraining's
+  job). G1's render-audit tool remains the last G1 checkbox.

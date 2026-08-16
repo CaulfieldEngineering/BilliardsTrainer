@@ -347,48 +347,79 @@ class BallTracker:
         return self._public()
 
     def _arbitrate_numbers(self) -> None:
-        """There is exactly ONE of each ball on a table, but per-track hysteresis
-        can leave the same number committed on two tracks (measured: duplicate
-        numbers alive in ~80% of frames on real footage). Arbitrate globally:
-        the track with the strongest recent evidence keeps the number, weaker
-        claimants render as unknown ('?') until the evidence sorts itself out."""
+        """GLOBAL EXCLUSIVE ASSIGNMENT of ball identities — one of each,
+        decided jointly, every frame.
+
+        Prior art (Pool-Aid's mutual exclusion, PoolLiveAid's bipartite
+        matching) and our own corpus agree: per-track identity decided
+        independently is why duplicates existed at all. Each confirmed track
+        scores every candidate number from three signals — vote evidence
+        (num_hist), measured-colour proximity (this table's references), and
+        a stickiness bonus for its currently committed number (identity must
+        not churn). A greedy best-score-first pass assigns each number at
+        most once; a SETTLED track's committed number is a hard constraint
+        (physics: a resting ball cannot become a different ball). Tracks left
+        without a plausible free identity show unknown rather than a guess.
+
+        Ghost cleanup rides along as before: a stale coasting claimant of a
+        LIVE number is deleted outright (its frozen graphic haunted the
+        table otherwise)."""
+        from .balls import measured_identity
+
+        tracks = [t for t in self._tracks if t.confirmed]
+        if not tracks:
+            return
+
+        # --- stale-ghost cleanup (pre-pass, unchanged behaviour) ---------- #
         by_num: dict[int, list[_Internal]] = {}
-        for t in self._tracks:
-            if t.confirmed and t.committed_number >= 0:
+        for t in tracks:
+            if t.committed_number >= 0:
                 by_num.setdefault(t.committed_number, []).append(t)
         doomed: set[int] = set()
         for num, ts in by_num.items():
-            if len(ts) < 2:
-                continue
-            # If the number is LIVE on some track while another claimant has
-            # been missing beyond the normal miss budget, the missing one is a
-            # stale ghost of the same physical ball (it moved while undetected —
-            # thrown/struck through motion blur). Blanking its number isn't
-            # enough: the ghost graphic stays frozen on the table. Delete it.
-            if any(t.misses == 0 for t in ts):
+            if len(ts) >= 2 and any(t.misses == 0 for t in ts):
                 for t in ts:
                     if t.misses > self.max_misses:
                         doomed.add(t.id)
-                ts = [t for t in ts if t.id not in doomed]
-                if len(ts) < 2:
-                    continue
-            ts.sort(key=lambda t: (sum(1 for n in t.num_hist if n == num),
-                                   t.hits, -t.misses), reverse=True)
-            taken = {t2.committed_number for t2 in self._tracks
-                     if t2.confirmed and t2.committed_number >= 0
-                     and t2 is not ts[0]} | {num}
-            for t in ts[1:]:
-                # Losing the arbitration used to blank the number, and a
-                # blanked ball renders in its MEASURED colour — for the purple
-                # 4 misread as 7 that is another dark maroon disc, so Joe saw
-                # "two sevens" even though the data had no duplicates. Give
-                # the loser its next-best FREE identity from its own colour
-                # instead of anonymity.
-                t.committed_number = self._colour_identity(t, taken)
-                if t.committed_number >= 0:
-                    taken.add(t.committed_number)
         if doomed:
             self._tracks = [t for t in self._tracks if t.id not in doomed]
+            tracks = [t for t in tracks if t.id not in doomed]
+
+        # --- candidate scoring ------------------------------------------- #
+        # score units are commensurable "evidence points": one recent vote
+        # ~= 1.0; colour proximity contributes up to ~6; stickiness +4;
+        # settled commitment is hard (inf).
+        STICKY = 4.0
+        COLOUR_MAX = 6.0
+        cands: list[tuple[float, int, int]] = []   # (score, track_idx, number)
+        for i, t in enumerate(tracks):
+            votes = Counter(n for n in t.num_hist if n is not None and n >= 0)
+            colour_num = measured_identity(tuple(int(v) for v in t.bgr))
+            nums = set(votes) | ({colour_num} if colour_num > 0 else set())
+            if t.committed_number >= 0:
+                nums.add(t.committed_number)
+            for n in nums:
+                s = float(votes.get(n, 0))
+                if n == colour_num:
+                    s += COLOUR_MAX
+                if n == t.committed_number:
+                    s += STICKY
+                cands.append((s, i, n))
+
+        # --- assignment: settled commitments first, then best-score greedy #
+        taken: set[int] = set()
+        assigned: dict[int, int] = {}
+        for i, t in enumerate(tracks):
+            if t.settled and t.committed_number >= 0                     and t.committed_number not in taken:
+                assigned[i] = t.committed_number
+                taken.add(t.committed_number)
+        for s, i, n in sorted(cands, key=lambda c: -c[0]):
+            if i in assigned or n in taken or s < 2.0:
+                continue
+            assigned[i] = n
+            taken.add(n)
+        for i, t in enumerate(tracks):
+            t.committed_number = assigned.get(i, -1)
 
     @staticmethod
     def _colour_identity(t: _Internal, taken: set[int]) -> int:
