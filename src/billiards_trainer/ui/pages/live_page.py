@@ -1134,7 +1134,11 @@ class LivePage(QWidget):
         elif self._is_video:
             self._status_badge.set_text_color("PLAYBACK", PALETTE.info)
         else:
-            self._status_badge.set_text_color("LIVE", PALETTE.danger)
+            # Red dot = ON RECORD, nothing else — a red "LIVE" while not
+            # recording tells the universal broadcast lie (Joe's call). Green
+            # = camera live, not being kept.
+            self._status_badge.set_text_color(
+                "LIVE", PALETTE.danger if self._recording_on else PALETTE.success)
 
         # CONDITION — transient, most severe first, blank when all is well.
         if getattr(packet, "feed_sd", False) and not self._is_video:
