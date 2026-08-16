@@ -455,6 +455,8 @@ class MainWindow(QMainWindow):
             self._controller.frame_ready.connect(self._mini.on_frame)
             self._controller.recording_changed.connect(self._mini.on_recording)
             self._controller.status_changed.connect(self._mini.on_status)
+            self._mini.record_toggled.connect(
+                self._controller.set_recording, Qt.QueuedConnection)
             self._mini.closed.connect(self._on_mini_closed)
             self._mini.restore_requested.connect(self._on_mini_restore)
             saved = getattr(self._settings.ui, "mini_geometry", "")

@@ -97,6 +97,8 @@ class ShotDetector:
         self._free_frames: dict[int, int] = {}
         self._free_travel: dict[int, float] = {}
         self._pending_free: dict[int, tuple] = {}
+        self._last_carried: dict[int, int] = {}
+        self._frame_idx = 0
         self._start_t = 0.0
         self._max_travel = 0.0
         self._motion = 0.0
@@ -129,6 +131,9 @@ class ShotDetector:
         by_id = {tr.id: tr for tr in tracks}
 
         cue_present = self._update_cue(tracks)
+        self._frame_idx += 1
+        for tid in (self._evidence.get("carried_ids") or set()):
+            self._last_carried[tid] = self._frame_idx
         # Fused multi-modal activity (or plain motion energy if fusion is off).
         if det.use_fusion:
             self._fused = self._fuse(motion, self._evidence)
@@ -157,6 +162,14 @@ class ShotDetector:
                 carried_pre = self._evidence.get("carried_ids") or set()
                 for tr in tracks:
                     if tr.id in carried_pre:
+                        continue
+                    # A ball carried RECENTLY doesn't bank: a just-placed ball
+                    # wobbles free for a few frames after release, and banking
+                    # that wobble resurrected a false shot the audio harness
+                    # had already killed once. A struck object ball was never
+                    # carried; the cue ball's stick contact happens at the
+                    # strike itself, inside the shot, not before it.
+                    if self._frame_idx - self._last_carried.get(tr.id, -10**9) < 15:
                         continue
                     prev = self._prev.get(tr.id)
                     step = math.hypot(tr.x - prev.x, tr.y - prev.y) if prev else 0.0

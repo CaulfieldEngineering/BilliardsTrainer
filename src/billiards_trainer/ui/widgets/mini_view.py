@@ -1,17 +1,22 @@
 """Always-on-top mini view: the live feed in a small floating card.
 
-Joe's ask: keep an eye on the camera and recording status while other
-windows (Spotify, a browser) have the screen. This is a frameless,
-always-on-top window fed by the SAME controller signals as the main live
-page — no second capture path, no extra decode work; it just paints the
-packets it is handed.
+Joe's asks, in order given: keep an eye on the camera while other windows
+have the screen; then — record from here, borderless, window hugging the
+video frame. So v2 is a pure video surface: the frame IS the window (the
+window snaps to the video's aspect ratio, so there are never letterbox
+bars), and all chrome lives on a hover overlay that vanishes when the
+mouse leaves. A small status dot stays visible so REC state is glanceable
+without hovering.
 
-Interactions, kept deliberately few:
-- drag anywhere on the top bar to move
-- bottom-right size grip to resize
-- double-click the video to switch camera <-> bird's-eye
-- the dot button returns to the full app; closing does the same
-Geometry persists in ``ui.mini_geometry`` so it reopens where it lived.
+Fed by the SAME controller signals as the main live page — no second
+capture path; painting only. The record button emits the same signal the
+main record button drives.
+
+Interactions:
+- drag anywhere to move; bottom-right grip to resize (aspect preserved)
+- hover: REC toggle, back-to-app, close
+- double-click: switch camera <-> bird's-eye
+Geometry persists in ``ui.mini_geometry``.
 """
 
 from PySide6.QtCore import QPoint, Qt, Signal
@@ -31,73 +36,86 @@ from .video_view import VideoView
 class MiniView(QWidget):
     closed = Signal()
     restore_requested = Signal()
+    record_toggled = Signal(bool)     # same contract as LivePage.record_toggled
 
     def __init__(self, parent=None):
-        # A top-level tool-style window: stays on top, no native frame, not a
-        # taskbar entry of its own (it belongs to the app).
         super().__init__(parent,
                          Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_DeleteOnClose, False)
         self.setWindowTitle("Billiards Trainer — Mini")
-        self.setMinimumSize(220, 180)
-        self.resize(360, 320)
+        self.setMinimumSize(200, 120)
+        self.resize(384, 216)
         self._drag: QPoint | None = None
         self._show_birdseye = False
         self._recording = False
+        self._running = True
+        self._aspect = 16 / 9        # updated from real frames
+        self._in_aspect_snap = False
 
-        self.setStyleSheet(
-            f"MiniView {{ background: {PALETTE.bg}; border: 1px solid #333;"
-            "border-radius: 10px; }}")
-
+        # The video IS the window: no margins, no card, no bars.
         root = QVBoxLayout(self)
-        root.setContentsMargins(8, 6, 8, 8)
-        root.setSpacing(6)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        self._video = VideoView()
+        self._video.setMinimumSize(1, 1)   # the WINDOW minimum governs
+        root.addWidget(self._video)
 
-        # --- top bar: status + controls (and the drag handle) -------------- #
-        bar = QHBoxLayout()
-        bar.setSpacing(8)
-        self._status = QLabel("")
-        self._status.setTextFormat(Qt.RichText)
-        self._status.setStyleSheet(
-            "font-size: 11px; font-weight: 800; letter-spacing: 1.2px;"
-            f"color: {PALETTE.text};")
-        bar.addWidget(self._status)
+        # --- hover overlay: all chrome lives here ------------------------- #
+        self._overlay = QWidget(self)
+        self._overlay.setStyleSheet(
+            "background: rgba(0,0,0,0.55); border-radius: 0px;")
+        bar = QHBoxLayout(self._overlay)
+        bar.setContentsMargins(10, 6, 10, 6)
+        bar.setSpacing(10)
+
+        self._rec_btn = QPushButton("● REC")
+        self._rec_btn.setToolTip("Start/stop recording (same as the main record button)")
+        self._rec_btn.setCursor(Qt.PointingHandCursor)
+        self._rec_btn.setCheckable(True)
+        self._rec_btn.setStyleSheet(
+            "QPushButton { background: rgba(255,255,255,0.10); border: none;"
+            "border-radius: 4px; padding: 3px 10px; font-size: 11px;"
+            f"font-weight: 800; letter-spacing: 1px; color: {PALETTE.text}; }}"
+            "QPushButton:hover { background: rgba(255,255,255,0.22); }"
+            "QPushButton:checked { background: #B3261E; color: white; }")
+        self._rec_btn.clicked.connect(
+            lambda checked: self.record_toggled.emit(bool(checked)))
+        bar.addWidget(self._rec_btn)
         bar.addStretch(1)
+
         restore = QPushButton("⤢")
         restore.setToolTip("Back to the full app")
         close = QPushButton("✕")
         close.setToolTip("Close mini view")
         for b in (restore, close):
             b.setCursor(Qt.PointingHandCursor)
-            b.setFixedSize(22, 22)
+            b.setFixedSize(24, 24)
             b.setStyleSheet(
-                "QPushButton { background: rgba(255,255,255,0.06); border: none;"
+                "QPushButton { background: rgba(255,255,255,0.10); border: none;"
                 f"border-radius: 4px; color: {PALETTE.text}; font-size: 12px; }}"
-                "QPushButton:hover { background: rgba(255,255,255,0.16); }")
+                "QPushButton:hover { background: rgba(255,255,255,0.25); }")
         restore.clicked.connect(self.restore_requested.emit)
         close.clicked.connect(self.close)
         bar.addWidget(restore)
         bar.addWidget(close)
-        root.addLayout(bar)
+        self._overlay.hide()
 
-        # --- the feed ------------------------------------------------------ #
-        self._video = VideoView()
-        root.addWidget(self._video, 1)
+        # Always-visible status dot (tiny, top-left): REC red / LIVE green.
+        self._dot = QLabel("●", self)
+        self._dot.setStyleSheet(
+            f"color: {PALETTE.success}; font-size: 11px; background: transparent;")
+        self._dot.move(8, 4)
 
-        # --- footer: hint + size grip -------------------------------------- #
-        foot = QHBoxLayout()
-        self._hint = QLabel("double-click: camera ⇄ table")
-        self._hint.setStyleSheet(
-            f"color: {PALETTE.text_dim}; font-size: 9px;")
-        foot.addWidget(self._hint)
-        foot.addStretch(1)
-        foot.addWidget(QSizeGrip(self), 0, Qt.AlignBottom | Qt.AlignRight)
-        root.addLayout(foot)
+        # Resize grip, overlaid bottom-right; aspect snap happens in resizeEvent.
+        self._grip = QSizeGrip(self)
+        self._grip.setFixedSize(16, 16)
+        self._grip.setStyleSheet("background: transparent;")
 
-        self._set_status_text("LIVE", PALETTE.success)
+        self.setMouseTracking(True)
+        self._video.setMouseTracking(True)
 
     # ------------------------------------------------------------------ #
-    # Feed — same packets the live page gets; painting only.
+    # Feed
     # ------------------------------------------------------------------ #
     def on_frame(self, packet) -> None:
         if not self.isVisible():
@@ -105,33 +123,64 @@ class MiniView(QWidget):
         img = packet.birdseye if (self._show_birdseye
                                   and packet.birdseye is not None) \
             else packet.perspective
-        if img is not None:
-            self._video.set_frame(img)
+        if img is None:
+            return
+        h, w = img.shape[:2]
+        if h > 0 and w > 0:
+            aspect = w / h
+            if abs(aspect - self._aspect) > 0.01:
+                self._aspect = aspect
+                self._snap_to_aspect()
+        self._video.set_frame(img)
 
     def on_recording(self, on: bool) -> None:
         self._recording = on
-        self._refresh_status()
+        self._rec_btn.setChecked(on)
+        self._rec_btn.setText("■ STOP" if on else "● REC")
+        self._refresh_dot()
 
     def on_status(self, status: str) -> None:
         self._running = status == "running"
-        self._refresh_status()
+        self._refresh_dot()
 
-    def _refresh_status(self) -> None:
-        if self._recording:
-            self._set_status_text("REC", PALETTE.danger)
-        elif getattr(self, "_running", True):
-            self._set_status_text("LIVE", PALETTE.success)
-        else:
-            self._set_status_text("IDLE", PALETTE.text_dim)
-
-    def _set_status_text(self, text: str, color: str) -> None:
-        self._status.setText(
-            f'<span style="color:{color}; font-size:10px;">●</span>'
-            f'&nbsp;&nbsp;{text}')
+    def _refresh_dot(self) -> None:
+        color = (PALETTE.danger if self._recording
+                 else PALETTE.success if self._running else PALETTE.text_dim)
+        self._dot.setStyleSheet(
+            f"color: {color}; font-size: 11px; background: transparent;")
 
     # ------------------------------------------------------------------ #
-    # Frameless-window ergonomics
+    # The window hugs the video: height follows width by aspect ratio.
     # ------------------------------------------------------------------ #
+    def _snap_to_aspect(self) -> None:
+        if self._in_aspect_snap:
+            return
+        self._in_aspect_snap = True
+        try:
+            w = self.width()
+            self.resize(w, max(self.minimumHeight(), round(w / self._aspect)))
+        finally:
+            self._in_aspect_snap = False
+
+    def resizeEvent(self, ev):  # noqa: N802 - Qt override
+        self._snap_to_aspect()
+        self._overlay.setGeometry(0, 0, self.width(), 36)
+        self._grip.move(self.width() - 16, self.height() - 16)
+        super().resizeEvent(ev)
+
+    # ------------------------------------------------------------------ #
+    # Hover chrome + frameless ergonomics
+    # ------------------------------------------------------------------ #
+    def enterEvent(self, ev):  # noqa: N802 - Qt override
+        self._overlay.show()
+        self._overlay.raise_()
+        self._grip.raise_()
+        super().enterEvent(ev)
+
+    def leaveEvent(self, ev):  # noqa: N802 - Qt override
+        self._overlay.hide()
+        super().leaveEvent(ev)
+
     def mousePressEvent(self, ev):  # noqa: N802 - Qt override
         if ev.button() == Qt.LeftButton:
             self._drag = ev.globalPosition().toPoint() - self.frameGeometry().topLeft()

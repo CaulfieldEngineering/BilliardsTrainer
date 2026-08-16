@@ -159,6 +159,23 @@ the recording path is never touched by this loop.
 - 2026-08-15: c3 gated held-out and DECLINED: formal gates pass (tolerance
   bands) but out-of-game went 67.5 → 71.6/1k, coverage 7.23 → 7.15 —
   nothing improved. Champion file verified restored byte-intact.
+- 2026-08-15 (later): Phase 3 shot detection VALIDATED against session
+  audio (score_shots.py): baseline 9 shots/2 provably false (both were Joe
+  hand-moving balls between drill reps — one frame shows the cue ball in
+  his glove). Three gate designs; audio harness killed two (arm-dwell:
+  stick hovers during real shots; carried-skip: displacement survives hand
+  withdrawal). Survivor: per-ball foreign adjacency (vision/foreign.py)
+  + travel as displacement integrated over FREE frames + pre-shot motion
+  banking with a carried-recency gate. End state: 5/5 shots
+  audio-confirmed, 0 false. LESSONS: never gate on a piped exit code (CI
+  caught a red-test push); never put a timeout on a command chain that
+  swaps the champion model.
+  c4 (78 imgs/459 boxes/5 sessions) DECLINED held-out like c2/c3:
+  impossible 1.21→1.29, oog 73.3→75.1. Hand-label scale (~460 boxes)
+  still loses to the champion. c5 strategy: public Roboflow datasets
+  (docs/BLOCKERS.md lists them; tools/fetch_datasets.py needs a free
+  ROBOFLOW_API_KEY — Joe item) + Joe-table labels on top. Until then the
+  labelling grind continues (~13 streamable sessions remain).
   CONCLUSION: 47 labelled frames cannot beat a champion trained on far
   more data; challengers become competitive at roughly 10× the dataset.
   The labelling loop is proven and cheap (~15 min per session of vision

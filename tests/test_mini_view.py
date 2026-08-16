@@ -34,9 +34,9 @@ class TestMiniView:
         frame = np.zeros((120, 160, 3), np.uint8)
         m.on_frame(_Packet(persp=frame))
         m.on_recording(True)
-        assert "REC" in m._status.text()
+        assert m._rec_btn.isChecked() and "STOP" in m._rec_btn.text()
         m.on_recording(False)
-        assert "LIVE" in m._status.text()
+        assert not m._rec_btn.isChecked() and "REC" in m._rec_btn.text()
         m.close()
 
     def test_hidden_mini_skips_painting(self, app):
@@ -63,6 +63,27 @@ class TestMiniView:
         m = MiniView()
         m.apply_geometry_string("garbage")
         m.apply_geometry_string("")
+
+    def test_aspect_snap_follows_frame(self, app):
+        """The window hugs the video: height follows width by frame aspect."""
+        from billiards_trainer.ui.widgets.mini_view import MiniView
+        m = MiniView()
+        m.show()
+        m.resize(400, 400)
+        # a 2:1 portrait-ish frame (h=200, w=400 -> aspect 2.0)
+        m.on_frame(_Packet(persp=np.zeros((200, 400, 3), np.uint8)))
+        assert abs(m.width() / m.height() - 2.0) < 0.1
+        m.close()
+
+    def test_record_button_emits_toggle(self, app):
+        from billiards_trainer.ui.widgets.mini_view import MiniView
+        m = MiniView()
+        got = []
+        m.record_toggled.connect(got.append)
+        m._rec_btn.click()
+        assert got == [True]
+        m._rec_btn.click()
+        assert got == [True, False]
 
     def test_double_click_toggles_view(self, app):
         from billiards_trainer.ui.widgets.mini_view import MiniView

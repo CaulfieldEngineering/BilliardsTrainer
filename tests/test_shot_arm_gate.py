@@ -123,3 +123,41 @@ class TestCarriedBallGate:
         events = _run(det, frames)
         assert len(events) == 1
         assert events[0].num_pocketed == 0, "picked-up ball must not be a pot"
+
+
+class TestBankRecencyGate:
+    def test_recently_carried_ball_does_not_bank(self):
+        """A just-placed ball's post-release wobble must not bank into a shot
+        (the wobble plus banked steps once resurrected a false scratch)."""
+        det = _detector()
+        frames = []
+        ball = _mk(1, 300.0, 300.0)
+        for _ in range(10):
+            frames.append(([ball], 0.0, set()))
+        # hand carries the ball across the table
+        x = 300.0
+        for _ in range(8):
+            x += 40.0
+            frames.append(([_mk(1, x, 300.0, vx=40.0)], 5.0, {1}))
+        # released: wobbles freely while motion still reads active
+        for _ in range(6):
+            x += 8.0
+            frames.append(([_mk(1, x, 300.0, vx=8.0)], 5.0, set()))
+        for _ in range(10):
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        assert _run(det, frames) == [], "placement wobble must not become a shot"
+
+    def test_never_carried_ball_still_banks(self):
+        """The fast-pot case: pre-shot steps of a struck ball must count."""
+        det = _detector()
+        frames = []
+        ball = _mk(1, 300.0, 300.0)
+        for _ in range(10):
+            frames.append(([ball], 0.0, set()))
+        x = 300.0
+        for _ in range(12):
+            x += 40.0
+            frames.append(([_mk(1, x, 300.0, vx=40.0)], 5.0, set()))
+        for _ in range(10):
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        assert len(_run(det, frames)) == 1
