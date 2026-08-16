@@ -106,3 +106,13 @@ Rounds continue with Joe's visual feedback as the gate.
   tracker-proximity identity weighting — queued as the loop's next major
   build. Also: 'TV colour' ball sets exist BECAUSE cameras can't separate
   purple/maroon — a legitimate hardware option for Joe someday.
+- 2026-08-16 (loop): ANALYZE-ONCE ARCHITECTURE shipped on Joe's direction —
+  every recording writes an analysis sidecar live (10Hz states + shots);
+  playback with a sidecar bypasses all inference (measured 94.8fps vs 30
+  needed; audio no longer re-anchors); whole library backfilled (25
+  files). Playback chain fixed end-to-end this session: worker cadence,
+  paint downscale-at-ingest, wall-clock pacing with frame drops. Dossier
+  slice 2: per-shot REVIEW LIST in the playback rail (rows w/ outcome,
+  clock, duration; click/Prev/Next seek to routine start), fed by the
+  same sidecar as the timeline lane. Next: per-shot correction channel ->
+  training store; exclusive-assignment identity layer.

@@ -211,6 +211,11 @@ class LivePage(QWidget):
         self._rail_stack.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._rail_stack.addWidget(self._stats_rail())      # 0 = normal
         self._rail_stack.addWidget(self._training_rail())   # 1 = training
+        from ..widgets.shot_list import ShotListPanel
+        self._shot_list = ShotListPanel(
+            pre_roll_s=getattr(self._settings.ui, "pre_shot_s", 5.0))
+        self._shot_list.shot_selected.connect(self._on_timeline_clicked)
+        self._rail_stack.addWidget(self._shot_list)          # 2 = playback review
         splitter.addWidget(self._rail_stack)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 4)
@@ -523,6 +528,9 @@ class LivePage(QWidget):
         if hasattr(self, "_jump_section"):
             self._jump_section.setVisible(is_video)  # jumping needs a seekable clip
         self._timeline.clear()
+        self._shot_list.set_shots([])
+        if not self._training:
+            self._rail_stack.setCurrentIndex(2 if is_video else 0)
         if is_video:
             self._timeline.set_duration(total / (fps or 30.0))
             self._seek.setRange(0, max(0, total - 1))
@@ -1229,6 +1237,10 @@ class LivePage(QWidget):
         try:
             self._timeline.add_shot(event.start_t, event.end_t,
                                     event.outcome.value, event.num_pocketed)
+            self._shot_list.add_shot({
+                "start": event.start_t, "end": event.end_t,
+                "outcome": event.outcome.value,
+                "pocketed": event.num_pocketed})
         except AttributeError:
             pass
 
@@ -1241,6 +1253,7 @@ class LivePage(QWidget):
                                     float(s.get("end", 0.0)),
                                     str(s.get("outcome", "miss")),
                                     int(s.get("pocketed", 0)))
+        self._shot_list.set_shots(list(shots or []))
 
     def _on_timeline_clicked(self, seconds: float) -> None:
         if self._is_video and self._video_fps > 0:
