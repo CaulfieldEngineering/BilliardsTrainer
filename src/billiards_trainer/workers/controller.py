@@ -248,6 +248,7 @@ class PipelineController(QObject):
         self._video_paused = False
         self._speed = 1.0
         self._video_pos = 0
+        self._pace_anchor = None
         if self._timer is None:
             self.on_started()
         self._timer.start(interval)
@@ -854,6 +855,29 @@ class PipelineController(QObject):
         # just stop advancing. Step/seek re-run detection on the chosen frame.
         if self._video_paused and getattr(self._source, "is_video", False):
             return
+        if getattr(self._source, "is_video", False):
+            # WALL-CLOCK pacing: audio plays at true speed, so video must hold
+            # it or the sync layer drags audio back (~every 4s, replaying the
+            # last second — Joe's "audio keeps looping"). Playback is an
+            # analyzer over a real-time clip: when processing falls behind the
+            # clock, DROP frames to catch up (decode-only, ~10ms each) instead
+            # of stretching time. Anchor resets on start/seek/speed/pause.
+            now = time.perf_counter()
+            anchor = getattr(self, "_pace_anchor", None)
+            if anchor is None:
+                self._pace_anchor = (now, self._video_pos)
+            else:
+                t0, f0 = anchor
+                expected = f0 + (now - t0) * self._src_fps * self._speed
+                behind = expected - self._video_pos
+                skipped = 0
+                while behind > 1.5 and skipped < 6:
+                    if self._source.read() is None:
+                        break
+                    self._video_pos = max(0, self._source.position() - 1)
+                    behind -= 1.0
+                    skipped += 1
+                    self._play_tick += 1
         frame = self._source.read()
         if frame is None:
             # Tolerate transient empty reads from a live camera; only give up
@@ -1090,6 +1114,7 @@ class PipelineController(QObject):
     @Slot(bool)
     def set_video_paused(self, paused: bool) -> None:
         self._video_paused = paused
+        self._pace_anchor = None   # resume re-anchors the wall clock
         if self._is_video():
             self.video_state.emit(self._video_pos, self._source.frame_count, not paused)
 
@@ -1109,6 +1134,7 @@ class PipelineController(QObject):
         if not self._is_video():
             return
         self._source.seek(int(frame_idx))
+        self._pace_anchor = None   # new position = new wall-clock anchor
         f = self._source.read()
         if f is not None:
             self._run_frame(f)
@@ -1129,6 +1155,7 @@ class PipelineController(QObject):
     @Slot(float)
     def set_playback_speed(self, mult: float) -> None:
         self._speed = max(0.1, float(mult))
+        self._pace_anchor = None   # new speed = new wall-clock anchor
         if self._timer is not None:
             self._timer.start(max(4, int(self._base_interval / self._speed)))
 
