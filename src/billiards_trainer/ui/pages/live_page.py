@@ -127,6 +127,7 @@ class LivePage(QWidget):
     video_step = Signal(int)                  # ±frames
     video_seek = Signal(int)                  # absolute frame index
     video_speed = Signal(float)               # playback multiplier
+    mini_view_requested = Signal()            # pop out the always-on-top mini view
     tuning_changed = Signal()                 # a live-tuning control changed (settings mutated in place)
     label_mode_toggled = Signal(bool)         # Training Mode on/off
     save_training_frame_requested = Signal(object)  # [(number, cx, cy, w, h) normalised] (object marshals cleanly cross-thread)
@@ -326,11 +327,26 @@ class LivePage(QWidget):
         self._alert_badge = _StatusPill(_ALERT_TEXTS)
         lay.addWidget(self._alert_badge)
 
+        # Pop-out mini view (Joe's ask): a small always-on-top feed for keeping
+        # an eye on the table while other windows have the screen.
+        self._mini_btn = self._tool_btn("pip", "Pop out a small always-on-top view")
+        self._mini_btn.clicked.connect(self.mini_view_requested.emit)
+        lay.addWidget(self._mini_btn)
+
         self._playback_widgets = [self._play_btn, pb_stop, back_btn, fwd_btn,
                                   self._seek, self._time_lbl, self._speed_combo,
                                   self._fix_labels_btn]
         for w in self._playback_widgets:
             w.setEnabled(False)
+        # The bar's children are fixed-width BY DESIGN (nothing may shift when
+        # a label changes), which makes their SUM the window's minimum width —
+        # measured at 1788px, the wall Joe hit trying to put Spotify
+        # side-by-side. Override the propagated minimum; resizeEvent hides the
+        # optional items before anything could clip.
+        self._bar_optional = [self._alert_badge, self._audio_meter,
+                              self._time_lbl, self._speed_combo,
+                              self._fix_labels_btn]
+        bar.setMinimumWidth(360)
         return bar
 
     def _vsep(self) -> QFrame:
@@ -547,7 +563,11 @@ class LivePage(QWidget):
         # Compact scoreboard — tight spacing, narrow column; more stats land
         # here later, so the layout leaves the room in the middle, not the edges.
         rail = Card(padding=12, spacing=8)
-        rail.setMinimumWidth(240)
+        # No hard minimum: the window's minimum width is the SUM of its
+        # children's minimums, and this rail's old 240px floor was a third of
+        # why the app refused to shrink for side-by-side use. The rail looks
+        # best >=240 wide, so narrow-mode HIDES it (resizeEvent) rather than
+        # squeezing it.
         rail.setMaximumWidth(300)
 
         # The headline: makes vs misses, big.
@@ -1151,6 +1171,26 @@ class LivePage(QWidget):
         if self._rec_time.property("paused") != paused:
             self._rec_time.setProperty("paused", paused)
             self._repolish(self._rec_time)
+
+    def resizeEvent(self, ev):  # noqa: N802 - Qt override
+        # Narrow-window mode (Joe's ask: app side-by-side with other windows).
+        # Each tier yields something the video needs more than chrome does; it
+        # all returns the moment there is room again.
+        # Tier thresholds must sit ABOVE the floor the previous tier enforces,
+        # or the window jams: it cannot shrink past a minimum whose reduction
+        # requires shrinking past it (measured: a 900px tier behind a 924px
+        # floor was unreachable by dragging).
+        w = self.width()
+        compact = w < 1000
+        if hasattr(self, "_rail_stack"):
+            self._rail_stack.setVisible(not compact)
+        if hasattr(self, "_bar_optional"):
+            for x in self._bar_optional:
+                x.setVisible(not compact)
+        if hasattr(self, "_bird"):
+            # narrowest tier: the camera IS the app; the bird's-eye yields
+            self._bird.parentWidget().setVisible(w >= 640)
+        super().resizeEvent(ev)
 
     def on_status(self, status: str) -> None:
         if status == "running":

@@ -51,6 +51,9 @@ _PATHS: dict[str, str] = {
     "step-fwd": ('<polygon points="5,5 14.5,12 5,19" fill="{c}" stroke="none"/>'
                  '<rect x="16" y="5" width="3" height="14" rx="1" fill="{c}" stroke="none"/>'),
     "film": '<rect x="2" y="3" width="20" height="18" rx="2"/><line x1="7" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="2" y1="15" x2="22" y2="15"/>',
+    # pop-out mini view: a small window escaping a large one
+    "pip": ('<rect x="2" y="4" width="20" height="16" rx="2"/>'
+            '<rect x="12" y="12" width="8" height="6" rx="1" fill="{c}" stroke="none"/>'),
 }
 
 

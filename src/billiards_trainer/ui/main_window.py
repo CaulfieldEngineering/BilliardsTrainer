@@ -199,6 +199,7 @@ class MainWindow(QMainWindow):
         self._controller.video_state.connect(self._live.update_video_state)
         self._live.open_settings_requested.connect(lambda: self._stack.setCurrentIndex(1))
         # Sidebar navigation (the only navigation)
+        self._live.mini_view_requested.connect(self._toggle_mini_view)
         self._sidebar.live_selected.connect(self._on_live_selected)
         self._sidebar.session_selected.connect(self._on_session_selected)
         self._sidebar.settings_toggled.connect(self._toggle_settings)
@@ -444,6 +445,43 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Replay saved: {path}", 6000)
 
     # ------------------------------------------------------------------ #
+    def _toggle_mini_view(self) -> None:
+        """Pop out (or refocus) the always-on-top mini view. The mini is fed by
+        the SAME controller signals as the live page — painting only, so having
+        it open costs one extra pixmap scale per frame."""
+        if getattr(self, "_mini", None) is None:
+            from .widgets.mini_view import MiniView
+            self._mini = MiniView()
+            self._controller.frame_ready.connect(self._mini.on_frame)
+            self._controller.recording_changed.connect(self._mini.on_recording)
+            self._controller.status_changed.connect(self._mini.on_status)
+            self._mini.closed.connect(self._on_mini_closed)
+            self._mini.restore_requested.connect(self._on_mini_restore)
+            saved = getattr(self._settings.ui, "mini_geometry", "")
+            if saved:
+                self._mini.apply_geometry_string(saved)
+        self._mini.show()
+        self._mini.raise_()
+
+    def _on_mini_closed(self) -> None:
+        if getattr(self, "_mini", None) is not None:
+            self._settings.ui.mini_geometry = self._mini.geometry_string()
+            self._settings.save()
+
+    def _on_mini_restore(self) -> None:
+        self._on_mini_closed()
+        self._mini.hide()
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def resizeEvent(self, ev):  # noqa: N802 - Qt override
+        # Narrow-window mode: the sessions sidebar yields below ~1000px so the
+        # app can sit side-by-side with another window; it returns with room.
+        if hasattr(self, "_sidebar"):
+            self._sidebar.setVisible(self.width() >= 1000)
+        super().resizeEvent(ev)
+
     def _maybe_check_updates(self) -> None:
         from ..update.updater import can_self_update
         if not can_self_update():

@@ -28,7 +28,7 @@ class VideoView(QWidget):
         self._balls: list = []     # [(x, y, r, label)] in image px — hover-to-reveal
         self._mouse_pos: QPointF | None = None
         self._pickable = False
-        self.setMinimumSize(160, 120)
+        self.setMinimumSize(120, 90)   # small floor so the WINDOW can get small
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.setMouseTracking(True)   # hover events without a pressed button
