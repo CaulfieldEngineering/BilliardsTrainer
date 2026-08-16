@@ -49,6 +49,21 @@ audio-confirmed (precision) AND a manual spot-check of ≥50 audio onsets
 finds no missed real strokes (recall floor).
 **Current:** 5/5 precision on one session; recall un-audited.
 
+## NORTH STAR (Joe, 2026-08-16): the SHOT DOSSIER
+"Parse shots, per session. So I can 1) review my gameplay and 2) start
+reviewing specific quality of the tracking analysis and correcting the
+specifics of what we're still missing. EVENTUALLY we'll use these
+individual shots for LLM/VLM analysis — 'on this shot you missed to the
+left, your head popped up, your cue swerved right'... but we're not there
+yet."
+
+Architecture that serves it: every shot becomes a DOSSIER — media clip
+(start/end timestamps into the session file), tracking record (ball paths,
+outcome, pocket), stroke record (IMU when present), and a CORRECTION
+channel (Joe flags what tracking got wrong; corrections feed the training
+store). Gameplay review and quality review are the same surface; the
+future VLM coach consumes the same dossier. Build order lives in G6.
+
 ## G6 — Analytics v1 in the app: the DAW timeline grows up
 The reason everything else exists. Joe (2026-08-16): "the shot timeline is
 rudimentary... you are the architect. Look beyond what I'm asking."
