@@ -149,3 +149,12 @@ Rounds continue with Joe's visual feedback as the gate.
   Successor goal G2b: stripe accuracy >=90% (stripe_reading tuning +
   stripe-heavy labels for c5). Also 0-as-15 x5 (cue misread!) worth a
   look at the cue-guard path.
+- 2026-08-16 (loop 6): G2b attacked with evidence — measured white_frac
+  distributions over 398 labelled balls: under warm light true stripe
+  whites carry a yellow cast (s 60-110) that the old s<60 gate missed, so
+  stripes leaked into "no white = solid". Retuned the white test
+  (s<110,v>170) + thresholds (0.32/0.48) fitted to the distributions:
+  reader errors stripes 30->8, solids 1 (unchanged), 14-ball 9%->100%,
+  9-ball 21%->47%. Dark cluster held 95.1%; suite green. Residual: 9->1
+  x17 (model wins on abstain), 9/5->13 hue tangles — c5 retrain +
+  possible band-colour sampling next.

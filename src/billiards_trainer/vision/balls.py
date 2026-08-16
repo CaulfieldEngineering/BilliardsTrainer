@@ -122,7 +122,7 @@ def _inner_disc(patch_bgr, mask):
 
 
 def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
-                   solid_below: float = 0.20, stripe_above: float = 0.45):
+                   solid_below: float = 0.32, stripe_above: float = 0.48):
     """Is this crop a STRIPE (True), a SOLID (False), or too close to call (None)?
 
     Deliberately abstains in the middle. The 16-class model gets a ball's HUE
@@ -144,7 +144,13 @@ def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
     hsv = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2HSV)
     s = hsv[:, :, 1][sel].astype(np.float32)
     v = hsv[:, :, 2][sel].astype(np.float32)
-    white_frac = float(np.mean((s < 60) & (v > 150)))
+    # White under Joe's warm light carries a YELLOW CAST: true stripe poles
+    # measure saturation 60-110, so the old s<60 gate missed them and a
+    # quarter of stripes read as "no white" -> declared solid (9-as-1 x31 on
+    # ground truth). Bounds and thresholds fitted to the measured
+    # distributions over 398 labelled balls: solids p95=0.31, stripes
+    # p10=0.37 under this test.
+    white_frac = float(np.mean((s < 110) & (v > 170)))
     if white_frac < solid_below:
         return False
     if white_frac > stripe_above:
