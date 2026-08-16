@@ -14,6 +14,11 @@ Format (one JSON object per line):
     {"type":"meta","v":1,"fps":30,"table":{...},"H":[...],"corners":[...]}
     {"type":"f","t":12.34,"tracks":[[id,x,y,r,num,cls,active],...]}
     {"type":"shot","start":10.2,"end":16.8,"outcome":"make","pocketed":1}
+    {"type":"correction","start":10.2,"outcome":"miss"}   # review verdicts
+
+Corrections are APPENDED (the file is a log, not a document): the reader
+applies the last correction matching a shot's start time. Joe's review
+verdicts therefore survive re-opens and travel with the session file.
 
 Track states land at detection cadence (~7-10 Hz); the reader interpolates
 between neighbouring records so overlays glide at display rate.
@@ -33,6 +38,20 @@ SIDECAR_SUFFIX = ".analysis.jsonl"
 
 def sidecar_path(video_path: str | Path) -> Path:
     return Path(str(video_path) + SIDECAR_SUFFIX)
+
+
+def append_correction(video_path: str | Path, start: float, outcome: str) -> bool:
+    """Persist a review verdict for the shot starting at ``start`` seconds.
+
+    Append-only by design — the sidecar is a log. Returns False when there
+    is no sidecar to correct (nothing silently invented)."""
+    p = sidecar_path(video_path)
+    if not p.is_file():
+        return False
+    with open(p, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "correction", "start": round(float(start), 3),
+                            "outcome": outcome}) + "\n")
+    return True
 
 
 class SidecarWriter:
@@ -94,6 +113,13 @@ class SidecarReader:
                     self._frames.append(d["tracks"])
                 elif d.get("type") == "shot":
                     self.shots.append(d)
+                elif d.get("type") == "correction":
+                    # last-wins: apply to the shot whose start matches
+                    for s in self.shots:
+                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            s["outcome"] = d.get("outcome", s.get("outcome"))
+                            s["corrected"] = True
+                            break
         log.info("analysis sidecar loaded: %s (%d states, %d shots)",
                  p.name, len(self._times), len(self.shots))
 

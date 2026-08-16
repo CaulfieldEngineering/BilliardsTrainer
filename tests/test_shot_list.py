@@ -64,3 +64,37 @@ class TestShotList:
         assert page._rail_stack.currentIndex() == 2, "playback shows the shot list"
         page.set_video_mode(False, total=0, fps=30.0)
         assert page._rail_stack.currentIndex() == 0, "live shows the stats rail"
+
+
+class TestCorrectionChannel:
+    def test_correct_outcome_emits_and_marks(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots(_shots())
+        got = []
+        pnl.outcome_corrected.connect(lambda s, o: got.append((s, o)))
+        pnl._correct(1, "make")                      # the miss becomes a make
+        assert got == [(75.2, "make")]
+        assert pnl._shots[1]["outcome"] == "make"
+        assert pnl._shots[1]["corrected"] is True
+
+    def test_sidecar_correction_roundtrip(self, tmp_path):
+        from billiards_trainer.events.shot_detector import ShotEvent, ShotOutcome
+        from billiards_trainer.vision.analysis_cache import (
+            SidecarReader,
+            SidecarWriter,
+            append_correction,
+        )
+        video = tmp_path / "s.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_shot(ShotEvent(outcome=ShotOutcome.MISS, num_pocketed=0,
+                             start_t=10.0, end_t=15.0))
+        w.close()
+        assert append_correction(video, 10.0, "make")
+        r = SidecarReader(video)
+        assert r.shots[0]["outcome"] == "make"
+        assert r.shots[0]["corrected"] is True
+
+    def test_correction_without_sidecar_refuses(self, tmp_path):
+        from billiards_trainer.vision.analysis_cache import append_correction
+        assert not append_correction(tmp_path / "nope.mp4", 1.0, "make")

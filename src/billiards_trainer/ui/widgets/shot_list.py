@@ -29,9 +29,16 @@ _OUTCOME = {
 
 
 class ShotListPanel(QWidget):
-    """``shot_selected(seconds)`` asks the owner to seek (routine start)."""
+    """``shot_selected(seconds)`` asks the owner to seek (routine start).
+
+    The CORRECTION channel lives here too (dossier slice 3): right-click a
+    shot to fix its outcome — the verdict is appended to the session's
+    sidecar and survives re-opens — or to jump into Training Mode at that
+    shot and fix ball labels (which feeds the training store)."""
 
     shot_selected = Signal(float)
+    outcome_corrected = Signal(float, str)   # (shot start s, new outcome)
+    fix_labels_requested = Signal(float)     # seek here + enter Training Mode
 
     def __init__(self, pre_roll_s: float = 5.0, parent=None):
         super().__init__(parent)
@@ -66,6 +73,8 @@ class ShotListPanel(QWidget):
         self._list.setSelectionMode(QListWidget.SingleSelection)
         self._list.itemActivated.connect(self._on_item)
         self._list.itemClicked.connect(self._on_item)
+        self._list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._list.customContextMenuRequested.connect(self._menu)
         root.addWidget(self._list, 1)
 
         self._empty = QLabel("No shots detected in this session yet.")
@@ -114,6 +123,35 @@ class ShotListPanel(QWidget):
     def _on_item(self, item: QListWidgetItem) -> None:
         start = float(item.data(Qt.UserRole) or 0.0)
         self.shot_selected.emit(max(0.0, start - self.pre_roll_s))
+
+    def _menu(self, pos) -> None:
+        item = self._list.itemAt(pos)
+        if item is None:
+            return
+        row = self._list.row(item)
+        shot = self._shots[row]
+        start = float(shot.get("start", 0.0))
+        from PySide6.QtWidgets import QMenu
+        m = QMenu(self)
+        cur = shot.get("outcome", "miss")
+        for oc in ("make", "miss", "scratch"):
+            if oc == cur:
+                continue
+            act = m.addAction(f"Mark as {oc.upper()}")
+            act.triggered.connect(
+                lambda _c=False, o=oc: self._correct(row, o))
+        m.addSeparator()
+        fix = m.addAction("Fix ball labels at this shot…")
+        fix.triggered.connect(
+            lambda _c=False: self.fix_labels_requested.emit(start))
+        m.exec(self._list.mapToGlobal(pos))
+
+    def _correct(self, row: int, outcome: str) -> None:
+        shot = self._shots[row]
+        shot["outcome"] = outcome
+        shot["corrected"] = True
+        self.outcome_corrected.emit(float(shot.get("start", 0.0)), outcome)
+        self.set_shots(self._shots)
 
     def _step(self, delta: int) -> None:
         if not self._shots:

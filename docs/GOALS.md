@@ -125,3 +125,9 @@ Rounds continue with Joe's visual feedback as the gate.
   duplicate-number violations structurally zero; id_flicker <=0.2/1k. All
   70 identity tests pass unchanged. oog unchanged (that is G3 retraining's
   job). G1's render-audit tool remains the last G1 checkbox.
+- 2026-08-16 (loop 3): CORRECTION CHANNEL shipped (dossier slice 3) —
+  right-click a shot in the review list: fix its outcome (appended to the
+  session sidecar as a last-wins log record; survives re-opens, verified
+  by round-trip test) or 'Fix ball labels at this shot' (seeks + opens
+  Training Mode there; saves feed the training store). Timeline repaints
+  corrected verdicts. Review->correct->retrain is now a closed loop.

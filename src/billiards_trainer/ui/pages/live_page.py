@@ -215,6 +215,8 @@ class LivePage(QWidget):
         self._shot_list = ShotListPanel(
             pre_roll_s=getattr(self._settings.ui, "pre_shot_s", 5.0))
         self._shot_list.shot_selected.connect(self._on_timeline_clicked)
+        self._shot_list.outcome_corrected.connect(self._on_outcome_corrected)
+        self._shot_list.fix_labels_requested.connect(self._on_fix_labels_at)
         self._rail_stack.addWidget(self._shot_list)          # 2 = playback review
         splitter.addWidget(self._rail_stack)
         splitter.setStretchFactor(0, 3)
@@ -973,7 +975,10 @@ class LivePage(QWidget):
         """Enter/leave label mode ('Fix labels'): swap the right rail to the
         number pad and make the camera view clickable for labelling."""
         self._training = on
-        self._rail_stack.setCurrentIndex(1 if on else 0)
+        # leaving training returns to the mode's home rail: shots in
+        # playback, stats while live
+        self._rail_stack.setCurrentIndex(
+            1 if on else (2 if self._is_video else 0))
         if hasattr(self, "_fix_labels_btn") and self._fix_labels_btn.isChecked() != on:
             self._fix_labels_btn.blockSignals(True)
             self._fix_labels_btn.setChecked(on)
@@ -1254,6 +1259,30 @@ class LivePage(QWidget):
                                     str(s.get("outcome", "miss")),
                                     int(s.get("pocketed", 0)))
         self._shot_list.set_shots(list(shots or []))
+
+    def _on_outcome_corrected(self, start: float, outcome: str) -> None:
+        """A review verdict: persist to the session's sidecar (append-only
+        log — survives re-opens) and repaint the lane to match."""
+        if getattr(self, "_media_path", ""):
+            from ...vision.analysis_cache import append_correction
+            try:
+                append_correction(self._media_path, start, outcome)
+            except OSError:
+                log.warning("could not persist correction", exc_info=True)
+        self._timeline.clear()
+        for s in self._shot_list._shots:
+            self._timeline.add_shot(float(s.get("start", 0.0)),
+                                    float(s.get("end", 0.0)),
+                                    str(s.get("outcome", "miss")),
+                                    int(s.get("pocketed", 0)))
+
+    def _on_fix_labels_at(self, start: float) -> None:
+        """Jump to the shot and open Training Mode there: Joe corrects ball
+        labels on the exact frames that were wrong; saves feed the training
+        store."""
+        if self._is_video and self._video_fps > 0:
+            self.video_seek.emit(int(start * self._video_fps))
+        self.set_training(True)
 
     def _on_timeline_clicked(self, seconds: float) -> None:
         if self._is_video and self._video_fps > 0:
