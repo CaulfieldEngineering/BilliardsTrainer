@@ -35,7 +35,7 @@ class ShotTimeline(QWidget):
 
     def __init__(self, pre_roll_s: float = 5.0, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(34)
+        self.setFixedHeight(64)
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip("Shot timeline — click a clip to replay that shot "
                         "from the start of your pre-shot routine")
@@ -106,6 +106,13 @@ class ShotTimeline(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.surface))
         p.drawRoundedRect(QRectF(0, h * 0.30, w, h * 0.40), 4, 4)
+        if self._duration <= 0 or not self._shots:
+            # Empty state: say what this lane IS instead of presenting a
+            # mystery sliver (Joe: "the clip window is small. Is that it?").
+            p.setPen(QColor(PALETTE.text_faint))
+            p.drawText(self.rect(), Qt.AlignCenter,
+                       "Shot timeline — clips appear here as you play; "
+                       "click one to replay from your pre-shot routine")
         if self._duration > 0:
             # minute ticks
             p.setPen(QPen(QColor(PALETTE.border), 1))

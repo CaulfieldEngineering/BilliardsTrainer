@@ -262,9 +262,17 @@ class LivePage(QWidget):
         # from the worst-case string rather than guessed — a hardcoded 96px
         # clipped "❚❚ PAUSED 125:30" down to "RE", because QLabel truncates
         # instead of growing once the width is fixed.
+        # fontMetrics cannot see the stylesheet's 1px letter-spacing, so the
+        # measured width under-reserved by ~one char per character and the
+        # clock CLIPPED (Joe's screenshot). Compensate per character, and hide
+        # the clock entirely while idle — an empty fixed-width label reads as
+        # a broken dead gap inside the capsule.
+        _worst = "❚❚ PAUSED   000:00"
         self._rec_time.setFixedWidth(
-            self._rec_time.fontMetrics().horizontalAdvance("❚❚ PAUSED   000:00") + 18)
+            self._rec_time.fontMetrics().horizontalAdvance(_worst)
+            + len(_worst) + 18)
         self._rec_time.setAlignment(Qt.AlignCenter)
+        self._rec_time.hide()
         cap.addWidget(self._rec_time)
         lay.addWidget(self._rec_capsule)
         # Mic level meter: proves the audio path end-to-end at a glance (the
@@ -1211,6 +1219,7 @@ class LivePage(QWidget):
         if on:
             import time
             self._rec_t0 = time.monotonic()
+            self._rec_time.show()
             self._tick_rec_time()
             timer.start()
         else:
@@ -1218,6 +1227,7 @@ class LivePage(QWidget):
             self._rec_pause_btn.setChecked(False)
             self._rec_pause_btn.setIcon(icon("rec-pause", PALETTE.text_dim, size=26))
             self._rec_time.setText("")
+            self._rec_time.hide()   # an empty fixed-width clock is a dead gap
 
     def _tick_rec_time(self) -> None:
         import time
