@@ -108,6 +108,12 @@ class Pipeline:
         self._last_ms = 0.0
         self._last_stages: dict = {}  # previous frame's per-stage ms (perf HUD)
         self._frame_ring: deque | None = None  # temporal-median buffer
+        # Cached playback (Joe: "we shouldn't process anything in realtime
+        # during playback"): when a SidecarReader is attached, detection,
+        # tracking, and shot detection are BYPASSED — tracks come from the
+        # cache, interpolated to the frame clock, and this pipeline only
+        # calibrates (once) and renders. Smooth by construction.
+        self.playback_cache = None
         self._cam_pose: tuple | None = None  # (key, C) parallax-camera cache
 
     def reconfigure(self, settings: Settings) -> None:
@@ -211,6 +217,39 @@ class Pipeline:
         self._prev_small = None
 
     # ------------------------------------------------------------------ #
+    def _process_cached(self, frame, t: float, res: PipelineResult, t_start) -> PipelineResult:
+        """Playback from the analysis sidecar: no models, no tracker — look
+        up, interpolate, render. Schematic refreshes at half rate; the
+        perspective overlay is cheap enough for every frame."""
+        calib = self.calib.calib
+        ui = self.settings.ui
+        tracks = self.playback_cache.tracks_at(t)
+        res.status = "tracking"
+        res.tracks = tracks
+        res.n_balls = len(tracks)
+        res.table = calib.table
+        res.corners = calib.corners
+        norm_r = expected_ball_radius_px(calib.table, self.settings.table.size)             if getattr(ui, "normalize_ball_size", True) else None
+        self._cached_flip = not getattr(self, "_cached_flip", False)
+        if ui.schematic_birdseye:
+            if self._cached_flip or self._last_schematic is None:
+                res.rect_bgr = render_schematic(
+                    calib.table, tracks, accent=ui.accent,
+                    show_traj=False, show_ids=ui.show_ball_ids,
+                    measured_colors=ui.measured_ball_colors, fixed_radius=norm_r)
+                self._last_schematic = res.rect_bgr
+            else:
+                res.rect_bgr = self._last_schematic
+        if getattr(ui, "show_overlays", True):
+            res.frame_bgr = draw_perspective(
+                frame, calib.corners, tracks, calib.Hinv,
+                accent=ui.accent, table=calib.table)
+        else:
+            res.frame_bgr = frame
+        self._last_ms = (time.perf_counter() - t_start) * 1000.0
+        res.diag = {"cached": True, "ms": round(self._last_ms, 1)}
+        return res
+
     def _preview_result(self, frame: np.ndarray, res: PipelineResult) -> PipelineResult:
         """Camera-preview mode (auto-detection OFF): show the raw live feed and a
         clean, empty proportional table overhead — no ball/shot detection at all,
@@ -713,6 +752,9 @@ class Pipeline:
         if not self.detect_enabled:
             self._last_ms = (time.perf_counter() - t_start) * 1000.0
             return self._preview_result(frame, res)
+
+        if self.playback_cache is not None and self.calib.calib is not None:
+            return self._process_cached(frame, t, res, t_start)
 
         # Noise-suppressed frame fed to the raw-frame strategy (display/projection
         # still use the original `frame`). The temporal median is a classical-blob

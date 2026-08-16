@@ -1232,6 +1232,16 @@ class LivePage(QWidget):
         except AttributeError:
             pass
 
+    def on_cached_shots(self, shots) -> None:
+        """A session opened with an analysis sidecar: the whole timeline
+        lands at once — no waiting for re-detection."""
+        self._timeline.clear()
+        for s in shots or []:
+            self._timeline.add_shot(float(s.get("start", 0.0)),
+                                    float(s.get("end", 0.0)),
+                                    str(s.get("outcome", "miss")),
+                                    int(s.get("pocketed", 0)))
+
     def _on_timeline_clicked(self, seconds: float) -> None:
         if self._is_video and self._video_fps > 0:
             self.video_seek.emit(int(seconds * self._video_fps))

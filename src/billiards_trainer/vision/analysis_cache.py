@@ -1,0 +1,144 @@
+"""Per-session analysis sidecar: analyze once, play back forever.
+
+Joe, watching choppy playback: "by the time we're playing a video back, we
+shouldn't have to process anything in realtime, right? It should all be
+cached data simply being played back." Correct — running 83ms/frame of
+inference during playback was the design mistake. The pipeline's output is
+recorded ONCE (live while recording, or backfilled offline) into a JSONL
+sidecar next to the session file; playback then decodes video, looks up
+the cached state, and paints — no models, no tracker, smooth by
+construction. This is also the substrate of the shot dossier: the sidecar
+IS the per-session tracking record.
+
+Format (one JSON object per line):
+    {"type":"meta","v":1,"fps":30,"table":{...},"H":[...],"corners":[...]}
+    {"type":"f","t":12.34,"tracks":[[id,x,y,r,num,cls,active],...]}
+    {"type":"shot","start":10.2,"end":16.8,"outcome":"make","pocketed":1}
+
+Track states land at detection cadence (~7-10 Hz); the reader interpolates
+between neighbouring records so overlays glide at display rate.
+"""
+
+import json
+import logging
+from bisect import bisect_right
+from pathlib import Path
+
+from .types import BallClass, Track
+
+log = logging.getLogger("vision.cache")
+
+SIDECAR_SUFFIX = ".analysis.jsonl"
+
+
+def sidecar_path(video_path: str | Path) -> Path:
+    return Path(str(video_path) + SIDECAR_SUFFIX)
+
+
+class SidecarWriter:
+    """Appends pipeline state while a session records. Cheap: ~3 KB/s."""
+
+    def __init__(self, video_path: str | Path, meta: dict):
+        self._path = sidecar_path(video_path)
+        self._f = open(self._path, "w", encoding="utf-8")  # noqa: SIM115 - long-lived
+        meta = {"type": "meta", "v": 1, **meta}
+        self._f.write(json.dumps(meta) + "\n")
+        self._n = 0
+
+    def add_frame(self, t: float, tracks: list) -> None:
+        rec = [[int(tr.id), round(float(tr.x), 1), round(float(tr.y), 1),
+                round(float(tr.radius), 1), int(tr.number),
+                tr.cls.value, bool(tr.active)] for tr in tracks]
+        self._f.write(json.dumps({"type": "f", "t": round(t, 3), "tracks": rec},
+                                 separators=(",", ":")) + "\n")
+        self._n += 1
+        if self._n % 50 == 0:
+            self._f.flush()
+
+    def add_shot(self, event) -> None:
+        self._f.write(json.dumps({
+            "type": "shot", "start": round(float(event.start_t), 3),
+            "end": round(float(event.end_t), 3),
+            "outcome": event.outcome.value,
+            "pocketed": int(event.num_pocketed)}) + "\n")
+        self._f.flush()
+
+    def close(self) -> None:
+        try:
+            self._f.flush()
+            self._f.close()
+            log.info("analysis sidecar written: %s (%d states)", self._path, self._n)
+        except OSError:
+            pass
+
+
+class SidecarReader:
+    """Loads a sidecar and answers 'tracks at time t' with interpolation."""
+
+    def __init__(self, video_path: str | Path):
+        self.meta: dict = {}
+        self.shots: list[dict] = []
+        self._times: list[float] = []
+        self._frames: list[list] = []
+        p = sidecar_path(video_path)
+        with open(p, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if d.get("type") == "meta":
+                    self.meta = d
+                elif d.get("type") == "f":
+                    self._times.append(float(d["t"]))
+                    self._frames.append(d["tracks"])
+                elif d.get("type") == "shot":
+                    self.shots.append(d)
+        log.info("analysis sidecar loaded: %s (%d states, %d shots)",
+                 p.name, len(self._times), len(self.shots))
+
+    @staticmethod
+    def exists(video_path: str | Path) -> bool:
+        return sidecar_path(video_path).is_file()
+
+    def __len__(self) -> int:
+        return len(self._times)
+
+    # ------------------------------------------------------------------ #
+    def tracks_at(self, t: float) -> list[Track]:
+        """Interpolated track list for media time ``t`` (seconds)."""
+        if not self._times:
+            return []
+        i = bisect_right(self._times, t)
+        if i <= 0:
+            return self._to_tracks(self._frames[0])
+        if i >= len(self._times):
+            return self._to_tracks(self._frames[-1])
+        t0, t1 = self._times[i - 1], self._times[i]
+        a, b = self._frames[i - 1], self._frames[i]
+        if t1 - t0 <= 1e-6 or t1 - t0 > 1.0:
+            # a gap (detection pause) — snap, don't tween across it
+            return self._to_tracks(a)
+        w = (t - t0) / (t1 - t0)
+        bmap = {r[0]: r for r in b}
+        out = []
+        for r in a:
+            r2 = bmap.get(r[0])
+            if r2 is None:
+                out.append(self._to_track(r))
+                continue
+            blended = [r[0],
+                       r[1] + (r2[1] - r[1]) * w,
+                       r[2] + (r2[2] - r[2]) * w,
+                       r[3], r[4], r[5], r[6]]
+            out.append(self._to_track(blended))
+        return out
+
+    @staticmethod
+    def _to_track(r) -> Track:
+        return Track(id=int(r[0]), x=float(r[1]), y=float(r[2]),
+                     radius=float(r[3]), number=int(r[4]),
+                     cls=BallClass(r[5]), active=bool(r[6]))
+
+    def _to_tracks(self, rows) -> list[Track]:
+        return [self._to_track(r) for r in rows]

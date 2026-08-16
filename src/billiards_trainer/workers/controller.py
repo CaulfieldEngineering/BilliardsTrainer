@@ -68,6 +68,7 @@ class PipelineController(QObject):
     frame_ready = Signal(object)        # FramePacket
     stats_updated = Signal(dict)        # session summary
     shot_recorded = Signal(object)      # ShotEvent
+    cached_shots = Signal(object)       # list[dict] from the analysis sidecar (UI only)
     status_changed = Signal(str)
     clock_event = Signal(str)           # 'warn' | 'expired'
     error = Signal(str)
@@ -254,6 +255,22 @@ class PipelineController(QObject):
         self._timer.start(interval)
         self.status_changed.emit("running")
         self.detection_changed.emit(self._detection_enabled)
+        # Cached playback: with an analysis sidecar, the pipeline bypasses
+        # inference entirely — smooth playback by construction, and the shot
+        # timeline populates instantly from the cache.
+        if self._pipeline is not None:
+            self._pipeline.playback_cache = None   # never leak into live mode
+        if getattr(self._source, "is_video", False):
+            try:
+                from ..vision.analysis_cache import SidecarReader
+                if SidecarReader.exists(source_spec):
+                    reader = SidecarReader(source_spec)
+                    if self._pipeline is not None:
+                        self._pipeline.playback_cache = reader
+                    self.cached_shots.emit(list(reader.shots))
+                    log.info("playback from analysis cache (%d states)", len(reader))
+            except (OSError, ValueError) as exc:
+                log.warning("analysis cache unreadable (%s) — re-analyzing live", exc)
         # tell the UI whether to show video transport controls
         is_vid = bool(getattr(self._source, "is_video", False))
         self.source_is_video.emit(is_vid, getattr(self._source, "frame_count", 0) if is_vid else 0,
@@ -543,6 +560,16 @@ class PipelineController(QObject):
             EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
             self._recording_tmp = str(EXPORTS_DIR / f".session-{stamp}.part.mp4")
             self._recording_paused = False
+            # Analysis sidecar: the pipeline's output is recorded ONCE, here,
+            # so playback never has to re-run inference (Joe's architecture).
+            try:
+                from ..vision.analysis_cache import SidecarWriter
+                self._sidecar = SidecarWriter(self._recording_path,
+                                              {"fps": self._src_fps})
+                self._sidecar_last_t = -1.0
+            except OSError as exc:
+                log.warning("sidecar unavailable (%s) — playback will re-analyze", exc)
+                self._sidecar = None
             self._rec_frames = 0
             self._rec_t0 = None
             self._rec_elapsed = 0.0
@@ -709,6 +736,10 @@ class PipelineController(QObject):
 
     def _finalize_recording_file(self) -> None:
         """Move the finished in-progress file into the recordings folder."""
+        sc = getattr(self, "_sidecar", None)
+        if sc is not None:
+            sc.close()
+            self._sidecar = None
         if not self._recording_path:
             return
         from pathlib import Path as _P
@@ -1027,6 +1058,14 @@ class PipelineController(QObject):
             return
 
         self._handle_state(res.shot_state, t)
+        # sidecar: record tracking states at ~10Hz while a session records
+        sc = getattr(self, "_sidecar", None)
+        if sc is not None and res.status == "tracking"                 and t - getattr(self, "_sidecar_last_t", -1.0) >= 0.1:
+            self._sidecar_last_t = t
+            try:
+                sc.add_frame(t, res.tracks)
+            except OSError:
+                pass
         self._update_cue_clock(res.tracks, t)
         # Shots only COUNT while a recording session is open — vision analyses
         # the table continuously, but stats belong to a session.
@@ -1303,6 +1342,12 @@ class PipelineController(QObject):
             shot_seconds=shot_seconds, stroke_json=self._consume_stroke(),
         )
         self._log_shot(event, shot_seconds)
+        sc = getattr(self, "_sidecar", None)
+        if sc is not None:
+            try:
+                sc.add_shot(event)
+            except OSError:
+                pass
         self.shot_recorded.emit(event)
         self.stats_updated.emit(self._repo.session_summary(self._session_id))
 

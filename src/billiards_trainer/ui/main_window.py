@@ -221,6 +221,7 @@ class MainWindow(QMainWindow):
         self._controller.frame_ready.connect(self._live.on_frame)
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.shot_recorded.connect(self._live.on_shot)
+        self._controller.cached_shots.connect(self._live.on_cached_shots)
         self._controller.shot_suggested.connect(self._live.on_suggestion)
         self._controller.recording_changed.connect(self._live.on_recording)
         self._controller.detection_changed.connect(self._live.set_detection)
