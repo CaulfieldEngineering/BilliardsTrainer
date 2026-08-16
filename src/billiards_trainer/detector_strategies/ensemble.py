@@ -97,10 +97,12 @@ class FindIdEnsemble(DetectorStrategy):
         disagreement is left to _fix_stripe_bit, which reads actual pixels.
         """
         n = f.number
-        # SOLIDS ONLY: a stripe's whole-crop median is white-dominant, so its
-        # measured colour cannot arbitrate identity (first attempt corrected
-        # stripes too and misreads doubled). The 4-as-7 case is solid-solid.
-        if n is None or n <= 0 or n >= 8:
+        # SOLID FAMILY ONLY (1..8): a stripe's whole-crop median is
+        # white-dominant, so its measured colour cannot arbitrate identity
+        # (first attempt corrected stripes too and misreads doubled). The 8
+        # is included — the dark trio 4/7/8 is THE confusion cluster under
+        # warm light (Joe: "an 8 ball is also being mistook for a 7").
+        if n is None or n <= 0 or n > 8:
             return
         from ..vision.balls import lab_distance_to_ref, measured_identity
         rr = max(2, int(round(f.radius * 0.7)))
@@ -115,13 +117,20 @@ class FindIdEnsemble(DetectorStrategy):
             return
         med = tuple(int(v) for v in np.median(keep, axis=0))
         claimed_d = lab_distance_to_ref(med, n)
-        if claimed_d is None or claimed_d < 40.0:
-            return   # agrees, or unjudgeable (no trustworthy ref) — hands off
-        m = measured_identity(med, max_dist=32.0)
-        if m <= 0 or m == n or m >= 8:
-            return   # correct solid-to-solid only
+        if claimed_d is None:
+            return   # no trustworthy reference for the claim — hands off
+        # RELATIVE margin, not absolute gates: 7-vs-8 references sit only 41
+        # Lab units apart, so 'claim within 40 = fine' let every 8-as-7 slip
+        # through. Correct only when another solid-family reference beats the
+        # claimed one decisively.
+        m = measured_identity(med, max_dist=45.0)
+        if m <= 0 or m == n or m > 8:
+            return   # correct within the solid family (incl. the 8) only
+        alt_d = lab_distance_to_ref(med, m)
+        if alt_d is None or claimed_d - alt_d < 12.0:
+            return   # not a decisive win — trust the model
         f.number = m
-        f.cls = BallClass.SOLID
+        f.cls = BallClass.EIGHT if m == 8 else BallClass.SOLID
         f.bgr = pool_ball_bgr(m)
 
     @staticmethod

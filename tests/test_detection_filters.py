@@ -261,3 +261,40 @@ class TestMeasuredColourFix:
         balls = self._use_repo_refs(monkeypatch, tmp_path)
         # turquoise felt colour: far from every ball reference
         assert balls.measured_identity((200, 200, 60), max_dist=32.0) == -1
+
+
+class TestDarkTrioCorrection:
+    """4/7/8 are THE confusion cluster under warm light (7v8 refs sit 41 Lab
+    units apart). The correction is a RELATIVE margin — another reference
+    must beat the claim decisively — and the 8 participates."""
+
+    def _fix(self, monkeypatch, tmp_path, bgr, claimed):
+        import shutil
+
+        import numpy as np
+
+        import billiards_trainer.config as cfg
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        from billiards_trainer.vision import balls
+        shutil.copy2("_train/colour_refs.json", tmp_path / "colour_refs.json")
+        monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
+        balls._MEASURED_REFS = None
+        frame = np.zeros((60, 60, 3), np.uint8)
+        frame[:] = bgr
+        f = Detection(30, 30, 14, cls=BallClass.SOLID, number=claimed, score=0.9)
+        FindIdEnsemble._fix_colour(frame, f)
+        return f.number
+
+    def test_eight_misread_as_seven_corrected(self, monkeypatch, tmp_path):
+        # the 8's measured colour on Joe's table, claimed as 7
+        assert self._fix(monkeypatch, tmp_path, (39, 21, 16), claimed=7) == 8
+
+    def test_true_seven_left_alone(self, monkeypatch, tmp_path):
+        assert self._fix(monkeypatch, tmp_path, (30, 14, 80), claimed=7) == 7
+
+    def test_navy_four_claimed_as_seven_corrected(self, monkeypatch, tmp_path):
+        assert self._fix(monkeypatch, tmp_path, (142, 26, 36), claimed=7) == 4
+
+    def test_ambiguous_midpoint_trusts_model(self, monkeypatch, tmp_path):
+        # halfway between 7 and 8 references: no decisive winner -> no change
+        assert self._fix(monkeypatch, tmp_path, (34, 18, 48), claimed=7) == 7
