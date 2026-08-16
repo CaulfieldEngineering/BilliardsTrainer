@@ -284,6 +284,9 @@ class UiSettings:
     debug_overlay: bool = False  # draw raw detections + shot-state diagnostics
     # Always-on-top mini view: last geometry as "x,y,w,h" ("" = never opened)
     mini_geometry: str = ""
+    # Seconds of pre-shot routine shown before each strike on the shot
+    # timeline (display-side lead-in; detection is untouched by it)
+    pre_shot_s: float = 5.0
     # Rail sections the user has folded (CollapsibleSection keys)
     collapsed_sections: list[str] = field(default_factory=list)
     schematic_birdseye: bool = True  # clean rendered overhead vs warped camera

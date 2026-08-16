@@ -162,6 +162,11 @@ class LivePage(QWidget):
         root.setContentsMargins(18, 16, 18, 16)
         root.setSpacing(14)
         root.addWidget(self._control_bar())
+        from ..widgets.shot_timeline import ShotTimeline
+        self._timeline = ShotTimeline(
+            pre_roll_s=getattr(self._settings.ui, "pre_shot_s", 5.0))
+        self._timeline.clicked.connect(self._on_timeline_clicked)
+        root.addWidget(self._timeline)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(8)
@@ -479,7 +484,9 @@ class LivePage(QWidget):
             w.setEnabled(is_video)
         if hasattr(self, "_jump_section"):
             self._jump_section.setVisible(is_video)  # jumping needs a seekable clip
+        self._timeline.clear()
         if is_video:
+            self._timeline.set_duration(total / (fps or 30.0))
             self._seek.setRange(0, max(0, total - 1))
             self._time_lbl.setText(f"0:00 / {self._fmt_t(total)}")
         else:
@@ -495,6 +502,7 @@ class LivePage(QWidget):
             self._seek.setValue(pos)
             self._seek.blockSignals(False)
             self._time_lbl.setText(f"{self._fmt_t(pos)} / {self._fmt_t(total)}")
+            self._timeline.set_playhead(pos / (self._video_fps or 30.0))
             self._play_btn.setChecked(not playing)
             self._play_btn.setIcon(icon("play-solid" if not playing else "rec-pause", PALETTE.text_dim))
         self._sync_audio(pos, playing)
@@ -1165,8 +1173,18 @@ class LivePage(QWidget):
         self._k_streak.set_value(str(summary.get("current_streak", 0)))
 
     def on_shot(self, event) -> None:
-        # Scoreboard numbers update via on_stats; a shot needs no extra banner.
-        pass
+        # Scoreboard numbers update via on_stats. The timeline gets a clip:
+        # start_t/end_t are pipeline media seconds, which match the seek bar
+        # in playback; live clips accumulate on the same clock.
+        try:
+            self._timeline.add_shot(event.start_t, event.end_t,
+                                    event.outcome.value, event.num_pocketed)
+        except AttributeError:
+            pass
+
+    def _on_timeline_clicked(self, seconds: float) -> None:
+        if self._is_video and self._video_fps > 0:
+            self.video_seek.emit(int(seconds * self._video_fps))
 
     def on_suggestion(self, event) -> None:
         # confirm-manually mode is retired from the surface; nothing to show.
