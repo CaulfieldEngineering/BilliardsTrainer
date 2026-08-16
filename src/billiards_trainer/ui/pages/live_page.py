@@ -203,6 +203,12 @@ class LivePage(QWidget):
         # rail (number pad + save/train), so Training Mode reuses this same video +
         # transport — you scrub the playback and label in place.
         self._rail_stack = QStackedWidget()
+        # A QStackedWidget's minimum is the MAX over ALL pages — the hidden
+        # Training page (320px floor) was re-imposing a window minimum after
+        # the rail became always-visible. Ignored horizontal policy lets the
+        # splitter squeeze the stack instead of the window refusing to shrink.
+        from PySide6.QtWidgets import QSizePolicy
+        self._rail_stack.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._rail_stack.addWidget(self._stats_rail())      # 0 = normal
         self._rail_stack.addWidget(self._training_rail())   # 1 = training
         splitter.addWidget(self._rail_stack)
@@ -461,24 +467,48 @@ class LivePage(QWidget):
         return f"{int(s // 60)}:{int(s % 60):02d}"
 
     def _apply_compact(self) -> None:
-        """Narrow-window chrome policy, re-applied on resize AND mode change.
-
-        The bar's children are fixed-width, so when narrow something must
-        yield — and the honest candidates are the controls that are dead
-        weight in the CURRENT mode: playback transport while live, the record
-        capsule while in playback. Hiding by context (instead of clipping)
-        is what stops the record capsule's clock being cut off mid-recording.
-        """
+        """CONTINUOUS chrome fit, re-applied on resize, mode and record
+        changes. A fixed threshold left a silent-overflow band (the record
+        clock appeared and crushed the capsule at ~1100px, Joe's screenshot
+        x2): instead, measure the bar's visible demand against its actual
+        width and shed the lowest-priority chrome until the row fits. Mode
+        decides the base set — playback transport is dead weight while live,
+        the record capsule can't record a playback."""
+        if not hasattr(self, "_bar_optional"):
+            return
         w = self.width()
-        compact = w < 1000
-        if hasattr(self, "_bar_optional"):
-            for x in self._bar_optional:
-                x.setVisible(not compact)
-        if hasattr(self, "_playback_widgets"):
-            for x in self._playback_widgets:
-                x.setVisible(not compact or self._is_video)
-        if hasattr(self, "_rec_capsule"):
-            self._rec_capsule.setVisible(not compact or not self._is_video)
+        # base set by mode
+        for x in self._playback_widgets:
+            x.setVisible(self._is_video)
+        self._rec_capsule.setVisible(not self._is_video)
+        for x in self._bar_optional:
+            x.setVisible(True)
+        # shed order: least-load-bearing first
+        shed = [self._alert_badge, self._audio_meter,
+                getattr(self, "_fix_labels_btn", None),
+                getattr(self, "_speed_combo", None),
+                getattr(self, "_time_lbl", None),
+                # emergency tier: the mode pill (the mini view carries its own
+                # dot) and finally the clock — the red REC button still burns
+                self._status_badge,
+                self._rec_time if self._recording_on else None]
+        bar = self._rec_capsule.parentWidget()
+        margin = 60          # bar paddings + separators slack
+
+        def demand() -> int:
+            total = 0
+            lay = bar.layout()
+            for i in range(lay.count()):
+                it = lay.itemAt(i).widget()
+                if it is not None and it.isVisibleTo(bar):
+                    total += max(it.minimumSizeHint().width(), it.minimumWidth())
+            return total + margin
+        for x in shed:
+            if x is None:
+                continue
+            if demand() <= w:
+                break
+            x.setVisible(False)
         if hasattr(self, "_bird"):
             # narrowest tier: the camera IS the app; the bird's-eye yields
             self._bird.parentWidget().setVisible(w >= 640)
@@ -1202,6 +1232,7 @@ class LivePage(QWidget):
         """Reflect recording state on the transport cluster + run the elapsed clock."""
         self._recording_on = on
         self._update_stats_active()
+        self._apply_compact()   # the clock changes the bar's width demand
         self._rec_btn.setIcon(icon("rec", PALETTE.danger if on else "#B0524C", size=26))
         self._rec_btn.setEnabled(not on)
         self._rec_pause_btn.setEnabled(on)

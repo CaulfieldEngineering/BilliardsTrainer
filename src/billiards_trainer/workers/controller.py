@@ -877,13 +877,17 @@ class PipelineController(QObject):
             return
         self._play_tick += 1
         if getattr(self._source, "is_video", False):
-            # Detection cadence: a fast video at 2x/4x can't run detection on
-            # every frame, so display every frame but only DETECT every Nth
-            # (stride == round of playback speed). Step/seek/stop call
-            # _run_frame directly with detect forced on, so a paused/landed
-            # frame is always fully analysed. Video replay stays SYNCHRONOUS —
-            # deterministic for the eval harness and tests.
-            stride = max(1, round(self._speed))
+            # Detection cadence: detection costs ~83ms/frame on this machine
+            # (measured, tools/bench_pipeline.py) while a frame's budget at 1x
+            # is 33ms — detecting EVERY frame dragged playback to 9fps ("super
+            # super slow", Joe, watching a clip back). Display every frame;
+            # DETECT at the same ~10Hz the live async path uses (every 3rd at
+            # 1x, sparser at higher speeds). The tracker is built to coast
+            # between detections. Step/seek/stop call _run_frame directly with
+            # detect forced on, so a paused/landed frame is always fully
+            # analysed. Offline tools drive the Pipeline directly and keep
+            # their own (deterministic) cadence.
+            stride = max(4, round(self._speed))
             self._run_frame(frame, detect=(self._play_tick % stride == 0))
         else:
             # LIVE camera: async vision. The display path never runs inference

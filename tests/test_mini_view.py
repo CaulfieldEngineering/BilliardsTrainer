@@ -109,8 +109,9 @@ class TestNarrowMode:
         assert hasattr(s.ui, "mini_geometry")
 
     def test_narrow_mode_keeps_stats_hides_bar_chrome(self, app):
-        """Joe: stats must survive narrowing. The bar sheds context-dead
-        controls instead (playback transport while live)."""
+        """Joe: stats must survive narrowing, the record capsule must never
+        clip. Continuous fit: chrome sheds by priority until the bar's
+        demand fits its width; playback transport is hidden whenever live."""
         from billiards_trainer.config import Settings
         from billiards_trainer.ui.pages.live_page import LivePage
         page = LivePage(Settings())
@@ -121,10 +122,34 @@ class TestNarrowMode:
         assert not page._alert_badge.isVisibleTo(page)
         assert not page._seek.isVisibleTo(page), "transport is dead weight live"
         assert page._rec_capsule.isVisibleTo(page), "record must stay while live"
-        page.resize(1200, 700)
+        page.resize(1850, 700)
         app.processEvents()
-        assert page._alert_badge.isVisibleTo(page)
-        assert page._seek.isVisibleTo(page)
+        assert page._alert_badge.isVisibleTo(page), "chrome returns with room"
+        assert not page._seek.isVisibleTo(page), "still live: transport stays hidden"
+
+    def test_bar_always_fits_even_while_recording(self, app):
+        """The invariant behind Joe's two clipped-capsule reports: at ANY
+        width, the sum of visible bar minimums fits the page width."""
+        from billiards_trainer.config import Settings
+        from billiards_trainer.ui.pages.live_page import LivePage
+        page = LivePage(Settings())
+        page.show()
+        page._recording_on = True
+        page._rec_time.setText("❘❘ PAUSED  125:30")
+        page._rec_time.show()
+        for w in (1850, 1200, 900, 700, 520):
+            page.resize(w, 700)
+            app.processEvents()
+            page._apply_compact()
+            app.processEvents()
+            bar = page._rec_capsule.parentWidget()
+            lay = bar.layout()
+            tot = 0
+            for i in range(lay.count()):
+                wd = lay.itemAt(i).widget()
+                if wd is not None and wd.isVisibleTo(bar):
+                    tot += max(wd.minimumSizeHint().width(), wd.minimumWidth())
+            assert tot + 60 <= page.width(),                 f"bar demand {tot + 60} exceeds width {page.width()}"
 
     def test_compact_playback_keeps_transport_drops_record(self, app):
         from billiards_trainer.config import Settings

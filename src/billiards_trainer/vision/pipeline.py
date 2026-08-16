@@ -101,6 +101,7 @@ class Pipeline:
         # shown until the NEXT play begins. id -> {pts, bgr, cue}
         self._play_paths: dict[int, dict] = {}
         self._prev_shot_state = "settled"
+        self._last_schematic = None
         self._bg = BackgroundModel()
         self._prev_small = None
         self._last_flow = 0.0
@@ -925,14 +926,24 @@ class Pipeline:
         # so both tabs share the same camera + animated-schematic layout.
         vtracks = self.view_tracks(tracks)
         if ui.schematic_birdseye:
-            res.rect_bgr = render_schematic(
-                calib.table, vtracks, accent=ui.accent,
-                play_paths=self._play_paths if ui.show_trajectories else None,
-                paths_alpha=self._paths_alpha,
-                show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
-                debug=ui.debug_overlay, detections=detections, diag=res.diag,
-                measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
-            )
+            # Playback coast frames (detect=False) reuse the last schematic:
+            # nothing detection-visible changed, and this render costs ~20ms
+            # of the 33ms frame budget — re-rendering it every frame is half
+            # of why watching a clip back ran at 9fps (Joe: "super super
+            # slow"). The bird's-eye updates at detection cadence (~10Hz);
+            # the video pane stays full rate.
+            if not detect and self._last_schematic is not None:
+                res.rect_bgr = self._last_schematic
+            else:
+                res.rect_bgr = render_schematic(
+                    calib.table, vtracks, accent=ui.accent,
+                    play_paths=self._play_paths if ui.show_trajectories else None,
+                    paths_alpha=self._paths_alpha,
+                    show_traj=ui.show_trajectories, show_ids=ui.show_ball_ids,
+                    debug=ui.debug_overlay, detections=detections, diag=res.diag,
+                    measured_colors=ui.measured_ball_colors, fixed_radius=norm_r,
+                )
+                self._last_schematic = res.rect_bgr
         elif overlays:
             res.rect_bgr = draw_rectified(
                 rect, vtracks, calib.table, show_traj=ui.show_trajectories,

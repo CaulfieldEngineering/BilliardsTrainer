@@ -49,12 +49,23 @@ audio-confirmed (precision) AND a manual spot-check of ≥50 audio onsets
 finds no missed real strokes (recall floor).
 **Current:** 5/5 precision on one session; recall un-audited.
 
-## G6 — Analytics v1 in the app
-The reason everything else exists. Session summary from VALIDATED shots:
-makes/misses/timeline per session, written to the DB, visible in-app.
-**Done when:** Joe finishes a session and the app shows him a truthful
-shot list + make % without any manual step.
-**Current:** DB schema exists; shot detector validated; UI not built.
+## G6 — Analytics v1 in the app: the DAW timeline grows up
+The reason everything else exists. Joe (2026-08-16): "the shot timeline is
+rudimentary... you are the architect. Look beyond what I'm asking."
+Architect's spec for timeline v2+, in build order:
+1. PERSIST: media timestamps on Shot rows; a reopened session shows its
+   timeline instantly (no re-detection needed).
+2. Hover cards: outcome, duration, balls potted, shot number.
+3. Prev/next shot keys + click-through from the MAKES/MISSES stat cards.
+4. Per-shot thumbnails (the settled frame after the shot) in the hover.
+5. Shot list panel synced with the lane (sortable: misses only, longest
+   shots, streaks).
+6. EXPORT A CLIP: right-click a shot -> save/share an mp4 of routine +
+   shot (ffmpeg -ss/-t on the session file; no re-encode needed).
+7. Zoom/pan the lane for hour-long sessions.
+**Done when:** Joe reviews a session start-to-finish from the timeline
+alone and exports a favourite shot without touching a file manager.
+**Current:** v1 lane shipped (clips, pre-roll, click-to-seek, playhead).
 
 ## G7 — UI: Joe stops saying it "screams python"
 Rounds continue with Joe's visual feedback as the gate.
