@@ -66,3 +66,17 @@ Rounds continue with Joe's visual feedback as the gate.
 - 2026-08-15: File created. G1 fix shipped (colour reassignment of
   arbitration losers + tests); corpus regression check running. Autonomy
   loop + watchdog armed (docs/AUTONOMY.md).
+- 2026-08-16: MEASURED COLOUR REFERENCES built from 459 labelled crops —
+  under Joe's light the purple 4 measures NAVY (bgr 142,26,36), which is
+  the whole 4-as-7 story; Lab separation 4v7=71, 3v4=137. Wired into
+  arbitration + a solids-only ensemble correction (A/B on identical
+  window: oog 152.2->145.5/1k, impossible flat). First attempt corrected
+  stripes too and DOUBLED misreads — caught by measurement, narrowed.
+  Pocket-ghost fixed live (settled+vanished at a pocket = potted, short
+  budget; Joe watched the failure happen). Prior-art research (5-agent
+  sweep) landed: NOBODY reads numbers; the structural fix is GLOBAL
+  EXCLUSIVE ASSIGNMENT over the identifier's 16-class confidences
+  (Pool-Aid mutual exclusion, PoolLiveAid bipartite matching) +
+  tracker-proximity identity weighting — queued as the loop's next major
+  build. Also: 'TV colour' ball sets exist BECAUSE cameras can't separate
+  purple/maroon — a legitimate hardware option for Joe someday.

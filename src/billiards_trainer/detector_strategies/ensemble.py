@@ -80,7 +80,49 @@ class FindIdEnsemble(DetectorStrategy):
             f = found[fi]
             f.number, f.cls, f.bgr = src.number, src.cls, src.bgr
             self._fix_stripe_bit(frame_bgr, f)
+            self._fix_colour(frame_bgr, f)
         return found
+
+    @staticmethod
+    def _fix_colour(frame_bgr, f) -> None:
+        """Correct a model misread using THIS table's measured colours.
+
+        The model was trained on canonical ball colours, but under Joe's warm
+        light the purple 4 measures NAVY — so it reads as the 7 ("two sevens
+        on the table"). The measured references (medians over ~460 labelled
+        crops from this table, per-number, Lab space) separate the confusable
+        pairs by 60+ units. When the crop's glare-trimmed colour is CLOSE to a
+        different number's reference and FAR from the model's claim, trust the
+        table over the model. Same base-colour family with a stripe/solid
+        disagreement is left to _fix_stripe_bit, which reads actual pixels.
+        """
+        n = f.number
+        # SOLIDS ONLY: a stripe's whole-crop median is white-dominant, so its
+        # measured colour cannot arbitrate identity (first attempt corrected
+        # stripes too and misreads doubled). The 4-as-7 case is solid-solid.
+        if n is None or n <= 0 or n >= 8:
+            return
+        from ..vision.balls import lab_distance_to_ref, measured_identity
+        rr = max(2, int(round(f.radius * 0.7)))
+        y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
+        crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
+        if crop.size < 30:
+            return
+        import numpy as np
+        px = crop.reshape(-1, 3).astype(np.float32)
+        keep = px[px.mean(1) <= np.percentile(px.mean(1), 75)]   # trim glare
+        if len(keep) < 10:
+            return
+        med = tuple(int(v) for v in np.median(keep, axis=0))
+        claimed_d = lab_distance_to_ref(med, n)
+        if claimed_d is None or claimed_d < 40.0:
+            return   # agrees, or unjudgeable (no trustworthy ref) — hands off
+        m = measured_identity(med, max_dist=32.0)
+        if m <= 0 or m == n or m >= 8:
+            return   # correct solid-to-solid only
+        f.number = m
+        f.cls = BallClass.SOLID
+        f.bgr = pool_ball_bgr(m)
 
     @staticmethod
     def _fix_stripe_bit(frame_bgr, f) -> None:

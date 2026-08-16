@@ -176,3 +176,88 @@ class TestTrackLevelCueUniqueness:
         cues = [t for t in tr.tracks if t.cls == BallClass.CUE]
         assert len(cues) == 1
         assert abs(cues[0].x - 200) < 5, "the evidence-rich cue must win"
+
+
+class TestColourReassignment:
+    """The 'two sevens' fix: an arbitration loser gets its next-best FREE
+    identity from its own colour, instead of rendering anonymously in a
+    measured colour that LOOKS like the winner (Joe: 'two sevens, one of
+    which is actually a 4')."""
+
+    def test_duplicate_loser_reassigned_by_colour(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        # real 7 (maroon) builds stronger evidence first
+        real7 = _mk(200, 200, 15, cls=BallClass.SOLID, number=7, score=0.9)
+        real7.bgr = (45, 45, 120)                  # maroon
+        for _ in range(6):
+            tr.update([real7], short_side=675.0)
+        # purple 4, misread as 7 by the model
+        fake7 = _mk(500, 500, 15, cls=BallClass.SOLID, number=7, score=0.8)
+        fake7.bgr = (110, 35, 95)                  # purple — the 4's colour
+        for _ in range(8):
+            tr.update([real7, fake7], short_side=675.0)
+        nums = sorted(t.number for t in tr.tracks)
+        assert nums == [4, 7], f"loser must become the 4, got {nums}"
+
+    def test_loser_stays_unknown_when_its_colour_is_taken(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        a = _mk(200, 200, 15, cls=BallClass.SOLID, number=7, score=0.9)
+        a.bgr = (45, 45, 120)
+        b = _mk(500, 500, 15, cls=BallClass.SOLID, number=7, score=0.8)
+        b.bgr = (45, 45, 120)                      # ALSO maroon: no free match
+        c = _mk(350, 600, 15, cls=BallClass.SOLID, number=15, score=0.8)
+        for _ in range(8):
+            tr.update([a, b, c], short_side=675.0)
+        nums = sorted(t.number for t in tr.tracks if t.number > 0)
+        # 7 kept once; the same-coloured loser gets 15's slot? no — 15 is
+        # taken by track c, so the loser must stay unknown
+        assert nums.count(7) == 1
+        assert nums.count(15) == 1
+
+    def test_white_ball_never_guessed(self):
+        from billiards_trainer.vision.tracking import BallTracker as BT
+        t = _mk(1, 1, 15)
+        class Fake:
+            bgr = (250, 250, 250)
+            committed_cls = BallClass.UNKNOWN
+            cls_hist = []
+        assert BT._colour_identity(Fake(), set()) == -1
+
+
+class TestMeasuredColourFix:
+    """The measured-reference identity layer: this table's colours, not
+    canonical ones. Under Joe's light the purple 4 measures NAVY, which is
+    why canonical classification called it a 7."""
+
+    def _use_repo_refs(self, monkeypatch, tmp_path):
+        import shutil
+
+        import billiards_trainer.config as cfg
+        from billiards_trainer.vision import balls
+        shutil.copy2("_train/colour_refs.json", tmp_path / "colour_refs.json")
+        monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
+        balls._MEASURED_REFS = None          # drop cache
+        return balls
+
+    def test_measured_navy_resolves_to_4(self, monkeypatch, tmp_path):
+        balls = self._use_repo_refs(monkeypatch, tmp_path)
+        # the 4's MEASURED colour on Joe's table (navy, not canonical purple)
+        assert balls.measured_identity((142, 26, 36)) == 4
+
+    def test_measured_maroon_resolves_to_7(self, monkeypatch, tmp_path):
+        balls = self._use_repo_refs(monkeypatch, tmp_path)
+        assert balls.measured_identity((30, 14, 80)) == 7
+
+    def test_taken_identity_excluded(self, monkeypatch, tmp_path):
+        balls = self._use_repo_refs(monkeypatch, tmp_path)
+        got = balls.measured_identity((142, 26, 36), taken={4})
+        assert got != 4
+
+    def test_white_never_guessed(self, monkeypatch, tmp_path):
+        balls = self._use_repo_refs(monkeypatch, tmp_path)
+        assert balls.measured_identity((250, 250, 250)) == -1
+
+    def test_junk_colour_rejected(self, monkeypatch, tmp_path):
+        balls = self._use_repo_refs(monkeypatch, tmp_path)
+        # turquoise felt colour: far from every ball reference
+        assert balls.measured_identity((200, 200, 60), max_dist=32.0) == -1

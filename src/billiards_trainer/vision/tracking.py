@@ -311,9 +311,24 @@ class BallTracker:
         # Velocity-aware keep-alive: a ball that vanished while SETTLED (resting) is
         # almost certainly occluded (a hand/cue over it) — keep it for a long budget
         # so it doesn't flicker. A ball that vanished while MOVING was pocketed or
-        # picked up — let it age out fast.
-        self._tracks = [t for t in self._tracks
-                        if t.misses <= (self.occluded_budget if t.settled else self.max_misses)]
+        # picked up — let it age out fast. EXCEPT near a pocket: a slow-rolled pot
+        # settles at the jaw for a beat before dropping, and the occlusion budget
+        # then parks a ghost "on the table" for a minute (Joe watched it live).
+        # Nothing occludes a ball inside a pocket mouth — settled + vanished
+        # there = potted, short budget.
+        if pockets and pocket_r > 0:
+            cap_sq2 = (1.8 * pocket_r) ** 2
+            def _at_pocket(t):
+                return any((t.x - px) ** 2 + (t.y - py) ** 2 <= cap_sq2
+                           for px, py in pockets)
+        else:
+            def _at_pocket(t):
+                return False
+        self._tracks = [
+            t for t in self._tracks
+            if t.misses <= (self.occluded_budget
+                            if t.settled and not _at_pocket(t)
+                            else self.max_misses)]
         # A track that came to rest PAST the cushion line inside a pocket zone
         # is a ball lying in the basket — pocketed, done. Without this the
         # occlusion budget keeps it as a ghost for another minute after the
@@ -359,10 +374,56 @@ class BallTracker:
                     continue
             ts.sort(key=lambda t: (sum(1 for n in t.num_hist if n == num),
                                    t.hits, -t.misses), reverse=True)
+            taken = {t2.committed_number for t2 in self._tracks
+                     if t2.confirmed and t2.committed_number >= 0
+                     and t2 is not ts[0]} | {num}
             for t in ts[1:]:
-                t.committed_number = -1
+                # Losing the arbitration used to blank the number, and a
+                # blanked ball renders in its MEASURED colour — for the purple
+                # 4 misread as 7 that is another dark maroon disc, so Joe saw
+                # "two sevens" even though the data had no duplicates. Give
+                # the loser its next-best FREE identity from its own colour
+                # instead of anonymity.
+                t.committed_number = self._colour_identity(t, taken)
+                if t.committed_number >= 0:
+                    taken.add(t.committed_number)
         if doomed:
             self._tracks = [t for t in self._tracks if t.id not in doomed]
+
+    @staticmethod
+    def _colour_identity(t: _Internal, taken: set[int]) -> int:
+        """Best FREE ball number for a track from its sampled colour, else -1.
+
+        Hue names the base colour; the stripe bit comes from the track's class
+        history (stripe = base + 8). Both variants are tried, class-preferred
+        order, so a free identity is found even when the stripe read is stale.
+        """
+        import cv2
+        import numpy as np
+
+        from .balls import _hue_to_base, measured_identity
+
+        # This table's measured references first — they separate 4/7 by 71 Lab
+        # units where canonical hues collapse them.
+        m = measured_identity(tuple(int(v) for v in t.bgr), taken=taken)
+        if m > 0:
+            return m
+
+        b, g, r = (int(v) for v in t.bgr)
+        h, s, v = cv2.cvtColor(
+            np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2HSV)[0][0]
+        if s < 45 and v > 170:
+            return -1          # white-ish: cue/9-pole; never guess from this
+        base = _hue_to_base(float(h), float(v))
+        if base <= 0:
+            return -1
+        # ONE candidate, matched to the track's class evidence — offering the
+        # stripe variant as a fallback for a taken solid INVENTED balls 10-15
+        # (out-of-game misreads doubled on real footage before this narrowed).
+        is_stripe = t.committed_cls == BallClass.STRIPE or any(
+            c == BallClass.STRIPE for c in list(t.cls_hist)[-5:])
+        cand = base + 8 if is_stripe else base
+        return cand if 1 <= cand <= 15 and cand not in taken else -1
 
     def _apply_match(self, t: _Internal, d: Detection) -> None:
         meas_vx = d.x - t.x

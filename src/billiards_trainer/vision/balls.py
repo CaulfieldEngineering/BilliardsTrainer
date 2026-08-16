@@ -227,3 +227,85 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
     number = base + 8 if is_stripe else base
     cls = BallClass.STRIPE if is_stripe else BallClass.SOLID
     return cls, number, pool_ball_bgr(number)
+
+
+# --------------------------------------------------------------------------- #
+# Measured colour references — THIS table under THIS light
+# --------------------------------------------------------------------------- #
+# Canonical hues lie: under Joe's warm indoor light the purple 4 measures as
+# NAVY (bgr ~[142, 26, 36]) — nothing like its canonical (110, 35, 95) — which
+# is exactly why it kept reading as the 7 ("two sevens on the table"). The
+# references below are medians over ~460 hand-labelled ball crops from five of
+# Joe's own sessions; in Lab space they separate the confusable pairs by 60+
+# units (4-vs-7: 71, 3-vs-4: 137) where within-ball noise is ~15.
+#
+# The JSON ships per-table in the app data dir (colour_refs.json) and can be
+# regenerated any time from labelled data; classes with too few samples are
+# ignored (n >= MIN_REF_SAMPLES) and fall back to canonical behaviour.
+
+_MEASURED_REFS: dict[int, "np.ndarray"] | None = None
+_MIN_REF_SAMPLES = 5
+
+
+def _load_measured_refs() -> dict[int, "np.ndarray"]:
+    global _MEASURED_REFS
+    if _MEASURED_REFS is not None:
+        return _MEASURED_REFS
+    import json
+
+    from ..config import APP_DIR
+    refs: dict[int, np.ndarray] = {}
+    try:
+        data = json.loads((APP_DIR / "colour_refs.json").read_text(encoding="utf-8"))
+        for k, v in data.items():
+            lab = np.array(v["lab"], np.float32)
+            # Near-white references cannot discriminate (cue, 9/11 whose white
+            # body swamps the band in a whole-crop median) — guessing from
+            # them would label any glare blob as that ball.
+            whiteish = lab[0] > 225 and abs(lab[1] - 128) < 10 and abs(lab[2] - 128) < 10
+            if int(v.get("n", 0)) >= _MIN_REF_SAMPLES and int(k) > 0 and not whiteish:
+                refs[int(k)] = lab
+    except (OSError, ValueError, KeyError):
+        pass
+    _MEASURED_REFS = refs
+    return refs
+
+
+def measured_identity(bgr: tuple[int, int, int],
+                      taken: set[int] | None = None,
+                      max_dist: float = 55.0) -> int:
+    """Nearest measured reference (Lab) for a sampled ball colour, else -1.
+
+    ``taken`` excludes identities already claimed by other balls — the caller
+    enforcing uniqueness is what turns 'two sevens' into 'a 7 and a 4'.
+    ``max_dist`` rejects colours far from every reference (chalk, glare,
+    markers) rather than guessing.
+    """
+    refs = _load_measured_refs()
+    if not refs:
+        return -1
+    b, g, r = (int(v) for v in bgr)
+    hsv = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2HSV)[0][0]
+    if hsv[1] < 45 and hsv[2] > 170:
+        return -1        # white-ish sample: cue / stripe pole — never guess
+    lab = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2LAB)[0][0].astype(np.float32)
+    best, best_d = -1, max_dist
+    for num, ref in refs.items():
+        if taken and num in taken:
+            continue
+        d = float(np.linalg.norm(lab - ref))
+        if d < best_d:
+            best_d, best = d, num
+    return best
+
+
+def lab_distance_to_ref(bgr: tuple[int, int, int], number: int) -> float | None:
+    """Lab distance from a sampled colour to ``number``'s measured reference,
+    or None when no trustworthy reference exists for that number."""
+    refs = _load_measured_refs()
+    ref = refs.get(int(number))
+    if ref is None:
+        return None
+    b, g, r = (int(v) for v in bgr)
+    lab = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2LAB)[0][0].astype(np.float32)
+    return float(np.linalg.norm(lab - ref))

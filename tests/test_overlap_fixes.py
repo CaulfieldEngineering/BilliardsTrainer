@@ -326,3 +326,33 @@ class TestGhostRetirement:
             tr.update([b], short_side=675.0, ball_r=15.2)
         nums = sorted(t.number for t in tr.tracks)
         assert nums == [3, 5], f"occluded ball must survive, got {nums}"
+
+
+class TestPocketGhost:
+    def test_settled_vanish_at_pocket_ages_out_fast(self):
+        """A slow-rolled pot settles at the jaw for a beat before dropping —
+        the occlusion budget must NOT park a ghost there for a minute (Joe
+        watched one live: 'registering a ball in pocket as on the table')."""
+        tr = BallTracker(min_hits=2, still_frames=3, max_misses=6)
+        pocket = (675.0, 635.0)
+        d = Detection(pocket[0] - 20, pocket[1] - 10, 15,
+                      cls=BallClass.SOLID, number=5, score=0.9)
+        for _ in range(8):    # settle at the jaw
+            tr.update([d], short_side=675.0, bounds=(0, 0, 675, 1271),
+                      pockets=[pocket], pocket_r=30.0)
+        assert len(tr.tracks) == 1
+        for _ in range(10):   # drops in: detections stop
+            tr.update([], short_side=675.0, bounds=(0, 0, 675, 1271),
+                      pockets=[pocket], pocket_r=30.0)
+        assert tr.tracks == [], "potted ball must not ghost at the jaw"
+
+    def test_settled_vanish_mid_table_still_occlusion_protected(self):
+        tr = BallTracker(min_hits=2, still_frames=3, max_misses=6)
+        d = Detection(300, 300, 15, cls=BallClass.SOLID, number=5, score=0.9)
+        for _ in range(8):
+            tr.update([d], short_side=675.0, bounds=(0, 0, 675, 1271),
+                      pockets=[(675.0, 635.0)], pocket_r=30.0)
+        for _ in range(10):   # hand covers it mid-table
+            tr.update([], short_side=675.0, bounds=(0, 0, 675, 1271),
+                      pockets=[(675.0, 635.0)], pocket_r=30.0)
+        assert len(tr.tracks) == 1, "mid-table occlusion must still protect"
