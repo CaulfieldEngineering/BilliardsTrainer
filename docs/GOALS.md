@@ -11,7 +11,7 @@ Progress log at the bottom — every work session appends one line.
 
 ---
 
-## G1 — Never show two balls with the same identity  ⏳ shipped, verifying
+## G1 — Never show two balls with the same identity  ✅ DONE 2026-08-16
 Joe's words: "we still have two sevens. One of which is actually a 4."
 The data layer had uniqueness, but an arbitration LOSER rendered in its
 measured colour — a purple 4 misread as 7 painted dark maroon = a second 7
@@ -19,8 +19,12 @@ on screen.
 **Done when:** a render-audit over the full corpus shows zero frames where
 two rendered balls share a number OR wear colours closer than a threshold
 while carrying no number. Spot-verified visually on 3 sessions.
-**Current:** colour-reassignment of arbitration losers shipped (the 4 now
-GETS purple). Corpus render-audit tool not yet built — build it, run it.
+**DONE:** tools/audit_render.py audits every sidecar for duplicate
+identities in seconds. Library-wide result: 0/149,094 states (0.00%),
+including sessions recorded live on the exclusive-assignment code. The
+colour-lookalike vector (a blanked ball painted a twin colour) is closed
+by measured-colour assignment; the audit re-runs each loop cycle as the
+regression tripwire.
 
 ## G2 — Red-family confusion (3/7, 4/7) under 5%
 The single most visible misread class on Joe's table (dim warm light makes
@@ -131,3 +135,8 @@ Rounds continue with Joe's visual feedback as the gate.
   by round-trip test) or 'Fix ball labels at this shot' (seeks + opens
   Training Mode there; saves feed the training store). Timeline repaints
   corrected verdicts. Review->correct->retrain is now a closed loop.
+- 2026-08-16 (loop 4): G1 CLOSED — built tools/audit_render.py; verdict
+  0/149,094 sidecar states with duplicate identities across the whole
+  library (including two sessions Joe recorded live on the
+  exclusive-assignment code). Labelled session 6 (s-20260728, blurrier
+  footage: 54 balls incl. touching clusters) toward c5; dataset built.
