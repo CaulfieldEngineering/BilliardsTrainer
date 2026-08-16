@@ -97,13 +97,12 @@ class FindIdEnsemble(DetectorStrategy):
         disagreement is left to _fix_stripe_bit, which reads actual pixels.
         """
         n = f.number
-        # SOLID FAMILY ONLY (1..8): a stripe's whole-crop median is
-        # white-dominant, so its measured colour cannot arbitrate identity
-        # (first attempt corrected stripes too and misreads doubled). The 8
-        # is included — the dark trio 4/7/8 is THE confusion cluster under
-        # warm light (Joe: "an 8 ball is also being mistook for a 7").
-        if n is None or n <= 0 or n > 8:
+        if n is None or n <= 0:
             return
+        if n > 8:
+            return FindIdEnsemble._fix_stripe_colour(frame_bgr, f)
+        # SOLID FAMILY (1..8): whole-crop median arbitrates identity — the
+        # dark trio 4/7/8 is THE confusion cluster under warm light.
         from ..vision.balls import lab_distance_to_ref, measured_identity
         rr = max(2, int(round(f.radius * 0.7)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
@@ -132,6 +131,48 @@ class FindIdEnsemble(DetectorStrategy):
         f.number = m
         f.cls = BallClass.EIGHT if m == 8 else BallClass.SOLID
         f.bgr = pool_ball_bgr(m)
+
+    @staticmethod
+    def _fix_stripe_colour(frame_bgr, f) -> None:
+        """Stripe hue via the BAND, not the whole crop (9-as-13 x11 on
+        ground truth: the whole-crop median of a stripe is white and says
+        nothing). Sample only the saturated band pixels and compare to the
+        SOLID references (a band is its base colour). No band at all means
+        the "stripe" is the CUE (0-as-15 x5) — hand it back."""
+        from ..vision.balls import band_colour, lab_distance_to_ref, measured_identity
+        n = f.number
+        rr = max(2, int(round(f.radius * 0.85)))
+        y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
+        crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
+        band = band_colour(crop)
+        if band is None:
+            # No saturated band: the CUE — but only when the crop is
+            # overwhelmingly white. A thin/edge-on band (the 11 viewed
+            # pole-on) also fails the band minimum, and declaring it cue
+            # regressed the 11 to 0% on ground truth. Below the white bar,
+            # abstain: the model keeps its read.
+            import cv2
+            import numpy as np
+            hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+            s = hsv[:, :, 1].astype(np.float32)
+            v = hsv[:, :, 2].astype(np.float32)
+            if float(np.mean((s < 110) & (v > 170))) > 0.75:
+                f.number, f.cls = 0, BallClass.CUE
+                f.bgr = pool_ball_bgr(0)
+            return
+        base_claim = n - 8
+        claimed_d = lab_distance_to_ref(band, base_claim)
+        if claimed_d is None:
+            return
+        m = measured_identity(band, max_dist=45.0)
+        if m <= 0 or m > 8 or m == base_claim:
+            return
+        alt_d = lab_distance_to_ref(band, m)
+        if alt_d is None or claimed_d - alt_d < 12.0:
+            return
+        f.number = m + 8
+        f.cls = BallClass.STRIPE
+        f.bgr = pool_ball_bgr(f.number)
 
     @staticmethod
     def _fix_stripe_bit(frame_bgr, f) -> None:

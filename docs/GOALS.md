@@ -158,3 +158,11 @@ Rounds continue with Joe's visual feedback as the gate.
   9-ball 21%->47%. Dark cluster held 95.1%; suite green. Residual: 9->1
   x17 (model wins on abstain), 9/5->13 hue tangles — c5 retrain +
   possible band-colour sampling next.
+- 2026-08-16 (loop 7): stripe BAND-colour correction shipped — a stripe's
+  identity lives in its saturated band pixels, not the white-dominated
+  whole crop. Cue guard rides along: "stripe" with no band AND >75% white
+  = the cue (first cut without the white bar regressed the thin-banded 11
+  to 0% — caught by the instrument, fixed same session). Ground truth:
+  cue 92.4->98.7%, 13 held 100%, 11 restored 80%, dark cluster 95.1%
+  unchanged. The 9 stays 47% — its yellow band photographs ORANGE under
+  warm light; that is c5 retrain territory, not heuristics.

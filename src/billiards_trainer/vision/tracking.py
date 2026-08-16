@@ -376,7 +376,7 @@ class BallTracker:
             if t.committed_number >= 0:
                 by_num.setdefault(t.committed_number, []).append(t)
         doomed: set[int] = set()
-        for num, ts in by_num.items():
+        for _num, ts in by_num.items():
             if len(ts) >= 2 and any(t.misses == 0 for t in ts):
                 for t in ts:
                     if t.misses > self.max_misses:

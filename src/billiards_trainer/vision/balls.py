@@ -315,3 +315,25 @@ def lab_distance_to_ref(bgr: tuple[int, int, int], number: int) -> float | None:
     b, g, r = (int(v) for v in bgr)
     lab = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2LAB)[0][0].astype(np.float32)
     return float(np.linalg.norm(lab - ref))
+
+
+def band_colour(patch_bgr: np.ndarray) -> tuple[int, int, int] | None:
+    """Median colour of a stripe's BAND — the saturated pixels only.
+
+    A stripe's whole-crop median is white-dominated and useless for hue;
+    its band pixels carry the identity (yellow band = 9, orange = 13). None
+    when too few saturated pixels exist — which is itself a signal: a
+    "stripe" with no band is the cue ball (the 0-as-15 misread).
+    """
+    if patch_bgr is None or patch_bgr.size < 30:
+        return None
+    sel = _inner_disc(patch_bgr, None)
+    hsv = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2HSV)
+    s = hsv[:, :, 1][sel]
+    v = hsv[:, :, 2][sel]
+    px = patch_bgr[sel]
+    band = px[(s >= 110) & (v >= 60)]
+    if len(band) < max(12, 0.06 * len(px)):
+        return None
+    med = np.median(band.reshape(-1, 3), axis=0)
+    return tuple(int(c) for c in med)
