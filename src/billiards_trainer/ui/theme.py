@@ -40,13 +40,13 @@ class _NoAnimationStyle(QProxyStyle):
 @dataclass(frozen=True)
 class Palette:
     # Near-black layered surfaces with a faint cool tint.
-    bg: str = "#0E1116"          # window base
-    bg_elevated: str = "#151A21"  # cards / panels
-    surface: str = "#1C2530"      # inputs, hover targets
-    surface_hi: str = "#243040"   # pressed / selected
+    bg: str = "#0B0E13"          # window base — deeper, calmer
+    bg_elevated: str = "#12161D"  # cards / panels (one clear step up)
+    surface: str = "#1A212B"      # inputs, hover targets
+    surface_hi: str = "#232D3A"   # pressed / selected
     border: str = "#2A3340"
-    border_soft: str = "#212A35"
-    text: str = "#E6EDF3"
+    border_soft: str = "#1D2530"
+    text: str = "#EDF2F7"
     text_dim: str = "#9AA7B4"
     text_faint: str = "#5E6B79"
     accent: str = "#3DDC97"       # mint (overridden by settings)
@@ -112,9 +112,11 @@ QToolTip {{
 
 /* ---- Cards / panels ---- */
 QFrame#Card, QFrame#Panel {{
-    background-color: {p.bg_elevated};
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 {_adjust(p.bg_elevated, 1.16)}, stop:0.04 {p.bg_elevated},
+        stop:1 {p.bg_elevated});
     border: 1px solid {p.border_soft};
-    border-radius: 12px;
+    border-radius: 14px;
 }}
 QFrame#Sidebar {{
     background-color: {p.bg_elevated};
@@ -145,6 +147,7 @@ QPushButton {{
 }}
 QPushButton:hover {{ background-color: {p.surface_hi}; border-color: {accent}; }}
 QPushButton:pressed {{ background-color: {p.surface}; }}
+QPushButton:focus {{ border: 1px solid {accent}; }}
 QPushButton:disabled {{ color: {p.text_faint}; border-color: {p.border_soft}; }}
 
 QPushButton#Accent {{
@@ -202,6 +205,8 @@ QPushButton#NavItem:hover {{ background-color: {p.surface}; color: {p.text}; }}
 QPushButton#NavItem:checked {{
     background-color: {accent_soft.name(QColor.HexArgb)};
     color: {accent};
+    border-left: 3px solid {accent};
+    padding-left: 11px;
 }}
 
 /* ---- Inputs ---- */

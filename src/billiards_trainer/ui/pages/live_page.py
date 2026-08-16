@@ -594,7 +594,7 @@ class LivePage(QWidget):
         # squeezing it.
         rail.setMaximumWidth(300)
 
-        # The headline: makes vs misses, big.
+        # The headline: makes vs misses, big. Always visible — it IS the rail.
         mm = QHBoxLayout()
         mm.setSpacing(8)
         self._makes_box, self._makes_val = self._big_stat("MAKES", PALETTE.success)
@@ -603,16 +603,27 @@ class LivePage(QWidget):
         mm.addWidget(self._misses_box)
         rail.layout().addLayout(mm)
 
-        grid = QHBoxLayout()
+        # Everything below the headline folds (Joe's ask: collapsible sections
+        # for narrow view). Collapsed state persists per section.
+        from ..widgets.collapsible import CollapsibleSection
+
+        grid_holder = QWidget()
+        grid = QHBoxLayout(grid_holder)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.setSpacing(8)
         self._k_pct = StatCard("Make %", "—", accent=True)
         self._k_streak = StatCard("Streak", "—")
         grid.addWidget(self._k_pct)
         grid.addWidget(self._k_streak)
-        rail.layout().addLayout(grid)
+        rail.layout().addWidget(CollapsibleSection(
+            "SESSION", grid_holder, "session", self._settings))
 
         # Cue-stroke stats (Bluetooth IMU) — hidden unless the sensor is enabled.
-        rail.layout().addWidget(self._stroke_section())
+        self._stroke_holder = self._stroke_section()
+        self._stroke_fold = CollapsibleSection(
+            "CUE SENSOR", self._stroke_holder, "cue_sensor", self._settings)
+        self._stroke_fold.setVisible(self._settings.cue.enabled)
+        rail.layout().addWidget(self._stroke_fold)
 
         # Shot clock — only visible when enabled, so it never crowds sandbox.
         self._clock_row = QHBoxLayout()
@@ -622,8 +633,10 @@ class LivePage(QWidget):
         self._clock_row.addStretch(1)
         self._clock_holder = QWidget()
         self._clock_holder.setLayout(self._clock_row)
-        self._clock_holder.setVisible(self._settings.shot_clock.enabled)
-        rail.layout().addWidget(self._clock_holder)
+        self._clock_fold = CollapsibleSection(
+            "SHOT CLOCK", self._clock_holder, "shot_clock", self._settings)
+        self._clock_fold.setVisible(self._settings.shot_clock.enabled)
+        rail.layout().addWidget(self._clock_fold)
 
         rail.layout().addStretch(1)
 
@@ -712,6 +725,8 @@ class LivePage(QWidget):
 
     def set_cue_enabled(self, on: bool) -> None:
         self._stroke_card.setVisible(on)
+        if hasattr(self, "_stroke_fold"):
+            self._stroke_fold.setVisible(on)
 
     def on_cue_status(self, state: str, detail) -> None:
         text, color = {
@@ -730,6 +745,8 @@ class LivePage(QWidget):
             text = f"LIVE · {detail['battery']}%"
         self._cue_badge.set_text_color(text, color)
         self._stroke_card.setVisible(self._settings.cue.enabled)
+        if hasattr(self, "_stroke_fold"):
+            self._stroke_fold.setVisible(self._settings.cue.enabled)
 
     def on_cue_impact(self, stroke: dict) -> None:
         """The strike itself — show peak g now, '…' while kinematics compute."""
@@ -1087,7 +1104,7 @@ class LivePage(QWidget):
         if packet.birdseye is not None:
             self._bird.set_frame(packet.birdseye)
             self._bird.set_balls(self._ball_markers(packet))
-        self._clock_holder.setVisible(packet.clock_enabled)
+        self._clock_fold.setVisible(packet.clock_enabled)
         if packet.clock_enabled:
             self._clock.update_clock(packet.clock_remaining,
                                      max(1.0, self._settings.shot_clock.seconds),

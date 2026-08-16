@@ -284,6 +284,8 @@ class UiSettings:
     debug_overlay: bool = False  # draw raw detections + shot-state diagnostics
     # Always-on-top mini view: last geometry as "x,y,w,h" ("" = never opened)
     mini_geometry: str = ""
+    # Rail sections the user has folded (CollapsibleSection keys)
+    collapsed_sections: list[str] = field(default_factory=list)
     schematic_birdseye: bool = True  # clean rendered overhead vs warped camera
     mirror_preview: bool = False
     # Render balls in their MEASURED mean colour (a blue ball looks blue), with a
