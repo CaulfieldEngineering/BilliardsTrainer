@@ -64,12 +64,21 @@ class SidecarWriter:
         self._f.write(json.dumps(meta) + "\n")
         self._n = 0
 
-    def add_frame(self, t: float, tracks: list) -> None:
+    def add_frame(self, t: float, tracks: list,
+                  carried_ids: set | None = None,
+                  foreign_frac: float = 0.0) -> None:
         rec = [[int(tr.id), round(float(tr.x), 1), round(float(tr.y), 1),
                 round(float(tr.radius), 1), int(tr.number),
                 tr.cls.value, bool(tr.active)] for tr in tracks]
-        self._f.write(json.dumps({"type": "f", "t": round(t, 3), "tracks": rec},
-                                 separators=(",", ":")) + "\n")
+        d = {"type": "f", "t": round(t, 3), "tracks": rec}
+        # v2 hand-context, omitted when absent so quiet states stay tiny:
+        # which balls are hand-adjacent, and how much bed the hand covers.
+        # This is what lets the recall audit tell strokes from gathering.
+        if carried_ids:
+            d["c"] = sorted(int(i) for i in carried_ids)
+        if foreign_frac >= 0.005:
+            d["ff"] = round(float(foreign_frac), 3)
+        self._f.write(json.dumps(d, separators=(",", ":")) + "\n")
         self._n += 1
         if self._n % 50 == 0:
             self._f.flush()
@@ -99,6 +108,8 @@ class SidecarReader:
         self.shots: list[dict] = []
         self._times: list[float] = []
         self._frames: list[list] = []
+        self._carried: list[list] = []      # v2: hand-adjacent ids per state
+        self._foreign: list[float] = []     # v2: bed fraction under hands
         p = sidecar_path(video_path)
         with open(p, encoding="utf-8") as f:
             for line in f:
@@ -111,6 +122,8 @@ class SidecarReader:
                 elif d.get("type") == "f":
                     self._times.append(float(d["t"]))
                     self._frames.append(d["tracks"])
+                    self._carried.append(d.get("c") or [])
+                    self._foreign.append(float(d.get("ff", 0.0)))
                 elif d.get("type") == "shot":
                     self.shots.append(d)
                 elif d.get("type") == "correction":
@@ -126,6 +139,23 @@ class SidecarReader:
     @staticmethod
     def exists(video_path: str | Path) -> bool:
         return sidecar_path(video_path).is_file()
+
+    def hand_context(self, t0: float, t1: float) -> tuple[set[int], float]:
+        """(union of hand-adjacent track ids, peak foreign fraction) over the
+        states in [t0, t1] — empty/0.0 on v1 sidecars, which never recorded
+        hand context (the caller should treat that as 'unknown', not 'no')."""
+        lo = bisect_right(self._times, t0 - 0.15)
+        hi = bisect_right(self._times, t1 + 0.15)
+        ids: set[int] = set()
+        peak = 0.0
+        for i in range(lo, min(hi, len(self._times))):
+            ids.update(self._carried[i])
+            peak = max(peak, self._foreign[i])
+        return ids, peak
+
+    @property
+    def has_hand_context(self) -> bool:
+        return any(self._carried) or any(f > 0 for f in self._foreign)
 
     def __len__(self) -> int:
         return len(self._times)

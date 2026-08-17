@@ -61,3 +61,34 @@ class TestSidecar:
         _write_sample(video)
         assert SidecarReader.exists(video)
         assert sidecar_path(video).name == "session-x.mp4.analysis.jsonl"
+
+
+class TestHandContextV2:
+    def test_carried_ids_roundtrip(self, tmp_path):
+        video = tmp_path / "s.mp4"
+        video.write_bytes(b"x")
+        w = SidecarWriter(video, {"fps": 30})
+        tr = Track(id=3, x=100, y=100, radius=14, number=5,
+                   cls=BallClass.SOLID, active=True)
+        w.add_frame(1.0, [tr])                                  # no hands
+        w.add_frame(2.0, [tr], carried_ids={3}, foreign_frac=0.04)
+        w.add_frame(3.0, [tr])
+        w.close()
+        r = SidecarReader(video)
+        assert r.has_hand_context
+        ids, peak = r.hand_context(1.7, 2.3)
+        assert ids == {3} and peak >= 0.04
+        ids2, _ = r.hand_context(2.8, 3.4)
+        assert ids2 == set()
+
+    def test_v1_sidecar_reports_no_hand_context(self, tmp_path):
+        video = tmp_path / "s.mp4"
+        video.write_bytes(b"x")
+        w = SidecarWriter(video, {"fps": 30})
+        tr = Track(id=1, x=50, y=50, radius=14, number=2,
+                   cls=BallClass.SOLID, active=True)
+        w.add_frame(1.0, [tr])
+        w.close()
+        r = SidecarReader(video)
+        assert not r.has_hand_context
+        assert r.hand_context(0.0, 2.0) == (set(), 0.0)

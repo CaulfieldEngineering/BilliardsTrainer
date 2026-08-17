@@ -86,10 +86,18 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
         else:
             unclaimed.append(o)
 
-    # Precision half: every vision shot must contain a strike onset.
-    unheard_shots = [s for s, _e in shots
+    # Precision half: every vision shot must contain a strike onset. With
+    # hand context (v2 sidecars), split the silent ones: hands-on-balls at
+    # "shot" time = likely a gathering that slipped the carried gate (a
+    # false shot); no hands = a soft/quiet stroke or true silence.
+    unheard_shots = [round(s, 2) for s, _e in shots
                      if not any(s - _CLAIM_BEFORE_S <= o <= s + _CLAIM_AFTER_S
                                 for o in onsets)]
+    unheard_handy: list[float] = []
+    if reader.has_hand_context:
+        unheard_handy = [s for s in unheard_shots
+                         if reader.hand_context(s - 0.5, s + 2.0)[0]]
+        unheard_shots = [s for s in unheard_shots if s not in unheard_handy]
 
     # Recall half: classify unclaimed onsets by what the balls did. A real
     # stroke ROLLS — sustained displacement across consecutive samples; a
@@ -97,12 +105,22 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
     # ball) SNAPS — one isolated jump. Only quiet-before + rolling-after
     # counts as a missed stroke.
     missed = []
+    hand_aware = reader.has_hand_context
     for o in unclaimed:
         pre_a = _positions(reader, max(0.0, o - 1.6))
         pre_b = _positions(reader, max(0.0, o - 0.3))
         d_pre, r_pre = _max_disp(pre_a, pre_b)
         if d_pre > 0.8 * r_pre:
             continue                    # already in motion — not a fresh stroke
+        # THE question, when the sidecar recorded hand context (v2): was any
+        # ball hand-adjacent around this onset? Gathering/racking always is;
+        # a stroke's cue contact lasts a frame and never marks the ball
+        # carried for a whole second. v1 sidecars fall through to the
+        # motion-profile heuristics below.
+        if hand_aware:
+            carried, _peak = reader.hand_context(o - 0.8, o + 2.2)
+            if carried:
+                continue                # hands on balls: not a missed stroke
         ts = [o - 0.2 + 0.3 * k for k in range(9)]          # o-0.2 .. o+2.5
         snaps = [_positions(reader, min(t_end, max(0.0, tt))) for tt in ts]
         ids: set = set().union(*[set(s) for s in snaps])
@@ -155,7 +173,9 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
         "pre_shot_sounds": len(pre_shot),
         "unclaimed_noise": len(unclaimed) - len(missed),
         "missed_shot_candidates": missed,
-        "unheard_shots": [round(s, 2) for s in unheard_shots],
+        "unheard_shots": unheard_shots,
+        "unheard_hand_involved": [round(s, 2) for s in unheard_handy],
+        "hand_aware": reader.has_hand_context,
     }
 
 
@@ -206,7 +226,9 @@ def main() -> int:
               f"strike={r['claimed_strike']:3d} body={r['claimed_body']:3d} "
               f"pre={r['pre_shot_sounds']:3d} noise={r['unclaimed_noise']:4d} "
               f"MISS?={len(r['missed_shot_candidates']):2d} "
-              f"UNHEARD={len(r['unheard_shots']):2d}")
+              f"UNHEARD={len(r['unheard_shots']):2d}"
+              f"+{len(r.get('unheard_hand_involved', [])):d}hand"
+              f"{'' if r.get('hand_aware') else '  [v1: no hand ctx]'}")
 
     total = {
         "sessions": len(reports),

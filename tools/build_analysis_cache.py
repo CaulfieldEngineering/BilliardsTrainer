@@ -50,7 +50,9 @@ def build(video: Path, force: bool = False) -> bool:
             writer.add_shot(res.shot_event)
         if res.status == "tracking" and t - last_t >= 0.1:
             last_t = t
-            writer.add_frame(t, res.tracks)
+            writer.add_frame(t, res.tracks,
+                             carried_ids=res.carried_ids,
+                             foreign_frac=res.foreign_frac)
         if n % 1800 == 0:
             print(f"    {t/60:.1f} min analyzed...")
     cap.release()

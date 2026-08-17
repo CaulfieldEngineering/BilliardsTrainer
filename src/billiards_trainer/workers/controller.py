@@ -1063,7 +1063,9 @@ class PipelineController(QObject):
         if sc is not None and res.status == "tracking"                 and t - getattr(self, "_sidecar_last_t", -1.0) >= 0.1:
             self._sidecar_last_t = t
             try:
-                sc.add_frame(t, res.tracks)
+                sc.add_frame(t, res.tracks,
+                             carried_ids=res.carried_ids,
+                             foreign_frac=res.foreign_frac)
             except OSError:
                 pass
         self._update_cue_clock(res.tracks, t)

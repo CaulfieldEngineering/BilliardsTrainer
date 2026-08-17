@@ -66,6 +66,11 @@ class PipelineResult:
     n_balls: int = 0
     deviated: bool = False
     diag: dict = field(default_factory=dict)
+    #: Hand-context for the sidecar (v2): which tracks are foreign-adjacent
+    #: (carried) this frame, and the bed fraction covered by hands/arms.
+    #: The recall audit needs these to tell a stroke from ball-gathering.
+    carried_ids: set = field(default_factory=set)
+    foreign_frac: float = 0.0
 
 
 class Pipeline:
@@ -889,6 +894,8 @@ class Pipeline:
         foreign = self._foreign_state(frame, calib)
         evidence = {"motion": motion, "arm": foreign[0],
                     "carried_ids": self._carried_ids(tracks, foreign)}
+        res.carried_ids = set(evidence["carried_ids"])
+        res.foreign_frac = float(foreign[0])
         if self.settings.detection.use_fusion and roi is not None:
             small = downscale(roi)
             fg = self._bg.update(small)
