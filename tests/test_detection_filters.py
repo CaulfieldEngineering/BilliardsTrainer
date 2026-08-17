@@ -298,3 +298,50 @@ class TestDarkTrioCorrection:
     def test_ambiguous_midpoint_trusts_model(self, monkeypatch, tmp_path):
         # halfway between 7 and 8 references: no decisive winner -> no change
         assert self._fix(monkeypatch, tmp_path, (34, 18, 48), claimed=7) == 7
+
+
+class TestForeignHandFilter:
+    def test_detection_inside_hand_blob_is_dropped(self):
+        """A gloved bridge hand resting on the cushion read as a resting ball
+        (#4 + two ghosts on session-20260802-173553). Detections whose centre
+        sits inside a kept foreign (hand-scale) blob must never be ingested;
+        detections on open felt are untouched."""
+        import numpy as np
+
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FakeStrategy:
+            model_based = True
+        p._strategy = FakeStrategy()
+        calib = _fake_calib()
+        tbl = calib.table
+        exp = expected_ball_radius_px(tbl, s.table.size)
+        fs = 160.0 / (tbl.x1 - tbl.x0)
+        mh = max(1, int((tbl.y1 - tbl.y0) * fs))
+        mask = np.zeros((mh, 160), np.uint8)
+        hx, hy = int((200 - tbl.x0) * fs), int((200 - tbl.y0) * fs)
+        mask[max(0, hy - 8):hy + 8, max(0, hx - 8):hx + 8] = 1
+        p._foreign_last = (0.05, mask, fs, tbl.x0, tbl.y0)
+        raw = [
+            _mk(200, 200, exp, cls=BallClass.SOLID, number=4, score=0.9),
+            _mk(400, 900, exp, cls=BallClass.SOLID, number=2, score=0.9),
+        ]
+        dets, _ = _run_apply(p, calib, raw)
+        assert len(dets) == 1, f"glove detection survived: {[(d.x, d.y) for d in dets]}"
+        assert dets[0].number == 2
+
+    def test_no_foreign_state_means_no_filtering(self):
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FakeStrategy:
+            model_based = True
+        p._strategy = FakeStrategy()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, s.table.size)
+        raw = [_mk(200, 200, exp, cls=BallClass.SOLID, number=4, score=0.9)]
+        dets, _ = _run_apply(p, calib, raw)
+        assert len(dets) == 1

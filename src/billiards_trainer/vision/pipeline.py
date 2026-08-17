@@ -342,6 +342,26 @@ class Pipeline:
             if exp_r > 2.0 and tol > 0:
                 lo, hi = exp_r * (1.0 - tol), exp_r * (1.0 + tol)
                 detections = [d for d in detections if lo <= d.radius <= hi]
+        # Hands are not balls: a detection whose centre lies inside a KEPT
+        # foreign blob (hand/arm-scale by construction — foreign_mask floors
+        # out ball-sized blobs, so a lone 8-ball never lands here) is a glove
+        # knuckle / wrist / cue butt. Measured on session-20260802-173553: a
+        # gloved bridge hand resting on the cushion for rail shots tracked as
+        # a resting "#4" flanked by two unknown ghosts — 25 impossible
+        # overlaps, the sole G4 per-session blocker. A real ball the hand is
+        # touching merges into the blob and is dropped too, which is correct:
+        # its track coasts on the occlusion budget and resumes on reappearance.
+        foreign = getattr(self, "_foreign_last", None)
+        if detections and foreign and foreign[1] is not None:
+            _ffrac, fmask, fs, fx0, fy0 = foreign
+            mh, mw = fmask.shape[:2]
+            kept = []
+            for d in detections:
+                mx, my = int((d.x - fx0) * fs), int((d.y - fy0) * fs)
+                if 0 <= mx < mw and 0 <= my < mh and fmask[my, mx]:
+                    continue
+                kept.append(d)
+            detections = kept
         # Rigid-body repair: two balls cannot interpenetrate, so when two
         # ball-sized detections sit closer than one diameter, either they are
         # two REAL touching balls whose centroids were pulled inward (daylight
