@@ -9,6 +9,8 @@ project to well under 0.7x the geometric ball radius; real balls stay above
 it. If someone re-loosens the band or re-exempts model detectors, these fail.
 """
 
+from pathlib import Path
+
 from billiards_trainer.config import Settings
 from billiards_trainer.vision.geometry import expected_ball_radius_px
 from billiards_trainer.vision.tracking import BallTracker
@@ -17,6 +19,26 @@ from billiards_trainer.vision.types import BallClass, Detection
 
 def _mk(x, y, r, cls=BallClass.UNKNOWN, number=-1, score=0.8):
     return Detection(x, y, r, cls=cls, number=number, score=score)
+
+
+#: Committed snapshot of the measured per-table colour references. Tests must
+#: NEVER read _train/colour_refs.json — it is gitignored (per-table measured
+#: data, Joe's machine only), and depending on it made every CI push red for a
+#: day while the local suite stayed green.
+_REFS_FIXTURE = Path(__file__).parent / "fixtures" / "colour_refs.json"
+
+
+def _use_fixture_refs(monkeypatch, tmp_path):
+    """Point the measured-colour layer at the fixture snapshot (hermetic on
+    CI). monkeypatch restores APP_DIR and the refs cache on teardown."""
+    import shutil
+
+    import billiards_trainer.config as cfg
+    from billiards_trainer.vision import balls
+    shutil.copy2(_REFS_FIXTURE, tmp_path / "colour_refs.json")
+    monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
+    monkeypatch.setattr(balls, "_MEASURED_REFS", None)   # drop cache
+    return balls
 
 
 class TestModelSizePrior:
@@ -184,7 +206,8 @@ class TestColourReassignment:
     measured colour that LOOKS like the winner (Joe: 'two sevens, one of
     which is actually a 4')."""
 
-    def test_duplicate_loser_reassigned_by_colour(self):
+    def test_duplicate_loser_reassigned_by_colour(self, monkeypatch, tmp_path):
+        _use_fixture_refs(monkeypatch, tmp_path)
         tr = BallTracker(min_hits=2, still_frames=3)
         # real 7 (maroon) builds stronger evidence first
         real7 = _mk(200, 200, 15, cls=BallClass.SOLID, number=7, score=0.9)
@@ -199,7 +222,8 @@ class TestColourReassignment:
         nums = sorted(t.number for t in tr.tracks)
         assert nums == [4, 7], f"loser must become the 4, got {nums}"
 
-    def test_loser_stays_unknown_when_its_colour_is_taken(self):
+    def test_loser_stays_unknown_when_its_colour_is_taken(self, monkeypatch, tmp_path):
+        _use_fixture_refs(monkeypatch, tmp_path)
         tr = BallTracker(min_hits=2, still_frames=3)
         a = _mk(200, 200, 15, cls=BallClass.SOLID, number=7, score=0.9)
         a.bgr = (45, 45, 120)
@@ -230,14 +254,7 @@ class TestMeasuredColourFix:
     why canonical classification called it a 7."""
 
     def _use_repo_refs(self, monkeypatch, tmp_path):
-        import shutil
-
-        import billiards_trainer.config as cfg
-        from billiards_trainer.vision import balls
-        shutil.copy2("_train/colour_refs.json", tmp_path / "colour_refs.json")
-        monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
-        balls._MEASURED_REFS = None          # drop cache
-        return balls
+        return _use_fixture_refs(monkeypatch, tmp_path)
 
     def test_measured_navy_resolves_to_4(self, monkeypatch, tmp_path):
         balls = self._use_repo_refs(monkeypatch, tmp_path)
@@ -269,16 +286,10 @@ class TestDarkTrioCorrection:
     must beat the claim decisively — and the 8 participates."""
 
     def _fix(self, monkeypatch, tmp_path, bgr, claimed):
-        import shutil
-
         import numpy as np
 
-        import billiards_trainer.config as cfg
         from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
-        from billiards_trainer.vision import balls
-        shutil.copy2("_train/colour_refs.json", tmp_path / "colour_refs.json")
-        monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
-        balls._MEASURED_REFS = None
+        _use_fixture_refs(monkeypatch, tmp_path)
         frame = np.zeros((60, 60, 3), np.uint8)
         frame[:] = bgr
         f = Detection(30, 30, 14, cls=BallClass.SOLID, number=claimed, score=0.9)
