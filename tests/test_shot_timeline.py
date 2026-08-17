@@ -78,3 +78,71 @@ class TestHoverCards:
         tl.add_shot(100.0, 106.0, "make", 1)
         tl._shots[0]["corrected"] = True
         assert "(corrected)" in tl.hover_text(101.0)
+
+
+class TestZoomPan:
+    """Editor zoom/pan: wheel zooms around the cursor, middle-drag pans —
+    all through pure methods (zoom_at / pan_by / view_range)."""
+
+    def test_zoom_keeps_cursor_time_at_same_pixel(self, app):
+        tl = _tl(app)
+        tl.zoom_at(300.0, 2.0)               # cursor mid-lane = t=300s
+        lo, hi = tl.view_range()
+        assert (lo, hi) == (150.0, 450.0)
+        assert abs(tl._x(300.0) - 300.0) < 1e-6   # t=300 still under cursor
+
+    def test_zoom_clamps_to_min_span(self, app):
+        tl = _tl(app)
+        for _ in range(20):
+            tl.zoom_at(300.0, 2.0)
+        lo, hi = tl.view_range()
+        assert hi - lo >= tl.MIN_SPAN_S - 1e-9
+
+    def test_zoom_out_past_full_resets_to_whole_session(self, app):
+        tl = _tl(app)
+        tl.zoom_at(300.0, 2.0)
+        tl.zoom_at(300.0, 0.25)              # zooming way out
+        assert tl.view_range() == (0.0, 600.0)
+        assert tl._view is None
+
+    def test_pan_clamps_at_session_edges(self, app):
+        tl = _tl(app)
+        tl.zoom_at(300.0, 2.0)               # (150, 450)
+        tl.pan_by(600.0)                      # drag right -> earlier, clamped
+        assert tl.view_range() == (0.0, 300.0)
+        tl.pan_by(-2400.0)                    # drag far left -> later, clamped
+        assert tl.view_range() == (300.0, 600.0)
+
+    def test_pan_is_noop_when_not_zoomed(self, app):
+        tl = _tl(app)
+        tl.pan_by(200.0)
+        assert tl.view_range() == (0.0, 600.0)
+
+    def test_click_seeks_through_zoomed_view(self, app):
+        tl = _tl(app)
+        tl.zoom_at(300.0, 2.0)               # view (150, 450)
+        got = []
+        tl.clicked.connect(got.append)
+
+        class Ev:
+            def button(self):
+                from PySide6.QtCore import Qt
+                return Qt.LeftButton
+            def pos(self):
+                from PySide6.QtCore import QPoint
+                return QPoint(0, 17)          # left edge of the zoomed view
+        tl.mousePressEvent(Ev())
+        assert got and abs(got[0] - 150.0) < 1.0
+
+    def test_live_follow_lane_ignores_zoom(self, app):
+        tl = _tl(app)
+        tl.follow_window_s = 120.0
+        tl.set_live_clock(600.0)
+        tl.zoom_at(300.0, 2.0)
+        assert tl.view_range() == (480.0, 600.0)   # still the live window
+
+    def test_clear_resets_zoom(self, app):
+        tl = _tl(app)
+        tl.zoom_at(300.0, 2.0)
+        tl.clear()
+        assert tl._view is None

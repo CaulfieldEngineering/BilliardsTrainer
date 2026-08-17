@@ -47,6 +47,10 @@ class ShotTimeline(QWidget):
         self._playhead = -1.0
         self._shots: list[dict] = []
         self.pre_roll_s = pre_roll_s
+        #: Zoomed view window (lo, hi) in seconds, or None = whole session.
+        #: Editor controls: wheel zooms around the cursor, middle-drag pans.
+        self._view: tuple[float, float] | None = None
+        self._pan_anchor_x: float | None = None
 
     # ------------------------------------------------------------------ #
     def set_duration(self, seconds: float) -> None:
@@ -76,6 +80,7 @@ class ShotTimeline(QWidget):
     def clear(self) -> None:
         self._shots.clear()
         self._playhead = -1.0
+        self._view = None
         self.update()
 
     @property
@@ -84,10 +89,50 @@ class ShotTimeline(QWidget):
 
     # ------------------------------------------------------------------ #
     def _range(self) -> tuple[float, float]:
-        """Visible time range: everything, or the rolling live window."""
+        """Visible time range: live rolling window > zoomed view > everything."""
         if self.follow_window_s > 0 and self._live_now > self.follow_window_s:
             return self._live_now - self.follow_window_s, self._live_now
+        if self._view is not None:
+            return self._view
         return 0.0, max(self._duration, self.follow_window_s or self._duration)
+
+    # -- editor zoom/pan (pure methods; event handlers are thin shells) ----- #
+    MIN_SPAN_S = 10.0
+
+    def zoom_at(self, x_px: float, factor: float) -> None:
+        """Scale the visible span by 1/``factor`` keeping the time under the
+        cursor at the same screen position (video-editor wheel zoom)."""
+        if self._duration <= 0 or self.follow_window_s > 0:
+            return                      # the live lane owns its own window
+        lo, hi = self._range()
+        span = hi - lo
+        new_span = span / max(1e-6, factor)
+        if new_span >= self._duration:
+            self._view = None           # zoomed all the way back out
+            self.update()
+            return
+        new_span = max(self.MIN_SPAN_S, new_span)
+        frac = min(1.0, max(0.0, x_px / max(1, self.width())))
+        t = lo + frac * span
+        new_lo = t - frac * new_span
+        new_lo = min(max(0.0, new_lo), self._duration - new_span)
+        self._view = (new_lo, new_lo + new_span)
+        self.update()
+
+    def pan_by(self, dx_px: float) -> None:
+        """Slide a zoomed view sideways (middle-drag). Content follows the
+        cursor: dragging right shows earlier time. No-op when not zoomed."""
+        if self._view is None or self._duration <= 0:
+            return
+        lo, hi = self._view
+        span = hi - lo
+        dt = -dx_px * span / max(1, self.width())
+        new_lo = min(max(0.0, lo + dt), self._duration - span)
+        self._view = (new_lo, new_lo + span)
+        self.update()
+
+    def view_range(self) -> tuple[float, float]:
+        return self._range()
 
     def _x(self, t: float) -> float:
         lo, hi = self._range()
@@ -116,7 +161,8 @@ class ShotTimeline(QWidget):
             return None
         s = self.shot_at(t)
         if s is None:
-            return "Click to seek — clips replay from your pre-shot routine"
+            return ("Click to seek — clips replay from your pre-shot routine"
+                    "\nWheel: zoom · middle-drag: pan")
         no = self._shots.index(s) + 1
         start = s["start"]
         mm, ss = int(start) // 60, int(start) % 60
@@ -130,9 +176,20 @@ class ShotTimeline(QWidget):
                 + f"{nl}Click: replay from routine · "
                   "Right-click list row: export/fix")
 
+    def wheelEvent(self, ev):  # noqa: N802 - Qt override
+        x = ev.position().x() if hasattr(ev, "position") else ev.pos().x()
+        notches = ev.angleDelta().y() / 120.0
+        if notches:
+            self.zoom_at(float(x), 1.25 ** notches)
+        ev.accept()
+
     def mouseMoveEvent(self, ev):  # noqa: N802 - Qt override
         from PySide6.QtWidgets import QToolTip
         pos = ev.position().toPoint() if hasattr(ev, "position") else ev.pos()
+        if self._pan_anchor_x is not None and (ev.buttons() & Qt.MiddleButton):
+            self.pan_by(float(pos.x()) - self._pan_anchor_x)
+            self._pan_anchor_x = float(pos.x())
+            return
         text = self.hover_text(self._t(float(pos.x())))
         if text:
             QToolTip.showText(self.mapToGlobal(pos), text, self)
@@ -140,10 +197,19 @@ class ShotTimeline(QWidget):
             QToolTip.hideText()
         super().mouseMoveEvent(ev)
 
+    def mouseReleaseEvent(self, ev):  # noqa: N802 - Qt override
+        if ev.button() == Qt.MiddleButton:
+            self._pan_anchor_x = None
+        super().mouseReleaseEvent(ev)
+
     def mousePressEvent(self, ev):  # noqa: N802 - Qt override
+        x = ev.position().x() if hasattr(ev, "position") else ev.pos().x()
+        if ev.button() == Qt.MiddleButton:
+            self._pan_anchor_x = float(x)     # start an editor pan
+            return
         if ev.button() != Qt.LeftButton or self._duration <= 0:
             return
-        t = self._t(ev.position().x() if hasattr(ev, "position") else ev.pos().x())
+        t = self._t(x)
         s = self.shot_at(t)
         # Clip click -> start of the pre-shot routine; bare-ruler click -> there.
         self.clicked.emit(max(0.0, s["start"] - self.pre_roll_s) if s else t)
