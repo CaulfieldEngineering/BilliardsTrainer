@@ -260,6 +260,21 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 15): board GREEN. G5 MEASUREMENT on re-backfilled
+  sidecars (new detector): 210621 0 -> 95 shots (the zero-detection
+  drill session now detects), 011928 76 -> 115, 011510 10 -> 13;
+  missed-stroke candidates across the three 535 -> 234 (-56%). NOT MET
+  yet: 210621 keeps 162 candidates + 20 unheard. Eyeballed the residual:
+  a 4-onset cluster at 31.9-32.9s is Joe FEATHERING before the break —
+  the audit's 2s look-ahead claims pre-shot taps as misses because the
+  real shot follows within the window, and the backdate cap pushes that
+  shot's start just past the claim window ("unheard"). So a big slice of
+  the residual is AUDIT-CLASSIFIER artefact, not detector failure. NEXT:
+  refine the audit (pre-shot-sound reclassification; claim window
+  covering capped backdates; placement-snap pattern), then the G5
+  verdict. Also shipped while measuring: G6 PER-SHOT THUMBNAILS
+  (strike-moment frames as row icons, outcome edge bar, off-thread
+  extraction over a signal bridge; 3 tests). Suite green, app restarted.
 - 2026-08-17 (post-loop-13): confirmation corpus landed — **G4 DONE**.
   Aggregate 0.50/1k (target <0.75), worst session 1.41 (target <2.0),
   0 failed. Journey: 1.05 -> 0.59 (rest-frozen identity) -> 0.50 (hand
