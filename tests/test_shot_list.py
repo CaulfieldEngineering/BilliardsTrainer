@@ -152,3 +152,47 @@ class TestOutcomeDots:
         plain = pnl._list.item(0).icon().pixmap(14, 14).toImage()
         ringed = pnl._list.item(1).icon().pixmap(14, 14).toImage()
         assert plain != ringed
+
+
+class TestShotThumbnails:
+    def _tiny_video(self, tmp_path):
+        import cv2
+        import numpy as np
+        p = str(tmp_path / "clip.mp4")
+        w = cv2.VideoWriter(p, cv2.VideoWriter_fourcc(*"mp4v"), 30, (160, 90))
+        for i in range(90):                     # 3s, frame index painted in
+            fr = np.full((90, 160, 3), (i % 3) * 60 + 40, np.uint8)
+            w.write(fr)
+        w.release()
+        return p
+
+    def test_extractor_returns_frames_at_requested_times(self, tmp_path):
+        from billiards_trainer.ui.widgets.shot_thumbs import extract_thumbs
+        video = self._tiny_video(tmp_path)
+        thumbs = extract_thumbs(video, [0.5, 2.0])
+        assert set(thumbs) == {0.5, 2.0}
+        assert all(v.shape == (54, 96, 3) for v in thumbs.values())
+
+    def test_rows_swap_dots_for_thumbnails(self, app, tmp_path):
+        import numpy as np
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots(_shots())
+        before = pnl._list.item(0).icon().pixmap(96, 54).toImage()
+        bgr = np.full((54, 96, 3), 90, np.uint8)
+        pnl.set_thumbnails({30.0: bgr, 75.2: bgr})
+        after0 = pnl._list.item(0).icon().pixmap(96, 54).toImage()
+        after2 = pnl._list.item(2).icon().pixmap(96, 54).toImage()
+        assert after0 != before, "row with a thumb must swap its icon"
+        assert not pnl._list.item(2).icon().isNull()  # row 2 keeps its dot
+
+    def test_thumbnails_survive_correction_rebuild(self, app):
+        import numpy as np
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots(_shots())
+        bgr = np.full((54, 96, 3), 90, np.uint8)
+        pnl.set_thumbnails({30.0: bgr})
+        pnl._correct(0, "miss")                  # rebuilds all rows
+        assert not pnl._list.item(0).icon().pixmap(96, 54).toImage().isNull()
+        assert "corrected" in pnl._list.item(0).toolTip()

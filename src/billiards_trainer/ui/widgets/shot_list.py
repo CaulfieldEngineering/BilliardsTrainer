@@ -31,6 +31,28 @@ _OUTCOME = {
 _DOT_CACHE: dict[tuple[str, bool], QIcon] = {}
 
 
+def _thumb_icon(bgr, colour: str, corrected: bool) -> QIcon:
+    """Thumbnail icon with the outcome painted as a left-edge bar (the row
+    has ONE icon slot, so the picture and the colour share it). Corrected
+    verdicts keep their ring, drawn around the whole thumb."""
+    import numpy as np
+    from PySide6.QtGui import QImage
+    h, w = bgr.shape[:2]
+    rgb = np.ascontiguousarray(bgr[..., ::-1])
+    img = QImage(rgb.data, w, h, 3 * w, QImage.Format_RGB888).copy()
+    pm = QPixmap.fromImage(img)
+    p = QPainter(pm)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(colour))
+    p.drawRect(0, 0, 4, h)                       # outcome edge bar
+    if corrected:
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(PALETTE.text), 2))
+        p.drawRect(1, 1, w - 2, h - 2)
+    p.end()
+    return QIcon(pm)
+
+
 def _outcome_dot(colour: str, corrected: bool) -> QIcon:
     """Small filled circle in the timeline's outcome colour; a corrected
     verdict gets a ring so Joe's own calls are distinguishable at a glance."""
@@ -133,10 +155,36 @@ class ShotListPanel(QWidget):
             self._list.addItem(item)
         self._count.setText(f"({len(self._shots)})")
         self._sync_empty()
+        if getattr(self, "_thumbs", None):
+            self.set_thumbnails(self._thumbs)   # corrections rebuild rows
 
     def add_shot(self, shot: dict) -> None:
         self._shots.append(shot)
         self.set_shots(self._shots)
+
+    def set_thumbnails(self, thumbs: dict) -> None:
+        """{shot start s: small BGR array} — swap dot icons for thumbnails.
+        Missing entries keep their dot. Safe to call repeatedly (icons are
+        rebuilt from the same shot list order)."""
+        self._thumbs = dict(thumbs or {})
+        for row, s in enumerate(self._shots):
+            start = float(s.get("start", 0.0))
+            bgr = self._match_thumb(start)
+            if bgr is None:
+                continue
+            colour, _name = _OUTCOME.get(s.get("outcome", "miss"),
+                                         (PALETTE.text_dim, "?"))
+            item = self._list.item(row)
+            if item is not None:
+                item.setIcon(_thumb_icon(bgr, colour, bool(s.get("corrected"))))
+        from PySide6.QtCore import QSize
+        self._list.setIconSize(QSize(96, 54))
+
+    def _match_thumb(self, start: float):
+        for t, bgr in getattr(self, "_thumbs", {}).items():
+            if abs(float(t) - start) < 0.25:
+                return bgr
+        return None
 
     def _sync_empty(self) -> None:
         has = bool(self._shots)

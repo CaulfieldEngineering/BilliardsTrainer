@@ -1260,6 +1260,34 @@ class LivePage(QWidget):
                                     str(s.get("outcome", "miss")),
                                     int(s.get("pocketed", 0)))
         self._shot_list.set_shots(list(shots or []))
+        self._load_shot_thumbs([float(s.get("start", 0.0)) for s in shots or []])
+
+    def _load_shot_thumbs(self, starts: list) -> None:
+        """Extract per-shot thumbnails off-thread and hand the BGR frames to
+        the list on the UI thread (pixmap conversion must stay there)."""
+        video = getattr(self, "_media_path", "")
+        if not video or not starts:
+            return
+        import threading
+
+        from PySide6.QtCore import QObject, Signal
+
+        class _Bridge(QObject):
+            ready = Signal(dict)     # worker thread -> UI thread, queued by Qt
+
+        self._thumb_bridge = _Bridge(self)
+        self._thumb_bridge.ready.connect(self._shot_list.set_thumbnails)
+
+        def work(bridge=self._thumb_bridge):
+            from ..widgets.shot_thumbs import extract_thumbs
+            try:
+                thumbs = extract_thumbs(video, starts)
+            except Exception:                      # noqa: BLE001 - decorative path
+                return
+            if thumbs:
+                bridge.ready.emit(thumbs)
+
+        threading.Thread(target=work, daemon=True, name="shot-thumbs").start()
 
     def _on_outcome_corrected(self, start: float, outcome: str) -> None:
         """A review verdict: persist to the session's sidecar (append-only
