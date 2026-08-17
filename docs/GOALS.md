@@ -44,12 +44,12 @@ c5. Roboflow key would add public base data (Joe item).
 ## G4 — Physics-impossible rate < 0.75/1k corpus-wide, no session > 2.0
 **Done when:** a full corpus run shows aggregate impossible < 0.75/1k and
 max per-session < 2.0.
-**Current:** aggregate ✅ MET — 0.59/1k over 22 sessions (was 1.05; rest-
-frozen identity, corpus run `_eval/corpus/restfreeze_c5`). Per-session bar:
-173553 (the sole blocker, 2.58) measured 0.27 after the hand filter — the
-"rail margin" theory was wrong, it was Joe's gloved bridge hand on the
-cushion detected as balls. Full-corpus confirmation run pending; if no
-session regresses above 2.0 there, G4 is DONE.
+**Current:** ✅ **DONE** (confirmed 2026-08-17, corpus run
+`_eval/corpus/handfilter_c5`): aggregate **0.50/1k** over 22 sessions /
+203k ball-frames (target <0.75; was 1.05 at the champion_v4 baseline),
+**worst session 1.41** (target <2.0; was 3.90), 0 failed, 0 degenerate.
+Delivered by rest-frozen identity + the foreign-hand ingestion filter.
+The bar stays enforced: every future challenger gates against this run.
 
 ## G5 — Shot detection: keep 100% audio precision, prove recall
 **Done when:** across ≥5 varied sessions, every vision shot is
@@ -244,3 +244,11 @@ Rounds continue with Joe's visual feedback as the gate.
   -> 0.27 (overlaps 25 -> 1); control identical to pre-change (0.24).
   Suite 267 green. Full-corpus confirmation LAUNCHED; aggregate + no-
   session->2.0 verdict lands next session. If clean, G4 is DONE.
+- 2026-08-17 (post-loop-13): confirmation corpus landed — **G4 DONE**.
+  Aggregate 0.50/1k (target <0.75), worst session 1.41 (target <2.0),
+  0 failed. Journey: 1.05 -> 0.59 (rest-frozen identity) -> 0.50 (hand
+  filter); worst session 3.90 -> 1.41. Also this hour, on Joe's report:
+  CI was red on every push (tests read the gitignored measured-colour
+  file, which only exists on the rig) — refs snapshot committed as a
+  fixture, suite verified green with the rig file hidden, Build &
+  Release confirmed green on 006ea3e. Failure emails stop.
