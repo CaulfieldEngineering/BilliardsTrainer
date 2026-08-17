@@ -19,7 +19,10 @@ def det() -> ShotDetector:
     d = DetectionSettings(warmup_seconds=0.0, cooldown_seconds=0.0, use_fusion=False,
                           motion_active=0.4, motion_quiet=0.2, strike_frames=3,
                           min_travel_px=50.0, pocket_frames=5)
-    return ShotDetector(d, BallSettings(), settle_frames=3, min_shot_frames=2)
+    # time floors zeroed: these short synthetic sequences test outcome logic;
+    # the physical-duration floors are covered in test_shot_arm_gate.py
+    return ShotDetector(d, BallSettings(), settle_frames=3, min_shot_frames=2,
+                        min_shot_s=0.0, settle_s=0.0)
 
 
 def trk(tid, x, y, cls=BallClass.SOLID):
