@@ -72,11 +72,21 @@ class _Seen:
 
 class ShotDetector:
     def __init__(self, detection: DetectionSettings, balls: BallSettings,
-                 settle_frames: int = 7, min_shot_frames: int = 3):
+                 settle_frames: int = 7, min_shot_frames: int = 3,
+                 min_shot_s: float = 1.2, settle_s: float = 0.5):
         self.det = detection
         self.balls = balls
         self.settle_frames = settle_frames
         self.min_shot_frames = min_shot_frames
+        # TIME floors alongside the frame counts: frame counts are cadence-
+        # dependent (7 quiet updates at 30 fps is 0.23s — a struck ball whose
+        # flight is motion-blurred out of tracking hasn't even REAPPEARED
+        # yet, so the shot resolved with ~35px of travel and was discarded;
+        # measured on 011510 @ 72.2s). Physics: a stroke's balls roll for
+        # over a second; holding the shot open that long lets the flyer's
+        # revival land inside it, where its snap displacement counts.
+        self.min_shot_s = min_shot_s
+        self.settle_s = settle_s
         self.reset()
 
     def reset(self) -> None:
@@ -89,12 +99,16 @@ class ShotDetector:
         self._shot_ids: set = set()                 # ids seen during this shot
         self._shot_cls: dict[int, BallClass] = {}   # id -> last class seen
         self._prev: dict[int, _Seen] = {}
+        self._prev_seen_at: dict[int, int] = {}
         self._pocketed: list[PocketedBall] = []
         self._active_run = 0
         self._quiet_run = 0
         self._shot_frames = 0
         self._arm_frames = 0
         self._still_run = 0
+        self._calm_since: float | None = None   # start of the current quiet+still spell
+        self._carried_moving = 0                # moving updates with a hand on a mover
+        self._any_moving = 0                    # moving updates with any tracked step
         self._free_frames: dict[int, int] = {}
         self._free_travel: dict[int, float] = {}
         self._pending_free: dict[int, tuple] = {}
@@ -222,6 +236,14 @@ class ShotDetector:
             # ways: the cue stick hovers over the felt through every real
             # shot, and a placing hand is too small to move the fraction.)
             carried = self._evidence.get("carried_ids") or set()
+            stepping = {tr.id for tr in tracks
+                        if self._prev.get(tr.id) is not None
+                        and math.hypot(tr.x - self._prev[tr.id].x,
+                                       tr.y - self._prev[tr.id].y) > 1.0}
+            if stepping:
+                self._any_moving += 1
+                if stepping & carried:
+                    self._carried_moving += 1
             max_step = 0.0
             for tr in tracks:
                 if tr.id in carried:
@@ -252,13 +274,37 @@ class ShotDetector:
             # settling additionally requires the TRACKED balls to be still
             # for the same run of frames.
             self._still_run = self._still_run + 1 if max_step <= 1.0 else 0
+            calm = (quiet and max_step <= 1.0)
+            if calm and self._calm_since is None:
+                self._calm_since = t
+            elif not calm:
+                self._calm_since = None
+            # Resolve on TIME, not update counts: the shot must have lived
+            # min_shot_s (long enough for a blurred-out flyer to reappear
+            # and be counted) and the table must have been continuously
+            # calm for settle_s. Frame-count floors remain as guards.
             if (self._quiet_run >= self.settle_frames
                     and self._still_run >= self.settle_frames
-                    and self._shot_frames >= self.min_shot_frames):
+                    and self._shot_frames >= self.min_shot_frames
+                    and t - self._start_t >= self.min_shot_s
+                    and self._calm_since is not None
+                    and t - self._calm_since >= self.settle_s):
                 self._finalize_pockets(by_id, table, t)
                 event = self._resolve(t)
 
-        self._prev = {tr.id: _Seen(tr.x, tr.y, tr.cls, tr.speed) for tr in tracks}
+        # Positional memory RETAINS vanished balls for ~3s: a struck ball
+        # motion-blurs out of tracking and its track revives far away — the
+        # revival step (last seen -> reappearance) is real displacement and
+        # must bank/count. Rebuilding _prev from current tracks forgot the
+        # flyer, so its 500px snap read as step 0 (011510 @ 72.2s).
+        for tr in tracks:
+            self._prev[tr.id] = _Seen(tr.x, tr.y, tr.cls, tr.speed)
+            self._prev_seen_at[tr.id] = self._frame_idx
+        stale = [tid for tid, at in self._prev_seen_at.items()
+                 if self._frame_idx - at > 90]
+        for tid in stale:
+            self._prev.pop(tid, None)
+            self._prev_seen_at.pop(tid, None)
         self._set_diag(t, motion, cue_present, warming, cooling)
         return event
 
@@ -290,6 +336,9 @@ class ShotDetector:
         self._shot_frames = 0
         self._arm_frames = 0
         self._still_run = 0
+        self._calm_since = None
+        self._carried_moving = 0
+        self._any_moving = 0
         self._free_frames = {tid: f for tid, (f, _d) in self._pending_free.items()}
         self._free_travel = {tid: d for tid, (_f, d) in self._pending_free.items()}
         self._max_travel = max(self._free_travel.values(), default=0.0)
@@ -347,6 +396,16 @@ class ShotDetector:
         if self._max_travel < self.det.min_travel_px:
             log.debug("Discarded non-shot (travel %.0f < %.0f)", self._max_travel,
                       self.det.min_travel_px)
+            self._pocketed = []
+            return None
+        # Carried-dwell veto: in a real stroke the stick leaves the ball
+        # within a frame or two, so moving updates with a hand ON a mover
+        # are rare; in ball-gathering they are the majority. This is what
+        # the audio audit exposed as "silent shots with hands involved" —
+        # gatherings whose intermittent free frames beat the travel gate.
+        if self._any_moving >= 4 and self._carried_moving > 0.6 * self._any_moving:
+            log.debug("Discarded gathering (hand on movers %d/%d updates)",
+                      self._carried_moving, self._any_moving)
             self._pocketed = []
             return None
 

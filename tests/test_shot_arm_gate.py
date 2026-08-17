@@ -36,7 +36,10 @@ def _detector() -> ShotDetector:
     s.detection.use_fusion = False
     s.detection.warmup_seconds = 0.0
     s.detection.cooldown_seconds = 0.0
-    return ShotDetector(s.detection, s.balls, settle_frames=3, min_shot_frames=2)
+    # time floors zeroed: these tests exercise the gates in tiny synthetic
+    # sequences; the physical-duration floors get their own dedicated test
+    return ShotDetector(s.detection, s.balls, settle_frames=3, min_shot_frames=2,
+                        min_shot_s=0.0, settle_s=0.0)
 
 
 def _run(det, frames):
@@ -212,3 +215,64 @@ class TestBallMotionArming:
         for _ in range(12):
             frames.append(([_mk(1, x, 300.0)], 0.0, set()))
         assert _run(det, frames) == [], "a release wobble must not arm a shot"
+
+
+class TestTimeFloorsAndCarriedDwell:
+    def _det(self, **kw):
+        s = Settings()
+        s.detection.require_cue = False
+        s.detection.use_fusion = False
+        s.detection.warmup_seconds = 0.0
+        s.detection.cooldown_seconds = 0.0
+        return ShotDetector(s.detection, s.balls, settle_frames=3,
+                            min_shot_frames=2, **kw)
+
+    def test_shot_stays_open_for_the_blurred_flyer(self):
+        """011510 @ 72.2s: the struck ball blurs out of tracking; the shot
+        resolved in 0.23s with ~35px of tracked travel and was discarded.
+        With the time floor the shot is still open when the flyer's track
+        revives far away — its snap displacement crosses the travel gate."""
+        det = self._det(min_shot_s=1.2, settle_s=0.5)
+        frames = []
+        cue = _mk(1, 300.0, 300.0)
+        flyer = _mk(2, 320.0, 300.0)
+        for _ in range(10):
+            frames.append(([cue, flyer], 0.0, set()))
+        # strike: cue nudges 3 frames (arms the detector), flyer VANISHES
+        x = 300.0
+        for _ in range(3):
+            x += 12.0
+            frames.append(([_mk(1, x, 300.0, vx=12.0)], 0.3, set()))
+        # 0.6s of nothing tracked moving (flyer in blurred flight)
+        for _ in range(18):
+            frames.append(([_mk(1, x, 300.0)], 0.1, set()))
+        # flyer's track revives 500px away, rolls a touch, then all settle
+        fx = 820.0
+        for _ in range(4):
+            fx += 6.0
+            frames.append(([_mk(1, x, 300.0), _mk(2, fx, 300.0, vx=6.0)], 0.2, set()))
+        for _ in range(40):
+            frames.append(([_mk(1, x, 300.0), _mk(2, fx, 300.0)], 0.0, set()))
+        events = _run(det, frames)
+        assert len(events) == 1, "flyer's revival must be credited to the shot"
+        assert events[0].max_travel >= 450.0
+
+    def test_gathering_with_hands_on_movers_is_discarded(self):
+        """The 19 'silent shots with hands involved': gathering whose
+        intermittent free frames beat the travel gate. Moving updates with
+        a hand ON the mover dominate -> discarded at resolve."""
+        det = self._det(min_shot_s=0.0, settle_s=0.0)
+        frames = []
+        ball = _mk(1, 300.0, 300.0)
+        for _ in range(10):
+            frames.append(([ball], 0.0, set()))
+        x = 300.0
+        # sweep: ball moves 24 frames; hand adjacent on ~70% of them, but
+        # with free gaps long enough to arm and accrue travel
+        for i in range(24):
+            x += 20.0
+            ids = {1} if (i % 10) < 7 else set()
+            frames.append(([_mk(1, x, 300.0, vx=20.0)], 2.0, ids))
+        for _ in range(10):
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        assert _run(det, frames) == [], "hand-dominated movement must not resolve"
