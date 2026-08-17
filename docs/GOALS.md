@@ -166,3 +166,10 @@ Rounds continue with Joe's visual feedback as the gate.
   cue 92.4->98.7%, 13 held 100%, 11 restored 80%, dark cluster 95.1%
   unchanged. The 9 stays 47% — its yellow band photographs ORANGE under
   warm light; that is c5 retrain territory, not heuristics.
+- 2026-08-16 (loop 8): c5 dataset assembled (90 images / 513 boxes across
+  six labelled sessions incl. daylight + blur + hard negatives) and c5
+  TRAINING launched in background (90 epochs, CPU). Gate next session
+  with --exclude of all six training sessions PLUS the per-class accuracy
+  instrument — the 9-ball (47%, yellow band photographs orange) is the
+  case c5 exists to fix. Serialization honoured: training is this
+  session's one heavy job; the gate runs next cycle.
