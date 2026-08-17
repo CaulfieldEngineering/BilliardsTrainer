@@ -44,8 +44,10 @@ c5. Roboflow key would add public base data (Joe item).
 ## G4 — Physics-impossible rate < 0.75/1k corpus-wide, no session > 2.0
 **Done when:** a full corpus run shows aggregate impossible < 0.75/1k and
 max per-session < 2.0.
-**Current:** 1.07/1k aggregate; worst sessions 3.2-3.4 (known causes:
-lock-margin defect on 173553, marker-dense drills on 011510/015737).
+**Current:** aggregate ✅ MET — 0.59/1k over 22 sessions (was 1.05; rest-
+frozen identity, corpus run `_eval/corpus/restfreeze_c5`). Per-session bar
+❌ blocked by exactly ONE session: 173553 at 2.58 (felt-lock rail margin —
+the fix is table-lock tightening, not tracking). Next worst is 1.41.
 
 ## G5 — Shot detection: keep 100% audio precision, prove recall
 **Done when:** across ≥5 varied sessions, every vision shot is
@@ -217,3 +219,14 @@ Rounds continue with Joe's visual feedback as the gate.
   merge-bar vs scorer-bar sliver (merge uses 1.6*exp_r, scorer uses
   published radii), a few class flickers. NEXT: full-corpus re-baseline
   to re-measure the G4 aggregate, then 173553 lock margin + teleports.
+- 2026-08-17 (loop 12): board GREEN. FULL-CORPUS RE-BASELINE on the
+  rest-frozen tracker: aggregate 0.59 impossible/1k over 22 sessions /
+  217k ball-frames, 0 failed — G4's <0.75 AGGREGATE TARGET IS MET (was
+  1.05). Per-session bar still blocked by ONE session: 173553 at 2.58
+  (felt-lock rail margin; next worst 1.41, control 011510 scored 0.00).
+  While the corpus ran, two G6 slices shipped: timeline ZOOM/PAN (wheel
+  zooms around cursor, middle-drag pans, min span 10s, 8 pure-math
+  tests) and shot-list OUTCOME DOTS (timeline colours as row icons;
+  corrected verdicts ringed + tooltip). Suite 265 green. NEXT: 173553
+  felt-lock rail margin (the only G4 blocker), then teleport/revival
+  oscillation + ghost merge-bar sliver.
