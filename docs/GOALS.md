@@ -244,6 +244,22 @@ Rounds continue with Joe's visual feedback as the gate.
   -> 0.27 (overlaps 25 -> 1); control identical to pre-change (0.24).
   Suite 267 green. Full-corpus confirmation LAUNCHED; aggregate + no-
   session->2.0 verdict lands next session. If clean, G4 is DONE.
+- 2026-08-17 (loop 14): board GREEN -> G5. Built the RECALL AUDIT
+  (tools/audit_shot_recall.py): every audio onset in 10 sessions
+  cross-examined against sidecar track motion — quiet-before +
+  moving-after with no claiming shot = missed-stroke candidate, each one
+  frame-dumped. HONEST RESULT: 163 detected shots vs 721 candidates, one
+  74-min drill session with ZERO detections; eyeballed frames confirmed
+  real strokes (a break; a full follow-through) among the misses. Traced
+  the mechanism on 011928 @44.5s: one fast ball's frame-diff energy
+  hovers at the 0.4 threshold — strike died at run 5/6, then armed 1.2s
+  late. FIXED: per-ball banking decoupled from table motion; a struck
+  ball (>=3 free frames, >=2.5 ball radii banked travel) arms directly;
+  start backdated to the strike; settle now also requires tracked balls
+  STILL (Joe's spec verbatim). Verified: all 4 unclaimed onsets in the
+  traced window now detect (one a MAKE w/ pot); 3 new tests; suite
+  green; app restarted. NEXT: re-backfill sidecars with the new
+  detector + re-run the audit for the G5 verdict (watch precision too).
 - 2026-08-17 (post-loop-13): confirmation corpus landed — **G4 DONE**.
   Aggregate 0.50/1k (target <0.75), worst session 1.41 (target <2.0),
   0 failed. Journey: 1.05 -> 0.59 (rest-frozen identity) -> 0.50 (hand
