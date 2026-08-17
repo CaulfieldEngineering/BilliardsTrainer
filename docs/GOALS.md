@@ -260,6 +260,21 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 17): board GREEN. SIDECAR V2 shipped (48de297): each
+  state records hand-adjacent ball ids + bed fraction under hands; v1
+  reads as unknown-not-no; live recorder + backfill both write it; app
+  restarted so new sessions carry hand context. Re-backfilled the 3
+  audit sessions and re-ran the audit with the exact question ("was the
+  mover hand-adjacent"). VERDICT NUMBERS: candidates 34 -> 25 (hand
+  evidence, not heuristics); unheard 20 -> 1 clean + 19 HAND-INVOLVED
+  (gathering that slipped the carried gate — a named precision leak,
+  not mystery silence). Eyeballed 011510's six hands-free candidates:
+  they come in PAIRS 0.3s apart (strike clack + object-ball impact) =
+  ~3 real missed strokes; 72.2s frame shows a clean follow-through the
+  detector missed outright. G5 STANDING: ~90-94% recall, ~91% precision
+  floor, both defect classes now named and countable. NEXT: trace WHY
+  the 011510 @72s class misses (cooldown? require_cue?) and plug the
+  carried-gate leak behind the 19 silent gathering-shots.
 - 2026-08-18 (loop 16): board GREEN. AUDIT CLASSIFIER v2 (7982191):
   pre-shot-sound window (feathering before a detected shot is not a
   miss), claim window covering the 2s backdate cap, launch test (>=1.2
