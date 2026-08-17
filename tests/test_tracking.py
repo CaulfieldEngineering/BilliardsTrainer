@@ -198,3 +198,66 @@ def test_coasting_track_bounces_off_cushion_bounds():
     t = out[0]
     assert t.x <= 780.0 - t.radius + 1e-6  # never rendered inside the cushion
     assert t.vx < 0                        # rebounded off the right cushion
+
+
+# --------------------------------------------------------------------------- #
+# Rest-frozen identity: "a ball at rest cannot become a different ball" made
+# airtight. The corpus flagged resting balls flipping number (#5 -> #9) in the
+# one-frame windows where a glare-shifted detection reset the settled bit, and
+# rack-time churn where the wobbly FIRST read was committed then corrected.
+# --------------------------------------------------------------------------- #
+
+def ndet(x, y, num, cls=BallClass.SOLID, r=10):
+    return Detection(x=x, y=y, radius=r, cls=cls, number=num)
+
+
+def test_resting_ball_identity_survives_glare_streak_and_blip():
+    """A long challenger streak (model misreads 5 as 9 under glare) plus a
+    single far-shifted detection — the exact combo that used to flip a
+    RESTING ball's identity — must change nothing."""
+    tr = BallTracker(min_hits=3)
+    short = 400
+    out = None
+    for _ in range(20):
+        out = tr.update([ndet(100, 100, 5)], short)
+    assert out[0].number == 5
+    for i in range(30):
+        x = 114 if i == 10 else 100      # one glare-shifted detection
+        out = tr.update([ndet(x, 100, 9, cls=BallClass.STRIPE)], short)
+        assert out[0].number == 5, "resting ball flipped identity"
+        assert out[0].cls == BallClass.SOLID
+
+
+def test_struck_ball_revotes_at_its_new_spot():
+    """The freeze defers the re-vote to real motion — so once the ball is
+    genuinely struck and re-read at its new location, the new majority must
+    actually win (stale rest-time votes are dropped at the rest->motion
+    edge, or a minute of old history would outvote the new spot forever)."""
+    tr = BallTracker(min_hits=3)
+    short = 400
+    for _ in range(20):
+        tr.update([ndet(100, 100, 5)], short)
+    x, out = 100.0, None
+    for _ in range(6):                    # struck: streams away
+        x += 20
+        out = tr.update([ndet(x, 100, 9, cls=BallClass.STRIPE)], short)
+    for _ in range(15):                   # settles at the new spot, reads 9
+        out = tr.update([ndet(x, 100, 9, cls=BallClass.STRIPE)], short)
+    assert out[0].number == 9, "post-move majority must win the re-vote"
+
+
+def test_first_identity_waits_for_three_agreeing_reads():
+    """Rack-time churn fix: the first wobbly read must NOT be committed and
+    then 'corrected' at rest (that correction is an impossible id_flicker to
+    the physics scorer). The ball publishes unknown until 3 reads agree."""
+    tr = BallTracker(min_hits=3)
+    short = 400
+    tr.update([ndet(100, 100, 5)], short)          # one wobbly 5-read
+    published = []
+    out = None
+    for _ in range(10):
+        out = tr.update([ndet(100, 100, 9, cls=BallClass.STRIPE)], short)
+        if out:
+            published.append(out[0].number)
+    assert out[0].number == 9
+    assert 5 not in published, f"wobbly first read was published: {published}"

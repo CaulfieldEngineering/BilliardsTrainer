@@ -31,6 +31,8 @@ class _Internal:
     bgr: tuple = (200, 200, 200)
     still_count: int = 0       # consecutive ~stationary frames
     settled: bool = False      # confirmed AND has been still a while (a resting ball)
+    move_streak: int = 0       # consecutive matched frames with real PUBLISHED motion
+    shown_number: int = -1     # the number last actually PUBLISHED for this track
     committed_number: int = -1  # hysteresis: the held identity (resists flicker)
     committed_cls: BallClass = BallClass.UNKNOWN  # sticky class for unnumbered balls
     cls_hist: deque = field(default_factory=lambda: deque(maxlen=15))
@@ -42,27 +44,48 @@ class _Internal:
         self.y += self.vy
         self.age += 1
 
+    def moving(self) -> bool:
+        """Demonstrably in motion RIGHT NOW — the only state in which the
+        physics scorer does not treat an identity change as impossible.
+
+        Judged from the PUBLISHED per-frame step (move_streak, kept by
+        _apply_match), because that is exactly what the scorer measures. A
+        settled-bit reset, a one-frame glare excursion, a post-revival
+        smoothing glide, a creeping sub-threshold drift: all of those stay
+        below the streak bar, so identity stays frozen through every window
+        that used to leak "changed #5 -> #9 while at rest" onto the corpus.
+        Three consecutive real steps mean the ball was actually struck."""
+        return self.move_streak >= 3
+
     @property
     def cls(self) -> BallClass:
         # Identity follows the (stickier) number vote so a few bad frames during a
         # shot — motion blur misreading the cue — don't flip its class. Falls back
-        # to the class-history vote until a number is established.
+        # to the class-history vote until a number is established. The number-
+        # derived class is REMEMBERED (committed_cls) so that losing the number
+        # to arbitration for a few contested frames does not flip the published
+        # class back to a stale colour vote ("eight -> solid at rest").
         n = self.number
-        if n == 0:
-            return BallClass.CUE
-        if n == 8:
-            return BallClass.EIGHT
-        if 1 <= n <= 7:
-            return BallClass.SOLID
-        if 9 <= n <= 15:
-            return BallClass.STRIPE
+        if n >= 0:
+            if n == 0:
+                self.committed_cls = BallClass.CUE
+            elif n == 8:
+                self.committed_cls = BallClass.EIGHT
+            elif n <= 7:
+                self.committed_cls = BallClass.SOLID
+            else:
+                self.committed_cls = BallClass.STRIPE
+            return self.committed_cls
         if not self.cls_hist:
             return self.committed_cls
         vote = Counter(self.cls_hist).most_common(1)[0][0]
         # Class is sticky too: a near-50/50 solid<->unknown vote must not strobe
         # the rendered ball. Adopt a non-UNKNOWN majority; keep it until another
-        # non-UNKNOWN majority replaces it.
-        if vote != BallClass.UNKNOWN:
+        # non-UNKNOWN majority replaces it — and NEVER while the ball is at
+        # rest (a resting ball cannot change class any more than number; the
+        # corpus flagged "solid -> cue at rest" from exactly this vote drift).
+        if vote != BallClass.UNKNOWN and (
+                self.committed_cls == BallClass.UNKNOWN or self.moving()):
             self.committed_cls = vote
         return self.committed_cls
 
@@ -81,14 +104,25 @@ class _Internal:
             return
         cnt = Counter(votes)
         top, topn = cnt.most_common(1)[0]
-        if self.committed_number < 0 or top == self.committed_number:
-            self.committed_number = top
+        if self.committed_number < 0:
+            # FIRST commit: wait for a formed majority (3 agreeing reads).
+            # The old spawn-read instant commit was the churn the corpus
+            # flagged at rack time: commit the first wobbly read, then "flip
+            # at rest" to the real one five votes later. Invisible in the UI
+            # — a track publishes at min_hits=5, by which point a consistent
+            # read has 3 votes. (-1 -> n transitions are never impossible.)
+            if topn >= 3:
+                self.committed_number = top
+        elif top == self.committed_number:
+            pass
         elif topn >= cnt.get(self.committed_number, 0) + 5:
             # A ball at rest cannot become a different ball — physics, not
-            # preference. While settled, identity is FROZEN: challenger votes
-            # (glare, a neighbour's edge in the crop) accumulate but cannot
-            # flip it. The re-vote happens when the ball actually moves.
-            if not self.settled:
+            # preference. Unless the ball is in demonstrable motion, identity
+            # is FROZEN: challenger votes (glare, a neighbour's edge in the
+            # crop) accumulate but cannot flip it. The re-vote rides the
+            # motion itself — stale votes are dropped when a motion episode
+            # starts, so the post-strike reads decide it.
+            if self.moving():
                 self.committed_number = top   # challenger clearly won — switch
 
 
@@ -129,6 +163,7 @@ class BallTracker:
         self.lock_dist_frac = lock_dist_frac
         self.occluded_budget = occluded_budget
         self._short_side = 400.0
+        self._ball_r = 0.0
         self._tracks: list[_Internal] = []
         self._next_id = 1
 
@@ -143,6 +178,11 @@ class BallTracker:
                pocket_r: float = 0.0,
                ball_r: float = 0.0) -> list[Track]:
         self._short_side = max(1.0, short_side)
+        # Table-wide expected ball radius: the FLOOR for the motion-streak
+        # bar. A shrunken ghost's own radius would put its bar below the
+        # scorer's rest threshold, silently re-opening the at-rest identity
+        # window for exactly the degenerate tracks most prone to misreads.
+        self._ball_r = float(ball_r)
         # Velocity-aware gate: a struck ball can cross more than the static gate
         # in one frame; letting the gate grow with track speed keeps the SAME
         # track attached through the fast phase instead of coasting a stale one.
@@ -263,6 +303,13 @@ class BallTracker:
                     t.vx = t.vy = 0.0
                     t.settled = False
                     t.still_count = 0
+                    # The identity rides the snap (revival exists for "the
+                    # same ball reappearing"), but trim the history so votes
+                    # read at the OLD spot cannot dominate a later re-vote.
+                    for hist in (t.num_hist, t.cls_hist):
+                        recent = list(hist)[-3:]
+                        hist.clear()
+                        hist.extend(recent)
                 self._apply_match(t, detections[di])
 
         # Unmatched tracks -> coast / age out
@@ -324,10 +371,17 @@ class BallTracker:
         else:
             def _at_pocket(t):
                 return False
+        # The long occlusion budget exists so an IDENTIFIED resting ball
+        # survives a hand/cue over it. A vanished track that never earned an
+        # identity is a glare/shadow blob, not a ball — since deferred
+        # commits stopped handing those instant numbers (which the stale-
+        # ghost cleanup used to reap them by), deny them the long budget or
+        # they linger for a minute as unknown phantoms.
         self._tracks = [
             t for t in self._tracks
             if t.misses <= (self.occluded_budget
-                            if t.settled and not _at_pocket(t)
+                            if t.settled and t.committed_number >= 0
+                            and not _at_pocket(t)
                             else self.max_misses)]
         # A track that came to rest PAST the cushion line inside a pocket zone
         # is a ball lying in the basket — pocketed, done. Without this the
@@ -357,8 +411,12 @@ class BallTracker:
         (num_hist), measured-colour proximity (this table's references), and
         a stickiness bonus for its currently committed number (identity must
         not churn). A greedy best-score-first pass assigns each number at
-        most once; a SETTLED track's committed number is a hard constraint
-        (physics: a resting ball cannot become a different ball). Tracks left
+        most once; any track NOT in demonstrable motion keeps its committed
+        number as a hard constraint (physics: a resting ball cannot become a
+        different ball — and motion is judged from the PUBLISHED step streak,
+        the same quantity the physics scorer measures, so neither a one-frame
+        glare blip nor a sub-threshold smoothing glide can open the
+        reassignment window a settled-bit reset used to). Tracks left
         without a plausible free identity show unknown rather than a guess.
 
         Ghost cleanup rides along as before: a stale coasting claimant of a
@@ -391,6 +449,13 @@ class BallTracker:
         # settled commitment is hard (inf).
         STICKY = 4.0
         COLOUR_MAX = 6.0
+        # A ball not in demonstrable motion cannot become a different ball,
+        # so its commitment is a hard constraint below; and a track with NO
+        # number yet needs a formed vote majority (3 reads) before greedy
+        # may name it — one wobbly read plus a colour match was exactly the
+        # rack-time churn the corpus flagged (commit #5 at rack, flip "at
+        # rest" to #9 five votes later).
+        rest = [not t.moving() for t in tracks]
         cands: list[tuple[float, int, int]] = []   # (score, track_idx, number)
         for i, t in enumerate(tracks):
             votes = Counter(n for n in t.num_hist if n is not None and n >= 0)
@@ -399,6 +464,8 @@ class BallTracker:
             if t.committed_number >= 0:
                 nums.add(t.committed_number)
             for n in nums:
+                if t.committed_number < 0 and votes.get(n, 0) < 3:
+                    continue
                 s = float(votes.get(n, 0))
                 if n == colour_num:
                     s += COLOUR_MAX
@@ -406,15 +473,28 @@ class BallTracker:
                     s += STICKY
                 cands.append((s, i, n))
 
-        # --- assignment: settled commitments first, then best-score greedy #
+        # --- assignment: at-rest commitments first, then best-score greedy #
         taken: set[int] = set()
         assigned: dict[int, int] = {}
+        no_rename: set[int] = set()
         for i, t in enumerate(tracks):
-            if t.settled and t.committed_number >= 0                     and t.committed_number not in taken:
-                assigned[i] = t.committed_number
-                taken.add(t.committed_number)
+            if rest[i] and t.committed_number >= 0:
+                if t.committed_number not in taken:
+                    assigned[i] = t.committed_number
+                    taken.add(t.committed_number)
+                elif t.shown_number >= 0:
+                    # Two resting tracks contest one number (a respawn next
+                    # to its own lingering ghost, or a dark-trio double
+                    # read). A loser that already PUBLISHED the number must
+                    # show UNKNOWN, not be greedily renamed — renaming a
+                    # resting published ball is exactly the impossible
+                    # "#5 -> #9 while at rest" the corpus flags. A loser
+                    # that never published stays fair game: naming it by
+                    # measured colour is the "two sevens" fix, and a
+                    # -1 -> n transition is never impossible.
+                    no_rename.add(i)
         for s, i, n in sorted(cands, key=lambda c: -c[0]):
-            if i in assigned or n in taken or s < 2.0:
+            if i in assigned or i in no_rename or n in taken or s < 2.0:
                 continue
             assigned[i] = n
             taken.add(n)
@@ -457,6 +537,11 @@ class BallTracker:
         return cand if 1 <= cand <= 15 and cand not in taken else -1
 
     def _apply_match(self, t: _Internal, d: Detection) -> None:
+        # Anchor for the published per-frame step: the last position handed
+        # out, NOT the post-predict() one — prediction already carries the
+        # velocity, so anchoring after it would hide steady rolling motion
+        # (a perfectly-tracked ball would look stationary to the streak).
+        prev_pub = t.pos_hist[-1] if t.pos_hist else (t.x, t.y)
         meas_vx = d.x - t.x
         meas_vy = d.y - t.y
         spd = (meas_vx * meas_vx + meas_vy * meas_vy) ** 0.5
@@ -505,8 +590,27 @@ class BallTracker:
             t.bgr = d.bgr
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
-        t._commit_number()
         t.pos_hist.append((t.x, t.y))
+        # Motion-episode bookkeeping from the PUBLISHED step — the quantity
+        # the physics scorer measures. The bar sits ABOVE the scorer's rest
+        # threshold (0.12 diam), so identity can only ever change on frames
+        # the scorer itself must call motion. One glare blip yields at most
+        # two big published steps (the excursion and the ease-back) — never
+        # three — so it cannot open the freeze. At the third real step the
+        # ball was genuinely struck: drop the stale rest-time vote pile so
+        # the RE-VOTE the freeze defers is decided by what the model reads
+        # from here on, not outvoted by a minute of history at the old spot.
+        pub_step = math.hypot(t.x - prev_pub[0], t.y - prev_pub[1])
+        if pub_step > 0.30 * max(6.0, t.radius, self._ball_r):
+            t.move_streak += 1
+            if t.move_streak == 3:
+                for hist in (t.num_hist, t.cls_hist):
+                    recent = list(hist)[-3:]
+                    hist.clear()
+                    hist.extend(recent)
+        else:
+            t.move_streak = 0
+        t._commit_number()
         t.hits += 1
         t.misses = 0
         if t.hits >= self.min_hits:
@@ -516,7 +620,9 @@ class BallTracker:
         t = _Internal(id=self._next_id, x=d.x, y=d.y, radius=d.radius, bgr=d.bgr)
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
-        t.committed_number = d.number
+        # NO instant identity commit: the first read is the least reliable one
+        # (rack-time glare, a half-occluded crop). _commit_number names the
+        # ball once 3 reads agree — before the track ever publishes.
         t.pos_hist.append((d.x, d.y))
         t.hits = 1
         self._next_id += 1
@@ -541,6 +647,7 @@ class BallTracker:
             cls, num = t.cls, t.number
             if cls == BallClass.CUE and t.id != cue_id:
                 cls, num = BallClass.UNKNOWN, -1
+            t.shown_number = num
             tr = Track(
                 id=t.id, x=t.x, y=t.y, radius=t.radius, vx=t.vx, vy=t.vy,
                 cls=cls, number=num, bgr=t.bgr, age=t.age, hits=t.hits,

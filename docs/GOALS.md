@@ -197,3 +197,23 @@ Rounds continue with Joe's visual feedback as the gate.
   sessions 015737 at 3.90 and 210621 at 2.07 lead). Honest gap named;
   next lever is the lock-margin defect on 173553 + marker-session
   handling. New gates now compare against champion_v4_c5.
+- 2026-08-17 (loop 11): board GREEN -> G4. REST-FROZEN IDENTITY: a ball
+  not in demonstrable motion can never change number or class. Motion is
+  judged from the published step streak (3 consecutive steps above a bar
+  that sits above the scorer's rest threshold, floored at the table ball
+  radius), so glare blips, settled-bit resets, post-revival smoothing
+  glides and creeping drifts all stay frozen. First commit now waits for
+  3 agreeing reads (no more rack-time commit-then-correct); stale votes
+  drop at motion start so the deferred re-vote is decided by post-strike
+  reads; a contested resting loser that already PUBLISHED its number
+  strips to unknown instead of being renamed (never-published losers keep
+  the colour-rename "two sevens" fix); never-numbered vanished tracks no
+  longer ride the long occlusion budget. Took 3 measure-fix rounds (round
+  1 regressed the control — median-based rest missed the glide window;
+  honest numbers kept it unshipped). Final: 015737 3.90 -> 1.48, 210621
+  2.07 -> 1.09, control 011510 0.32 -> 0.24 impossible/1k; id_flicker 12
+  -> 0 across all three; out-of-game misreads 249/592/2562 -> 0. Suite
+  green (255). Residuals named: teleports (revival oscillation), ghost
+  merge-bar vs scorer-bar sliver (merge uses 1.6*exp_r, scorer uses
+  published radii), a few class flickers. NEXT: full-corpus re-baseline
+  to re-measure the G4 aggregate, then 173553 lock margin + teleports.
