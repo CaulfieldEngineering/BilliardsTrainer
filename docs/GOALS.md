@@ -260,6 +260,20 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 16): board GREEN. AUDIT CLASSIFIER v2 (7982191):
+  pre-shot-sound window (feathering before a detected shot is not a
+  miss), claim window covering the 2s backdate cap, launch test (>=1.2
+  radii per 0.3s sample) + convergence veto (>=3 movers ending >=25%
+  closer = racking). Candidates 234 -> 34, unheard 36 -> 20 across the
+  three re-backfilled sessions. Eyeballed survivors: fast hand-SWEEPS
+  still pass the launch test (and the hand filter leaves too few
+  tracked movers for the convergence veto) — sidecar-only
+  classification is at its ceiling. HONEST G5 STANDING: 223 detected
+  shots, <=34 candidate misses (~87% recall floor; several survivors
+  visibly hand-work), ~91% precision floor. NEXT: sidecar v2 records
+  per-state carried ids / foreign fraction (tiny, live-path), re-backfill,
+  and the audit asks the exact question "was the mover hand-adjacent" —
+  then the G5 verdict.
 - 2026-08-18 (loop 15): board GREEN. G5 MEASUREMENT on re-backfilled
   sidecars (new detector): 210621 0 -> 95 shots (the zero-detection
   drill session now detects), 011928 76 -> 115, 011510 10 -> 13;
