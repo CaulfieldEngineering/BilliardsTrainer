@@ -173,3 +173,12 @@ Rounds continue with Joe's visual feedback as the gate.
   instrument — the 9-ball (47%, yellow band photographs orange) is the
   case c5 exists to fix. Serialization honoured: training is this
   session's one heavy job; the gate runs next cycle.
+- 2026-08-16 (loop 8b): **FIRST PROMOTION — c5 IS CHAMPION.** Held-out
+  gate: impossible 1.22->1.06, out-of-game 75.7->65.1 (-14%), coverage
+  within gate — the first challenger of five to IMPROVE held-out metrics.
+  Per-class sanity (train-set, optimistic): 9-ball 47->87%, 5-ball
+  82->98%, dark cluster held 95.1%, no class collapsed. Promoted with
+  rollback archive pool_ballid_r2.prev.onnx; watchdog/cron invariants
+  updated to the new champion size (12,277,106). G3 progress: held-out
+  oog now 65.1/1k vs the 34/1k target — the labelling+retrain engine
+  demonstrably works; next challengers ride the same rails.

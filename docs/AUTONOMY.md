@@ -22,8 +22,10 @@ Two scheduled jobs live in the Claude session attached to this repo:
 - `%LOCALAPPDATA%/BilliardsTrainer/models/pool_ballid_r2.onnx.bak`
   exists only during a gate run. Present with no live gate ⇒ a swap died
   mid-run; watchdog restores the champion from the .bak (copy back,
-  delete .bak) and logs the incident. The champion's byte size is
-  12,277,094 — verify after restore.
+  delete .bak) and logs the incident. CURRENT champion: **c5**, byte size
+  12,277,106 (promoted 2026-08-16 — the first challenger to win).
+  `pool_ballid_r2.prev.onnx` is the intentional rollback archive of the
+  previous champion (12,277,094) — never auto-"restore" it.
 - Never run two of: corpus scoring, challenger gate, app restart.
 - Never restart the app while Joe is recording (check for a growing
   session-*.mp4 in the recording dir before any restart).
