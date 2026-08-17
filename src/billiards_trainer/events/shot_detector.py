@@ -94,9 +94,12 @@ class ShotDetector:
         self._quiet_run = 0
         self._shot_frames = 0
         self._arm_frames = 0
+        self._still_run = 0
         self._free_frames: dict[int, int] = {}
         self._free_travel: dict[int, float] = {}
         self._pending_free: dict[int, tuple] = {}
+        self._pending_free_t0: dict[int, float] = {}
+        self._pending_quiet: dict[int, int] = {}
         self._last_carried: dict[int, int] = {}
         self._frame_idx = 0
         self._start_t = 0.0
@@ -153,36 +156,58 @@ class ShotDetector:
         if self._state == _State.SETTLED and quiet:
             for tr in tracks:
                 self._rest[tr.id] = (tr.x, tr.y)
-        # Pre-shot motion bank: while strike_frames counts up, the struck ball
-        # is already moving — without banking those steps a fast pot loses its
-        # first (and sometimes only) tracked frames of free motion and gets
-        # denied pocket credit. Seeded into the shot at _begin_shot.
+        # Pre-shot motion bank: a struck ball is already moving while the arm
+        # gate deliberates — bank its free steps so travel/pocket credit and
+        # the shot START reach back to the strike itself. Banking is PER-BALL
+        # and independent of the whole-table motion signal: frame-difference
+        # energy of one fast ball on a big table hovers around the activity
+        # threshold, and a single sub-threshold frame used to wipe the bank
+        # (measured on session-011928: a clean stroke died at run 5/6 and the
+        # detector armed 1.2s late on a secondary surge — the G5 recall audit
+        # flagged 721 candidate misses across 10 sessions on exactly this).
         if self._state == _State.SETTLED:
-            if active:
-                carried_pre = self._evidence.get("carried_ids") or set()
-                for tr in tracks:
-                    if tr.id in carried_pre:
-                        continue
-                    # A ball carried RECENTLY doesn't bank: a just-placed ball
-                    # wobbles free for a few frames after release, and banking
-                    # that wobble resurrected a false shot the audio harness
-                    # had already killed once. A struck object ball was never
-                    # carried; the cue ball's stick contact happens at the
-                    # strike itself, inside the shot, not before it.
-                    if self._frame_idx - self._last_carried.get(tr.id, -10**9) < 15:
-                        continue
-                    prev = self._prev.get(tr.id)
-                    step = math.hypot(tr.x - prev.x, tr.y - prev.y) if prev else 0.0
-                    if step > 1.0:
-                        f, d = self._pending_free.get(tr.id, (0, 0.0))
-                        self._pending_free[tr.id] = (f + 1, d + step)
-            else:
-                self._pending_free = {}
+            carried_pre = self._evidence.get("carried_ids") or set()
+            for tr in tracks:
+                # A ball carried NOW or recently doesn't bank: a just-placed
+                # ball wobbles free for a few frames after release, and
+                # banking that wobble resurrected a false shot the audio
+                # harness had already killed once. A struck object ball was
+                # never carried; the cue ball's stick contact happens at the
+                # strike itself, inside the shot, not before it.
+                if (tr.id in carried_pre or self._frame_idx
+                        - self._last_carried.get(tr.id, -10**9) < 15):
+                    self._pending_free.pop(tr.id, None)
+                    self._pending_free_t0.pop(tr.id, None)
+                    self._pending_quiet.pop(tr.id, None)
+                    continue
+                prev = self._prev.get(tr.id)
+                step = math.hypot(tr.x - prev.x, tr.y - prev.y) if prev else 0.0
+                if step > 1.0:
+                    f, d = self._pending_free.get(tr.id, (0, 0.0))
+                    if f == 0:
+                        self._pending_free_t0[tr.id] = t
+                    self._pending_free[tr.id] = (f + 1, d + step)
+                    self._pending_quiet[tr.id] = 0
+                elif tr.id in self._pending_free:
+                    q = self._pending_quiet.get(tr.id, 0) + 1
+                    self._pending_quiet[tr.id] = q
+                    if q >= 4:      # flurry ended without arming: not a shot
+                        self._pending_free.pop(tr.id, None)
+                        self._pending_free_t0.pop(tr.id, None)
+                        self._pending_quiet.pop(tr.id, None)
 
         event: ShotEvent | None = None
         if self._state == _State.SETTLED:
+            # A ball demonstrably STRUCK is the primary arm signal: >=3 banked
+            # free frames and >=2.5 ball radii of integrated free travel — a
+            # placed ball's release wobble reaches neither. The whole-table
+            # motion run stays as a fallback for breaks and multi-ball chaos
+            # where the tracker briefly loses the fast balls.
+            ball_r = 0.0225 * table.short_side
+            struck = any(f >= 3 and d >= 2.5 * ball_r
+                         for f, d in self._pending_free.values())
             if (not warming and not cooling and (not det.require_cue or cue_present)
-                    and self._active_run >= det.strike_frames):
+                    and (struck or self._active_run >= det.strike_frames)):
                 self._begin_shot(t)
         else:  # MOVING
             self._shot_frames += 1
@@ -197,6 +222,7 @@ class ShotDetector:
             # ways: the cue stick hovers over the felt through every real
             # shot, and a placing hand is too small to move the fraction.)
             carried = self._evidence.get("carried_ids") or set()
+            max_step = 0.0
             for tr in tracks:
                 if tr.id in carried:
                     continue
@@ -205,6 +231,7 @@ class ShotDetector:
                 # settled lock, while position deltas are direct truth.
                 prev = self._prev.get(tr.id)
                 step = math.hypot(tr.x - prev.x, tr.y - prev.y) if prev else 0.0
+                max_step = max(max_step, step)
                 if step > 1.0:
                     self._free_frames[tr.id] = self._free_frames.get(tr.id, 0) + 1
                     # Travel is displacement INTEGRATED over free frames — not
@@ -219,7 +246,15 @@ class ShotDetector:
                     if ft > self._max_travel:
                         self._max_travel = ft
             self._accumulate(by_id, table)
-            if self._quiet_run >= self.settle_frames and self._shot_frames >= self.min_shot_frames:
+            # Joe's spec, verbatim: the shot continues until all balls stop
+            # rolling or are pocketed. "Quiet" frame-diff energy alone is not
+            # that — a lone slow-rolling ball barely registers as motion — so
+            # settling additionally requires the TRACKED balls to be still
+            # for the same run of frames.
+            self._still_run = self._still_run + 1 if max_step <= 1.0 else 0
+            if (self._quiet_run >= self.settle_frames
+                    and self._still_run >= self.settle_frames
+                    and self._shot_frames >= self.min_shot_frames):
                 self._finalize_pockets(by_id, table, t)
                 event = self._resolve(t)
 
@@ -254,12 +289,21 @@ class ShotDetector:
         self._quiet_run = 0
         self._shot_frames = 0
         self._arm_frames = 0
+        self._still_run = 0
         self._free_frames = {tid: f for tid, (f, _d) in self._pending_free.items()}
         self._free_travel = {tid: d for tid, (_f, d) in self._pending_free.items()}
         self._max_travel = max(self._free_travel.values(), default=0.0)
+        # The shot STARTS at the strike, not at the arm decision: backdate to
+        # the first banked free step (capped — a stale bank must not drag the
+        # start into the previous rack). This is what puts the strike inside
+        # the clip and the audio onset inside the claim window.
+        t0 = min(self._pending_free_t0.values(), default=t)
+        self._start_t = max(t0, t - 2.0)
         self._pending_free = {}
-        self._start_t = t
-        log.debug("Shot started @ %.2f (motion %.1f)", t, self._motion)
+        self._pending_free_t0 = {}
+        self._pending_quiet = {}
+        log.debug("Shot started @ %.2f (backdated from %.2f, motion %.1f)",
+                  self._start_t, t, self._motion)
 
     def _accumulate(self, by_id: dict, table: TableModel) -> None:
         """Track, per ball seen during the shot, its class and closest-ever

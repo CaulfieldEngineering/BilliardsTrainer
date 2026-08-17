@@ -161,3 +161,54 @@ class TestBankRecencyGate:
         for _ in range(10):
             frames.append(([_mk(1, x, 300.0)], 0.0, set()))
         assert len(_run(det, frames)) == 1
+
+
+class TestBallMotionArming:
+    """G5 recall fix: the whole-table motion signal of ONE fast ball hovers
+    around the activity threshold and a single sub-threshold frame used to
+    kill the arm run (011928 @ 44.5s: died at run 5/6, armed 1.2s late).
+    A demonstrably struck ball — banked free frames + travel — arms the
+    detector directly, and the shot start is backdated to the strike."""
+
+    def test_stroke_arms_on_ball_motion_alone(self):
+        det = _detector()
+        frames = []
+        for _ in range(10):
+            frames.append(([_mk(1, 300.0, 300.0)], 0.0, set()))
+        x = 300.0
+        for _ in range(12):                    # struck ball, motion signal DEAD
+            x += 40.0
+            frames.append(([_mk(1, x, 300.0, vx=40.0)], 0.0, set()))
+        for _ in range(10):
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        events = _run(det, frames)
+        assert len(events) == 1, "struck ball must arm without table motion"
+
+    def test_shot_start_backdated_to_strike(self):
+        det = _detector()
+        frames = []
+        for _ in range(10):
+            frames.append(([_mk(1, 300.0, 300.0)], 0.0, set()))
+        x = 300.0
+        for _ in range(12):
+            x += 40.0
+            frames.append(([_mk(1, x, 300.0, vx=40.0)], 0.0, set()))
+        for _ in range(10):
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        events = _run(det, frames)
+        strike_t = 10 / 30.0                   # first moving frame
+        assert events and abs(events[0].start_t - strike_t) < 3 / 30.0, \
+            f"start {events[0].start_t:.3f} should be ~{strike_t:.3f}"
+
+    def test_release_wobble_does_not_arm(self):
+        det = _detector()
+        frames = []
+        for _ in range(10):
+            frames.append(([_mk(1, 300.0, 300.0)], 0.0, set()))
+        x = 300.0
+        for _ in range(4):                     # small free wobble, no motion
+            x += 3.0
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        for _ in range(12):
+            frames.append(([_mk(1, x, 300.0)], 0.0, set()))
+        assert _run(det, frames) == [], "a release wobble must not arm a shot"
