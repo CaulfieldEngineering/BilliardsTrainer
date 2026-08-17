@@ -189,3 +189,11 @@ Rounds continue with Joe's visual feedback as the gate.
   Smoke-tested on a real session (7.9s clip, 4MB, plays). The G6
   definition-of-done clause "export a favourite shot without touching a
   file manager" is now met.
+- 2026-08-17 (loop 10): board GREEN -> features. Timeline HOVER CARDS
+  shipped (pure hover_text + thin event shell). champion_v4 corpus
+  baseline measured on c5: 1.05 impossible/1k over 22 sessions / 229k
+  ball-frames, 0 failed. G4 verdict: NOT MET yet (target <0.75 aggregate,
+  no session >2.0; three sessions above 2.0 — the marker-dense drill
+  sessions 015737 at 3.90 and 210621 at 2.07 lead). Honest gap named;
+  next lever is the lock-margin defect on 173553 + marker-session
+  handling. New gates now compare against champion_v4_c5.
