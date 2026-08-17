@@ -45,9 +45,11 @@ c5. Roboflow key would add public base data (Joe item).
 **Done when:** a full corpus run shows aggregate impossible < 0.75/1k and
 max per-session < 2.0.
 **Current:** aggregate ✅ MET — 0.59/1k over 22 sessions (was 1.05; rest-
-frozen identity, corpus run `_eval/corpus/restfreeze_c5`). Per-session bar
-❌ blocked by exactly ONE session: 173553 at 2.58 (felt-lock rail margin —
-the fix is table-lock tightening, not tracking). Next worst is 1.41.
+frozen identity, corpus run `_eval/corpus/restfreeze_c5`). Per-session bar:
+173553 (the sole blocker, 2.58) measured 0.27 after the hand filter — the
+"rail margin" theory was wrong, it was Joe's gloved bridge hand on the
+cushion detected as balls. Full-corpus confirmation run pending; if no
+session regresses above 2.0 there, G4 is DONE.
 
 ## G5 — Shot detection: keep 100% audio precision, prove recall
 **Done when:** across ≥5 varied sessions, every vision shot is
@@ -230,3 +232,15 @@ Rounds continue with Joe's visual feedback as the gate.
   corrected verdicts ringed + tooltip). Suite 265 green. NEXT: 173553
   felt-lock rail margin (the only G4 blocker), then teleport/revival
   oscillation + ghost merge-bar sliver.
+- 2026-08-17 (loop 13): board GREEN -> the 173553 blocker. LOOKED at the
+  frames instead of trusting the old theory: the "rail margin" diagnosis
+  was WRONG — the locked quad is fine (nose inset applied, verified
+  against the video). The violations were Joe's GLOVED BRIDGE HAND
+  resting on the cushion for rail shots: knuckles detected as balls, one
+  misread #4, two ghosts. Fix: ingestion drops detections whose centre
+  lies inside a kept foreign (hand-scale) blob — the foreign mask's size
+  floor already excludes lone balls, so an isolated 8-ball is safe, and
+  a hand-covered ball correctly coasts occluded. Measured: 173553 2.58
+  -> 0.27 (overlaps 25 -> 1); control identical to pre-change (0.24).
+  Suite 267 green. Full-corpus confirmation LAUNCHED; aggregate + no-
+  session->2.0 verdict lands next session. If clean, G4 is DONE.
