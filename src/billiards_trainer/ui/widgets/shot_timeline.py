@@ -42,8 +42,7 @@ class ShotTimeline(QWidget):
         self.follow_window_s = 0.0
         self._live_now = 0.0
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip("Shot timeline — click a clip to replay that shot "
-                        "from the start of your pre-shot routine")
+        self.setMouseTracking(True)   # hover cards need move events
         self._duration = 0.0
         self._playhead = -1.0
         self._shots: list[dict] = []
@@ -110,6 +109,37 @@ class ShotTimeline(QWidget):
         return None
 
     # ------------------------------------------------------------------ #
+    def hover_text(self, t: float) -> str | None:
+        """Hover-card text for time ``t`` (pure — the event handler is a
+        thin shell around this so it can be tested without fake QEvents)."""
+        if self._duration <= 0:
+            return None
+        s = self.shot_at(t)
+        if s is None:
+            return "Click to seek — clips replay from your pre-shot routine"
+        no = self._shots.index(s) + 1
+        start = s["start"]
+        mm, ss = int(start) // 60, int(start) % 60
+        dur = max(0.0, s["end"] - start)
+        pot = int(s.get("pocketed", 0))
+        nl = "\n"
+        return (f"Shot {no} — {s['outcome'].upper()}"
+                + (" (corrected)" if s.get("corrected") else "")
+                + f"{nl}{mm}:{ss:02d} · {dur:.1f}s"
+                + (f" · {pot} potted" if pot else "")
+                + f"{nl}Click: replay from routine · "
+                  "Right-click list row: export/fix")
+
+    def mouseMoveEvent(self, ev):  # noqa: N802 - Qt override
+        from PySide6.QtWidgets import QToolTip
+        pos = ev.position().toPoint() if hasattr(ev, "position") else ev.pos()
+        text = self.hover_text(self._t(float(pos.x())))
+        if text:
+            QToolTip.showText(self.mapToGlobal(pos), text, self)
+        else:
+            QToolTip.hideText()
+        super().mouseMoveEvent(ev)
+
     def mousePressEvent(self, ev):  # noqa: N802 - Qt override
         if ev.button() != Qt.LeftButton or self._duration <= 0:
             return

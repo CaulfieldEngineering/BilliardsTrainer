@@ -59,3 +59,22 @@ class TestShotTimeline:
         tl.show()
         tl.repaint()
         tl.close()
+
+
+class TestHoverCards:
+    def test_hover_identifies_the_clip(self, app):
+        tl = _tl(app)
+        tl.add_shot(100.0, 106.0, "make", 1)
+        text = tl.hover_text(101.0)
+        assert "Shot 1" in text and "MAKE" in text and "6.0s" in text
+
+    def test_hover_off_clip_gives_hint(self, app):
+        tl = _tl(app)
+        tl.add_shot(100.0, 106.0, "make", 1)
+        assert "Click to seek" in tl.hover_text(300.0)
+
+    def test_hover_marks_corrections(self, app):
+        tl = _tl(app)
+        tl.add_shot(100.0, 106.0, "make", 1)
+        tl._shots[0]["corrected"] = True
+        assert "(corrected)" in tl.hover_text(101.0)
