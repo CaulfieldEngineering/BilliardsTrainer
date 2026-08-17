@@ -8,7 +8,8 @@ the pre-shot routine. The same data feeds the timeline lane; this is the
 list view of it.
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -22,10 +23,33 @@ from PySide6.QtWidgets import (
 from ..theme import PALETTE
 
 _OUTCOME = {
-    "make": ("●", "#3FB950", "MAKE"),
-    "miss": ("●", "#7D8590", "MISS"),
-    "scratch": ("●", "#E3B341", "SCRATCH"),
+    "make": ("#3FB950", "MAKE"),
+    "miss": ("#7D8590", "MISS"),
+    "scratch": ("#E3B341", "SCRATCH"),
 }
+
+_DOT_CACHE: dict[tuple[str, bool], QIcon] = {}
+
+
+def _outcome_dot(colour: str, corrected: bool) -> QIcon:
+    """Small filled circle in the timeline's outcome colour; a corrected
+    verdict gets a ring so Joe's own calls are distinguishable at a glance."""
+    key = (colour, corrected)
+    if key not in _DOT_CACHE:
+        pm = QPixmap(14, 14)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(colour))
+        p.drawEllipse(QRectF(3, 3, 8, 8))
+        if corrected:
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(QColor(PALETTE.text), 1.2))
+            p.drawEllipse(QRectF(1, 1, 12, 12))
+        p.end()
+        _DOT_CACHE[key] = QIcon(pm)
+    return _DOT_CACHE[key]
 
 
 class ShotListPanel(QWidget):
@@ -89,8 +113,9 @@ class ShotListPanel(QWidget):
         self._shots = list(shots or [])
         self._list.clear()
         for i, s in enumerate(self._shots):
-            dot, colour, name = _OUTCOME.get(s.get("outcome", "miss"),
-                                             ("●", PALETTE.text_dim, "?"))
+            colour, name = _OUTCOME.get(s.get("outcome", "miss"),
+                                        (PALETTE.text_dim, "?"))
+            corrected = bool(s.get("corrected"))
             start = float(s.get("start", 0.0))
             dur = max(0.0, float(s.get("end", start)) - start)
             pot = int(s.get("pocketed", 0))
@@ -98,14 +123,14 @@ class ShotListPanel(QWidget):
             text = f"{i + 1:>3}   {name:<7} {mm}:{ss:02d}   {dur:.1f}s"
             if pot > 1:
                 text += f"   ×{pot}"
-            item = QListWidgetItem(f"{dot}  {text}")
+            item = QListWidgetItem(text)
+            item.setIcon(_outcome_dot(colour, corrected))
             item.setForeground(Qt.GlobalColor.white)
             item.setData(Qt.UserRole, start)
             item.setToolTip(f"Shot {i + 1}: {name.lower()}, {dur:.1f}s"
-                            + (f", {pot} balls potted" if pot else ""))
+                            + (f", {pot} balls potted" if pot else "")
+                            + (" — outcome corrected by you" if corrected else ""))
             self._list.addItem(item)
-            # colour the dot by re-setting rich-ish text is not possible in
-            # QListWidgetItem; the outcome name carries the meaning.
         self._count.setText(f"({len(self._shots)})")
         self._sync_empty()
 

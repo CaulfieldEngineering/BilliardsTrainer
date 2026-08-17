@@ -131,3 +131,24 @@ class TestClipExport:
         # drive the signal path directly (menus need a real event loop)
         pnl.export_requested.emit(2, 75.2, 80.0)
         assert got == [(2, 75.2, 80.0)]
+
+
+class TestOutcomeDots:
+    def test_rows_carry_outcome_coloured_icons(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots(_shots())
+        for i in range(pnl._list.count()):
+            assert not pnl._list.item(i).icon().isNull()
+
+    def test_corrected_shot_is_marked(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        shots = _shots()
+        shots[1]["corrected"] = True
+        pnl.set_shots(shots)
+        assert "corrected" in pnl._list.item(1).toolTip()
+        # corrected icon (ringed) differs from the plain one
+        plain = pnl._list.item(0).icon().pixmap(14, 14).toImage()
+        ringed = pnl._list.item(1).icon().pixmap(14, 14).toImage()
+        assert plain != ringed
