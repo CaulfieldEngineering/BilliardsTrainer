@@ -39,6 +39,7 @@ class ShotListPanel(QWidget):
     shot_selected = Signal(float)
     outcome_corrected = Signal(float, str)   # (shot start s, new outcome)
     fix_labels_requested = Signal(float)     # seek here + enter Training Mode
+    export_requested = Signal(int, float, float)  # (shot no, start s, end s)
 
     def __init__(self, pre_roll_s: float = 5.0, parent=None):
         super().__init__(parent)
@@ -141,6 +142,10 @@ class ShotListPanel(QWidget):
             act.triggered.connect(
                 lambda _c=False, o=oc: self._correct(row, o))
         m.addSeparator()
+        exp = m.addAction("Export this shot as a clip…")
+        exp.triggered.connect(
+            lambda _c=False: self.export_requested.emit(
+                row + 1, start, float(shot.get("end", start))))
         fix = m.addAction("Fix ball labels at this shot…")
         fix.triggered.connect(
             lambda _c=False: self.fix_labels_requested.emit(start))

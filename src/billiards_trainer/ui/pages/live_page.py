@@ -217,6 +217,7 @@ class LivePage(QWidget):
         self._shot_list.shot_selected.connect(self._on_timeline_clicked)
         self._shot_list.outcome_corrected.connect(self._on_outcome_corrected)
         self._shot_list.fix_labels_requested.connect(self._on_fix_labels_at)
+        self._shot_list.export_requested.connect(self._on_export_shot)
         self._rail_stack.addWidget(self._shot_list)          # 2 = playback review
         splitter.addWidget(self._rail_stack)
         splitter.setStretchFactor(0, 3)
@@ -1275,6 +1276,30 @@ class LivePage(QWidget):
                                     float(s.get("end", 0.0)),
                                     str(s.get("outcome", "miss")),
                                     int(s.get("pocketed", 0)))
+
+    def _on_export_shot(self, shot_no: int, start: float, end: float) -> None:
+        """G6: 'export a favourite shot without touching a file manager'.
+        Stream copy — instant, exact source quality — then reveal it."""
+        if not getattr(self, "_media_path", ""):
+            return
+        import subprocess
+
+        from ...vision.analysis_cache import clip_export_cmd
+        cmd, dest = clip_export_cmd(
+            self._media_path, start, end,
+            pre_roll_s=getattr(self._settings.ui, "pre_shot_s", 5.0),
+            shot_no=shot_no)
+        try:
+            creation = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               timeout=60, creationflags=creation)
+            if r.returncode == 0 and dest.exists():
+                subprocess.Popen(["explorer", "/select,", str(dest)],
+                                 creationflags=creation)
+            else:
+                log.warning("clip export failed: %s", (r.stderr or "")[-200:])
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            log.warning("clip export failed: %s", exc)
 
     def _on_fix_labels_at(self, start: float) -> None:
         """Jump to the shot and open Training Mode there: Joe corrects ball

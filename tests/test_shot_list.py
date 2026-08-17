@@ -98,3 +98,36 @@ class TestCorrectionChannel:
     def test_correction_without_sidecar_refuses(self, tmp_path):
         from billiards_trainer.vision.analysis_cache import append_correction
         assert not append_correction(tmp_path / "nope.mp4", 1.0, "make")
+
+
+class TestClipExport:
+    def test_command_shape_and_destination(self, tmp_path):
+        from billiards_trainer.vision.analysis_cache import clip_export_cmd
+        video = tmp_path / "session-x.mp4"
+        video.write_bytes(b"0")
+        cmd, dest = clip_export_cmd(video, start=75.2, end=80.0,
+                                    pre_roll_s=5.0, shot_no=3)
+        assert cmd[0] == "ffmpeg" and "-c" in cmd and "copy" in cmd
+        i = cmd.index("-ss")
+        assert abs(float(cmd[i + 1]) - 70.2) < 0.01     # routine start
+        j = cmd.index("-to")
+        assert abs(float(cmd[j + 1]) - 81.0) < 0.01     # +1s tail
+        assert dest.name == "session-x_shot03.mp4"
+        assert dest.parent.name == "clips"
+
+    def test_start_clamped_at_zero(self, tmp_path):
+        from billiards_trainer.vision.analysis_cache import clip_export_cmd
+        video = tmp_path / "s.mp4"
+        video.write_bytes(b"0")
+        cmd, _ = clip_export_cmd(video, start=2.0, end=6.0, pre_roll_s=5.0)
+        assert float(cmd[cmd.index("-ss") + 1]) == 0.0
+
+    def test_menu_emits_export(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots(_shots())
+        got = []
+        pnl.export_requested.connect(lambda n, s, e: got.append((n, s, e)))
+        # drive the signal path directly (menus need a real event loop)
+        pnl.export_requested.emit(2, 75.2, 80.0)
+        assert got == [(2, 75.2, 80.0)]

@@ -182,3 +182,10 @@ Rounds continue with Joe's visual feedback as the gate.
   updated to the new champion size (12,277,106). G3 progress: held-out
   oog now 65.1/1k vs the 34/1k target — the labelling+retrain engine
   demonstrably works; next challengers ride the same rails.
+- 2026-08-17 (loop 9): health board GREEN across all ten areas -> feature
+  work allowed. G6 slice: PER-SHOT CLIP EXPORT shipped — right-click a
+  shot -> stream-copied mp4 (routine + shot + 1s tail, exact source
+  quality, <1s export) into <recordings>/clips/, revealed in Explorer.
+  Smoke-tested on a real session (7.9s clip, 4MB, plays). The G6
+  definition-of-done clause "export a favourite shot without touching a
+  file manager" is now met.

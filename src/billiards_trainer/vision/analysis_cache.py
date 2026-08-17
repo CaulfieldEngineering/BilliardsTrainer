@@ -168,3 +168,26 @@ class SidecarReader:
 
     def _to_tracks(self, rows) -> list[Track]:
         return [self._to_track(r) for r in rows]
+
+
+def clip_export_cmd(video_path: str | Path, start: float, end: float,
+                    pre_roll_s: float = 5.0, tail_s: float = 1.0,
+                    shot_no: int | None = None) -> tuple[list[str], Path]:
+    """(ffmpeg argv, destination) for exporting one shot as a clip.
+
+    STREAM COPY — no re-encode, so an export takes well under a second and
+    keeps the recording's exact quality. -ss before -i snaps to the
+    previous keyframe, which errs on including a little MORE lead-in: for
+    a pre-shot-routine clip that is the right direction to err.
+    Destination: <recordings>/clips/<session>_shotNN.mp4.
+    """
+    video_path = Path(video_path)
+    t0 = max(0.0, float(start) - pre_roll_s)
+    t1 = float(end) + tail_s
+    out_dir = video_path.parent / "clips"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tag = f"_shot{shot_no:02d}" if shot_no is not None else f"_{t0:.0f}s"
+    dest = out_dir / f"{video_path.stem}{tag}.mp4"
+    cmd = ["ffmpeg", "-v", "error", "-ss", f"{t0:.2f}", "-to", f"{t1:.2f}",
+           "-i", str(video_path), "-c", "copy", "-y", str(dest)]
+    return cmd, dest
