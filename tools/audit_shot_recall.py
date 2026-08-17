@@ -35,12 +35,20 @@ from score_shots import audio_onsets  # noqa: E402
 from billiards_trainer.config import Settings  # noqa: E402
 from billiards_trainer.vision.analysis_cache import SidecarReader  # noqa: E402
 
-#: An onset this close to a shot START is that shot's strike. The window is
-#: asymmetric: the detector stamps start at the strike frame, but audio can
-#: lead vision by a beat (sound reaches the mic instantly; motion needs a
-#: detection tick at ~10 Hz).
-_CLAIM_BEFORE_S = 1.0
+#: An onset this close to a shot START is that shot's strike. Asymmetric,
+#: and wide on the early side: the detector BACKDATES starts to the first
+#: banked step but caps the backdating at 2s, so a true strike can sit up
+#: to ~2.5s before the stamped start (measured: the 210621 break's strike
+#: onsets landed just past the old 1.0s window and scored "unheard").
+_CLAIM_BEFORE_S = 2.5
 _CLAIM_AFTER_S = 1.5
+
+#: Unclaimed onsets in this window BEFORE a detected shot are pre-shot
+#: sounds — feathering, address taps, the cue butt on the floor. Eyeballed
+#: on 210621 @ 31.9-32.9s: a 4-onset cluster was Joe addressing the break;
+#: the old classifier called every tap a missed shot because the REAL
+#: break followed inside its 2s motion look-ahead.
+_PRE_SHOT_S = 6.0
 
 
 def _positions(reader: SidecarReader, t: float) -> dict[int, tuple[float, float, float]]:
@@ -67,12 +75,14 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
     onsets = audio_onsets(video, 0.0, t_end + 2.0)
     shots = [(float(s["start"]), float(s["end"])) for s in reader.shots]
 
-    claimed_strike, claimed_body, unclaimed = [], [], []
+    claimed_strike, claimed_body, pre_shot, unclaimed = [], [], [], []
     for o in onsets:
         if any(s - _CLAIM_BEFORE_S <= o <= s + _CLAIM_AFTER_S for s, _e in shots):
             claimed_strike.append(o)
         elif any(s <= o <= e + 1.0 for s, e in shots):
             claimed_body.append(o)      # rail thump / pocket drop of a shot
+        elif any(0.0 < s - o <= _PRE_SHOT_S for s, _e in shots):
+            pre_shot.append(o)          # feathering / address taps before it
         else:
             unclaimed.append(o)
 
@@ -81,7 +91,11 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
                      if not any(s - _CLAIM_BEFORE_S <= o <= s + _CLAIM_AFTER_S
                                 for o in onsets)]
 
-    # Recall half: classify unclaimed onsets by what the balls did.
+    # Recall half: classify unclaimed onsets by what the balls did. A real
+    # stroke ROLLS — sustained displacement across consecutive samples; a
+    # hand placement (or the track revival after the hand filter releases a
+    # ball) SNAPS — one isolated jump. Only quiet-before + rolling-after
+    # counts as a missed stroke.
     missed = []
     for o in unclaimed:
         pre_a = _positions(reader, max(0.0, o - 1.6))
@@ -89,15 +103,46 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
         d_pre, r_pre = _max_disp(pre_a, pre_b)
         if d_pre > 0.8 * r_pre:
             continue                    # already in motion — not a fresh stroke
-        base = _positions(reader, max(0.0, o - 0.2))
-        moved = False
-        for dt in (0.7, 1.3, 2.0):
-            post = _positions(reader, min(t_end, o + dt))
-            d_post, r_post = _max_disp(base, post)
-            if d_post > 1.5 * r_post:
-                moved = True
-                break
-        if moved:
+        ts = [o - 0.2 + 0.3 * k for k in range(9)]          # o-0.2 .. o+2.5
+        snaps = [_positions(reader, min(t_end, max(0.0, tt))) for tt in ts]
+        ids: set = set().union(*[set(s) for s in snaps])
+        launched = False
+        movers: list[int] = []
+        for tid in ids:
+            steps = []
+            for a, b in zip(snaps, snaps[1:]):
+                if tid in a and tid in b:
+                    (ax, ay, ar), (bx, by, br) = a[tid], b[tid]
+                    steps.append((float(np.hypot(bx - ax, by - ay)),
+                                  max(6.0, (ar + br) / 2.0)))
+                else:
+                    steps.append((0.0, 6.0))
+            moving = [d > 0.45 * r for d, r in steps]
+            total = sum(d for d, _r in steps)
+            if total >= 1.5 * max(r for _d, r in steps):
+                movers.append(tid)
+            sustained = any(m1 and m2 for m1, m2 in zip(moving, moving[1:]))
+            # A STRUCK ball launches fast — >=1.2 radii covered in one 0.3s
+            # sample — where a hand rolls balls at sweep speed. (Measured:
+            # a real stroke covers 3-4 radii per sample; racking ~0.6.)
+            fast = any(d >= 1.2 * r for d, r in steps)
+            if sustained and fast and total >= 1.5 * max(r for _d, r in steps):
+                launched = True
+        # Gathering veto: racking/collecting moves SEVERAL balls that end up
+        # CONVERGING into a cluster; a stroke's balls scatter or hold spread.
+        if launched and len(movers) >= 3:
+            def _spread(snap):
+                pts = [(snap[m][0], snap[m][1]) for m in movers if m in snap]
+                if len(pts) < 2:
+                    return None
+                n = len(pts)
+                return sum(np.hypot(px - qx, py - qy)
+                           for i, (px, py) in enumerate(pts)
+                           for qx, qy in pts[i + 1:]) / (n * (n - 1) / 2)
+            s0, s1 = _spread(snaps[0]), _spread(snaps[-1])
+            if s0 and s1 and s1 < 0.75 * s0:
+                launched = False        # balls converged: hands, not a stroke
+        if launched:
             missed.append(round(o, 2))
 
     return {
@@ -107,6 +152,7 @@ def audit_session(video: Path, quiet: bool = False) -> dict | None:
         "onsets": len(onsets),
         "claimed_strike": len(claimed_strike),
         "claimed_body": len(claimed_body),
+        "pre_shot_sounds": len(pre_shot),
         "unclaimed_noise": len(unclaimed) - len(missed),
         "missed_shot_candidates": missed,
         "unheard_shots": [round(s, 2) for s in unheard_shots],
@@ -158,7 +204,7 @@ def main() -> int:
                               Path(args.dump_dir) / v.stem)
         print(f"{r['video'][:44]:46s} shots={r['shots']:3d} onsets={r['onsets']:4d} "
               f"strike={r['claimed_strike']:3d} body={r['claimed_body']:3d} "
-              f"noise={r['unclaimed_noise']:4d} "
+              f"pre={r['pre_shot_sounds']:3d} noise={r['unclaimed_noise']:4d} "
               f"MISS?={len(r['missed_shot_candidates']):2d} "
               f"UNHEARD={len(r['unheard_shots']):2d}")
 
