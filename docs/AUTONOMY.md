@@ -4,6 +4,24 @@ Joe (2026-08-15): *"Set up some way where you can work on this day and
 night until it's fixed... watchdog timers to see if your workflow has
 halted... be relentless."*
 
+## Scope and the health-first rule (Joe, 2026-08-16)
+The loop covers the WHOLE product: UI updates, features, research,
+development, training, tooling — "expand this beyond vision training."
+With one hard rule: **"ensure we don't add features when others are still
+broken or lacking."** Made executable by tools/health_check.py:
+
+- Every work session runs the health board FIRST (--quick).
+- RED anywhere ⇒ fixing it IS the session. No exceptions.
+- AMBER ⇒ fix before feature work, unless the amber is blocked on Joe
+  (e.g. cue sensor hardware) — then note it and proceed to features.
+- All GREEN ⇒ feature/research/UI work proceeds by GOALS priority.
+
+The board checks: app process + log errors, recording pipeline +
+orphans, cached playback speed (>=30fps bar), identity duplicates (G1
+tripwire), champion fingerprint (_eval/champion.json is canonical),
+autonomy heartbeat/lock, cue sensor state, disk space; --full adds the
+test suite.
+
 ## How it runs
 Two scheduled jobs live in the Claude session attached to this repo:
 
