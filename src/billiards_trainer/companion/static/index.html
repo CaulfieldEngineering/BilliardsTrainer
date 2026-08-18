@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Billiards Trainer</title>
+<style>
+  /* Same visual language as the desktop app: near-black, one accent. */
+  :root { --bg:#0d1117; --card:#161b22; --line:#21262d; --text:#e6edf3;
+          --dim:#7d8590; --accent:#2f81f7;
+          --make:#3fb950; --miss:#7d8590; --scratch:#e3b341; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--text);
+         font:16px/1.45 -apple-system, "SF Pro Text", system-ui, sans-serif;
+         padding-bottom: env(safe-area-inset-bottom); }
+  header { padding:calc(14px + env(safe-area-inset-top)) 16px 10px;
+           display:flex; align-items:center; gap:10px;
+           border-bottom:1px solid var(--line); position:sticky; top:0;
+           background:var(--bg); z-index:5; }
+  header .dot { width:10px; height:10px; border-radius:50%; background:var(--accent); }
+  header h1 { font-size:17px; font-weight:600; flex:1; }
+  header button { background:none; border:none; color:var(--accent);
+                  font-size:16px; display:none; padding:6px 2px; }
+
+  /* session list */
+  #sessions { padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+  .sess { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:14px; display:flex; align-items:center; gap:12px; }
+  .sess:active { background:#1c2230; }
+  .sess .when { font-weight:600; }
+  .sess .meta { color:var(--dim); font-size:13px; margin-top:2px; }
+  .sess .shots { margin-left:auto; text-align:right; color:var(--accent);
+                 font-weight:600; white-space:nowrap; }
+  .sess .shots.none { color:var(--dim); font-weight:400; font-size:13px; }
+
+  /* player */
+  #player { display:none; }
+  video { width:100%; max-height:52vh; background:#000; display:block; }
+  #shotbar { padding:12px; }
+  #shotinfo { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  #shotinfo .n { font-size:20px; font-weight:700; }
+  #shotinfo .oc { font-weight:700; }
+  #shotinfo .t { color:var(--dim); font-size:13px; margin-left:auto; }
+  #nav { display:flex; gap:10px; }
+  #nav button { flex:1; padding:16px 0; font-size:17px; font-weight:600;
+                background:var(--card); color:var(--text);
+                border:1px solid var(--line); border-radius:12px; }
+  #nav button:active { background:#1c2230; }
+  #nav #replay { flex:0.8; color:var(--accent); }
+  #chips { display:flex; gap:8px; overflow-x:auto; padding:12px 2px 4px;
+           -webkit-overflow-scrolling:touch; }
+  .chip { min-width:44px; height:44px; border-radius:10px; flex:0 0 auto;
+          display:flex; align-items:center; justify-content:center;
+          font-weight:700; background:var(--card); border:2px solid var(--line);
+          color:var(--dim); }
+  .chip.make    { border-color:var(--make);    color:var(--make); }
+  .chip.miss    { border-color:#39414d;        color:var(--text); }
+  .chip.scratch { border-color:var(--scratch); color:var(--scratch); }
+  .chip.cur { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .note { color:var(--dim); text-align:center; padding:24px 16px; font-size:14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot"></div>
+  <h1 id="title">Billiards Trainer</h1>
+  <button id="back">&#8249; Sessions</button>
+</header>
+
+<div id="sessions"><div class="note">Loading sessions…</div></div>
+
+<div id="player">
+  <video id="video" controls playsinline preload="metadata"></video>
+  <div id="shotbar">
+    <div id="shotinfo">
+      <span class="n" id="shot-n">–</span>
+      <span class="oc" id="shot-oc"></span>
+      <span class="t" id="shot-t"></span>
+    </div>
+    <div id="nav">
+      <button id="prev">&#9198; Prev</button>
+      <button id="replay">&#8635; Replay</button>
+      <button id="next">Next &#9197;</button>
+    </div>
+    <div id="chips"></div>
+    <div class="note" id="noshots" style="display:none">
+      No shot markers for this session — transport controls only.</div>
+  </div>
+</div>
+
+<script>
+// The API host. Same-origin while the PC serves everything; when the
+// frontend moves to Vercel, set this to the PC/tunnel URL.
+const API = "";
+const PRE_ROLL = 5.0;      // seconds before the strike, same as the desktop app
+
+const $ = id => document.getElementById(id);
+let shots = [], cur = -1;
+
+function fmt(t){ t = Math.max(0, t|0); return `${(t/60)|0}:${String(t%60).padStart(2,"0")}`; }
+function fmtDur(s){ if(!s) return ""; if(s >= 3600) return `${(s/3600)|0}h${String(((s%3600)/60)|0).padStart(2,"0")}`;
+                    if(s >= 60) return `${(s/60)|0}m`; return `${s|0}s`; }
+
+async function loadSessions(){
+  try{
+    const r = await fetch(API + "/api/sessions");
+    const list = await r.json();
+    const box = $("sessions");
+    box.innerHTML = "";
+    if(!list.length){ box.innerHTML = '<div class="note">No recordings found.</div>'; return; }
+    for(const s of list){
+      const d = new Date(s.mtime * 1000);
+      const el = document.createElement("div");
+      el.className = "sess";
+      el.innerHTML = `<div><div class="when">${d.toLocaleDateString([], {month:"short", day:"numeric"})}
+          ${d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}</div>
+          <div class="meta">${fmtDur(s.duration_s)} · ${s.size_mb} MB</div></div>
+        <div class="shots ${s.shots ? "" : "none"}">${s.shots ? s.shots + " shots" : (s.shots === 0 ? "no shots" : "not analyzed")}</div>`;
+      el.onclick = () => openSession(s);
+      box.appendChild(el);
+    }
+  }catch(e){
+    $("sessions").innerHTML = '<div class="note">Can\'t reach the Trainer PC.<br>Same Wi-Fi? Server running?</div>';
+  }
+}
+
+async function openSession(s){
+  $("sessions").style.display = "none";
+  $("player").style.display = "block";
+  $("back").style.display = "block";
+  $("title").textContent = new Date(s.mtime * 1000).toLocaleDateString([], {month:"short", day:"numeric"});
+  const v = $("video");
+  v.src = API + "/media/" + encodeURIComponent(s.name);
+  shots = []; cur = -1;
+  try{
+    const r = await fetch(API + `/api/session/${encodeURIComponent(s.name)}/shots`);
+    shots = await r.json();
+  }catch(e){ shots = []; }
+  buildChips();
+  const none = !shots.length;
+  $("noshots").style.display = none ? "block" : "none";
+  $("prev").disabled = $("next").disabled = $("replay").disabled = none;
+  updateInfo();
+}
+
+function buildChips(){
+  const c = $("chips");
+  c.innerHTML = "";
+  shots.forEach((s, i) => {
+    const el = document.createElement("div");
+    el.className = "chip " + (s.outcome || "miss");
+    el.textContent = i + 1;
+    el.onclick = () => gotoShot(i);
+    c.appendChild(el);
+  });
+}
+
+function gotoShot(i){
+  if(i < 0 || i >= shots.length) return;
+  cur = i;
+  const v = $("video");
+  v.currentTime = Math.max(0, shots[i].start - PRE_ROLL);
+  v.play();
+  updateInfo();
+  const chip = $("chips").children[i];
+  if(chip) chip.scrollIntoView({behavior:"smooth", inline:"center", block:"nearest"});
+}
+
+function updateInfo(){
+  [...$("chips").children].forEach((el, i) => el.classList.toggle("cur", i === cur));
+  if(cur < 0 || !shots[cur]){
+    $("shot-n").textContent = shots.length ? `${shots.length} shots` : "–";
+    $("shot-oc").textContent = ""; $("shot-t").textContent = "";
+    return;
+  }
+  const s = shots[cur];
+  $("shot-n").textContent = `Shot ${cur + 1}/${shots.length}`;
+  $("shot-oc").textContent = (s.outcome || "").toUpperCase() + (s.corrected ? " ✓" : "");
+  $("shot-oc").style.color = s.outcome === "make" ? "var(--make)"
+                            : s.outcome === "scratch" ? "var(--scratch)" : "var(--dim)";
+  $("shot-t").textContent = `${fmt(s.start)} · ${(s.end - s.start).toFixed(1)}s`
+                            + (s.pocketed > 1 ? ` · ×${s.pocketed}` : "");
+}
+
+// While playing, keep "current shot" in sync so Prev/Next feel right
+setInterval(() => {
+  if($("player").style.display === "none" || !shots.length) return;
+  const t = $("video").currentTime;
+  let i = shots.findIndex(s => t >= s.start - PRE_ROLL && t <= s.end + 0.5);
+  if(i >= 0 && i !== cur){ cur = i; updateInfo(); }
+}, 500);
+
+$("prev").onclick = () => gotoShot(Math.max(0, (cur < 0 ? 0 : cur - 1)));
+$("next").onclick = () => gotoShot(cur < 0 ? 0 : Math.min(shots.length - 1, cur + 1));
+$("replay").onclick = () => gotoShot(cur < 0 ? 0 : cur);
+$("back").onclick = () => {
+  $("video").pause(); $("video").removeAttribute("src"); $("video").load();
+  $("player").style.display = "none";
+  $("back").style.display = "none";
+  $("sessions").style.display = "flex";
+  $("title").textContent = "Billiards Trainer";
+};
+
+loadSessions();
+</script>
+</body>
+</html>
