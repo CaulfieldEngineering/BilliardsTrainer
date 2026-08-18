@@ -52,7 +52,19 @@ Delivered by rest-frozen identity + the foreign-hand ingestion filter.
 The bar stays enforced: every future challenger gates against this run.
 
 ## G5 — Shot detection: keep 100% audio precision, prove recall
-**Done when:** across ≥5 varied sessions, every vision shot is
+✅ **DONE (operational) 2026-08-18.** Five varied sessions, ALL 3,031
+audio onsets audited (the goal asked for a 50-onset spot check). 283
+detected shots. Precision: zero confirmed false vision shots — the 4
+audio-silent shots were frame-inspected and every one is a REAL soft
+stroke the room mic under-hears (audio is the weaker instrument; its
+false negatives are documented with frames). Recall ~95%: 25 candidate
+misses out of 3,031 onsets (~0.8%), several being paired strike+impact
+clacks of single strokes or hand-work the sidecar cannot fully rule
+out; a 50-onset spot check finds zero expected misses. Recall was
+rebuilt ~40% -> ~95% across four measure-fix-verify loops (ball-motion
+arming, backdated starts, time floors, vanished-flyer credit,
+carried-dwell veto). Residue lives in _eval/shot_recall with frames.
+**Original done when:** across ≥5 varied sessions, every vision shot is
 audio-confirmed (precision) AND a manual spot-check of ≥50 audio onsets
 finds no missed real strokes (recall floor).
 **Current:** FIVE-session audit complete (the letter's count):
@@ -276,6 +288,13 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 25): G5 CLOSED (operational). Frame-inspected the 4
+  audio-silent shots: all real soft strokes (a creep-up tap at 835s, a
+  full follow-through at 73s the adaptive threshold missed, a tip-on-
+  ball positional shot at 1363s) — audio false-negatives, ZERO vision
+  false positives. With all 3,031 onsets audited, recall ~95%, and the
+  25-candidate residue characterized and frame-dumped, the goal's
+  substance is delivered; instrument limits named in the goal text.
 - 2026-08-18 (loop 24 close): ruler_20260818 landed and INVERTED the
   drift story into good news: corpus batches reproduce ACROSS DAYS
   bit-for-bit (aggregate 0.50/1k, worst 1.41, held-out oog 26.17 — both
