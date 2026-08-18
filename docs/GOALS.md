@@ -276,6 +276,18 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 23): the merge-bar/cooldown experiment — three guard
+  variants, five measurements, ALL REVERTED (every variant pushed 015737
+  over the G4 line while helping 173553). The session's real product is
+  the STALE-RULER DISCOVERY made while verifying the revert: identical
+  tracker code scores 173553 at 0.27 today vs 1.40 in the loop-13 corpus
+  (the parked ghosts I was "fixing" were already gone) and 015737 at
+  2.00 vs 1.41. Cross-era score comparisons are INVALID — something
+  since loop 13 moved per-session scores in both directions. Standing
+  orders adopted: gates must score champion+challenger in the SAME
+  batch (the c6 decline needs re-checking under this rule); G4 needs a
+  fresh same-batch re-baseline; bisect the drift on 015737. Suite green,
+  tree verified byte-identical to pre-experiment.
 - 2026-08-18 (loop 22): board GREEN -> G3 data hunt. Built rack mining
   (--min-dets density floor on the montage stage) and probed SEVEN
   sessions for dense settled frames. HONEST CEILING FOUND: the library's
