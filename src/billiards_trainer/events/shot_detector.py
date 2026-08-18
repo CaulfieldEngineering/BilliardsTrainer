@@ -290,7 +290,7 @@ class ShotDetector:
                     and self._calm_since is not None
                     and t - self._calm_since >= self.settle_s):
                 self._finalize_pockets(by_id, table, t)
-                event = self._resolve(t)
+                event = self._resolve(t, by_id)
 
         # Positional memory RETAINS vanished balls for ~3s: a struck ball
         # motion-blurs out of tracking and its track revives far away — the
@@ -330,7 +330,10 @@ class ShotDetector:
         self._state = _State.MOVING
         self._pocketed = []
         self._min_pdist = {}
-        self._shot_ids = set()
+        # The banked strikers ARE shot participants — seed them, or a ball
+        # that vanishes on the very frame the shot begins (a fast pot whose
+        # flight is all blur) is never accumulated and can't be credited.
+        self._shot_ids = set(self._pending_free)
         self._shot_cls = {}
         self._quiet_run = 0
         self._shot_frames = 0
@@ -390,14 +393,30 @@ class ShotDetector:
     def _already(self, tid: int) -> bool:
         return any(p.track_id == tid for p in self._pocketed)
 
-    def _resolve(self, t: float) -> ShotEvent | None:
+    def _resolve(self, t: float, by_id: dict | None = None) -> ShotEvent | None:
         self._state = _State.SETTLED
-        # the decisive gate: a real shot moved a ball a meaningful distance
+        # the decisive gate: a real shot moved a ball a meaningful distance —
+        # OR a ball that moved freely during the shot VANISHED and never came
+        # back. A cleanly potted ball's whole flight can be motion-blurred
+        # out of tracking (011510 @ 72.2s: tracked travel 34px, object ball
+        # gone — eyeball-confirmed a real stroke), so the disappearance is
+        # itself the travel evidence. Guards: the vanished ball must have
+        # been seen moving FREE (>=2 steps) and must not have been near a
+        # hand recently (a lifted ball also vanishes, but carried).
         if self._max_travel < self.det.min_travel_px:
-            log.debug("Discarded non-shot (travel %.0f < %.0f)", self._max_travel,
-                      self.det.min_travel_px)
-            self._pocketed = []
-            return None
+            present = by_id or {}
+            vanished_free = [
+                tid for tid in self._shot_ids
+                if tid not in present
+                and self._free_frames.get(tid, 0) >= 2
+                and self._frame_idx - self._last_carried.get(tid, -10**9) > 45]
+            if not vanished_free:
+                log.debug("Discarded non-shot (travel %.0f < %.0f)",
+                          self._max_travel, self.det.min_travel_px)
+                self._pocketed = []
+                return None
+            log.debug("Travel %.0f below gate but free ball(s) %s vanished — "
+                      "keeping the shot", self._max_travel, vanished_free)
         # Carried-dwell veto: in a real stroke the stick leaves the ball
         # within a frame or two, so moving updates with a hand ON a mover
         # are rare; in ball-gathering they are the majority. This is what

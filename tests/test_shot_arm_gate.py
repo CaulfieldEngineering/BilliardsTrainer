@@ -276,3 +276,53 @@ class TestTimeFloorsAndCarriedDwell:
         for _ in range(10):
             frames.append(([_mk(1, x, 300.0)], 0.0, set()))
         assert _run(det, frames) == [], "hand-dominated movement must not resolve"
+
+
+class TestVanishedFlyerCredit:
+    def _det(self):
+        s = Settings()
+        s.detection.require_cue = False
+        s.detection.use_fusion = False
+        s.detection.warmup_seconds = 0.0
+        s.detection.cooldown_seconds = 0.0
+        return ShotDetector(s.detection, s.balls, settle_frames=3,
+                            min_shot_frames=2, min_shot_s=0.0, settle_s=0.0)
+
+    def test_potted_flyer_with_tiny_tracked_travel_still_a_shot(self):
+        """011510 @ 72.2s: the object ball's whole flight is blur, it drops
+        in a pocket unseen; tracked travel is a ~35px cue nudge. The free
+        ball's disappearance must carry the shot past the travel gate."""
+        det = self._det()
+        frames = []
+        cue = _mk(1, 300.0, 300.0)
+        obj = _mk(2, 340.0, 300.0, number=5)
+        for _ in range(10):
+            frames.append(([cue, obj], 0.0, set()))
+        # strike: object ball takes 3 slow tracked steps (arming bank), cue still
+        x = 340.0
+        for _ in range(3):
+            x += 14.0
+            frames.append(([cue, _mk(2, x, 300.0, vx=14.0)], 0.3, set()))
+        # then the flyer is GONE for good (blur -> pocket); table calm
+        for _ in range(20):
+            frames.append(([cue], 0.0, set()))
+        events = _run(det, frames)
+        assert len(events) == 1, "vanished free ball must carry the shot"
+
+    def test_static_ghost_dying_does_not_carry_a_shot(self):
+        """A phantom track expiring mid-shot has no free motion — the travel
+        gate must still discard."""
+        det = self._det()
+        frames = []
+        cue = _mk(1, 300.0, 300.0)
+        ghost = _mk(9, 500.0, 500.0)
+        for _ in range(10):
+            frames.append(([cue, ghost], 0.0, set()))
+        x = 300.0
+        for _ in range(3):                      # tiny cue wobble arms nothing much
+            x += 14.0
+            frames.append(([_mk(1, x, 300.0, vx=14.0), ghost], 0.5, set()))
+        for i in range(20):                     # ghost dies, never moved
+            tracks = [_mk(1, x, 300.0)] if i > 2 else [_mk(1, x, 300.0), ghost]
+            frames.append((tracks, 0.0, set()))
+        assert _run(det, frames) == [], "static ghost death must not make a shot"
