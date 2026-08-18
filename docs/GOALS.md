@@ -276,6 +276,20 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 21): board GREEN -> G3 (the last open metric goal).
+  MONTAGE LABELLING, me as the vision model: read 33 crop sheets across
+  two sessions (011510 game + 011928 games), labelled 161 crops
+  conservatively (-1 when unsure; markers, rail diamonds, and a finger
+  correctly refused). Increments lift the starved classes: 4 -> 17,
+  5 -> 33 (first orange-5 labels), 13 -> 21, 15 -> 17, two fresh 8s;
+  10/12/14 remain starved (2/1/11) — need a targeted full-rack session.
+  Found and dodged a build-tool footgun: increments write to the same
+  layout-indexed filenames, so batch 3 silently OVERWROTE batch 1 in the
+  shared dataset dir — rebuilt each into its own dir and assembled
+  _train/c6/dataset (86 frames) with source-prefixed names. c6 finetune
+  LAUNCHED (60 epochs, CPU venv, background). NEXT session: held-out
+  gate vs champion c5 (compare against handfilter_c5 corpus baselines);
+  promote only on measured improvement, decline counts as progress.
 - 2026-08-18 (loops 19-20 + a hard night shift): VANISHED-FLYER CREDIT
   shipped after discard-logging pinned the truth — the "missed" strokes
   were clean pots whose whole flight was motion blur (travel gate saw a
