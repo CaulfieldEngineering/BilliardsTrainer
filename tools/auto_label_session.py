@@ -215,6 +215,24 @@ def stage_montages(args) -> int:
     print(f"{len(settled)} settled, {len(layouts)} distinct layouts")
 
     det = _detector()
+    # Rack mining (--min-dets): the cheap layout pass keeps the FIRST distinct
+    # settled frames, but racks are brief moments in game footage — so when a
+    # density floor is set, widen the candidate pool to every distinct settled
+    # frame and keep only the dense ones (detector-counted) up to max_layouts.
+    if getattr(args, "min_dets", 0) > 0:
+        pool = dedupe_layouts(store, settled, max_layouts=10 ** 6)
+        dense = []
+        for fi in pool:
+            frame = store.full(fi)
+            if frame is None:
+                continue
+            if len(det.detect(frame, None)) >= args.min_dets:
+                dense.append(fi)
+                if len(dense) >= args.max_layouts:
+                    break
+        print(f"density floor {args.min_dets}: {len(dense)} rack-like layouts "
+              f"from {len(pool)} candidates")
+        layouts = dense
     # The stride is part of the data: frame_index values below are positions in
     # THIS sampling. The build stage must re-load at the same stride or its
     # propagation bases land on entirely different moments of the session (the
@@ -366,6 +384,10 @@ def main() -> int:
     m.add_argument("--work", default=str(ROOT / "_train" / "autolabel"))
     m.add_argument("--stride", type=int, default=2)
     m.add_argument("--max-layouts", type=int, default=12)
+    m.add_argument("--min-dets", type=int, default=0,
+                   help="keep only layouts with at least this many ball "
+                        "detections (rack mining: pre-break frames carry "
+                        "ALL 15 classes, including the starved stripes)")
     m.set_defaults(fn=stage_montages)
     b = sub.add_parser("build", help="stage 3: labels.json -> YOLO dataset + accuracy")
     b.add_argument("--work", default=str(ROOT / "_train" / "autolabel"))
