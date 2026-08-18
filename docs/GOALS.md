@@ -292,6 +292,12 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-19 (loop 28): dossier surfaced IN-APP — right-click a shot ->
+  "Export shot dossier (data + diagram)" writes the north-star files
+  beside the session's clips and reveals them; original shot numbers
+  survive filtered views (test). Additive only, zero layout/styling
+  risk. App restarted (19h recording-quiet). G7 visual round stays
+  gated on Joe's eye by design.
 - 2026-08-19 (loop 27): NORTH-STAR GROUNDWORK — shot dossier export
   shipped (tools/export_shot_dossier.py): per-shot machine-readable
   JSON (trajectories, cue-stroke metrics, direction changes) + rendered
