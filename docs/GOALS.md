@@ -292,6 +292,15 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-19 (loop 27): NORTH-STAR GROUNDWORK — shot dossier export
+  shipped (tools/export_shot_dossier.py): per-shot machine-readable
+  JSON (trajectories, cue-stroke metrics, direction changes) + rendered
+  trajectory diagram, all from the sidecar. Proven as a consumer would
+  use it: exported a real miss and wrote the first dossier-only coach
+  note ("479 px/s peak into a full-table overshoot — speed control on
+  mid-table cuts"). The eventual VLM coach reads exactly these files.
+  Contract pinned by test. Known nit: cue cls string shows the stored
+  per-state class, number 0 is authoritative.
 - 2026-08-19 (loop 26): G6 SPEC COMPLETE — shot-list VIEWS shipped
   (All/Misses/Makes/Longest/Streaks; original shot numbers preserved
   across views; corrections flow from any view to all surfaces; 3 new
