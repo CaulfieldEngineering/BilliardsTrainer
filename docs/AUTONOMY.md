@@ -77,3 +77,12 @@ session did. Refreshed at the END of each successful work session.
   ships with a pinned UI test through the real theme (test_transport_bar
   is the pattern). (3) App restarts wait for 5 minutes of recording
   quiet, monitored, not assumed.
+- 2026-08-18 (measurement invariant, PERMANENT): per-session physics
+  scores are only comparable WITHIN a same-day batch. Proven by worktree
+  bisect: the exact loop-13 commit that produced 015737=1.41/6-teleports
+  in its own corpus run scores 2.00/12 today — identical code, video,
+  and model; the environment (GPU runtime/driver state) moved. Rules:
+  (1) promotion gates score champion+challenger same-batch (now the
+  score_challenger default); (2) never compare against a saved
+  aggregate across days for any decision; (3) corpus dirs are
+  era-stamped by date — treat old ones as historical record only.

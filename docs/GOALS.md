@@ -276,6 +276,16 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 24): THE RULER. Worktree bisect settled it: the exact
+  loop-13 commit reproduces TODAY at 2.00/12-teleports on 015737, not
+  its own recorded 1.41/6 — the drift is ENVIRONMENTAL (GPU runtime /
+  driver state across days), not any commit. Same-batch gating shipped
+  as score_challenger's default (champion re-scored fresh every gate;
+  --champion-agg demoted to a warned quick-look). Measurement invariant
+  added to AUTONOMY: scores compare only within a same-day batch; old
+  corpus dirs are historical record. Fresh champion re-baseline
+  (ruler_20260818) launched — G4 re-affirmation and the c6 same-batch
+  re-verdict land on it.
 - 2026-08-18 (loop 23): the merge-bar/cooldown experiment — three guard
   variants, five measurements, ALL REVERTED (every variant pushed 015737
   over the G4 line while helping 173553). The session's real product is
