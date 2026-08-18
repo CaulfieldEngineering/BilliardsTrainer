@@ -276,6 +276,15 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 24 close): ruler_20260818 landed and INVERTED the
+  drift story into good news: corpus batches reproduce ACROSS DAYS
+  bit-for-bit (aggregate 0.50/1k, worst 1.41, held-out oog 26.17 — both
+  runs identical). G4 RE-AFFIRMED on today's environment. The "drift"
+  was solo-vs-corpus execution context (idle GPU vs 16-sessions-deep
+  thermal load) — my loop-23 category error, corrected in AUTONOMY.
+  c6 RE-VERDICT under same-day corpus context: 28.60 vs 26.17 held-out
+  oog — DECLINE CONFIRMED. Instruments trustworthy again, and better
+  understood than before the scare.
 - 2026-08-18 (loop 24): THE RULER. Worktree bisect settled it: the exact
   loop-13 commit reproduces TODAY at 2.00/12-teleports on 015737, not
   its own recorded 1.41/6 — the drift is ENVIRONMENTAL (GPU runtime /

@@ -86,3 +86,14 @@ session did. Refreshed at the END of each successful work session.
   score_challenger default); (2) never compare against a saved
   aggregate across days for any decision; (3) corpus dirs are
   era-stamped by date — treat old ones as historical record only.
+- 2026-08-18 (invariant REFINED by the ruler_20260818 run): corpus
+  batches reproduce across days bit-for-bit (0.50/1k aggregate, worst
+  1.41, held-out oog 26.17 — twice, days apart). What does NOT compare
+  is SOLO score_session runs vs corpus numbers: a lone run executes on
+  an idle GPU; a mid-corpus subprocess runs 16 sessions deep into
+  thermal/driver load, and detection cadence shifts either direction
+  per session (015737: 2.00 solo vs 1.41 in-corpus, identical code).
+  Rules stay: same-batch gates for promotions; solo runs are for
+  debugging deltas within one sitting, never for cross-checking corpus
+  verdicts. The loop-23 "environmental drift across days" reading was
+  this category error — corrected here.
