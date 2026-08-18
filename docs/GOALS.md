@@ -116,7 +116,11 @@ Architect's spec for timeline v2+, in build order:
 7. Zoom/pan the lane for hour-long sessions.
 **Done when:** Joe reviews a session start-to-finish from the timeline
 alone and exports a favourite shot without touching a file manager.
-**Current:** v1 lane shipped (clips, pre-roll, click-to-seek, playhead).
+**Current:** ✅ ALL SEVEN SPEC ITEMS SHIPPED (2026-08-19): persist,
+hover cards, prev/next, per-shot thumbnails, synced+sortable list
+(All/Misses/Makes/Longest/Streaks), one-click clip export, zoom/pan.
+Joe's definition of done was met at clip-export; the spec is now
+complete. Remaining G6 work happens only if Joe asks for more.
 
 ## G7 — UI: Joe stops saying it "screams python"
 Rounds continue with Joe's visual feedback as the gate.
@@ -288,6 +292,11 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-19 (loop 26): G6 SPEC COMPLETE — shot-list VIEWS shipped
+  (All/Misses/Makes/Longest/Streaks; original shot numbers preserved
+  across views; corrections flow from any view to all surfaces; 3 new
+  tests, suite green). All seven architect-spec items now live. Next
+  frontier: G7 UI rounds + the VLM-coach groundwork on the dossier.
 - 2026-08-18 (loop 25): G5 CLOSED (operational). Frame-inspected the 4
   audio-silent shots: all real soft strokes (a creep-up tap at 835s, a
   full follow-through at 73s the adaptive threshold missed, a tip-on-
