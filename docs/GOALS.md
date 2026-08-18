@@ -260,6 +260,29 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loops 19-20 + a hard night shift): VANISHED-FLYER CREDIT
+  shipped after discard-logging pinned the truth — the "missed" strokes
+  were clean pots whose whole flight was motion blur (travel gate saw a
+  34px cue nudge; the ball left the table unseen). A free-moving ball
+  that vanishes now carries the shot. V7 verification: 011510 13 -> 14
+  shots (candidates 6 -> 4), 210621 87 -> 90, 011928 105 -> 108. G5 arc
+  to date: 163 shots/721 candidates/39 unheard -> 212/21/1-clean.
+  BETWEEN loops, Joe live-reported three regressions and the night went
+  to triage: the mouse hog was OUR backfill (killed; presence rules now
+  in AUTONOMY); the REC clock clipped a third time (now GROW-ONLY — no
+  fixed width exists to clip against); and the empty schematic unwound
+  into THREE stacked causes — a dead detect worker nothing restarted
+  (now self-heals), a coordinate-space confusion that made me delete a
+  CORRECT saved lock (live frames vs letterbox-cropped recordings — now
+  documented), and finally the TABLE COVER poisoning restore validation
+  (felt-detect found wrinkle-quads; validate_against was the one path
+  missing the cloth-saturation guard — fixed, with ground-truth frame
+  dumps + a per-link vision heartbeat in the log so the next such night
+  is one read, not four hypotheses). Also shipped: sidebar rows show
+  duration + shots instead of megabytes (cached, off-thread, stubs
+  dimmed). Suite green throughout; every push through the pre-push gate.
+  NEXT: extend the audit to 5+ sessions for the G5 letter-verdict;
+  backfill v2 sidecars for two more sessions overnight.
 - 2026-08-18 (loop 18): board GREEN. Traced 011510 @72.2s for real: the
   detector ARMED on the banked cue nudge, then resolved 0.23s later
   (frame-count floors are cadence-dependent) and discarded on ~35px of
