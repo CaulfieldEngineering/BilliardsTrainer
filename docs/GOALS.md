@@ -55,7 +55,13 @@ The bar stays enforced: every future challenger gates against this run.
 **Done when:** across ≥5 varied sessions, every vision shot is
 audio-confirmed (precision) AND a manual spot-check of ≥50 audio onsets
 finds no missed real strokes (recall floor).
-**Current:** 5/5 precision on one session; recall un-audited.
+**Current:** deep-audited on 3 sessions with hand-context sidecars
+(v2): 212 detected shots, 21 remaining missed-stroke candidates (~2-10
+real strokes; several are paired strike+impact clacks), 1 clean silent
+shot, 16 hand-involved silent (gathering suspects). Recall rebuilt
+~40% -> ~95% via ball-motion arming, backdated starts, time floors,
+vanished-flyer credit. Remaining for the letter of DONE: extend to 5
+sessions (2 more v2 backfills queued overnight).
 
 ## NORTH STAR (Joe, 2026-08-16): the SHOT DOSSIER
 "Parse shots, per session. So I can 1) review my gameplay and 2) start
