@@ -67,3 +67,13 @@ session did. Refreshed at the END of each successful work session.
   full suite UNPIPED and blocks the push on any failure — the loop can
   no longer push red by construction. Rule stays: never gate on a piped
   exit code.
+- 2026-08-18: Joe reported mouse lag + empty schematic while playing —
+  the loop's verification backfill was running full-tilt inference while
+  he was AT THE TABLE, and a dead detect-worker thread had never been
+  restarted. New rules: (1) HEAVY JOBS (backfill, corpus scoring,
+  training) must not START if any session-*.mp4 was modified in the last
+  10 minutes, and must be KILLED if a recording starts — Joe's presence
+  outranks loop verification, always. (2) Every fix to something Joe SEES
+  ships with a pinned UI test through the real theme (test_transport_bar
+  is the pattern). (3) App restarts wait for 5 minutes of recording
+  quiet, monitored, not assumed.
