@@ -63,10 +63,19 @@ class SidecarWriter:
         meta = {"type": "meta", "v": 1, **meta}
         self._f.write(json.dumps(meta) + "\n")
         self._n = 0
+        # REBASE to recording time: live recordings feed pipeline t (seconds
+        # since the SOURCE started), so an evening session's sidecar began at
+        # t=1160 while its video starts at 0 — every seek/audit/phone-chip
+        # missed (found on Joe's first live-reviewed 9-ball drill). The first
+        # frame written defines t=0; shots backdated before it clamp to 0.
+        self._t0: float | None = None
 
     def add_frame(self, t: float, tracks: list,
                   carried_ids: set | None = None,
                   foreign_frac: float = 0.0) -> None:
+        if self._t0 is None:
+            self._t0 = float(t)
+        t = max(0.0, t - self._t0)
         rec = [[int(tr.id), round(float(tr.x), 1), round(float(tr.y), 1),
                 round(float(tr.radius), 1), int(tr.number),
                 tr.cls.value, bool(tr.active)] for tr in tracks]
@@ -84,9 +93,10 @@ class SidecarWriter:
             self._f.flush()
 
     def add_shot(self, event) -> None:
+        t0 = self._t0 or 0.0
         self._f.write(json.dumps({
-            "type": "shot", "start": round(float(event.start_t), 3),
-            "end": round(float(event.end_t), 3),
+            "type": "shot", "start": round(max(0.0, float(event.start_t) - t0), 3),
+            "end": round(max(0.0, float(event.end_t) - t0), 3),
             "outcome": event.outcome.value,
             "pocketed": int(event.num_pocketed)}) + "\n")
         self._f.flush()
@@ -133,6 +143,17 @@ class SidecarReader:
                             s["outcome"] = d.get("outcome", s.get("outcome"))
                             s["corrected"] = True
                             break
+        # LEGACY live sidecars recorded source-uptime, not recording time.
+        # A recording's first state lands within ~2s of zero when times are
+        # right; a first state minutes in means the offset bug — normalize
+        # everything by it so old sessions review correctly too.
+        if self._times and self._times[0] > 30.0:
+            t0 = self._times[0]
+            self._times = [t - t0 for t in self._times]
+            for s in self.shots:
+                s["start"] = max(0.0, float(s.get("start", 0)) - t0)
+                s["end"] = max(0.0, float(s.get("end", 0)) - t0)
+            log.info("sidecar times normalized by legacy offset %.1fs", t0)
         log.info("analysis sidecar loaded: %s (%d states, %d shots)",
                  p.name, len(self._times), len(self.shots))
 

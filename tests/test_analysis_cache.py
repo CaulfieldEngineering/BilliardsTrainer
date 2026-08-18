@@ -16,11 +16,13 @@ def _track(tid, x, y, num=3):
 
 
 def _write_sample(video):
+    # times are RECORDING-relative by contract: the first frame defines t=0
+    # (the writer rebases whatever pipeline time it is fed)
     w = SidecarWriter(video, {"fps": 30.0})
-    w.add_frame(1.0, [_track(1, 100.0, 200.0), _track(2, 500.0, 600.0, num=5)])
-    w.add_frame(2.0, [_track(1, 200.0, 300.0), _track(2, 500.0, 600.0, num=5)])
+    w.add_frame(0.0, [_track(1, 100.0, 200.0), _track(2, 500.0, 600.0, num=5)])
+    w.add_frame(1.0, [_track(1, 200.0, 300.0), _track(2, 500.0, 600.0, num=5)])
     w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=1,
-                         start_t=1.2, end_t=1.9))
+                         start_t=0.2, end_t=0.9))
     w.close()
 
 
@@ -31,7 +33,7 @@ class TestSidecar:
         r = SidecarReader(video)
         assert len(r) == 2
         assert r.shots[0]["outcome"] == "make"
-        mid = r.tracks_at(1.5)                       # halfway between states
+        mid = r.tracks_at(0.5)                       # halfway between states
         t1 = next(t for t in mid if t.id == 1)
         assert abs(t1.x - 150.0) < 0.5 and abs(t1.y - 250.0) < 0.5
         assert t1.number == 3
@@ -76,9 +78,11 @@ class TestHandContextV2:
         w.close()
         r = SidecarReader(video)
         assert r.has_hand_context
-        ids, peak = r.hand_context(1.7, 2.3)
+        # times are RECORDING-relative now: frames written at 1.0/2.0/3.0
+        # land at 0/1/2 (the first frame defines t=0)
+        ids, peak = r.hand_context(0.7, 1.3)
         assert ids == {3} and peak >= 0.04
-        ids2, _ = r.hand_context(2.8, 3.4)
+        ids2, _ = r.hand_context(1.8, 2.4)
         assert ids2 == set()
 
     def test_v1_sidecar_reports_no_hand_context(self, tmp_path):
@@ -92,3 +96,37 @@ class TestHandContextV2:
         r = SidecarReader(video)
         assert not r.has_hand_context
         assert r.hand_context(0.0, 2.0) == (set(), 0.0)
+
+
+class TestRecordingTimebase:
+    def test_writer_rebases_to_first_frame(self, tmp_path):
+        video = tmp_path / "s.mp4"
+        video.write_bytes(b"x")
+        w = SidecarWriter(video, {"fps": 30})
+        tr = Track(id=1, x=5, y=5, radius=12, number=2,
+                   cls=BallClass.SOLID, active=True)
+        w.add_frame(1160.5, [tr])
+        w.add_frame(1161.5, [tr])
+        class Ev:
+            start_t, end_t = 1168.8, 1173.2
+            class outcome:
+                value = "miss"
+            num_pocketed = 0
+        w.add_shot(Ev)
+        w.close()
+        r = SidecarReader(video)
+        assert r._times[0] == 0.0 and abs(r._times[1] - 1.0) < 1e-6
+        assert abs(r.shots[0]["start"] - 8.3) < 0.01
+
+    def test_reader_normalizes_legacy_offset(self, tmp_path):
+        video = tmp_path / "s.mp4"
+        video.write_bytes(b"x")
+        sc = tmp_path / "s.mp4.analysis.jsonl"
+        sc.write_text('{"type":"meta","v":1,"fps":30}\n'
+                      '{"type":"f","t":1160.5,"tracks":[[1,5,5,12,2,"solid",true]]}\n'
+                      '{"type":"f","t":1161.5,"tracks":[[1,5,5,12,2,"solid",true]]}\n'
+                      '{"type":"shot","start":1168.8,"end":1173.2,'
+                      '"outcome":"miss","pocketed":0}\n')
+        r = SidecarReader(video)
+        assert r._times[0] == 0.0
+        assert abs(r.shots[0]["start"] - 8.3) < 0.01

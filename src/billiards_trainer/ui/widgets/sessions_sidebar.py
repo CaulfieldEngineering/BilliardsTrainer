@@ -14,9 +14,9 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
 )
 
@@ -34,7 +34,9 @@ class SessionsSidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedWidth(210)
+        # Wider than the old list: four sortable columns need the room
+        # (Joe: "Session Name | Date | Length | # Shots ... can be sorted").
+        self.setFixedWidth(300)
         # Where recordings are listed from; main_window points this at the
         # configured recordings folder (Settings -> Recording).
         self.recordings_dir: Path = EXPORTS_DIR
@@ -51,8 +53,26 @@ class SessionsSidebar(QFrame):
         cap.setObjectName("StatLabel")
         lay.addWidget(cap)
 
-        self._list = QListWidget()
+        # LIVE is a fixed button — sorting must never shuffle it.
+        self._live_btn = QPushButton("▶  LIVE")
+        self._live_btn.setObjectName("Ghost")
+        self._live_btn.setCursor(Qt.PointingHandCursor)
+        self._live_btn.clicked.connect(self.live_selected.emit)
+        lay.addWidget(self._live_btn)
+
+        # Explorer-style session table (Joe's ask, and ONLY that): four
+        # sortable headers. Click a header to sort; default = Date, newest
+        # first. Everything else (click-to-open, right-click menu) unchanged.
+        self._list = QTreeWidget()
         self._list.setFrameShape(QFrame.NoFrame)
+        self._list.setRootIsDecorated(False)
+        self._list.setHeaderLabels(["Session", "Date", "Length", "Shots"])
+        self._list.setSortingEnabled(True)
+        self._list.sortByColumn(1, Qt.DescendingOrder)
+        hdr = self._list.header()
+        hdr.resizeSection(0, 96)
+        hdr.resizeSection(1, 86)
+        hdr.resizeSection(2, 52)
         self._list.itemClicked.connect(self._on_item)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._context_menu)
@@ -72,21 +92,25 @@ class SessionsSidebar(QFrame):
         self.refresh()
 
     # ------------------------------------------------------------------ #
+    class _Row(QTreeWidgetItem):
+        """Sorts by the hidden numeric role so Length sorts by seconds and
+        Date by mtime — not alphabetically ("9m" < "42m" must be true)."""
+        SORT_ROLE = Qt.UserRole + 1
+
+        def __lt__(self, other):
+            col = self.treeWidget().sortColumn() if self.treeWidget() else 0
+            a = self.data(col, self.SORT_ROLE)
+            b = other.data(col, self.SORT_ROLE)
+            if a is not None and b is not None:
+                return a < b
+            return self.text(col).lower() < other.text(col).lower()
+
     def refresh(self) -> None:
-        """Rebuild the list: LIVE on top, then session recordings newest-first."""
+        """Rebuild the session table (LIVE is its own button above it)."""
         current = self._current_path()
+        self._list.setSortingEnabled(False)
         self._list.clear()
-        live = QListWidgetItem("▶  LIVE")
-        live.setData(Qt.UserRole, "")           # empty payload = live camera
-        f = live.font()
-        f.setBold(True)
-        live.setFont(f)
-        self._list.addItem(live)
-        # ANY video dropped into the recordings folder is a session — recorded
-        # by the app (session-*.mp4) or copied in by hand.
         try:
-            # pathlib.glob matches dotfiles, so in-progress/aborted hidden
-            # ".session-*.part.mp4" files showed up in the list — skip them.
             clips = sorted(
                 (p for ext in ("*.mp4", "*.mov", "*.m4v", "*.avi", "*.mkv")
                  for p in self.recordings_dir.glob(ext)
@@ -95,27 +119,24 @@ class SessionsSidebar(QFrame):
         except OSError:
             clips = []
         for p in clips[:60]:
-            mb = p.stat().st_size / 1e6
-            if p.name.startswith("session-"):
-                when = datetime.fromtimestamp(p.stat().st_mtime).strftime("%b %d  %H:%M")
-                label = f"{when}   ·  {mb:.0f} MB"
-            else:  # a hand-copied clip: its filename IS its identity
-                label = f"{p.stem[:22]}   ·  {mb:.0f} MB"
-            it = QListWidgetItem(label)
-            it.setData(Qt.UserRole, str(p))
-            it.setToolTip(p.name)
-            self._list.addItem(it)
-        # Rows fill in with duration + shot count off-thread (cached after
-        # the first pass); "13 MB" answers nothing Joe actually asks.
+            st = p.stat()
+            when = datetime.fromtimestamp(st.st_mtime)
+            name = when.strftime("%b %d %H:%M") if p.name.startswith("session-")                 else p.stem[:18]
+            it = self._Row([name, when.strftime("%m/%d %H:%M"), "…", "…"])
+            it.setData(0, Qt.UserRole, str(p))
+            it.setData(0, self._Row.SORT_ROLE, name.lower())
+            it.setData(1, self._Row.SORT_ROLE, st.st_mtime)
+            it.setData(2, self._Row.SORT_ROLE, -1.0)
+            it.setData(3, self._Row.SORT_ROLE, -1)
+            it.setToolTip(0, f"{p.name}  ·  {st.st_size / 1e6:.0f} MB")
+            self._list.addTopLevelItem(it)
+        self._list.setSortingEnabled(True)
         self._load_summaries([str(p) for p in clips[:60]])
-        # restore selection (default LIVE)
-        idx = 0
         if current:
-            for i in range(self._list.count()):
-                if self._list.item(i).data(Qt.UserRole) == current:
-                    idx = i
+            for i in range(self._list.topLevelItemCount()):
+                if self._list.topLevelItem(i).data(0, Qt.UserRole) == current:
+                    self._list.setCurrentItem(self._list.topLevelItem(i))
                     break
-        self._list.setCurrentRow(idx)
 
     def _load_summaries(self, paths: list[str]) -> None:
         """Fill rows with duration + shots, computed off-thread, applied on
@@ -153,37 +174,45 @@ class SessionsSidebar(QFrame):
 
     def _apply_summary(self, path: str, summary: dict) -> None:
         from .. import session_summaries as ss
-        for i in range(1, self._list.count()):
-            it = self._list.item(i)
-            if it.data(Qt.UserRole) != path:
+        from PySide6.QtGui import QColor
+        for i in range(self._list.topLevelItemCount()):
+            it = self._list.topLevelItem(i)
+            if it.data(0, Qt.UserRole) != path:
                 continue
-            p = Path(path)
+            dur = float(summary.get("dur_s") or 0.0)
+            shots = summary.get("shots")
+            if dur >= 3600:
+                dtext = f"{int(dur // 3600)}h{int(dur % 3600 // 60):02d}"
+            elif dur >= 60:
+                dtext = f"{int(dur // 60)}m"
+            else:
+                dtext = f"{int(dur)}s" if dur > 0 else "–"
+            it.setText(2, dtext)
+            it.setData(2, self._Row.SORT_ROLE, dur)
+            it.setText(3, "–" if shots is None else str(shots))
+            it.setData(3, self._Row.SORT_ROLE, -1 if shots is None else int(shots))
             try:
-                mb = p.stat().st_size / 1e6
+                mb = Path(path).stat().st_size / 1e6
             except OSError:
                 return
-            if p.name.startswith("session-"):
-                when = datetime.fromtimestamp(p.stat().st_mtime).strftime("%b %d  %H:%M")
-                it.setText(ss.row_text(when, mb, summary))
-            it.setToolTip(f"{p.name}  ·  {mb:.0f} MB")
             if ss.is_stub(summary, mb):
-                from PySide6.QtGui import QColor
-                it.setForeground(QColor(PALETTE.text_faint))
+                dim = QColor(PALETTE.text_faint)
+                for c in range(4):
+                    it.setForeground(c, dim)
             return
 
     def select_live(self) -> None:
-        self._list.setCurrentRow(0)
+        self._list.clearSelection()
+        self._list.setCurrentItem(None)
 
     def _current_path(self) -> str:
         it = self._list.currentItem()
-        return it.data(Qt.UserRole) if it else ""
+        return it.data(0, Qt.UserRole) if it else ""
 
-    def _on_item(self, item: QListWidgetItem) -> None:
-        path = item.data(Qt.UserRole)
+    def _on_item(self, item: QTreeWidgetItem, _col: int = 0) -> None:
+        path = item.data(0, Qt.UserRole)
         if path:
             self.session_selected.emit(path)
-        else:
-            self.live_selected.emit()
 
     def mark_live(self) -> None:
         """Programmatic switch back to LIVE (e.g. after an error)."""
@@ -191,7 +220,7 @@ class SessionsSidebar(QFrame):
 
     def _context_menu(self, pos) -> None:
         item = self._list.itemAt(pos)
-        path = item.data(Qt.UserRole) if item else ""
+        path = item.data(0, Qt.UserRole) if item else ""
         if not path:
             return   # LIVE row / empty area: nothing to reveal
         from PySide6.QtWidgets import QMenu

@@ -547,7 +547,17 @@ class Pipeline:
         through the settle for review, then FADE OUT starting 3s after all
         table movement stops (Joe's spec); a new play clears them instantly."""
         if shot_state == "moving" and self._prev_shot_state != "moving":
-            self._play_paths.clear()
+            # A new shot ARMED — but arming lags the strike by ~half a second
+            # (banked ball-motion evidence), and the struck ball's first steps
+            # are ALREADY in the paths. Clearing everything here amputated the
+            # first half of every trail (Joe: "the trail is only the second
+            # half of the movement"). Prune only STALE entries — leftovers of
+            # the previous play — and keep anything that moved recently: that
+            # IS this stroke's opening.
+            stale = [tid for tid, e in self._play_paths.items()
+                     if t - e.get("t_last", -1e9) > 1.5]
+            for tid in stale:
+                self._play_paths.pop(tid, None)
         # The fade clock starts only when the COMPLETE shot is over: every
         # tracked ball at rest. "Movement" needs a REAL threshold — detection
         # jitter keeps instantaneous velocity nonzero forever (which froze the
@@ -583,7 +593,7 @@ class Pipeline:
             e = self._play_paths.get(tr.id)
             if e is None:
                 e = self._play_paths[tr.id] = {"pts": [], "bgr": (200, 200, 200),
-                                               "cue": False}
+                                               "cue": False, "t_last": t}
             # identity can firm up mid-roll — keep colour/cue flag current
             if tr.number == 0:
                 e["cue"], e["bgr"] = True, (250, 250, 250)
@@ -596,6 +606,7 @@ class Pipeline:
             if (not pts or abs(pts[-1][0] - q[0]) + abs(pts[-1][1] - q[1]) >= 1.5) \
                     and len(pts) < 800:
                 pts.append(q)
+                e["t_last"] = t
 
     def view_tracks(self, tracks):
         """Velocity-extrapolated copies for RENDERING between async detection

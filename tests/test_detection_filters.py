@@ -401,3 +401,38 @@ class TestLiveSchematicFreshness:
         assert r.rect_bgr is not None
         assert not np.array_equal(before, r.rect_bgr), \
             "schematic must re-render after ingested detections"
+
+
+class TestFullShotTrails:
+    def test_pre_arm_trail_survives_the_arm_transition(self):
+        """Joe: 'the trail is only the second half of the movement.' Arming
+        lags the strike, and the settled->moving transition wiped the paths —
+        including the struck ball's opening steps. Fresh entries must survive
+        the transition; stale (previous-play) entries must not."""
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+        p.calib.calib = None      # move threshold falls back to a constant
+
+        class T:
+            def __init__(self, tid, x, y, vx=8.0):
+                self.id, self.x, self.y = tid, x, y
+                self.vx, self.vy = vx, 0.0
+                self.number, self.bgr = 3, (10, 10, 10)
+                self.misses = 0
+                self.history = [(x - 40, y)] * 2 + [(x, y)]
+
+        # previous play's leftover: entry that last moved long ago
+        p._play_paths[99] = {"pts": [(1.0, 1.0)], "bgr": (1, 1, 1),
+                             "cue": False, "t_last": 5.0}
+        p._prev_shot_state = "settled"
+        # strike happens; ball accumulates pre-arm points at t=10.0-10.4
+        for i, t in enumerate((10.0, 10.2, 10.4)):
+            p._update_play_paths([T(1, 100 + i * 20, 300)], "settled", t)
+        assert 1 in p._play_paths and len(p._play_paths[1]["pts"]) >= 2
+        before = list(p._play_paths[1]["pts"])
+        # the detector arms NOW (settled -> moving)
+        p._update_play_paths([T(1, 160, 300)], "moving", 10.5)
+        assert 99 not in p._play_paths, "stale previous-play entry must clear"
+        assert 1 in p._play_paths, "the stroke's opening must survive arming"
+        assert p._play_paths[1]["pts"][:len(before)] == before
