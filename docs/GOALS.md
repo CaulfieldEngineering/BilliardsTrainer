@@ -292,6 +292,15 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (Joe request): PHONE COMPANION shipped — review-only PWA
+  (session list -> player, shot chips, Prev/Replay/Next to pre-roll)
+  served by a zero-dep range-capable server on the rig; recordings
+  verified iOS-native (H.264+AAC). Static frontend is the future Vercel
+  deploy as-is (CORS ready). Running now at http://192.168.0.223:8765.
+  Also this hour: the REAL empty-schematic root cause — the live
+  bird's-eye rendered once at startup and cached forever (async frames
+  all detect=False); ingested detections now invalidate the cache,
+  pinned by test.
 - 2026-08-19 (loop 28): dossier surfaced IN-APP — right-click a shot ->
   "Export shot dossier (data + diagram)" writes the north-star files
   beside the session's clips and reveals them; original shot numbers
