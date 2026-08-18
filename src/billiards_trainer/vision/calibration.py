@@ -188,8 +188,15 @@ class CalibrationManager:
         if self.calib is None:
             return False
         felt = detect_felt(frame, self.calib.felt)
-        if not felt.has_corners or felt.area_ratio < 0.04:
-            return True  # can't judge (table occluded right now) — watchdog guards
+        if (not felt.has_corners or felt.area_ratio < 0.04
+                or cloth_saturation(frame, felt.mask) < _CLOTH_MIN_SAT):
+            # Can't judge: table occluded, covered, or lights off. The grey
+            # cover detects as a perfectly plausible wrinkle-quad and RMSE'd
+            # a CORRECT restored lock into the bin (measured live: RMSE 366
+            # against the cover, lock was exactly on the table) — the same
+            # guard calibrate() and check_deviation() already apply. Keep
+            # the lock; the watchdog re-judges when cloth is visible.
+            return True
         rmse = float(np.sqrt(np.mean(np.sum(
             (felt.corners - self.calib.corners) ** 2, axis=1))))
         if rmse > self._deviation_px:

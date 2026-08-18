@@ -1037,6 +1037,40 @@ class Pipeline:
         res.diag["stages"] = self._last_stages  # this frame's — for the bench
         return res
 
+    def _dump_calib_debug(self, frame: np.ndarray, tag: str) -> None:
+        """Ground-truth breadcrumbs for calibration failures: the ACTUAL frame
+        the pipeline saw, with the live felt corners (if any) and the current/
+        restored lock drawn in. Throttled hard — this is evidence, not a log.
+        (Written after an evening of guessing at coordinate spaces from three
+        different code paths; one image answers what ten traces did not.)"""
+        import time as _t
+        now = _t.monotonic()
+        if now - getattr(self, "_calib_dbg_t", 0.0) < 10.0 \
+                or getattr(self, "_calib_dbg_n", 0) >= 6:
+            return
+        self._calib_dbg_t = now
+        self._calib_dbg_n = getattr(self, "_calib_dbg_n", 0) + 1
+        try:
+            from pathlib import Path
+
+            from .felt import detect_felt
+            out = Path("_eval") / "calib_debug"
+            out.mkdir(parents=True, exist_ok=True)
+            img = frame.copy()
+            felt = detect_felt(img, self.settings.felt)
+            if getattr(felt, "has_corners", False):
+                cv2.polylines(img, [np.int32(felt.corners.reshape(-1, 1, 2))],
+                              True, (0, 255, 0), 2)      # live felt = green
+            if self.calib.calib is not None:
+                cv2.polylines(img, [np.int32(self.calib.calib.corners.reshape(-1, 1, 2))],
+                              True, (0, 0, 255), 2)      # current lock = red
+            cv2.putText(img, f"{tag} shape={frame.shape[1]}x{frame.shape[0]}",
+                        (12, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
+            cv2.imwrite(str(out / f"{tag}_{self._calib_dbg_n}.png"), img)
+            log.info("calib debug frame dumped: %s #%d", tag, self._calib_dbg_n)
+        except Exception:  # noqa: BLE001 - diagnostics must never hurt the app
+            pass
+
     # ------------------------------------------------------------------ #
     def _acquire_calibration(self, frame: np.ndarray) -> bool:
         """Restore a saved calibration if available + matching, else detect and
@@ -1051,8 +1085,10 @@ class Pipeline:
                 # watchdog catches up.
                 if self.calib.validate_against(frame, self.settings):
                     return True
+                self._dump_calib_debug(frame, "restore_rejected")
                 self.calib.clear()  # stale — fall through to a fresh lock
         if not self.calib.calibrate(frame, self.settings):
+            self._dump_calib_debug(frame, "no_lock")
             return False
         if self.settings.table.persist_calibration and self.source:
             self.calib.save(CALIBRATION_PATH, self.source, frame.shape, self.settings)
