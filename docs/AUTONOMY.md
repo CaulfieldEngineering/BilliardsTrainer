@@ -61,3 +61,9 @@ session did. Refreshed at the END of each successful work session.
 
 ## Incident log
 (watchdog appends here)
+- 2026-08-17: red push slipped through a PIPED pytest exit code for the
+  second time (5b877cf; first was the 088ed55 CI incident). Joe got the
+  failure email. Structural fix: a local git pre-push hook now runs the
+  full suite UNPIPED and blocks the push on any failure — the loop can
+  no longer push red by construction. Rule stays: never gate on a piped
+  exit code.
