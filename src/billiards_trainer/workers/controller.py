@@ -990,7 +990,9 @@ class PipelineController(QObject):
         if (not self._detection_enabled or self._pipeline is None
                 or self._pipeline._strategy is None
                 or not self._pipeline.calib.is_calibrated):
+            self._diag_blocked = getattr(self, "_diag_blocked", 0) + 1
             return  # calibration/preview paths handle themselves synchronously
+        self._diag_submit = getattr(self, "_diag_submit", 0) + 1
         if self._det_thread is None or not self._det_thread.is_alive():
             # SELF-HEAL: a dead worker starved the schematic of balls for an
             # entire evening (Joe found it, not the loop) — the thread had
@@ -1031,6 +1033,8 @@ class PipelineController(QObject):
                 or not self._detection_enabled
                 or getattr(self._source, "is_video", False)):
             return
+        self._diag_ingest = getattr(self, "_diag_ingest", 0) + 1
+        self._diag_raw = len(raw_dets)
         try:
             self._pipeline.ingest_raw_detections(raw_dets, frame_shape)
         except Exception:  # noqa: BLE001
@@ -1070,6 +1074,7 @@ class PipelineController(QObject):
             self.error.emit(f"Pipeline error: {exc}")
             return
 
+        self._diag_pub = len(res.tracks)
         self._handle_state(res.shot_state, t)
         # sidecar: record tracking states at ~10Hz while a session records
         sc = getattr(self, "_sidecar", None)
@@ -1142,9 +1147,22 @@ class PipelineController(QObject):
         dt = time.perf_counter() - t_wall0
         inst = 1.0 / dt if dt > 0 else 0.0
         self._fps = 0.9 * self._fps + 0.1 * inst if self._fps else inst
-        if self._play_tick and self._play_tick % 900 == 0:
-            log.info("health: display %.1f fps, pipeline %.0f ms/frame",
-                     self._fps, getattr(self._pipeline, "_last_ms", 0.0))
+        if self._play_tick and self._play_tick % 150 == 0:
+            # Vision-chain heartbeat: every link, countable. Joe watched an
+            # empty schematic for an evening while the log said everything
+            # was fine — this line makes "which link is dead" a read, not an
+            # investigation. (submit=frames offered, blocked=gate refusals,
+            # raw=last detection count, ingest=results applied, pub=tracks)
+            log.info("health: display %.1f fps, pipeline %.0f ms | vision "
+                     "submit=%d blocked=%d worker=%s raw=%d ingest=%d pub=%d",
+                     self._fps, getattr(self._pipeline, "_last_ms", 0.0),
+                     getattr(self, "_diag_submit", 0),
+                     getattr(self, "_diag_blocked", 0),
+                     "alive" if (self._det_thread is not None
+                                 and self._det_thread.is_alive()) else "DEAD",
+                     getattr(self, "_diag_raw", -1),
+                     getattr(self, "_diag_ingest", 0),
+                     getattr(self, "_diag_pub", -1))
 
         self.frame_ready.emit(FramePacket(
             feed_sd=self._feed_sd, feed_info=self._feed_info,

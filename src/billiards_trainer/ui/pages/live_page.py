@@ -1387,15 +1387,20 @@ class LivePage(QWidget):
     )
 
     def _size_rec_clock(self) -> None:
-        """Fix the clock's width from its own rich-text sizeHint — the only
-        measurement that cannot diverge from what gets painted."""
+        """GROW-ONLY width: the clock's minimum width ratchets up to whatever
+        its current content renders at, and there is NO maximum. Clipping is
+        structurally impossible — on any font, style, DPI, or scale — because
+        nothing ever constrains the label below its own rendering. (Every
+        measured-width scheme, plain or rich, has clipped on Joe's display;
+        this one cannot.) The ratchet also stops the per-second nudge: width
+        never shrinks mid-recording."""
         keep = self._rec_time.text()
-        w = 0
+        w = self._rec_time.minimumWidth()
         for worst in self.REC_CLOCK_WORST:
             self._rec_time.setText(worst)
             w = max(w, self._rec_time.sizeHint().width())
         self._rec_time.setText(keep)
-        self._rec_time.setFixedWidth(w + 6)
+        self._rec_time.setMinimumWidth(w + 6)
 
     def _tick_rec_time(self) -> None:
         import time
@@ -1410,6 +1415,11 @@ class LivePage(QWidget):
             # so the transport row stops shifting on each blink
             tag = f'<span style="color:{dot}">●</span> REC'
         self._rec_time.setText(f"{tag}&nbsp;&nbsp;{secs // 60}:{secs % 60:02d}")
+        # Ratchet every tick: if THIS string renders wider than the label,
+        # the label grows right now. No measurement scheme to trust.
+        need = self._rec_time.sizeHint().width()
+        if need > self._rec_time.minimumWidth():
+            self._rec_time.setMinimumWidth(need)
         if self._rec_time.property("paused") != paused:
             self._rec_time.setProperty("paused", paused)
             self._repolish(self._rec_time)
