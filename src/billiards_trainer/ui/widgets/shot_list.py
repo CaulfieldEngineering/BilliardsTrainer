@@ -120,6 +120,7 @@ class ShotListPanel(QWidget):
     outcome_corrected = Signal(float, str)   # (shot start s, new outcome)
     fix_labels_requested = Signal(float)     # seek here + enter Training Mode
     export_requested = Signal(int, float, float)  # (shot no, start s, end s)
+    dossier_requested = Signal(int)               # (shot no) -> JSON + diagram
 
     def __init__(self, pre_roll_s: float = 5.0, parent=None):
         super().__init__(parent)
@@ -283,6 +284,11 @@ class ShotListPanel(QWidget):
             lambda _c=False: self.export_requested.emit(
                 self._nos[row] if row < len(getattr(self, "_nos", []))
                 else row + 1, start, float(shot.get("end", start))))
+        dos = m.addAction("Export shot dossier (data + diagram)…")
+        dos.triggered.connect(
+            lambda _c=False: self.dossier_requested.emit(
+                self._nos[row] if row < len(getattr(self, "_nos", []))
+                else row + 1))
         fix = m.addAction("Fix ball labels at this shot…")
         fix.triggered.connect(
             lambda _c=False: self.fix_labels_requested.emit(start))

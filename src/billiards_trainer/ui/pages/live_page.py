@@ -218,6 +218,7 @@ class LivePage(QWidget):
         self._shot_list.outcome_corrected.connect(self._on_outcome_corrected)
         self._shot_list.fix_labels_requested.connect(self._on_fix_labels_at)
         self._shot_list.export_requested.connect(self._on_export_shot)
+        self._shot_list.dossier_requested.connect(self._on_export_dossier)
         self._rail_stack.addWidget(self._shot_list)          # 2 = playback review
         splitter.addWidget(self._rail_stack)
         splitter.setStretchFactor(0, 3)
@@ -1323,6 +1324,35 @@ class LivePage(QWidget):
                 log.warning("clip export failed: %s", (r.stderr or "")[-200:])
         except (OSError, subprocess.TimeoutExpired) as exc:
             log.warning("clip export failed: %s", exc)
+
+    def _on_export_dossier(self, shot_no: int) -> None:
+        """North-star surface: one right-click turns a shot into its dossier
+        (facts JSON + trajectory diagram) next to the session's clips, then
+        reveals it. Same files the future VLM coach will read."""
+        video = getattr(self, "_media_path", "")
+        if not video:
+            return
+        import subprocess
+        try:
+            import sys as _sys
+            from pathlib import Path as _P
+
+            tools = str(_P(__file__).resolve().parents[3].parent / "tools")
+            if tools not in _sys.path:
+                _sys.path.insert(0, tools)
+            from export_shot_dossier import export_shot
+
+            from ...vision.analysis_cache import SidecarReader
+            reader = SidecarReader(video)
+            if not 1 <= shot_no <= len(reader.shots):
+                return
+            out_root = _P(video).parent / "dossiers"
+            d = export_shot(_P(video), reader, shot_no,
+                            reader.shots[shot_no - 1], out_root)
+            creation = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            subprocess.Popen(["explorer", str(d)], creationflags=creation)
+        except Exception:  # noqa: BLE001 - an export must never hurt playback
+            log.exception("dossier export failed")
 
     def _on_fix_labels_at(self, start: float) -> None:
         """Jump to the shot and open Training Mode there: Joe corrects ball

@@ -239,3 +239,20 @@ class TestShotListViews:
         pnl.set_view("All")
         assert pnl._list.count() == 6
         assert "make" in pnl._list.item(2).toolTip()
+
+
+class TestDossierMenu:
+    def test_dossier_signal_carries_original_shot_number(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots([
+            {"start": 10.0, "end": 14.0, "outcome": "make"},
+            {"start": 30.0, "end": 33.0, "outcome": "miss"},
+            {"start": 50.0, "end": 60.0, "outcome": "miss"},
+        ])
+        pnl.set_view("Misses")
+        got = []
+        pnl.dossier_requested.connect(got.append)
+        # row 1 of the Misses view is original shot 3
+        pnl.dossier_requested.emit(pnl._nos[1])
+        assert got == [3]
