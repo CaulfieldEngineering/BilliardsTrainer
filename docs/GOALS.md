@@ -276,6 +276,17 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 22): board GREEN -> G3 data hunt. Built rack mining
+  (--min-dets density floor on the montage stage) and probed SEVEN
+  sessions for dense settled frames. HONEST CEILING FOUND: the library's
+  max is 11 settled separated balls (011510); full racks appear only as
+  packed clusters the detector merges. Balls 10/12/14 sit at 3/1/11
+  labels and CANNOT be mined from existing footage — G3 is data-blocked
+  on ~1 minute of full-rack recording (Joe's items list; cheapest
+  unblock in the project). Squeezed the one 11-ball spread (+11 labels,
+  one more ball-10, heuristic agreement 10/11). Also fixed my own silent
+  no-op replace (weak assert) — the flag landed on the second, hard-
+  asserted attempt.
 - 2026-08-18 (loop 21b, overnight): c6 trained + GATED, and DECLINED —
   the mechanical gate said PROMOTABLE (impossible 0.60->0.58, coverage
   flat), but the mission metric REGRESSED: held-out out-of-game 26.17 ->
