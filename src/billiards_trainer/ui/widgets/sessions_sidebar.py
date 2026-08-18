@@ -105,6 +105,9 @@ class SessionsSidebar(QFrame):
             it.setData(Qt.UserRole, str(p))
             it.setToolTip(p.name)
             self._list.addItem(it)
+        # Rows fill in with duration + shot count off-thread (cached after
+        # the first pass); "13 MB" answers nothing Joe actually asks.
+        self._load_summaries([str(p) for p in clips[:60]])
         # restore selection (default LIVE)
         idx = 0
         if current:
@@ -113,6 +116,60 @@ class SessionsSidebar(QFrame):
                     idx = i
                     break
         self._list.setCurrentRow(idx)
+
+    def _load_summaries(self, paths: list[str]) -> None:
+        """Fill rows with duration + shots, computed off-thread, applied on
+        the UI thread over a queued signal (same bridge pattern as the shot
+        thumbnails). Cache makes every pass after the first instant."""
+        import threading
+
+        from PySide6.QtCore import QObject, Signal
+
+        class _Bridge(QObject):
+            ready = Signal(str, dict)     # (path, summary)
+
+        self._sum_bridge = _Bridge(self)
+        self._sum_bridge.ready.connect(self._apply_summary)
+
+        def work(bridge=self._sum_bridge, targets=list(paths)):
+            from .. import session_summaries as ss
+            cache = ss.load_cache()
+            dirty = False
+            for sp in targets:
+                p = Path(sp)
+                if not p.exists():
+                    continue
+                before = len(cache)
+                try:
+                    s = ss.summarize(p, cache)
+                except Exception:  # noqa: BLE001 - one bad file, keep going
+                    continue
+                dirty = dirty or len(cache) != before
+                bridge.ready.emit(sp, s)
+            if dirty:
+                ss.save_cache(cache)
+
+        threading.Thread(target=work, daemon=True, name="session-summaries").start()
+
+    def _apply_summary(self, path: str, summary: dict) -> None:
+        from .. import session_summaries as ss
+        for i in range(1, self._list.count()):
+            it = self._list.item(i)
+            if it.data(Qt.UserRole) != path:
+                continue
+            p = Path(path)
+            try:
+                mb = p.stat().st_size / 1e6
+            except OSError:
+                return
+            if p.name.startswith("session-"):
+                when = datetime.fromtimestamp(p.stat().st_mtime).strftime("%b %d  %H:%M")
+                it.setText(ss.row_text(when, mb, summary))
+            it.setToolTip(f"{p.name}  ·  {mb:.0f} MB")
+            if ss.is_stub(summary, mb):
+                from PySide6.QtGui import QColor
+                it.setForeground(QColor(PALETTE.text_faint))
+            return
 
     def select_live(self) -> None:
         self._list.setCurrentRow(0)
