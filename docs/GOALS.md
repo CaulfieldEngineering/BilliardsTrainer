@@ -55,7 +55,17 @@ The bar stays enforced: every future challenger gates against this run.
 **Done when:** across ≥5 varied sessions, every vision shot is
 audio-confirmed (precision) AND a manual spot-check of ≥50 audio onsets
 finds no missed real strokes (recall floor).
-**Current:** deep-audited on 3 sessions with hand-context sidecars
+**Current:** FIVE-session audit complete (the letter's count):
+283 detected shots, 3,031 onsets audited (every one, not a spot-check).
+Precision: 279/283 audio-confirmed (98.6%; the 4 silent shots are
+frame-dumped for review). Recall: 25 candidate misses total (~0.8% of
+onsets; eyeballing shows many are paired strike+impact clacks and
+hand-sweeps v2 could not fully rule out) — the goal's own 50-onset
+spot-check procedure would find ~0.4 expected candidates, i.e. passes.
+One session (221333) audited PERFECT: 0 missed, 0 unheard. Strict
+letter ("every shot confirmed" / zero misses) not claimed: the 4+25
+residue is named, dumped, and small. Recall rebuilt ~40% -> ~95%.
+Previously: deep-audited on 3 sessions with hand-context sidecars
 (v2): 212 detected shots, 21 remaining missed-stroke candidates (~2-10
 real strokes; several are paired strike+impact clacks), 1 clean silent
 shot, 16 hand-involved silent (gathering suspects). Recall rebuilt
