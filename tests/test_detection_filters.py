@@ -356,3 +356,48 @@ class TestForeignHandFilter:
         raw = [_mk(200, 200, exp, cls=BallClass.SOLID, number=4, score=0.9)]
         dets, _ = _run_apply(p, calib, raw)
         assert len(dets) == 1
+
+
+class TestLiveSchematicFreshness:
+    def test_ingest_invalidates_cached_schematic(self):
+        """The live async split sends every display frame with detect=False,
+        so the schematic cache must be invalidated when detections are
+        INGESTED — or the bird's-eye renders once at startup (empty) and
+        freezes forever while the tracker publishes balls (Joe's thrice-
+        reported empty schematic)."""
+        import numpy as np
+
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        s.ui.schematic_birdseye = True
+        p = Pipeline(s)
+
+        class FakeStrategy:
+            model_based = True
+        p._strategy = FakeStrategy()
+        base = _fake_calib()
+        exp = expected_ball_radius_px(base.table, s.table.size)
+
+        class C2:
+            H = base.H
+            Hinv = np.eye(3)
+            table = base.table
+            corners = np.float32([[0, 0], [675, 0], [675, 1271], [0, 1271]])
+            felt = None
+        calib = C2()
+        p.calib.calib = calib
+        s.ui.show_overlays = False        # keep the test off the overlay path
+
+        frame = np.zeros((1271, 675, 3), np.uint8)
+        r1 = p.process(frame, 1.0, detect=False)
+        assert r1.rect_bgr is not None
+        before = r1.rect_bgr.copy()
+        # async worker delivers a ball; display frames stay detect=False
+        for i in range(8):
+            p.ingest_raw_detections(
+                [_mk(200 + i * 4, 300, exp, cls=BallClass.SOLID,
+                     number=3, score=0.9)], frame.shape)
+            r = p.process(frame, 1.0 + i * 0.03, detect=False)
+        assert r.rect_bgr is not None
+        assert not np.array_equal(before, r.rect_bgr), \
+            "schematic must re-render after ingested detections"

@@ -533,6 +533,14 @@ class Pipeline:
         if calib is None:
             return
         self._apply_detections(raw_dets, calib, frame_shape)
+        # The tracks just changed, so the cached schematic is STALE. Live
+        # display frames all carry detect=False (the async split), so without
+        # this invalidation the bird's-eye rendered once at startup — an
+        # empty table — and froze forever while the tracker published balls
+        # (Joe, three times: "the schematic isn't showing any balls").
+        # Re-render happens on the next display frame, i.e. the schematic
+        # updates at detection cadence, which is exactly the old economy.
+        self._last_schematic = None
 
     def _update_play_paths(self, tracks, shot_state: str, t: float) -> None:
         """Accumulate each moving ball's path for the CURRENT play. Paths hold
