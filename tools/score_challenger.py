@@ -68,15 +68,32 @@ def main() -> int:
         return 2
 
     if args.champion_agg:
+        # STALE-RULER WARNING (measured 2026-08-18): identical tracker code
+        # scored 173553 at 0.27 vs a weeks-old baseline's 1.40, and 015737 at
+        # 2.00 vs 1.41 — per-session scores move across code eras for reasons
+        # outside the model. A verdict against a saved aggregate compares two
+        # different rulers. Only pass --champion-agg for a quick look, never
+        # for a promotion decision.
+        print("WARNING: comparing against a SAVED champion aggregate — "
+              "cross-era scores are not comparable (stale ruler). "
+              "Promotion decisions require the same-batch default.")
         champ_agg_path = Path(args.champion_agg)
+        champ_agg = json.loads(champ_agg_path.read_text(encoding="utf-8"))
     else:
-        cands = sorted(ROOT.glob("_eval/corpus/*/aggregate.json"),
-                       key=lambda p: p.stat().st_mtime)
-        if not cands:
-            print("no champion aggregate — run tools/score_corpus.py first", file=sys.stderr)
+        # SAME-BATCH default: score the CHAMPION fresh, right now, with this
+        # exact code + environment, then the challenger. Twice the wall-clock
+        # and the only comparison that means anything.
+        champ_out = ROOT / "_eval" / "corpus" / f"samebatch_champion_{champion.stem}"
+        print(f"same-batch: scoring champion fresh -> {champ_out}")
+        cmd = [sys.executable, str(ROOT / "tools" / "score_corpus.py"),
+               "--out", str(champ_out), "--stride", str(args.stride),
+               "--max-seconds", str(args.max_seconds)]
+        subprocess.run(cmd, check=False, timeout=4 * 3600)
+        champ_agg_path = champ_out / "aggregate.json"
+        if not champ_agg_path.exists():
+            print("champion same-batch run failed", file=sys.stderr)
             return 2
-        champ_agg_path = cands[-1]
-    champ_agg = json.loads(champ_agg_path.read_text(encoding="utf-8"))
+        champ_agg = json.loads(champ_agg_path.read_text(encoding="utf-8"))
 
     out_dir = Path(args.out) if args.out else ROOT / "_eval" / "corpus" / f"challenger_{challenger.stem}"
     backup = champion.with_suffix(".onnx.bak")
