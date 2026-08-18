@@ -276,6 +276,18 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 21b, overnight): c6 trained + GATED, and DECLINED —
+  the mechanical gate said PROMOTABLE (impossible 0.60->0.58, coverage
+  flat), but the mission metric REGRESSED: held-out out-of-game 26.17 ->
+  28.60/1k on the c6 config, 41.44 -> 43.49 on the canonical 6-session
+  config. A model whose one job is lowering oog does not ship by raising
+  it. Also corrected a would-be false victory: the "26/1k, under the
+  <=34 target!" reading was a holdout-slice artifact (excluding the two
+  newly-labelled oog-heavy sessions flattered the number) — on the
+  canonical config c5 stands at 41.4 vs the <=34 target, so G3 remains
+  OPEN. 86 frames was not enough signal. Path: targeted full-rack
+  labelling for the starved classes (10: 2, 12: 1, 14: 11 labels) and a
+  bigger increment before c7. Champion restored, fingerprint verified.
 - 2026-08-18 (loop 21): board GREEN -> G3 (the last open metric goal).
   MONTAGE LABELLING, me as the vision model: read 33 crop sheets across
   two sessions (011510 game + 011928 games), labelled 161 crops
