@@ -196,3 +196,46 @@ class TestShotThumbnails:
         pnl._correct(0, "miss")                  # rebuilds all rows
         assert not pnl._list.item(0).icon().pixmap(96, 54).toImage().isNull()
         assert "corrected" in pnl._list.item(0).toolTip()
+
+
+class TestShotListViews:
+    def _shots6(self):
+        return [
+            {"start": 10.0, "end": 14.0, "outcome": "make"},
+            {"start": 30.0, "end": 33.0, "outcome": "make"},
+            {"start": 50.0, "end": 60.0, "outcome": "miss"},
+            {"start": 70.0, "end": 71.5, "outcome": "make"},
+            {"start": 90.0, "end": 99.0, "outcome": "scratch"},
+            {"start": 110.0, "end": 111.0, "outcome": "miss"},
+        ]
+
+    def test_view_functions(self):
+        from billiards_trainer.ui.widgets.shot_list import view_shots
+        shots = self._shots6()
+        assert [n for n, _ in view_shots(shots, "Misses")] == [3, 6]
+        assert [n for n, _ in view_shots(shots, "Makes")] == [1, 2, 4]
+        assert [n for n, _ in view_shots(shots, "Longest")][:2] == [3, 5]
+        # streaks: shots 1+2 are a 2-run; shot 4 is a lone make (excluded)
+        assert [n for n, _ in view_shots(shots, "Streaks")] == [1, 2]
+        assert [n for n, _ in view_shots(shots, "All")] == [1, 2, 3, 4, 5, 6]
+
+    def test_panel_filters_and_keeps_original_numbers(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        pnl.set_shots(self._shots6())
+        pnl.set_view("Misses")
+        assert pnl._list.count() == 2
+        assert pnl._list.item(0).text().strip().startswith("3")
+        assert "(2/6)" in pnl._count.text()
+
+    def test_correction_in_filtered_view_flows_to_full_list(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        pnl = ShotListPanel()
+        shots = self._shots6()
+        pnl.set_shots(shots)
+        pnl.set_view("Misses")
+        pnl._correct(0, "make")              # correct original shot 3
+        assert shots[2]["outcome"] == "make"  # shared dict mutated
+        pnl.set_view("All")
+        assert pnl._list.count() == 6
+        assert "make" in pnl._list.item(2).toolTip()

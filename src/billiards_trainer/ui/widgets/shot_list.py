@@ -74,6 +74,40 @@ def _outcome_dot(colour: str, corrected: bool) -> QIcon:
     return _DOT_CACHE[key]
 
 
+#: The list's views (G6 spec item 5: "sortable: misses only, longest shots,
+#: streaks"). Each maps the full chronological shot list to a displayed
+#: sequence of (original_shot_no, shot) — the shot keeps its real number in
+#: every view, so "Shot 7" in Misses is the same Shot 7 on the timeline.
+VIEWS = ("All", "Misses", "Makes", "Longest", "Streaks")
+
+
+def view_shots(shots: list[dict], view: str) -> list[tuple[int, dict]]:
+    seq = [(i + 1, s) for i, s in enumerate(shots or [])]
+    if view == "Misses":
+        return [(n, s) for n, s in seq if s.get("outcome") == "miss"]
+    if view == "Makes":
+        return [(n, s) for n, s in seq if s.get("outcome") == "make"]
+    if view == "Longest":
+        return sorted(seq, key=lambda ns: (float(ns[1].get("end", 0))
+                                           - float(ns[1].get("start", 0))),
+                      reverse=True)
+    if view == "Streaks":
+        # Shots that belong to a run of >=2 consecutive MAKES, chronological.
+        # Original dicts are returned untouched so corrections made from this
+        # view flow back to the one shot list everything else shares.
+        out: list[tuple[int, dict]] = []
+        run: list[tuple[int, dict]] = []
+        for n, s in seq + [(0, {"outcome": "_end"})]:
+            if s.get("outcome") == "make":
+                run.append((n, s))
+                continue
+            if len(run) >= 2:
+                out.extend(run)
+            run = []
+        return out
+    return seq
+
+
 class ShotListPanel(QWidget):
     """``shot_selected(seconds)`` asks the owner to seek (routine start).
 
@@ -104,6 +138,15 @@ class ShotListPanel(QWidget):
         self._count.setObjectName("Faint")
         head.addWidget(self._count)
         head.addStretch(1)
+        from PySide6.QtWidgets import QComboBox
+        self._view = "All"
+        self._view_box = QComboBox()
+        self._view_box.addItems(list(VIEWS))
+        self._view_box.setFixedHeight(24)
+        self._view_box.setToolTip("View: all shots, misses only, makes only, "
+                                  "longest first, or make-streaks")
+        self._view_box.currentTextChanged.connect(self.set_view)
+        head.addWidget(self._view_box)
         self._prev = QPushButton("‹")
         self._next = QPushButton("›")
         for b, tip in ((self._prev, "Previous shot"), (self._next, "Next shot")):
@@ -132,9 +175,25 @@ class ShotListPanel(QWidget):
 
     # ------------------------------------------------------------------ #
     def set_shots(self, shots: list[dict]) -> None:
-        self._shots = list(shots or [])
+        self._all_shots = list(shots or [])
+        self._render()
+
+    def set_view(self, view: str) -> None:
+        if view in VIEWS:
+            self._view = view
+            self._render()
+
+    def _render(self) -> None:
+        """Rebuild rows from the current view. ``self._shots`` holds the
+        VIEWED sequence (row index -> shot dict, the same shared dicts as
+        the full list, so corrections made in any view flow everywhere);
+        ``self._nos`` holds each row's ORIGINAL shot number."""
+        viewed = view_shots(getattr(self, "_all_shots", []),
+                            getattr(self, "_view", "All"))
+        self._shots = [s for _n, s in viewed]
+        self._nos = [n for n, _s in viewed]
         self._list.clear()
-        for i, s in enumerate(self._shots):
+        for no, s in viewed:
             colour, name = _OUTCOME.get(s.get("outcome", "miss"),
                                         (PALETTE.text_dim, "?"))
             corrected = bool(s.get("corrected"))
@@ -142,25 +201,29 @@ class ShotListPanel(QWidget):
             dur = max(0.0, float(s.get("end", start)) - start)
             pot = int(s.get("pocketed", 0))
             mm, ss = int(start) // 60, int(start) % 60
-            text = f"{i + 1:>3}   {name:<7} {mm}:{ss:02d}   {dur:.1f}s"
+            text = f"{no:>3}   {name:<7} {mm}:{ss:02d}   {dur:.1f}s"
             if pot > 1:
                 text += f"   ×{pot}"
             item = QListWidgetItem(text)
             item.setIcon(_outcome_dot(colour, corrected))
             item.setForeground(Qt.GlobalColor.white)
             item.setData(Qt.UserRole, start)
-            item.setToolTip(f"Shot {i + 1}: {name.lower()}, {dur:.1f}s"
+            item.setToolTip(f"Shot {no}: {name.lower()}, {dur:.1f}s"
                             + (f", {pot} balls potted" if pot else "")
                             + (" — outcome corrected by you" if corrected else ""))
             self._list.addItem(item)
-        self._count.setText(f"({len(self._shots)})")
+        total = len(getattr(self, "_all_shots", []))
+        shown = len(self._shots)
+        self._count.setText(f"({shown}/{total})" if shown != total else f"({total})")
         self._sync_empty()
         if getattr(self, "_thumbs", None):
-            self.set_thumbnails(self._thumbs)   # corrections rebuild rows
+            self.set_thumbnails(self._thumbs)   # rebuilds icons for the view
 
     def add_shot(self, shot: dict) -> None:
-        self._shots.append(shot)
-        self.set_shots(self._shots)
+        if not hasattr(self, "_all_shots"):
+            self._all_shots = []
+        self._all_shots.append(shot)
+        self._render()
 
     def set_thumbnails(self, thumbs: dict) -> None:
         """{shot start s: small BGR array} — swap dot icons for thumbnails.
@@ -187,7 +250,7 @@ class ShotListPanel(QWidget):
         return None
 
     def _sync_empty(self) -> None:
-        has = bool(self._shots)
+        has = bool(getattr(self, "_all_shots", None) or self._shots)
         self._list.setVisible(has)
         self._empty.setVisible(not has)
         self._prev.setEnabled(has)
@@ -218,18 +281,19 @@ class ShotListPanel(QWidget):
         exp = m.addAction("Export this shot as a clip…")
         exp.triggered.connect(
             lambda _c=False: self.export_requested.emit(
-                row + 1, start, float(shot.get("end", start))))
+                self._nos[row] if row < len(getattr(self, "_nos", []))
+                else row + 1, start, float(shot.get("end", start))))
         fix = m.addAction("Fix ball labels at this shot…")
         fix.triggered.connect(
             lambda _c=False: self.fix_labels_requested.emit(start))
         m.exec(self._list.mapToGlobal(pos))
 
     def _correct(self, row: int, outcome: str) -> None:
-        shot = self._shots[row]
+        shot = self._shots[row]          # shared dict: flows to every view
         shot["outcome"] = outcome
         shot["corrected"] = True
         self.outcome_corrected.emit(float(shot.get("start", 0.0)), outcome)
-        self.set_shots(self._shots)
+        self._render()                   # NOT set_shots: keep the full list
 
     def _step(self, delta: int) -> None:
         if not self._shots:
