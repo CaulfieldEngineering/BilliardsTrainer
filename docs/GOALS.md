@@ -260,6 +260,24 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 18): board GREEN. Traced 011510 @72.2s for real: the
+  detector ARMED on the banked cue nudge, then resolved 0.23s later
+  (frame-count floors are cadence-dependent) and discarded on ~35px of
+  tracked travel — the struck ball's flight was motion-blurred out of
+  tracking and its 500px revival snap read as step 0 because _prev
+  forgot vanished balls. SHIPPED (5b877cf): TIME floors on resolution
+  (min_shot_s=1.2, settle_s=0.5), 3s positional memory for vanished
+  balls, and a CARRIED-DWELL veto (hand on movers >60% of moving
+  updates = gathering, discard at resolve). Also: my pytest gate was
+  PIPED again — second-ever red push (Joe got the email); fixed the two
+  legacy tests, verified unpiped (347 green), and installed a pre-push
+  hook that runs the suite unpiped and blocks red pushes structurally.
+  VERIFICATION (re-backfill + audit, all 3): carried-dwell veto WORKS —
+  18 gathering-shots removed (115->105, 95->87), hand-involved silent
+  19->14. NOT fixed: 011510's 6 miss candidates unchanged — synthetic
+  test passes but the real flyer likely returns as a NEW track id, not
+  a same-id revival, sidestepping the positional memory. NEXT: trace
+  that spawn path and credit new-id appearances born mid-shot.
 - 2026-08-18 (loop 17): board GREEN. SIDECAR V2 shipped (48de297): each
   state records hand-adjacent ball ids + bed fraction under hands; v1
   reads as unknown-not-no; live recorder + backfill both write it; app
