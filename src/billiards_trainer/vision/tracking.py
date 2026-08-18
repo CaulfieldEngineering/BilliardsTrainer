@@ -33,6 +33,7 @@ class _Internal:
     settled: bool = False      # confirmed AND has been still a while (a resting ball)
     move_streak: int = 0       # consecutive matched frames with real PUBLISHED motion
     shown_number: int = -1     # the number last actually PUBLISHED for this track
+    snap_age: int = -10**9     # age at the last beyond-gate revival snap
     committed_number: int = -1  # hysteresis: the held identity (resists flicker)
     committed_cls: BallClass = BallClass.UNKNOWN  # sticky class for unnumbered balls
     cls_hist: deque = field(default_factory=lambda: deque(maxlen=15))
@@ -275,8 +276,16 @@ class BallTracker:
         # the longer the track has been missing, and SNAP across the gap (the
         # intermediate path was never observed — smoothing it in would whip the
         # velocity estimate).
+        # A track that just SNAPPED across the table cannot snap again for a
+        # while: without the cooldown a starved track ping-ponged between two
+        # distant balls through the growing revival gate — the corpus's
+        # repeating "moved 9.5 diameters in one frame" teleports (015737
+        # track 9 fired five times in 20 seconds). One snap is a rescue;
+        # serial snapping is identity theft, so the second vanish ages out
+        # and the far ball spawns a fresh track instead.
         lost_tis = [ti for ti, t in enumerate(self._tracks)
-                    if ti not in matched_tracks and t.confirmed and t.misses >= 1]
+                    if ti not in matched_tracks and t.confirmed and t.misses >= 1
+                    and t.age - t.snap_age > 90]
         if lost_tis and len(matched_dets) < len(detections):
             revive = []
             for ti in lost_tis:
@@ -303,6 +312,7 @@ class BallTracker:
                     t.vx = t.vy = 0.0
                     t.settled = False
                     t.still_count = 0
+                    t.snap_age = t.age
                     # The identity rides the snap (revival exists for "the
                     # same ball reappearing"), but trim the history so votes
                     # read at the OLD spot cannot dominate a later re-vote.
@@ -342,17 +352,28 @@ class BallTracker:
             # 2.4% sliver where a starved duplicate could ride the settled
             # occlusion budget for a minute, parked inside a real ball (the
             # dedupe already prefers the detection-backed track of a pair).
-            merge_dist = max(0.035 * self._short_side, 1.6 * ball_r)
+            # The bar uses BOTH the geometric expectation and the pair's own
+            # published radii: the scorer flags pairs under 0.8x the published
+            # diameter, and published radii run ~10% larger than exp_r — that
+            # gap let a ghost park 0.75-0.79 diameters inside a real ball for
+            # a minute at a time (corpus: 25 overlap violations on 173553).
+            # Two REAL touching balls sit at 1.0x the pair diameter — safe.
+            merge_floor = max(0.035 * self._short_side, 1.6 * ball_r)
             order = sorted(range(len(self._tracks)),
                            key=lambda i: (self._tracks[i].misses == 0, self._tracks[i].hits),
                            reverse=True)
             keep_idx: list[int] = []
             for i in order:
                 ti = self._tracks[i]
-                if any(math.hypot(self._tracks[j].x - ti.x, self._tracks[j].y - ti.y) < merge_dist
-                       for j in keep_idx):
-                    continue
-                keep_idx.append(i)
+                merged = False
+                for j in keep_idx:
+                    tj = self._tracks[j]
+                    bar = max(merge_floor, 0.8 * (ti.radius + tj.radius))
+                    if math.hypot(tj.x - ti.x, tj.y - ti.y) < bar:
+                        merged = True
+                        break
+                if not merged:
+                    keep_idx.append(i)
             self._tracks = [self._tracks[i] for i in keep_idx]
 
         # Velocity-aware keep-alive: a ball that vanished while SETTLED (resting) is
