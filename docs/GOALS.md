@@ -292,6 +292,15 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-19 (loop 29): OUTCOME AUDIT built (Joe's progression: shots
+  verified, now makes/misses). His 9-ball session: 7/11 outcomes agree
+  with the table's ball-count deltas; frame inspection of the rest
+  found the UNSEEN-POT class — a ball's whole flight into the pocket is
+  blur, no tracked approach, no credit: a frame-verified scratch was
+  recorded as a miss. Fixed: free-moving vanished-never-returned balls
+  earn the nearest pocket at resolve (cue -> scratch); two tests. His
+  session's stored outcomes unchanged until re-analysis — offer him a
+  re-backfill.
 - 2026-08-18 (Joe request): PHONE COMPANION shipped — review-only PWA
   (session list -> player, shot chips, Prev/Replay/Next to pre-roll)
   served by a zero-dep range-capable server on the rig; recordings
