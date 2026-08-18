@@ -389,6 +389,23 @@ class ShotDetector:
                 cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
                 self._pocketed.append(PocketedBall(tid, cls, name, t))
                 log.debug("Ball %d dropped into %s (closest %.0fpx)", tid, name, dist)
+                continue
+            # UNSEEN POT (Joe's 9-ball audit: scratches recorded as misses):
+            # a fast ball's whole flight into the pocket can be motion blur —
+            # it never TRACKS near a pocket, so the approach gate above can't
+            # credit it. But it moved freely, vanished, never came back, and
+            # no hand was near it: the table says it went down. Credit the
+            # pocket nearest its last tracked position; the cue ball makes
+            # this a scratch via the normal resolve path.
+            if (self._free_frames.get(tid, 0) >= 2
+                    and self._frame_idx - self._last_carried.get(tid, -10**9) > 45):
+                prev = self._prev.get(tid)
+                if prev is not None:
+                    pk, pdist = table.nearest_pocket(prev.x, prev.y)
+                    cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
+                    self._pocketed.append(PocketedBall(tid, cls, pk.name, t))
+                    log.debug("Ball %d vanished free mid-shot — credited to "
+                              "%s (last seen %.0fpx away)", tid, pk.name, pdist)
 
     def _already(self, tid: int) -> bool:
         return any(p.track_id == tid for p in self._pocketed)

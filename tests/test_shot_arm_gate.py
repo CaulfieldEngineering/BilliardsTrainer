@@ -326,3 +326,55 @@ class TestVanishedFlyerCredit:
             tracks = [_mk(1, x, 300.0)] if i > 2 else [_mk(1, x, 300.0), ghost]
             frames.append((tracks, 0.0, set()))
         assert _run(det, frames) == [], "static ghost death must not make a shot"
+
+
+class TestUnseenPotCredit:
+    def _det(self):
+        s = Settings()
+        s.detection.require_cue = False
+        s.detection.use_fusion = False
+        s.detection.warmup_seconds = 0.0
+        s.detection.cooldown_seconds = 0.0
+        return ShotDetector(s.detection, s.balls, settle_frames=3,
+                            min_shot_frames=2, min_shot_s=0.0, settle_s=0.0)
+
+    def test_cue_vanishing_free_is_a_scratch(self):
+        """Joe's 9-ball audit: the cue flew into a pocket entirely in blur —
+        no tracked approach, so no pocket credit, and a real scratch was
+        recorded as a miss. A free-moving ball that vanishes and never
+        returns now earns the nearest pocket; cue -> SCRATCH."""
+        det = self._det()
+        frames = []
+        cue = _mk(1, 300.0, 300.0, cls=BallClass.CUE, number=0)
+        obj = _mk(2, 500.0, 700.0, number=5)
+        for _ in range(10):
+            frames.append(([cue, obj], 0.0, set()))
+        x = 300.0
+        for _ in range(4):                    # cue streaks away, then GONE
+            x += 30.0
+            frames.append(([_mk(1, x, 300.0, cls=BallClass.CUE, number=0, vx=30.0),
+                            obj], 0.5, set()))
+        for _ in range(24):                   # never comes back; table calm
+            frames.append(([obj], 0.0, set()))
+        events = _run(det, frames)
+        assert len(events) == 1
+        assert events[0].outcome.value == "scratch", \
+            f"vanished cue must scratch, got {events[0].outcome.value}"
+
+    def test_object_ball_vanishing_free_is_a_make(self):
+        det = self._det()
+        frames = []
+        cue = _mk(1, 300.0, 300.0, cls=BallClass.CUE, number=0)
+        obj = _mk(2, 340.0, 300.0, number=5)
+        for _ in range(10):
+            frames.append(([cue, obj], 0.0, set()))
+        x = 340.0
+        for _ in range(4):
+            x += 30.0
+            frames.append(([cue, _mk(2, x, 300.0, number=5, vx=30.0)], 0.5, set()))
+        for _ in range(24):
+            frames.append(([cue], 0.0, set()))
+        events = _run(det, frames)
+        assert len(events) == 1
+        assert events[0].outcome.value == "make"
+        assert events[0].num_pocketed == 1
