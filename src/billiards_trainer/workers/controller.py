@@ -991,7 +991,13 @@ class PipelineController(QObject):
                 or self._pipeline._strategy is None
                 or not self._pipeline.calib.is_calibrated):
             return  # calibration/preview paths handle themselves synchronously
-        if self._det_thread is None:
+        if self._det_thread is None or not self._det_thread.is_alive():
+            # SELF-HEAL: a dead worker starved the schematic of balls for an
+            # entire evening (Joe found it, not the loop) — the thread had
+            # died on a stale-signal race and nothing ever restarted it. Any
+            # submitted frame now resurrects a dead worker.
+            if self._det_thread is not None:
+                log.warning("detect worker was dead — respawning")
             self._det_thread = threading.Thread(
                 target=self._detect_worker, daemon=True, name="detect-worker")
             self._det_thread.start()
@@ -1009,7 +1015,14 @@ class PipelineController(QObject):
                 raw = self._pipeline._strategy.detect(frame, calib)
             except Exception:  # noqa: BLE001 - a bad frame must not kill the worker
                 raw = []
-            self._detections_ready.emit(raw, frame.shape)
+            try:
+                self._detections_ready.emit(raw, frame.shape)
+            except RuntimeError:
+                # The controller QObject backing this signal was deleted (a
+                # source-switch race). Exit CLEANLY — _submit_detection
+                # respawns a worker for whichever controller is alive.
+                log.warning("detect worker: signal source gone, exiting")
+                return
 
     @Slot(object, object)
     def _on_detections_ready(self, raw_dets, frame_shape) -> None:

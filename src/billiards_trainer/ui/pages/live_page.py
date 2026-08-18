@@ -271,20 +271,15 @@ class LivePage(QWidget):
         self._rec_time = QLabel("")
         self._rec_time.setObjectName("RecClock")
         self._rec_time.setTextFormat(Qt.RichText)
-        # FIXED, not minimum: the clock counts up and a minimum width still lets
-        # it grow, nudging the whole capsule sideways. The width is MEASURED
-        # from the worst-case string rather than guessed — a hardcoded 96px
-        # clipped "❚❚ PAUSED 125:30" down to "RE", because QLabel truncates
-        # instead of growing once the width is fixed.
-        # fontMetrics cannot see the stylesheet's 1px letter-spacing, so the
-        # measured width under-reserved by ~one char per character and the
-        # clock CLIPPED (Joe's screenshot). Compensate per character, and hide
-        # the clock entirely while idle — an empty fixed-width label reads as
-        # a broken dead gap inside the capsule.
-        _worst = "❚❚ PAUSED   000:00"
-        self._rec_time.setFixedWidth(
-            self._rec_time.fontMetrics().horizontalAdvance(_worst)
-            + len(_worst) + 18)
+        # FIXED, not minimum: the clock counts up and a minimum width still
+        # lets it grow, nudging the whole capsule sideways. This label has
+        # now clipped THREE times, each fix a different fudge constant on
+        # plain fontMetrics — which measures a different thing than the
+        # rich-text engine actually renders (span + &nbsp; + late-applied
+        # stylesheet). _size_rec_clock() measures via the label's OWN
+        # sizeHint on the worst-case strings (the exact rendering path) and
+        # runs again at record start, when styling is final.
+        self._size_rec_clock()
         self._rec_time.setAlignment(Qt.AlignCenter)
         self._rec_time.hide()
         cap.addWidget(self._rec_time)
@@ -1367,6 +1362,9 @@ class LivePage(QWidget):
         if on:
             import time
             self._rec_t0 = time.monotonic()
+            # Styling is final by now (repolish above) — re-measure so the
+            # fixed width matches what THIS style actually renders.
+            self._size_rec_clock()
             self._rec_time.show()
             # the lane becomes a rolling capture timeline while recording
             self._timeline.clear()
@@ -1380,6 +1378,24 @@ class LivePage(QWidget):
             self._rec_time.setText("")
             self._rec_time.hide()   # an empty fixed-width clock is a dead gap
             self._timeline.follow_window_s = 0.0   # back to show-everything
+
+    #: Worst-case clock renderings — every string _tick_rec_time can produce
+    #: is no wider than one of these (000:00 uses the widest digit slots).
+    REC_CLOCK_WORST = (
+        '<span style="color:#ff0000">●</span> REC&nbsp;&nbsp;000:00',
+        "❚❚ PAUSED&nbsp;&nbsp;000:00",
+    )
+
+    def _size_rec_clock(self) -> None:
+        """Fix the clock's width from its own rich-text sizeHint — the only
+        measurement that cannot diverge from what gets painted."""
+        keep = self._rec_time.text()
+        w = 0
+        for worst in self.REC_CLOCK_WORST:
+            self._rec_time.setText(worst)
+            w = max(w, self._rec_time.sizeHint().width())
+        self._rec_time.setText(keep)
+        self._rec_time.setFixedWidth(w + 6)
 
     def _tick_rec_time(self) -> None:
         import time
