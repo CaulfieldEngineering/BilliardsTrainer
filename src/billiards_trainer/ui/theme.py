@@ -285,16 +285,29 @@ QTabBar::tab {{
 QTabBar::tab:selected {{ color: {p.text}; border-bottom: 2px solid {accent}; }}
 QTabBar::tab:hover {{ color: {p.text}; }}
 
-/* ---- Tables ---- */
+/* ---- Tables: ONE selection surface (Joe: "never use this
+   text-highlight background color method anywhere ever again").
+   Selection = a single subtle full-row tint; hover = a lighter one;
+   no per-cell accent boxes, no focus rectangle, no banding. ---- */
 QTableView, QTableWidget, QTreeView, QListView {{
     background-color: {p.bg_elevated};
     border: 1px solid {p.border_soft};
-    border-radius: 10px;
+    border-radius: 2px;
     gridline-color: {p.border_soft};
-    selection-background-color: {accent_soft.name(QColor.HexArgb)};
-    selection-color: {p.text};
-    alternate-background-color: {p.surface};
+    outline: none;
+    alternate-background-color: {p.bg_elevated};
 }}
+QTreeView::item, QListView::item {{
+    padding: 5px 8px;
+    border: none;
+    background: transparent;
+}}
+QTreeView::item:hover, QListView::item:hover {{ background: {p.surface}; }}
+QTreeView::item:selected, QListView::item:selected {{
+    background: {p.surface_hi};
+    color: {p.text};
+}}
+QTreeView {{ show-decoration-selected: 1; }}
 QHeaderView::section {{
     background-color: {p.bg_elevated};
     color: {p.text_dim};

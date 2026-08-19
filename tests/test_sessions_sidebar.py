@@ -35,8 +35,8 @@ class TestSessionTable:
     def test_columns_and_default_sort_newest_first(self, app, tmp_path):
         sb = _sidebar(app, tmp_path)
         t = sb._list
-        assert [t.headerItem().text(i) for i in range(4)] == \
-            ["Name", "Date", "Len", "Shots"]
+        assert [t.headerItem().text(i) for i in range(3)] == \
+            ["Date", "Len", "Shots"]
         first = t.topLevelItem(0)
         assert "session-b" in first.data(0, Qt.UserRole)   # newest on top
 
@@ -49,8 +49,8 @@ class TestSessionTable:
             dur = [9.0, 2520.0, 600.0][i]
             sb._apply_summary(it.data(0, Qt.UserRole),
                               {"dur_s": dur, "shots": i})
-        t.sortByColumn(2, Qt.DescendingOrder)
-        durs = [t.topLevelItem(i).data(2, sb._Row.SORT_ROLE)
+        t.sortByColumn(1, Qt.DescendingOrder)
+        durs = [t.topLevelItem(i).data(1, sb._Row.SORT_ROLE)
                 for i in range(t.topLevelItemCount())]
         assert durs == sorted(durs, reverse=True)
 
@@ -72,7 +72,7 @@ class TestHeadersFit:
         app.processEvents()
         t = sb._list
         fm = QFontMetrics(t.header().font())
-        for col in range(4):
+        for col in range(3):
             need = fm.horizontalAdvance(t.headerItem().text(col)) + 12
             assert t.header().sectionSize(col) >= need, \
                 f"column {col} ({t.headerItem().text(col)!r}) clips: " \
@@ -92,7 +92,37 @@ class TestSectionsFitUnderAnyFont:
         sb = _sidebar(app, tmp_path)
         hdr = sb._list.header()
         assert hdr.sectionResizeMode(0) == QHeaderView.Stretch
-        for col in (1, 2, 3):
+        for col in (1, 2):
             assert hdr.sectionResizeMode(col) == QHeaderView.ResizeToContents, \
                 f"column {col} is fixed-width again"
         assert not hdr.stretchLastSection()
+
+
+class TestDesignLanguage:
+    """docs/DESIGN.md pins: one selection surface, right-aligned numerics,
+    no redundant Name column."""
+
+    def test_one_selection_surface(self):
+        """Row selection = ONE subtle full-row tint. The per-cell accent
+        boxes (blue box on blue row) are banned from list/table views;
+        text-input character selection elsewhere is a different thing."""
+        from billiards_trainer.ui.theme import build_stylesheet
+        qss = build_stylesheet()
+        tables = qss.split("---- Tables")[1].split("---- Scrollbars")[0]
+        assert "selection-background-color" not in tables, \
+            "per-cell selection boxes came back (banned by Joe)"
+        assert "QTreeView::item:selected, QListView::item:selected" in tables
+
+    def test_numeric_columns_right_aligned(self, app, tmp_path):
+        from PySide6.QtCore import Qt
+        sb = _sidebar(app, tmp_path)
+        it = sb._list.topLevelItem(0)
+        for col in (1, 2):
+            assert it.textAlignment(col) & Qt.AlignRight, \
+                f"column {col} lost its right alignment"
+
+    def test_no_name_column(self, app, tmp_path):
+        sb = _sidebar(app, tmp_path)
+        heads = [sb._list.headerItem().text(i) for i in range(3)]
+        assert "Name" not in heads, \
+            "the Name column (pure Date duplication) came back"

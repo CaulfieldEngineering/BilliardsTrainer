@@ -68,9 +68,13 @@ class SessionsSidebar(QFrame):
         self._list = QTreeWidget()
         self._list.setFrameShape(QFrame.NoFrame)
         self._list.setRootIsDecorated(False)
-        self._list.setHeaderLabels(["Name", "Date", "Len", "Shots"])
+        # Three columns, not four: session NAMES are timestamps, so a
+        # Name column only ever duplicated Date while starving it of room
+        # ("Aug…" clipped everywhere — Joe: "so much information yet all
+        # of it is cut off"). Numbers right-align so digits line up.
+        self._list.setHeaderLabels(["Date", "Len", "Shots"])
         self._list.setSortingEnabled(True)
-        self._list.sortByColumn(1, Qt.DescendingOrder)
+        self._list.sortByColumn(0, Qt.DescendingOrder)
         hdr = self._list.header()
         f = self._list.font()
         f.setPointSizeF(max(7.5, f.pointSizeF() - 0.5))
@@ -83,7 +87,7 @@ class SessionsSidebar(QFrame):
         from PySide6.QtWidgets import QHeaderView
         hdr.setStretchLastSection(False)
         hdr.setSectionResizeMode(0, QHeaderView.Stretch)
-        for col in (1, 2, 3):
+        for col in (1, 2):
             hdr.setSectionResizeMode(col, QHeaderView.ResizeToContents)
         hdr.setMinimumSectionSize(36)
         self._list.itemClicked.connect(self._on_item)
@@ -134,13 +138,14 @@ class SessionsSidebar(QFrame):
         for p in clips[:60]:
             st = p.stat()
             when = datetime.fromtimestamp(st.st_mtime)
-            name = when.strftime("%b %d %H:%M") if p.name.startswith("session-")                 else p.stem[:18]
-            it = self._Row([name, when.strftime("%m/%d %H:%M"), "…", "…"])
+            hour12 = when.strftime("%I:%M %p").lstrip("0")
+            it = self._Row([f"{when.strftime('%b %d')} · {hour12}", "…", "…"])
             it.setData(0, Qt.UserRole, str(p))
-            it.setData(0, self._Row.SORT_ROLE, name.lower())
-            it.setData(1, self._Row.SORT_ROLE, st.st_mtime)
-            it.setData(2, self._Row.SORT_ROLE, -1.0)
-            it.setData(3, self._Row.SORT_ROLE, -1)
+            it.setData(0, self._Row.SORT_ROLE, st.st_mtime)
+            it.setData(1, self._Row.SORT_ROLE, -1.0)
+            it.setData(2, self._Row.SORT_ROLE, -1)
+            it.setTextAlignment(1, Qt.AlignRight | Qt.AlignVCenter)
+            it.setTextAlignment(2, Qt.AlignRight | Qt.AlignVCenter)
             it.setToolTip(0, f"{p.name}  ·  {st.st_size / 1e6:.0f} MB")
             self._list.addTopLevelItem(it)
         self._list.setSortingEnabled(True)
@@ -206,17 +211,17 @@ class SessionsSidebar(QFrame):
                 dtext = f"{int(dur // 60)}m"
             else:
                 dtext = f"{int(dur)}s" if dur > 0 else "–"
-            it.setText(2, dtext)
-            it.setData(2, self._Row.SORT_ROLE, dur)
-            it.setText(3, "–" if shots is None else str(shots))
-            it.setData(3, self._Row.SORT_ROLE, -1 if shots is None else int(shots))
+            it.setText(1, dtext)
+            it.setData(1, self._Row.SORT_ROLE, dur)
+            it.setText(2, "–" if shots is None else str(shots))
+            it.setData(2, self._Row.SORT_ROLE, -1 if shots is None else int(shots))
             try:
                 mb = Path(path).stat().st_size / 1e6
             except OSError:
                 return
             if ss.is_stub(summary, mb):
                 dim = QColor(PALETTE.text_faint)
-                for c in range(4):
+                for c in range(3):
                     it.setForeground(c, dim)
             return
 

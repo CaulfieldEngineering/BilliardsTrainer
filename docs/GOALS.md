@@ -637,3 +637,14 @@ Rounds continue with Joe's visual feedback as the gate.
   stat — MAKES/MISSES/MAKE %/STREAK), big blocks and the meaningless
   per-session "SESSION" fold removed; verified by offscreen render;
   pinned test.
+- 2026-08-19 (Joe UI round 4): SESSION LIST REDESIGNED ON PRINCIPLE.
+  Researched current dark-UI/data-table practice and codified it as
+  docs/DESIGN.md — binding rules, several test-pinned: ONE selection
+  surface (the blue-box-on-blue-row method is banned outright per Joe),
+  numbers right-aligned so digits line up, no redundant columns, no
+  truncation-as-a-lifestyle, flat labeled panes, offscreen render
+  before shipping. Applied: the Name column died (session names ARE
+  timestamps — it duplicated Date while starving every other column),
+  leaving Date · Len · Shots with room to breathe; row selection is a
+  single subtle tint (per-cell accent boxes and focus rects removed
+  from all list/table views); numerics right-aligned. Suite green.
