@@ -570,6 +570,7 @@ class LivePage(QWidget):
     def set_media_path(self, path: str) -> None:
         """The session clip under playback ('' = live camera, audio off)."""
         self._media_path = path or ""
+        self._timeline.set_media_source(self._media_path)   # v3 filmstrip
         player = getattr(self, "_audio_player", None)
         if not self._media_path:
             if player is not None:

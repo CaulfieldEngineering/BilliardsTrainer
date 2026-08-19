@@ -146,3 +146,37 @@ class TestZoomPan:
         tl.zoom_at(300.0, 2.0)
         tl.clear()
         assert tl._view is None
+
+
+class TestFilmstripV3:
+    def test_strip_times_are_stable_cache_keys(self, app):
+        tl = _tl(app)
+        a = tl.strip_times(0.0, 600.0)
+        b = tl.strip_times(0.0, 600.0)
+        assert a == b and len(a) >= 10
+        assert all(isinstance(t, int) for t in a)
+
+    def test_full_shot_region_paints_with_thumbs(self, app, tmp_path):
+        import cv2
+        import numpy as np
+        video = tmp_path / "clip.mp4"
+        w = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*"mp4v"), 30, (160, 90))
+        for _ in range(60):
+            w.write(np.full((90, 160, 3), 60, np.uint8))
+        w.release()
+        tl = _tl(app)
+        tl.set_media_source(str(video))
+        tl.add_shot(100.0, 112.0, "make", 1)
+        tl.show()
+        tl.repaint()          # requests thumbs; paints placeholders first
+        tl.close()
+
+    def test_live_mode_skips_filmstrip(self, app):
+        tl = _tl(app)
+        tl.set_media_source("nonexistent.mp4")
+        tl.follow_window_s = 120.0
+        tl.set_live_clock(300.0)
+        tl.show()
+        tl.repaint()          # must not request strips in live-follow
+        tl.close()
+        assert not tl._strip_pending

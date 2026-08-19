@@ -33,9 +33,16 @@ class ShotTimeline(QWidget):
 
     clicked = Signal(float)
 
+    #: Number of filmstrip thumbnails sampled across the visible range.
+    STRIP_N = 12
+
     def __init__(self, pre_roll_s: float = 5.0, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(72)
+        # v3 (Joe: "a visual timeline of the video, with thumbnails, like a
+        # video editing system, and the entirety of the shot highlighted"):
+        # a filmstrip band under translucent full-shot regions. Taller lane
+        # to give the thumbnails legible room.
+        self.setFixedHeight(108)
         #: While recording, the lane FOLLOWS: it shows the trailing window so
         #: clips stay readable in hour-long sessions, scrolling like a video
         #: editor capture lane (Joe's spec). 0 = show everything (playback).
@@ -51,6 +58,11 @@ class ShotTimeline(QWidget):
         #: Editor controls: wheel zooms around the cursor, middle-drag pans.
         self._view: tuple[float, float] | None = None
         self._pan_anchor_x: float | None = None
+        #: Filmstrip: media path + {rounded-second: QImage} cache, filled by
+        #: a worker thread; painting only ever READS the cache.
+        self._media: str = ""
+        self._strip: dict[int, object] = {}
+        self._strip_pending: set[int] = set()
 
     # ------------------------------------------------------------------ #
     def set_duration(self, seconds: float) -> None:
@@ -133,6 +145,66 @@ class ShotTimeline(QWidget):
 
     def view_range(self) -> tuple[float, float]:
         return self._range()
+
+    # -- filmstrip (v3) -------------------------------------------------- #
+    def strip_times(self, lo: float, hi: float) -> list[int]:
+        """Rounded-second sample times for STRIP_N thumbnails across a view
+        (pure; stable keys = stable cache across repaints and small pans)."""
+        if hi <= lo:
+            return []
+        step = (hi - lo) / self.STRIP_N
+        return sorted({int(lo + (i + 0.5) * step) for i in range(self.STRIP_N)})
+
+    def set_media_source(self, path: str) -> None:
+        """Point the filmstrip at a video file ('' = live, no filmstrip)."""
+        if path == self._media:
+            return
+        self._media = path or ""
+        self._strip.clear()
+        self._strip_pending.clear()
+        self.update()
+
+    def _request_strip(self, times: list[int]) -> None:
+        missing = [t for t in times
+                   if t not in self._strip and t not in self._strip_pending]
+        if not missing or not self._media:
+            return
+        self._strip_pending.update(missing)
+        import threading
+
+        from PySide6.QtCore import QObject, Signal as _Sig
+
+        if not hasattr(self, "_strip_bridge"):
+            class _Bridge(QObject):
+                ready = _Sig(int, object)
+            self._strip_bridge = _Bridge(self)
+            self._strip_bridge.ready.connect(self._on_strip_ready)
+
+        def work(media=self._media, want=list(missing), bridge=self._strip_bridge):
+            import cv2
+            from PySide6.QtGui import QImage
+            cap = cv2.VideoCapture(media)
+            if not cap.isOpened():
+                return
+            for sec in sorted(want):
+                cap.set(cv2.CAP_PROP_POS_MSEC, sec * 1000.0)
+                ok, fr = cap.read()
+                if not ok:
+                    continue
+                fr = cv2.resize(fr, (96, 54), interpolation=cv2.INTER_AREA)
+                rgb = cv2.cvtColor(fr, cv2.COLOR_BGR2RGB).copy()
+                img = QImage(rgb.data, 96, 54, 3 * 96, QImage.Format_RGB888).copy()
+                bridge.ready.emit(sec, img)
+            cap.release()
+
+        threading.Thread(target=work, daemon=True, name="timeline-strip").start()
+
+    def _on_strip_ready(self, sec: int, img) -> None:
+        self._strip_pending.discard(sec)
+        if len(self._strip) > 400:          # bounded cache across zooms
+            self._strip.clear()
+        self._strip[sec] = img
+        self.update()
 
     def _x(self, t: float) -> float:
         lo, hi = self._range()
@@ -218,10 +290,10 @@ class ShotTimeline(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
-        # ruler bed
+        # ruler bed (below the filmstrip band)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.surface))
-        p.drawRoundedRect(QRectF(0, h * 0.30, w, h * 0.40), 4, 4)
+        p.drawRoundedRect(QRectF(0, h * 0.66, w, h * 0.22), 4, 4)
         if self._duration <= 0 or not self._shots:
             # Empty state: say what this lane IS instead of presenting a
             # mystery sliver (Joe: "the clip window is small. Is that it?").
@@ -232,6 +304,25 @@ class ShotTimeline(QWidget):
         if self._duration > 0:
             lo, hi = self._range()
             span = max(1.0, hi - lo)
+            # FILMSTRIP band (v3): the video itself as thumbnails across the
+            # visible range — the timeline reads like an editor, and shots
+            # highlight ON the footage instead of floating as bare bars.
+            strip_top, strip_h = 6.0, h * 0.52
+            if self._media and self.follow_window_s <= 0:
+                times = self.strip_times(lo, hi)
+                self._request_strip(times)
+                slot_w = w / max(1, len(times))
+                for k, sec in enumerate(times):
+                    img = self._strip.get(sec)
+                    slot = QRectF(k * slot_w, strip_top, slot_w - 1.0, strip_h)
+                    if img is not None:
+                        p.setOpacity(0.72)
+                        p.drawImage(slot, img)
+                        p.setOpacity(1.0)
+                    else:
+                        p.setPen(Qt.NoPen)
+                        p.setBrush(QColor(PALETTE.surface))
+                        p.drawRect(slot)
             # Editor-style ruler: labelled ticks at a step that keeps ~6-10
             # labels visible regardless of zoom/window.
             step = 10.0
@@ -246,7 +337,7 @@ class ShotTimeline(QWidget):
             t = (int(lo // step) + 1) * step
             while t < hi:
                 x = self._x(t)
-                p.drawLine(int(x), int(h * 0.34), int(x), int(h * 0.66))
+                p.drawLine(int(x), int(h * 0.68), int(x), int(h * 0.86))
                 p.setPen(QColor(PALETTE.text_faint))
                 p.drawText(int(x) + 3, int(h * 0.98) - 2,
                            f"{int(t) // 60}:{int(t) % 60:02d}")
@@ -262,27 +353,38 @@ class ShotTimeline(QWidget):
                 x2 = self._x(max(s["end"], s["start"] + 0.5))
                 if x2 <= 0 or x0 >= w:
                     continue                       # outside the live window
+                # THE ENTIRE SHOT, highlighted (Joe's ask): a translucent
+                # region over the filmstrip spanning strike -> settled, a
+                # dimmer lead-in for the routine, a bright strike tick, and
+                # a solid outcome bar underlining the region.
+                region_top, region_h = 4.0, h * 0.56
                 lead = QColor(colour)
-                lead.setAlpha(70)
+                lead.setAlpha(36)
                 p.setPen(Qt.NoPen)
-                p.setBrush(lead)                                  # pre-shot routine
-                p.drawRoundedRect(QRectF(x0, h * 0.24, max(1.0, x1 - x0), h * 0.44), 3, 3)
-                body = QRectF(x1, h * 0.14, max(3.0, x2 - x1), h * 0.62)
-                p.setBrush(colour)                                # the shot itself
-                p.drawRoundedRect(body, 3, 3)
-                top = QColor(255, 255, 255, 60)                   # lit top edge
-                p.setBrush(top)
-                p.drawRoundedRect(QRectF(body.x(), body.y(), body.width(), 2.5), 1, 1)
+                p.setBrush(lead)
+                p.drawRect(QRectF(x0, region_top, max(1.0, x1 - x0), region_h))
+                body = QColor(colour)
+                body.setAlpha(64)
+                p.setBrush(body)
+                p.drawRect(QRectF(x1, region_top, max(3.0, x2 - x1), region_h))
+                p.setBrush(colour)                 # solid outcome underline
+                p.drawRoundedRect(QRectF(x1, region_top + region_h,
+                                         max(3.0, x2 - x1), 5.0), 2, 2)
+                p.setPen(QPen(QColor(colour).lighter(130), 2))
+                p.drawLine(int(x1), int(region_top),
+                           int(x1), int(region_top + region_h + 5))  # strike
+                p.setPen(Qt.NoPen)
                 newest = i == len(self._shots) - 1
                 if newest and self.follow_window_s > 0:
                     ring = QPen(QColor(PALETTE.accent), 2)
                     p.setPen(ring)
                     p.setBrush(Qt.NoBrush)
-                    p.drawRoundedRect(body.adjusted(-1.5, -1.5, 1.5, 1.5), 4, 4)
+                    p.drawRect(QRectF(x1, region_top, max(3.0, x2 - x1), region_h))
                     p.setPen(Qt.NoPen)
-                if body.width() >= 16:
-                    p.setPen(QColor(0, 0, 0, 170))
-                    p.drawText(body, Qt.AlignCenter, str(i + 1))
+                if x2 - x1 >= 16:
+                    p.setPen(QColor(255, 255, 255, 220))
+                    p.drawText(QRectF(x1, region_top + region_h - 16,
+                                      x2 - x1, 16), Qt.AlignCenter, str(i + 1))
                     p.setPen(Qt.NoPen)
             # playhead (or the live record head at the lane's right edge)
             head = self._live_now if self.follow_window_s > 0 else self._playhead
