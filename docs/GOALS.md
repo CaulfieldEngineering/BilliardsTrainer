@@ -703,3 +703,17 @@ Rounds continue with Joe's visual feedback as the gate.
   Post-recording clutter: routine lead-ins and labels no longer paint
   on sliver regions at whole-session zoom. Tests updated (live window
   compares with tolerance — it ROLLS continuously now, by design).
+- 2026-08-19 (loop 39, shot-detection push #3): CLOSE-PASS COMPLETE +
+  LIVE VALIDATION. Session close and backfill now run BOTH post-passes
+  (outcome derivation + action labels) so every sidecar is born
+  complete; the phone app ghosts relocation chips (hand icon) and
+  titles BALL IN HAND/BREAK. Library re-analysis of the 17
+  pre-hand-context sessions started (2 done: +27 outcome corrections,
+  34 events labeled) and CORRECTLY self-aborted when Joe started
+  recording — the heavy-job guard worked as designed; resumable runner
+  queued for the next quiet session. Meanwhile the first session
+  recorded under the finished pipeline (session-20260819-163313, 34
+  shots) came out perfect: hand context recorded, live markers on the
+  correct timebase, and 11 outcomes auto-corrected by the close daemon
+  seconds after Joe hit stop. The whole loop-32-to-39 arc is now
+  running in production.
