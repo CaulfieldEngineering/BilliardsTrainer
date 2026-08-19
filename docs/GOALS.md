@@ -688,3 +688,18 @@ Rounds continue with Joe's visual feedback as the gate.
   tests; suite green. Remaining in the push: live-detector suppression,
   re-analysis of pre-hand-context sessions, phone chip badges, then
   hierarchy #3 (describe the make/miss).
+- 2026-08-19 (Joe UI round 6, recording feedback): four fixes. (1) The
+  REC clock, fourth and final redesign: plain-text digits, ALWAYS
+  visible (dim 0:00 idle), colour carries state — the rich-text badge
+  and its worst-case ratchet held the capsule twice as wide as its
+  content ("way off to the side"), and its record-start re-measure was
+  the first-record layout jump; both structurally gone, geometry pinned
+  identical before/after record start. (2) Live lane scrolls SMOOTHLY:
+  the lane interpolates between 1Hz clock syncs from a monotonic
+  reference at ~30fps. (3) Shot markers now APPEAR while recording: the
+  controller emitted UI events in source-uptime while the lane counts
+  recording time — the same timebase bug the sidecar writer fixed,
+  one layer up; UI events now rebase on the sidecar's own t0. (4)
+  Post-recording clutter: routine lead-ins and labels no longer paint
+  on sliver regions at whole-session zoom. Tests updated (live window
+  compares with tolerance — it ROLLS continuously now, by design).

@@ -319,25 +319,20 @@ class LivePage(QWidget):
         self._rec_stop_btn.clicked.connect(lambda: self.record_toggled.emit(False))
         for w in (self._rec_btn, self._rec_pause_btn, self._rec_stop_btn):
             cap.addWidget(w)
-        self._rec_time = QLabel("")
+        # The clock, fourth redesign — and the boring one that ends the
+        # saga: PLAIN TEXT ("0:00"), ALWAYS VISIBLE (dim when idle), width
+        # fixed once from plain font metrics at first show. Recording state
+        # lives in the capsule outline and the colour of these digits — the
+        # rich-text "● REC" badge is gone, and with it the mis-measuring,
+        # the worst-case ratchet that held the capsule twice as wide as its
+        # content (Joe: "way off to the side"), and the first-record
+        # re-measure that made the layout jump on first load.
+        self._rec_time = QLabel("0:00")
         self._rec_time.setObjectName("RecClock")
-        self._rec_time.setTextFormat(Qt.RichText)
-        # FIXED, not minimum: the clock counts up and a minimum width still
-        # lets it grow, nudging the whole capsule sideways. This label has
-        # now clipped THREE times, each fix a different fudge constant on
-        # plain fontMetrics — which measures a different thing than the
-        # rich-text engine actually renders (span + &nbsp; + late-applied
-        # stylesheet). _size_rec_clock() measures via the label's OWN
-        # sizeHint on the worst-case strings (the exact rendering path) and
-        # runs again at record start, when styling is final.
-        self._size_rec_clock()
+        self._rec_time.setTextFormat(Qt.PlainText)
         self._rec_time.setAlignment(Qt.AlignCenter)
-        # Height-match the buttons: the clock label's font made it the
-        # tallest thing in the capsule, so showing it on record GREW the
-        # whole transport row and the timeline visibly jumped (Joe's
-        # report). Fixed height = show/hide changes width only.
+        self._rec_time.setStyleSheet(f"color: {PALETTE.text_faint};")
         self._rec_time.setFixedHeight(self._rec_btn.sizeHint().height())
-        self._rec_time.hide()
         cap.addWidget(self._rec_time)
         lay.addWidget(self._rec_capsule)
         # Mic level meter: proves the audio path end-to-end at a glance (the
@@ -1454,8 +1449,7 @@ class LivePage(QWidget):
             self._rec_t0 = time.monotonic()
             # Styling is final by now (repolish above) — re-measure so the
             # fixed width matches what THIS style actually renders.
-            self._size_rec_clock()
-            self._rec_time.show()
+            self._rec_time.setStyleSheet(f"color: {PALETTE.danger};")
             # the lane becomes a rolling capture timeline while recording
             self._timeline.clear()
             self._timeline.follow_window_s = 120.0
@@ -1465,46 +1459,22 @@ class LivePage(QWidget):
             timer.stop()
             self._rec_pause_btn.setChecked(False)
             self._rec_pause_btn.setIcon(icon("rec-pause", PALETTE.text_dim, size=26))
-            self._rec_time.setText("")
-            self._rec_time.hide()   # an empty fixed-width clock is a dead gap
+            self._rec_time.setText("0:00")
+            self._rec_time.setStyleSheet(f"color: {PALETTE.text_faint};")
             self._timeline.follow_window_s = 0.0   # back to show-everything
-
-    #: Worst-case clock renderings — every string _tick_rec_time can produce
-    #: is no wider than one of these (000:00 uses the widest digit slots).
-    REC_CLOCK_WORST = (
-        '<span style="color:#ff0000">●</span> REC&nbsp;&nbsp;000:00',
-        "❚❚ PAUSED&nbsp;&nbsp;000:00",
-    )
-
-    def _size_rec_clock(self) -> None:
-        """GROW-ONLY width: the clock's minimum width ratchets up to whatever
-        its current content renders at, and there is NO maximum. Clipping is
-        structurally impossible — on any font, style, DPI, or scale — because
-        nothing ever constrains the label below its own rendering. (Every
-        measured-width scheme, plain or rich, has clipped on Joe's display;
-        this one cannot.) The ratchet also stops the per-second nudge: width
-        never shrinks mid-recording."""
-        keep = self._rec_time.text()
-        w = self._rec_time.minimumWidth()
-        for worst in self.REC_CLOCK_WORST:
-            self._rec_time.setText(worst)
-            w = max(w, self._rec_time.sizeHint().width())
-        self._rec_time.setText(keep)
-        self._rec_time.setMinimumWidth(w + 6)
 
     def _tick_rec_time(self) -> None:
         import time
-        secs = int(time.monotonic() - getattr(self, "_rec_t0", time.monotonic()))
-        self._timeline.set_live_clock(float(secs))
+        elapsed = time.monotonic() - getattr(self, "_rec_t0", time.monotonic())
+        # float seconds: the lane interpolates between these syncs for
+        # smooth scrolling (Joe: "smooth continuous scrolling rather than
+        # discrete seconds progression")
+        self._timeline.set_live_clock(max(0.0, elapsed))
+        secs = int(elapsed)
         paused = self._rec_pause_btn.isChecked()
-        if paused:
-            tag = "❚❚ PAUSED"
-        else:
-            dot = PALETTE.danger if secs % 2 == 0 else "transparent"
-            # same glyph every tick, colour alternates -> metrics never change,
-            # so the transport row stops shifting on each blink
-            tag = f'<span style="color:{dot}">●</span> REC'
-        self._rec_time.setText(f"{tag}&nbsp;&nbsp;{secs // 60}:{secs % 60:02d}")
+        colour = "#E3B341" if paused else PALETTE.danger
+        self._rec_time.setStyleSheet(f"color: {colour};")
+        self._rec_time.setText(f"{secs // 60}:{secs % 60:02d}")
         # Ratchet every tick: if THIS string renders wider than the label,
         # the label grows right now. No measurement scheme to trust.
         need = self._rec_time.sizeHint().width()

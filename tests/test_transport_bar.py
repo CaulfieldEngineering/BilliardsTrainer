@@ -34,17 +34,19 @@ def _page(app):
 
 
 class TestRecClockNeverClips:
-    def test_every_tick_string_fits_the_fixed_width(self, app):
-        pg = _page(app)
-        pg.on_recording(True)                    # styling final + re-measure
-        label = pg._rec_time
-        for worst in pg.REC_CLOCK_WORST:
-            label.setText(worst)
-            need = label.sizeHint().width()
-            assert need <= label.width(), \
-                f"clock clips: needs {need}px, has {label.width()}px for {worst!r}"
+    """Clock v4: PLAIN text digits, always visible, dim when idle. The
+    rich-text badge and its worst-case width ratchet (which held the
+    capsule twice as wide as its content — Joe: 'way off to the side')
+    are gone; state lives in the digits' colour and the capsule outline."""
 
-    def test_live_tick_strings_fit_too(self, app):
+    def test_clock_is_plain_text_and_always_visible(self, app):
+        from PySide6.QtCore import Qt
+        pg = _page(app)
+        assert pg._rec_time.textFormat() == Qt.PlainText
+        assert not pg._rec_time.isHidden()       # idle: dim 0:00, no gap
+        assert pg._rec_time.text() == "0:00"
+
+    def test_live_tick_strings_are_plain_digits(self, app):
         import time
         pg = _page(app)
         pg.on_recording(True)
@@ -52,9 +54,25 @@ class TestRecClockNeverClips:
         for paused in (False, True):
             pg._rec_pause_btn.setChecked(paused)
             pg._tick_rec_time()
-            label = pg._rec_time
-            assert label.sizeHint().width() <= label.width(), \
-                f"tick string clips (paused={paused}): {label.text()!r}"
+            text = pg._rec_time.text()
+            assert "<" not in text and "REC" not in text, \
+                f"rich-text badge returned: {text!r}"
+            assert text == "59:59"
+
+    def test_recording_start_does_not_change_capsule_geometry(self, app):
+        """Joe: 'something in the timeline layout still expands after I hit
+        record, on first app load only' — the clock re-measure at record
+        start grew the capsule. Geometry must be identical before/after."""
+        pg = _page(app)
+        pg.show()
+        app.processEvents()
+        before = (pg._rec_capsule.sizeHint().width(),
+                  pg._rec_capsule.sizeHint().height())
+        pg.on_recording(True)
+        app.processEvents()
+        after = (pg._rec_capsule.sizeHint().width(),
+                 pg._rec_capsule.sizeHint().height())
+        assert before == after, f"capsule jumped: {before} -> {after}"
 
     def test_recording_capsule_children_fit_at_narrow_widths(self, app):
         """The whole capsule, not just the clock: at every compact tier the

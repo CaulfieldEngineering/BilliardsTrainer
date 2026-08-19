@@ -85,10 +85,42 @@ class ShotTimeline(QWidget):
         self.update()
 
     def set_live_clock(self, seconds: float) -> None:
-        """Recording mode: the lane rolls with the record clock."""
+        """Recording mode: the lane rolls with the record clock. Syncs
+        arrive ~1/s; between them the lane interpolates from a monotonic
+        reference and repaints at ~30fps, so the scroll is CONTINUOUS
+        (Joe: "smooth continuous scrolling rather than discrete seconds
+        progression")."""
+        import time
         self._live_now = float(seconds)
+        self._live_sync = (time.monotonic(), float(seconds))
         if seconds > self._duration:
             self._duration = float(seconds)
+        if self.follow_window_s > 0:
+            if not hasattr(self, "_smooth_timer"):
+                from PySide6.QtCore import QTimer
+                self._smooth_timer = QTimer(self)
+                self._smooth_timer.setInterval(33)
+                self._smooth_timer.timeout.connect(self._smooth_tick)
+            if not self._smooth_timer.isActive():
+                self._smooth_timer.start()
+        self.update()
+
+    def _smooth_now(self) -> float:
+        """Interpolated live time between clock syncs."""
+        import time
+        sync = getattr(self, "_live_sync", None)
+        if sync is None or self.follow_window_s <= 0:
+            return self._live_now
+        ref, secs = sync
+        return secs + (time.monotonic() - ref)
+
+    def _smooth_tick(self) -> None:
+        if self.follow_window_s <= 0:
+            self._smooth_timer.stop()
+            return
+        now = self._smooth_now()
+        if now > self._duration:
+            self._duration = now
         self.update()
 
     def add_shot(self, start_t: float, end_t: float, outcome: str,
@@ -113,8 +145,10 @@ class ShotTimeline(QWidget):
     # ------------------------------------------------------------------ #
     def _range(self) -> tuple[float, float]:
         """Visible time range: live rolling window > zoomed view > everything."""
-        if self.follow_window_s > 0 and self._live_now > self.follow_window_s:
-            return self._live_now - self.follow_window_s, self._live_now
+        if self.follow_window_s > 0:
+            now = self._smooth_now()
+            if now > self.follow_window_s:
+                return now - self.follow_window_s, now
         if self._view is not None:
             return self._view
         return 0.0, max(self._duration, self.follow_window_s or self._duration)
@@ -406,11 +440,18 @@ class ShotTimeline(QWidget):
                     p.drawRect(QRectF(x1, region_top, max(3.0, x2 - x1),
                                       region_h))
                     continue
-                lead = QColor(colour)
-                lead.setAlpha(36)
+                # Overview zoom de-clutter (Joe: "afterwards it's really
+                # cluttered"): the routine lead-in only paints when the
+                # region itself has real width — at whole-session zoom the
+                # lead-ins of adjacent shots overlapped into one smear.
+                if x2 - x1 >= 18:
+                    lead = QColor(colour)
+                    lead.setAlpha(36)
+                    p.setPen(Qt.NoPen)
+                    p.setBrush(lead)
+                    p.drawRect(QRectF(x0, region_top, max(1.0, x1 - x0),
+                                      region_h))
                 p.setPen(Qt.NoPen)
-                p.setBrush(lead)
-                p.drawRect(QRectF(x0, region_top, max(1.0, x1 - x0), region_h))
                 body = QColor(colour)
                 body.setAlpha(64)
                 p.setBrush(body)
@@ -429,13 +470,14 @@ class ShotTimeline(QWidget):
                     p.setBrush(Qt.NoBrush)
                     p.drawRect(QRectF(x1, region_top, max(3.0, x2 - x1), region_h))
                     p.setPen(Qt.NoPen)
-                if x2 - x1 >= 16:
+                if x2 - x1 >= 28:
                     p.setPen(QColor(255, 255, 255, 220))
                     p.drawText(QRectF(x1, region_top + region_h - 16,
                                       x2 - x1, 16), Qt.AlignCenter, str(i + 1))
                     p.setPen(Qt.NoPen)
             # playhead (or the live record head at the lane's right edge)
-            head = self._live_now if self.follow_window_s > 0 else self._playhead
+            head = (self._smooth_now() if self.follow_window_s > 0
+                    else self._playhead)
             if head >= 0:
                 x = self._x(head)
                 p.setPen(QPen(QColor(PALETTE.text), 2))

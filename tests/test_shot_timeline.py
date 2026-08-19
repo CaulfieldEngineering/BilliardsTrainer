@@ -143,7 +143,12 @@ class TestZoomPan:
         tl.follow_window_s = 120.0
         tl.set_live_clock(600.0)
         tl.zoom_at(300.0, 2.0)
-        assert tl.view_range() == (480.0, 600.0)   # still the live window
+        # The live window rolls CONTINUOUSLY now (smooth scroll interpolates
+        # between clock syncs), so compare with tolerance, not equality.
+        lo, hi = tl.view_range()
+        assert abs(lo - 480.0) < 0.5 and abs(hi - 600.0) < 0.5, \
+            f"zoom hijacked the live window: {(lo, hi)}"
+        assert abs((hi - lo) - 120.0) < 1e-6
 
     def test_clear_resets_zoom(self, app):
         tl = _tl(app)

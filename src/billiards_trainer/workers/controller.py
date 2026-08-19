@@ -1412,7 +1412,22 @@ class PipelineController(QObject):
                 sc.add_shot(event)
             except OSError:
                 pass
-        self.shot_recorded.emit(event)
+        # The UI gets RECORDING time, same base the sidecar writes: live
+        # pipeline t is SOURCE UPTIME, so an unrebased event 20 minutes
+        # into a camera session landed at t=1200 on a lane showing 0-120
+        # and no marker ever appeared while recording (Joe's report — the
+        # same timebase bug the sidecar writer fixed, one layer up).
+        ui_event = event
+        if sc is not None and getattr(sc, "_t0", None) is not None:
+            import dataclasses
+            try:
+                ui_event = dataclasses.replace(
+                    event,
+                    start_t=max(0.0, event.start_t - sc._t0),
+                    end_t=max(0.0, event.end_t - sc._t0))
+            except TypeError:
+                ui_event = event
+        self.shot_recorded.emit(ui_event)
         self.stats_updated.emit(self._repo.session_summary(self._session_id))
 
     def _log_shot(self, event: ShotEvent, shot_seconds: float) -> None:
