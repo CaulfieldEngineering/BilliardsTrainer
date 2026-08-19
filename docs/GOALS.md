@@ -751,3 +751,19 @@ Rounds continue with Joe's visual feedback as the gate.
   Tailscale set up (phone <-> mini-pc; instant remote review while the
   PC is awake). Setup rounds included recovering from a wrong-account
   Dropbox authorization (personal vs Pro).
+- 2026-08-19 (evening, Joe-directed phone rounds + batch): LIBRARY FULLY
+  UPGRADED — all 17 pre-hand-context sessions re-analyzed with the
+  current champion + full identity/outcome/action pipeline (one 44-min
+  session hit a runner timeout mid-analysis and is re-running with a
+  raised cap; runner now survives per-session timeouts). Re-analysis
+  keeps finding what Joe reported: the 0802 sessions alone carried 22,
+  11 and 9 relocations mislabeled as shots. Phone app iterated live on
+  Joe's feedback across five deploys: install-key flow hardened for
+  iOS's separate PWA storage (paste-in gate), Dynamic Island safe-area,
+  landing page grew DATE/LENGTH/SHOTS headers fed by a new library.json
+  index (written PC-side at every close, one fetch for the whole list),
+  shot-scoped scrubber (routine shaded, body outcome-colored), and
+  loop-vs-roll-on playback modes (CD-style review: dead time between
+  shots skipped). Queued next for the companion: trails overlay
+  (per-shot ball paths pre-mapped to video pixels PC-side), review
+  corrections from the phone.
