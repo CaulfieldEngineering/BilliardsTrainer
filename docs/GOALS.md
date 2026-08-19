@@ -519,3 +519,23 @@ Rounds continue with Joe's visual feedback as the gate.
   file, which only exists on the rig) — refs snapshot committed as a
   fixture, suite verified green with the rig file hidden, Build &
   Release confirmed green on 006ea3e. Failure emails stop.
+- 2026-08-19 (loop 32): OUTCOME ACCURACY, measured against frame truth.
+  Built the identity-aware outcome audit (tools/audit_outcomes_v2.py):
+  a shot's outcome derives from which numbered balls left the bed
+  (majority-sampled sets before/after), with two mechanisms frame
+  verification forced: (1) return-mode discrimination — a departed ball
+  that returns hands-free at the same spot is flicker (never left), but
+  one returning near a hand or at a new spot was potted-then-replaced
+  (Joe's re-spread drills); (2) anonymous-resident departures — a ball
+  whose digit never faces the camera carries num=-1 for life (this
+  session's 6-ball), invisible to number sets, but its settled track id
+  dying during a shot (not hand-carried, no newborn re-ID) is a pot.
+  Frame-verified on the 9-ball session (11 shots, before/after/later
+  frames read for every disagreement): **derived 11/11, live-recorded
+  7/11**. The four live-detector errors (miss->scratch, scratch->miss,
+  2x miss->make incl. the 9-ball session winner) are now corrected in
+  the sidecar via the append-only correction log — Joe's review shows
+  frame-true outcomes. 7 mechanism tests. Verdict logged: derived,
+  recomputable outcomes from the sidecar beat live attribution; next
+  bounded chunk is number COVERAGE (the 6 never read all session —
+  digit-down; ball 4 read for 1s) so set-difference sees every ball.
