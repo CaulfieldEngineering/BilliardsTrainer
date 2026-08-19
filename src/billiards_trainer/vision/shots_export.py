@@ -65,3 +65,31 @@ def export_shots_summary(video_path) -> Path | None:
         log.exception("shots summary write failed for %s", video_path)
         return None
     return out
+
+
+def export_library_index(recordings_dir) -> Path | None:
+    """One small library.json for the whole recordings folder: every
+    session's duration and ATTEMPT count (strokes + breaks — same rule as
+    the desktop list). The phone's landing page reads this in a single
+    fetch instead of one summary per session."""
+    root = Path(recordings_dir)
+    entries = []
+    for sj in sorted(root.glob("*.shots.json")):
+        try:
+            doc = json.loads(sj.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        shots = doc.get("shots", [])
+        attempts = sum(1 for s in shots
+                       if s.get("action", "stroke") in ("stroke", "break"))
+        entries.append({"name": doc.get("session", sj.name[:-11]),
+                        "dur_s": doc.get("duration_s", 0.0),
+                        "shots": attempts})
+    out = root / "library.json"
+    try:
+        out.write_text(json.dumps({"v": 1, "sessions": entries},
+                                  separators=(",", ":")), encoding="utf-8")
+    except OSError:
+        log.exception("library index write failed")
+        return None
+    return out

@@ -23,6 +23,21 @@ module.exports = async (req, res) => {
     }
     const summaries = new Set(
       entries.filter(e => e.name.endsWith(".shots.json")).map(e => e.name));
+    // library.json: one fetch for every session's duration + attempt count
+    let lib = {};
+    try {
+      const lr = await fetch("https://content.dropboxapi.com/2/files/download", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Dropbox-API-Arg": JSON.stringify({ path: `${FOLDER}/library.json` }),
+        },
+      });
+      if (lr.ok) {
+        const d = await lr.json();
+        (d.sessions || []).forEach(s => { lib[s.name] = s; });
+      }
+    } catch (e) { /* index optional; list still renders */ }
     const sessions = entries
       .filter(e => e[".tag"] === "file" && /\.(mp4|mov|m4v)$/.test(e.name))
       .map(e => ({
@@ -30,6 +45,8 @@ module.exports = async (req, res) => {
         size_mb: Math.round(e.size / 1e6),
         modified: e.server_modified,
         analyzed: summaries.has(e.name + ".shots.json"),
+        dur_s: lib[e.name] ? lib[e.name].dur_s : null,
+        shots: lib[e.name] ? lib[e.name].shots : null,
       }))
       .sort((a, b) => (a.modified < b.modified ? 1 : -1))
       .slice(0, 100);

@@ -26,13 +26,17 @@
   #keygate { padding:40px 24px; text-align:center; color:var(--dim);
              display:none; }
   #sessions { padding:8px 0; }
-  .sess { display:flex; align-items:baseline; gap:10px; padding:12px 16px;
+  .sess { display:grid; grid-template-columns: 1fr 64px 56px;
+          gap:10px; padding:12px 16px; align-items:baseline;
           border-bottom:1px solid var(--line); }
   .sess:active { background:var(--panel); }
   .sess .d { font-weight:600; }
-  .sess .meta { margin-left:auto; color:var(--dim); font-size:13px;
-                text-align:right; }
-  .sess.stub .d { color:var(--faint); font-weight:400; }
+  .sess .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .sess .dim { color:var(--dim); }
+  .sess.stub .d, .sess.stub .num { color:var(--faint); font-weight:400; }
+  .sess.head { padding:8px 16px 6px; border-bottom:1px solid var(--line); }
+  .sess.head span { color:var(--dim); font-size:11px; font-weight:600;
+                    letter-spacing:.8px; }
   #player { display:none; }
   #topbar { display:flex; align-items:center; gap:12px; padding:10px 16px; }
   #back { color:var(--accent); font-weight:600; background:none; border:none;
@@ -182,10 +186,24 @@ async function loadSessions() {
   const box = $("sessions");
   box.innerHTML = "<div class='empty'>Loading sessions…</div>";
   try {
-    const d = await api("/api/sessions");
+    const resp = await api("/api/sessions");
     box.innerHTML = "";
-    if (!d.sessions.length) box.innerHTML = "<div class='empty'>No sessions.</div>";
-    d.sessions.forEach(s => {
+    if (!resp.sessions.length) box.innerHTML = "<div class='empty'>No sessions.</div>";
+    else {
+      const head = document.createElement("div");
+      head.className = "sess head";
+      ["DATE", "LENGTH", "SHOTS"].forEach((t, i) => {
+        const sp = document.createElement("span");
+        if (i > 0) sp.className = "num";
+        sp.textContent = t;
+        head.appendChild(sp);
+      });
+      box.appendChild(head);
+    }
+    const fmtDur = d => d == null ? "–"
+      : d >= 3600 ? `${Math.floor(d / 3600)}h${String(Math.floor(d % 3600 / 60)).padStart(2, "0")}`
+      : d >= 60 ? `${Math.floor(d / 60)}m` : `${Math.floor(d)}s`;
+    resp.sessions.forEach(s => {
       const el = document.createElement("div");
       el.className = "sess" + (s.analyzed ? "" : " stub");
       // textContent only — a Dropbox filename is untrusted input and the
@@ -193,10 +211,13 @@ async function loadSessions() {
       const d = document.createElement("span");
       d.className = "d";
       d.textContent = fmtDate(s.name, s.modified);
-      const meta = document.createElement("span");
-      meta.className = "meta";
-      meta.textContent = `${s.size_mb} MB${s.analyzed ? "" : " · no analysis"}`;
-      el.append(d, meta);
+      const len = document.createElement("span");
+      len.className = "num" + (s.dur_s == null ? " dim" : "");
+      len.textContent = fmtDur(s.dur_s);
+      const sh = document.createElement("span");
+      sh.className = "num" + (s.shots == null ? " dim" : "");
+      sh.textContent = s.shots == null ? "–" : s.shots;
+      el.append(d, len, sh);
       el.onclick = () => openSession(s);
       box.appendChild(el);
     });
