@@ -43,7 +43,7 @@ class SessionsSidebar(QFrame):
         # configured recordings folder (Settings -> Recording).
         self.recordings_dir: Path = EXPORTS_DIR
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(14, 18, 14, 14)
+        lay.setContentsMargins(8, 10, 8, 8)
         lay.setSpacing(8)
 
         brand = QLabel(f"<span style='color:{PALETTE.accent}'>●</span>  "
@@ -72,15 +72,22 @@ class SessionsSidebar(QFrame):
         self._list.setSortingEnabled(True)
         self._list.sortByColumn(1, Qt.DescendingOrder)
         hdr = self._list.header()
-        # Tight defaults so ALL FOUR headers render fully at minimum width
-        # (the old defaults left the last column ~38px: "Shots" -> "Sho").
-        hdr.resizeSection(0, 78)
-        hdr.resizeSection(1, 74)
-        hdr.resizeSection(2, 48)
-        hdr.setMinimumSectionSize(40)
         f = self._list.font()
         f.setPointSizeF(max(7.5, f.pointSizeF() - 0.5))
         self._list.setFont(f)
+        # Section floors from MEASURED header text, not constants: constants
+        # fit one theme's font and clip under another ("Shots" -> "Sho" was
+        # exactly this class of bug). Name gets whatever remains.
+        from PySide6.QtGui import QFontMetrics
+        fm = QFontMetrics(hdr.font())
+        widths = [fm.horizontalAdvance(t) + 14
+                  for t in ("Name", "Date", "Len", "Shots")]
+        for col in (1, 2, 3):
+            hdr.resizeSection(col, widths[col])
+        hdr.setMinimumSectionSize(min(widths))
+        hdr.resizeSection(0, max(78, widths[0]))
+        self.setMinimumWidth(max(252, sum(widths) + max(78, widths[0])
+                                 - widths[0] + 24))
         self._list.itemClicked.connect(self._on_item)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._context_menu)
@@ -174,7 +181,13 @@ class SessionsSidebar(QFrame):
                 except Exception:  # noqa: BLE001 - one bad file, keep going
                     continue
                 dirty = dirty or len(cache) != before
-                bridge.ready.emit(sp, s)
+                try:
+                    bridge.ready.emit(sp, s)
+                except RuntimeError:
+                    # The sidebar (and its bridge) died while we were
+                    # summarizing — a refresh mid-teardown. Nothing to
+                    # deliver to; save what we learned and stop quietly.
+                    break
             if dirty:
                 ss.save_cache(cache)
 

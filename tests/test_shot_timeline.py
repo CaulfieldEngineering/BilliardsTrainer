@@ -239,3 +239,21 @@ class TestScrubOverhaul:
         tl.add_shot(100.0, 106.0, "make")
         assert tl.hover_text(300.0) is None, "no tooltip on bare lane"
         assert "Shot 1" in tl.hover_text(101.0)
+
+
+class TestCompactLane:
+    """Joe (v3.2): 'a tighter rectangle across the top... too much padding
+    and negative space' — the lane is compact and the big empty-state help
+    text is gone for good."""
+
+    def test_lane_is_compact(self, app):
+        from billiards_trainer.ui.widgets.shot_timeline import ShotTimeline
+        tl = ShotTimeline()
+        assert tl.height() <= 80, f"lane grew back to {tl.height()}px"
+
+    def test_no_placeholder_help_text(self):
+        from pathlib import Path
+        import billiards_trainer.ui.widgets.shot_timeline as m
+        src = Path(m.__file__).read_text(encoding="utf-8")
+        assert "clips appear here" not in src, \
+            "the empty-state help text Joe removed came back"

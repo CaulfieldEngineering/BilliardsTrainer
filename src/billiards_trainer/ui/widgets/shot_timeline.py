@@ -46,9 +46,11 @@ class ShotTimeline(QWidget):
         super().__init__(parent)
         # v3 (Joe: "a visual timeline of the video, with thumbnails, like a
         # video editing system, and the entirety of the shot highlighted"):
-        # a filmstrip band under translucent full-shot regions. Taller lane
-        # to give the thumbnails legible room.
-        self.setFixedHeight(108)
+        # a filmstrip band under translucent full-shot regions. v3.2 (Joe:
+        # "a tighter rectangle across the top... a little too much padding
+        # and negative space"): compact lane — the filmstrip stays legible
+        # at this height and the ruler proportions are relative already.
+        self.setFixedHeight(78)
         #: While recording, the lane FOLLOWS: it shows the trailing window so
         #: clips stay readable in hour-long sessions, scrolling like a video
         #: editor capture lane (Joe's spec). 0 = show everything (playback).
@@ -320,13 +322,6 @@ class ShotTimeline(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.surface))
         p.drawRoundedRect(QRectF(0, h * 0.66, w, h * 0.22), 4, 4)
-        if self._duration <= 0 or not self._shots:
-            # Empty state: say what this lane IS instead of presenting a
-            # mystery sliver (Joe: "the clip window is small. Is that it?").
-            p.setPen(QColor(PALETTE.text_faint))
-            p.drawText(self.rect(), Qt.AlignCenter,
-                       "Shot timeline — clips appear here as you play; "
-                       "click one to replay from your pre-shot routine")
         if self._duration > 0:
             lo, hi = self._range()
             span = max(1.0, hi - lo)

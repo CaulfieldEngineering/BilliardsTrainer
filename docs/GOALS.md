@@ -594,3 +594,14 @@ Rounds continue with Joe's visual feedback as the gate.
   estimate cannot tell a jaw rest from a basket sitter. Rule earned:
   agreement between systems sharing a blind spot is not verification;
   only frames are.
+- 2026-08-19 (Joe UI round): TIGHTER EVERYTHING. Timeline lane 108->78px
+  with the empty-state help paragraph deleted (Joe: "I don't think I
+  need the big help text... a tighter rectangle across the top"); page
+  margins 18/16->10/8, control bar and cards slimmed, stats/training
+  rails and sessions sidebar padding reduced. Sidebar header widths now
+  come from MEASURED font metrics instead of constants (the "Sho" clip
+  class of bug can't recur under any theme) — which also killed a
+  test-order sensitivity between the theme loader and the header-fit
+  test. Summaries thread emit guarded against mid-teardown refresh
+  (the flaky RuntimeError warning is gone for good). 2 new pinned tests
+  (compact lane height, help text stays gone); suite green both orders.

@@ -159,8 +159,10 @@ class LivePage(QWidget):
     # ------------------------------------------------------------------ #
     def _build(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(18, 16, 18, 16)
-        root.setSpacing(14)
+        # Joe: "tighten up the entire UI... a lot of negative space" —
+        # page chrome shrinks so the video views get the pixels.
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(8)
         root.addWidget(self._control_bar())
         from ..widgets.shot_timeline import ShotTimeline
         self._timeline = ShotTimeline(
@@ -186,13 +188,13 @@ class LivePage(QWidget):
         splitter.setHandleWidth(8)
         splitter.setChildrenCollapsible(False)
 
-        bird_card = Card(padding=10, spacing=6)
+        bird_card = Card(padding=6, spacing=4)
         bird_card.add(self._caption("BIRD'S-EYE"))
         self._bird = VideoView("Bird's-eye view")
         bird_card.add(self._bird)
         splitter.addWidget(bird_card)
 
-        persp_card = Card(padding=10, spacing=6)
+        persp_card = Card(padding=6, spacing=4)
         persp_card.add(self._caption("LIVE CAMERA"))
         # The live view and an inline camera-error panel share a stack, so a
         # camera failure surfaces right here (with Retry / Open Settings) instead
@@ -253,7 +255,7 @@ class LivePage(QWidget):
         bar = QFrame()
         bar.setObjectName("Card")
         lay = QHBoxLayout(bar)
-        lay.setContentsMargins(14, 8, 14, 8)
+        lay.setContentsMargins(10, 5, 10, 5)
         lay.setSpacing(8)
 
         # Broadcast bug: ● LIVE / PREVIEW / PLAYBACK. MODE ONLY — this answers
@@ -676,7 +678,7 @@ class LivePage(QWidget):
     def _stats_rail(self) -> QWidget:
         # Compact scoreboard — tight spacing, narrow column; more stats land
         # here later, so the layout leaves the room in the middle, not the edges.
-        rail = Card(padding=12, spacing=8)
+        rail = Card(padding=8, spacing=6)
         # No hard minimum: the window's minimum width is the SUM of its
         # children's minimums, and this rail's old 240px floor was a third of
         # why the app refused to shrink for side-by-side use. The rail looks
@@ -733,7 +735,7 @@ class LivePage(QWidget):
         return rail
 
     def _big_stat(self, label: str, color: str):
-        box = Card(padding=14, spacing=2)
+        box = Card(padding=8, spacing=2)
         lbl = QLabel(label)
         lbl.setObjectName("StatLabel")
         val = QLabel("—")
@@ -879,7 +881,7 @@ class LivePage(QWidget):
     # Training Mode — label/correct ball numbers on the playback video
     # ------------------------------------------------------------------ #
     def _training_rail(self) -> QWidget:
-        rail = Card(padding=16, spacing=10)
+        rail = Card(padding=10, spacing=8)
         rail.setMinimumWidth(320)
         rail.setMaximumWidth(440)
         cap = QLabel("TRAINING MODE")
