@@ -292,6 +292,15 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 31): TIMELINE V3 shipped per Joe's spec — filmstrip
+  of video thumbnails across the lane (off-thread, rounded-second cache,
+  zoom-aware) with each shot as a translucent full-span highlight region
+  over the footage (routine lead-in, strike tick, outcome underline),
+  replacing the thin markers. Also this evening, Joe's live review
+  round: shots-bar wipe (signal order), white playback balls (bgr from
+  number), 3s schematic lag (media-time lookup), record-click height
+  jump (pinned clock height), resizable sidebar with fitting headers —
+  all fixed same-hour, each pinned by test where testable. App deployed.
 - 2026-08-18 (loop 30): the unseen-pot proof run REFUSED to prove — the
   re-analyzed session scored WORSE on the outcome audit (6/11 vs 7/11)
   and disagrees with the live run's outcomes too; ball-count deltas
