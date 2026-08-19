@@ -163,8 +163,11 @@ def derive_and_correct(video_path) -> int:
             log.exception("outcome derivation failed for shot at %.1fs",
                           float(s.get("start", -1)))
             continue
+        if s.get("_reviewed"):
+            continue        # a human looked; the derivation stands down
         if derived != s.get("outcome"):
-            if append_correction(video_path, float(s["start"]), derived):
+            if append_correction(video_path, float(s["start"]), derived,
+                                 src="derived"):
                 fixed += 1
                 log.info("outcome corrected at %.1fs: %s -> %s (derived)",
                          float(s["start"]), s.get("outcome"), derived)

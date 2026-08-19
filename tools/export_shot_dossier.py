@@ -124,6 +124,17 @@ def _diagram(paths: dict[int, dict], size: tuple[int, int],
     cv2.imwrite(str(out_png), img)
 
 
+def _describe(reader: SidecarReader, shot: dict) -> dict:
+    """Structured description + one factual line (never fatal)."""
+    try:
+        from billiards_trainer.vision.describe import compose_text, describe_shot
+        d = describe_shot(reader, shot)
+        d["text"] = compose_text(d)
+        return d
+    except Exception:  # noqa: BLE001 - description is enrichment
+        return {}
+
+
 def export_shot(video: Path, reader: SidecarReader, shot_no: int,
                 shot: dict, out_root: Path) -> Path:
     t0 = float(shot["start"])
@@ -162,6 +173,9 @@ def export_shot(video: Path, reader: SidecarReader, shot_no: int,
              "travel_px": e["travel_px"], "points_txy": e["points"]}
             for tid, e in sorted(participants.items())],
         "cue_stroke": cue_metrics,
+        # Hierarchy #3: structured facts + one factual line — the coach's
+        # raw material ("on this shot you..." starts from exactly this).
+        "description": _describe(reader, shot),
         "media": {"video": str(video),
                   "clip_hint": f"ffmpeg -ss {max(0, t0 - 5):.2f} -to {t1 + 1:.2f}"
                                f" -i \"{video}\" -c copy shot{shot_no:02d}.mp4"},

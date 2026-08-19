@@ -717,3 +717,20 @@ Rounds continue with Joe's visual feedback as the gate.
   correct timebase, and 11 outcomes auto-corrected by the close daemon
   seconds after Joe hit stop. The whole loop-32-to-39 arc is now
   running in production.
+- 2026-08-19 (loop 40, shot-detection push #4): DESCRIBE THE SHOT +
+  human verdicts made inviolable. vision/describe.py turns a sidecar
+  shot into structured facts (pace class, contact ball, potted balls
+  with pocket names, cue travel in table-widths) plus one factual line
+  — validated against the frame-verified 9-ball session ("Stroke at
+  firm pace; potted the 1 into the top-left pocket; cue travelled 1.4
+  table-widths"). Wired into the dossier JSON (the coach's raw
+  material). Contact claims are conservative by construction: launch
+  next to the cue + stable pre-shot identity + real travel (a blurred
+  7 misread "4" mid-flight and a basket blip both tried to claim
+  contact; both rejected). CRITICAL FIX en route: the loop-36 library
+  derivation pass had CLOBBERED loop-35's frame-verified human
+  corrections (last-wins had no rank) — corrections now carry src
+  review|derived, human verdicts are final, derived re-runs stand
+  down, legacy untagged lines rank as review; the 9-ball shots 5/6
+  restored and proven to survive re-derivation. 8 new tests. Library
+  re-analysis batch resumed this loop (was 2/17).

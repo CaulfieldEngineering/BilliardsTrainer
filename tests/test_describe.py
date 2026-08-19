@@ -1,0 +1,95 @@
+"""Shot description (hierarchy #3) + correction ranking: human verdicts
+are final; derived re-runs stand down."""
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from billiards_trainer.vision.analysis_cache import (  # noqa: E402
+    SidecarReader,
+    append_correction,
+)
+from billiards_trainer.vision.describe import compose_text  # noqa: E402
+from billiards_trainer.vision.outcomes import derive_and_correct  # noqa: E402
+
+
+def _write(tmp_path, states, shots):
+    vid = tmp_path / "s.mp4"
+    vid.write_bytes(b"0")
+    with open(str(vid) + ".analysis.jsonl", "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "meta", "v": 1, "fps": 30}) + "\n")
+        for t, tracks in states:
+            f.write(json.dumps({"type": "f", "t": t,
+                                "tracks": [[i, x, y, 12.0, n, c, True]
+                                           for i, x, y, n, c in tracks]}) + "\n")
+        for s in shots:
+            f.write(json.dumps({"type": "shot", **s}) + "\n")
+    return vid
+
+
+class TestCorrectionRanking:
+    def _mismatched(self, tmp_path):
+        """Recorded miss; ball 5 demonstrably departs -> derived make."""
+        states = []
+        t = 0.0
+        while t <= 30.0:
+            tracks = [(1, 100.0, 100.0, 0, "cue"), (2, 300.0, 700.0, 9, "stripe")]
+            if t < 8.0:
+                tracks.append((3, 200.0, 500.0, 5, "solid"))
+            states.append((round(t, 2), tracks))
+            t += 0.25
+        return _write(tmp_path, states,
+                      [{"start": 8.0, "end": 12.0, "outcome": "miss",
+                        "pocketed": 0}])
+
+    def test_derived_never_overrides_review(self, tmp_path):
+        vid = self._mismatched(tmp_path)
+        append_correction(vid, 8.0, "miss", src="review")   # human says miss
+        n = derive_and_correct(vid)                          # derives make
+        assert n == 0, "derivation overrode a human verdict"
+        assert SidecarReader(vid).shots[0]["outcome"] == "miss"
+
+    def test_review_overrides_derived(self, tmp_path):
+        vid = self._mismatched(tmp_path)
+        derive_and_correct(vid)                              # derived: make
+        append_correction(vid, 8.0, "scratch", src="review")
+        s = SidecarReader(vid).shots[0]
+        assert s["outcome"] == "scratch" and s["corrected"]
+
+    def test_derived_corrections_carry_no_review_ring(self, tmp_path):
+        vid = self._mismatched(tmp_path)
+        derive_and_correct(vid)
+        s = SidecarReader(vid).shots[0]
+        assert s["outcome"] == "make" and not s.get("corrected"), \
+            "derived corrections must not wear the human-verdict ring"
+
+    def test_legacy_untagged_corrections_rank_as_review(self, tmp_path):
+        vid = self._mismatched(tmp_path)
+        sc = Path(str(vid) + ".analysis.jsonl")
+        with open(sc, "a", encoding="utf-8") as f:      # pre-src-field line
+            f.write(json.dumps({"type": "correction", "start": 8.0,
+                                "outcome": "miss"}) + "\n")
+        assert derive_and_correct(vid) == 0
+        assert SidecarReader(vid).shots[0]["outcome"] == "miss"
+
+
+class TestComposeText:
+    def test_make_line(self):
+        d = {"outcome": "make", "action": "stroke", "pace": "firm",
+             "n_movers": 2, "cue_travel_tw": 1.4, "first_object": 1,
+             "object_travel_tw": 0.8,
+             "potted": [{"ball": 1, "pocket": "top-left"}],
+             "duration_s": 5.0}
+        line = compose_text(d)
+        assert "firm" in line and "the 1 into the top-left pocket" in line
+
+    def test_scratch_and_relocation_lines(self):
+        d = {"outcome": "scratch", "action": "stroke", "pace": "soft",
+             "n_movers": 1, "cue_travel_tw": 0.5, "first_object": None,
+             "object_travel_tw": None, "potted": [{"ball": 0}],
+             "duration_s": 4.0}
+        assert "scratched" in compose_text(d)
+        assert compose_text({"action": "ball_in_hand"}).startswith("Ball in hand")

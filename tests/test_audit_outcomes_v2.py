@@ -153,7 +153,8 @@ class TestDeriveAndCorrect:
         vid = self._mismatched(tmp_path)
         assert derive_and_correct(vid) == 1
         r = SidecarReader(vid)
-        assert r.shots[0]["outcome"] == "make" and r.shots[0]["corrected"]
+        assert r.shots[0]["outcome"] == "make"
+        assert not r.shots[0].get("corrected"),             "derived corrections must not wear the human-verdict ring"
         assert derive_and_correct(vid) == 0     # second pass changes nothing
 
     def test_agreeing_outcome_is_left_alone(self, tmp_path):

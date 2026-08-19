@@ -40,17 +40,21 @@ def sidecar_path(video_path: str | Path) -> Path:
     return Path(str(video_path) + SIDECAR_SUFFIX)
 
 
-def append_correction(video_path: str | Path, start: float, outcome: str) -> bool:
-    """Persist a review verdict for the shot starting at ``start`` seconds.
+def append_correction(video_path: str | Path, start: float, outcome: str,
+                      src: str = "review") -> bool:
+    """Persist an outcome verdict for the shot starting at ``start``.
 
-    Append-only by design — the sidecar is a log. Returns False when there
-    is no sidecar to correct (nothing silently invented)."""
+    ``src`` ranks the verdict: "review" (a human looked) outranks
+    "derived" (recomputed from the identity record) — a re-run of the
+    derivation must never clobber a frame-verified human call, which is
+    exactly what happened to the 9-ball session's shot 5 before this
+    field existed. Append-only by design — the sidecar is a log."""
     p = sidecar_path(video_path)
     if not p.is_file():
         return False
     with open(p, "a", encoding="utf-8") as f:
         f.write(json.dumps({"type": "correction", "start": round(float(start), 3),
-                            "outcome": outcome}) + "\n")
+                            "outcome": outcome, "src": src}) + "\n")
     return True
 
 
@@ -137,11 +141,19 @@ class SidecarReader:
                 elif d.get("type") == "shot":
                     self.shots.append(d)
                 elif d.get("type") == "correction":
-                    # last-wins: apply to the shot whose start matches
+                    # last-wins WITHIN a rank, but a human verdict is FINAL:
+                    # once a review-source correction lands, derived re-runs
+                    # can no longer change the outcome. Legacy corrections
+                    # (no src field) are treated as review — the safe rank.
                     for s in self.shots:
                         if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            csrc = d.get("src", "review")
+                            if csrc == "derived" and s.get("_reviewed"):
+                                break
                             s["outcome"] = d.get("outcome", s.get("outcome"))
-                            s["corrected"] = True
+                            if csrc != "derived":
+                                s["corrected"] = True
+                                s["_reviewed"] = True
                             break
                 elif d.get("type") == "action":
                     # same last-wins pattern: the event's classified action
