@@ -194,7 +194,7 @@ class BallSettings:
     # session-20260812: markers project to <=0.66x the geometric radius, real
     # balls to >=0.89x. The band splits the two populations down the middle.
     model_size_lo: float = 0.72
-    model_size_hi: float = 1.55
+    model_size_hi: float = 1.75   # corner warp inflates real balls to ~1.6x
     detect_param2: int = 18         # Hough accumulator threshold (lower => more circles)
     cue_speed_strike: float = 14.0  # px/frame on rectified view that counts as a strike
     stop_speed: float = 1.2         # px/frame below which a ball is "stopped"

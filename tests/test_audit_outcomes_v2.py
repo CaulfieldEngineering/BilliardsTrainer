@@ -182,3 +182,4 @@ class TestDeriveAndCorrect:
     def test_missing_sidecar_is_a_quiet_zero(self, tmp_path):
         from billiards_trainer.vision.outcomes import derive_and_correct
         assert derive_and_correct(tmp_path / "nope.mp4") == 0
+

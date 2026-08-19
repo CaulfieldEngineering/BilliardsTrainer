@@ -532,3 +532,64 @@ class TestNameUnknownByMeasuredColour:
         d = self._det()
         FindIdEnsemble._name_unknown(self._frame(self.GREEN6), d)
         assert d.number == 6 and d.measured_bgr is not None
+
+    def test_unmatched_heuristic_guess_is_colour_corrected(self, monkeypatch, tmp_path):
+        """The purple 4 measures NAVY under warm light and the finder's
+        heuristic guesses blue 2 — unchecked, it voted '2' every frame of
+        a session and stayed nameless (duplicate stripped by arbitration).
+        Unmatched numbered finds must get the same measured-colour
+        correction matched pairs get."""
+        import numpy as np, cv2
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        from billiards_trainer.vision.types import BallClass, Detection
+
+        class _Finder:
+            name = "stub"
+            far_rail_rescan = False
+            def detect(self, frame, calib, rescan=None):
+                return [Detection(x=30.0, y=30.0, radius=10.0,
+                                  cls=BallClass.SOLID, number=2,
+                                  bgr=(200, 75, 25))]   # guessed blue 2
+
+        class _Ident:
+            name = "stub_id"
+            far_rail_rescan = False
+            def detect(self, frame, calib, rescan=None):
+                return []                                # identifier blind
+
+        f = np.zeros((60, 60, 3), np.uint8)
+        f[:] = self.FELT
+        cv2.circle(f, (30, 30), 10, (142, 26, 36), -1)   # navy = the real 4
+        ens = FindIdEnsemble(_Finder(), _Ident())
+        out = ens.detect(f, None)
+        assert out[0].number == 4 and out[0].measured_bgr is not None
+
+
+class TestSizePriorCornerInflation:
+    """The rectifying warp inflates ball discs toward the corners (balls
+    have height; only the table plane rectifies uniformly). The 4-ball
+    measured 1.59x expected radius in the top-right corner and the old
+    1.55 model-band ceiling discarded it every frame of a session. The
+    band must admit corner inflation and still reject merged-pair blobs."""
+
+    def _band(self):
+        from billiards_trainer.config import Settings
+        from billiards_trainer.vision.pipeline import Pipeline
+        pipe = Pipeline.__new__(Pipeline)
+        pipe.settings = Settings.load()
+        lo = getattr(pipe.settings.balls, "model_size_lo", 0.72)
+        hi = getattr(pipe.settings.balls, "model_size_hi", 1.75)
+        return lo, hi
+
+    def test_corner_inflated_ball_survives(self):
+        lo, hi = self._band()
+        assert 1.59 <= hi, f"measured corner inflation 1.59x exceeds cap {hi}"
+
+    def test_merged_pair_blob_still_rejected(self):
+        lo, hi = self._band()
+        assert hi < 1.95, f"cap {hi} would admit a merged two-ball blob"
+
+    def test_marker_floor_unchanged(self):
+        lo, hi = self._band()
+        assert lo >= 0.7, "sticker/marker floor must hold"

@@ -570,3 +570,27 @@ Rounds continue with Joe's visual feedback as the gate.
   alone, human-verdict precedence, missing-sidecar quiet). Verified
   end-to-end on the live 9-ball sidecar: derivation now reads 11/11
   agreement against its corrected record and appends nothing.
+- 2026-08-19 (loop 35): THE CORNER SIZE FILTER — and a truth correction.
+  The navy 4 was detected every frame yet nameless all session: (1) the
+  finder's colour heuristic guessed it BLUE and unmatched finds kept
+  their guess unchecked (fixed: unmatched numbered finds get the same
+  measured-colour correction as matched pairs — its crop measures 7.8
+  Lab from the 4's ref, 69 from the 2's; also removed the early-return
+  that skipped naming when the identifier pass was empty); (2) the warp
+  inflates ball discs toward corners — the 4 projected at 1.59x expected
+  radius and the model size band's 1.55 cap DISCARDED a real ball every
+  frame (cap now 1.75, merged pairs at ~2x still rejected; default +
+  persisted setting + band tests). Coverage A/B on the 9-ball session:
+  ball 4 3%->52%, cue 87%->96%, 8-ball 79%->87%, duplicates 0. Then the
+  humbling part: better tracking exposed that loop 32's "frame truth"
+  was wrong on two shots I had verified only by TWO-SYSTEM AGREEMENT —
+  the cue never scratched at shot 5 (it stopped at the corner, where the
+  old size cap made it INVISIBLE to both the live detector and the old
+  derivation: shared blind spot, confident consensus, both wrong) and
+  shot 6 potted the 4 (frame-verified this loop). Live sidecar corrected
+  (5: scratch->make, 6: miss->make); derived outcomes now 11/11 against
+  frame-verified truth WITH full coverage. A pocket-zone exclusion
+  experiment measured 7/11 vs 9/11 and was reverted — the bed-envelope
+  estimate cannot tell a jaw rest from a basket sitter. Rule earned:
+  agreement between systems sharing a blind spot is not verification;
+  only frames are.

@@ -338,7 +338,14 @@ class Pipeline:
         exp_r = expected_ball_radius_px(calib.table, self.settings.table.size)
         if getattr(self._strategy, "model_based", False):
             lo_f = getattr(self.settings.balls, "model_size_lo", 0.72)
-            hi_f = getattr(self.settings.balls, "model_size_hi", 1.55)
+            # Ceiling 1.75, not 1.55: rectification is uniform only for the
+            # table PLANE — a ball's disc rides above it, so the warp
+            # inflates it toward the corners. The 4 sat in the top-right
+            # corner projecting at 1.59x expected radius and was discarded
+            # by the old 1.55 cap EVERY FRAME of a session (a real ball,
+            # half a pixel over the line, nameless for a minute of footage).
+            # Merged two-ball blobs project near 2.0x and stay rejected.
+            hi_f = getattr(self.settings.balls, "model_size_hi", 1.75)
             if exp_r > 2.0 and lo_f > 0:
                 lo, hi = exp_r * lo_f, exp_r * hi_f
                 detections = [d for d in detections if lo <= d.radius <= hi]

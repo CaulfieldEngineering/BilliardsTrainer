@@ -57,10 +57,12 @@ class FindIdEnsemble(DetectorStrategy):
                                   if d.number >= 0]
             except Exception:  # noqa: BLE001 - identity is enrichment, never fatal
                 log.debug("identity pass failed", exc_info=True)
-        if not self._last_ids:
-            return found
         # Greedy nearest pairing, each identity used at most once, so two
-        # adjacent finds can't both claim the same number.
+        # adjacent finds can't both claim the same number. (An empty
+        # identity pass skips pairing but NOT the naming/correction stage
+        # below — heuristic guesses need checking most exactly when the
+        # identifier went blind; the early return here once skipped both.)
+        used_f: set[int] = set()
         pairs = []
         for fi, f in enumerate(found):
             lim = (0.9 * max(f.radius, 6.0)) ** 2
@@ -69,7 +71,6 @@ class FindIdEnsemble(DetectorStrategy):
                 if d2 <= lim:
                     pairs.append((d2, fi, di))
         pairs.sort(key=lambda p: p[0])
-        used_f: set[int] = set()
         used_d: set[int] = set()
         for _d2, fi, di in pairs:
             if fi in used_f or di in used_d:
@@ -89,10 +90,23 @@ class FindIdEnsemble(DetectorStrategy):
         present = {f.number for f in found
                    if f.number is not None and f.number > 0}
         for fi, f in enumerate(found):
-            if fi not in used_f and (f.number is None or f.number < 0):
+            if fi in used_f:
+                continue
+            if f.number is None or f.number < 0:
                 self._name_unknown(frame_bgr, f, present)
                 if f.number > 0:
                     present.add(f.number)
+            else:
+                # An unmatched find keeps the FINDER's colour-heuristic
+                # guess — which nothing ever checked, while matched pairs
+                # get the measured-colour correction. Under Joe's warm
+                # light the purple 4 guesses BLUE (its crop measures 7.8
+                # Lab from the 4's reference and 69 from the 2's), so the
+                # 4 voted '2' every frame of a session, arbitration
+                # stripped the duplicate, and the ball stayed nameless.
+                # Same decisive-margin machinery, same trust order:
+                # measured table colour over a canonical-palette guess.
+                self._fix_colour(frame_bgr, f)
         return found
 
     @staticmethod
