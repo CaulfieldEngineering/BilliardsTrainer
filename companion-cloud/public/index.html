@@ -70,8 +70,7 @@
   <span class="sub" id="build"></span>
 </header>
 <div id="update">Update available — tap to reload</div>
-<div id="keygate">This app needs its key. Open the install link Joe was
-  given (the one containing <b>?k=…</b>) once on this device.</div>
+<div id="keygate"></div>
 
 <div id="sessions"></div>
 
@@ -106,7 +105,10 @@ $("build").textContent = BUILD.slice(0, 10);
 // ---- key handling: arrives once as ?k=, lives in localStorage ----------
 const url = new URL(location.href);
 if (url.searchParams.get("k")) {
-  localStorage.setItem("key", url.searchParams.get("k"));
+  // strip anything a chat renderer glued onto the key (asterisks,
+  // punctuation, whitespace) — the key alphabet is base64url only
+  const raw = url.searchParams.get("k").replace(/[^A-Za-z0-9_-]/g, "");
+  localStorage.setItem("key", raw);
   url.searchParams.delete("k");
   history.replaceState(null, "", url.pathname);
 }
@@ -115,8 +117,15 @@ const KEY = localStorage.getItem("key");
 async function api(path) {
   const r = await fetch(path, { headers: { "x-key": KEY || "" } });
   if (r.status === 401) {
+    // say exactly which failure this is, so remote debugging isn't a guess
+    $("keygate").textContent = KEY
+      ? `A key ending "…${KEY.slice(-4)}" (${KEY.length} chars) is stored, ` +
+        "but the server rejected it. Re-open the current install link — " +
+        "the key may have been rotated or mangled."
+      : "No key stored on this device yet. Open the install link " +
+        "(the one containing ?k=…) once.";
     $("keygate").style.display = "block";
-    $("sessions").innerHTML = "";      // no stuck "Loading…" under the gate
+    $("sessions").innerHTML = "";
     throw new Error("401");
   }
   if (!r.ok) throw new Error(path + " -> " + r.status);
