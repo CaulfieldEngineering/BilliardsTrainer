@@ -15,7 +15,8 @@
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,
          "Segoe UI", sans-serif; padding-bottom:env(safe-area-inset-bottom); }
-  header { padding:14px 16px 10px; display:flex; align-items:baseline; gap:10px;
+  header { padding:calc(14px + env(safe-area-inset-top)) 16px 10px;
+           display:flex; align-items:baseline; gap:10px;
            border-bottom:1px solid var(--line); }
   header h1 { font-size:17px; font-weight:700; letter-spacing:.4px; }
   header .sub { color:var(--dim); font-size:12px; margin-left:auto; }
@@ -71,6 +72,18 @@
 </header>
 <div id="update">Update available — tap to reload</div>
 <div id="keygate"></div>
+<div id="keyentry" style="display:none; padding:0 24px 24px; text-align:center;">
+  <input id="keyfield" placeholder="paste key here" autocapitalize="off"
+         autocorrect="off" spellcheck="false"
+         style="width:100%; max-width:340px; height:44px; padding:0 12px;
+                background:var(--panel); border:1px solid var(--line);
+                border-radius:4px; color:var(--text); font-size:15px;">
+  <button id="keysave"
+          style="margin-top:10px; height:44px; padding:0 24px;
+                 background:var(--panel); border:1px solid var(--accent);
+                 border-radius:4px; color:var(--accent); font-weight:600;
+                 font-size:15px;">Save key</button>
+</div>
 
 <div id="sessions"></div>
 
@@ -112,7 +125,18 @@ if (url.searchParams.get("k")) {
   url.searchParams.delete("k");
   history.replaceState(null, "", url.pathname);
 }
-const KEY = localStorage.getItem("key");
+let KEY = localStorage.getItem("key");
+document.addEventListener("DOMContentLoaded", () => {
+  $("keysave").onclick = () => {
+    const v = $("keyfield").value.replace(/[^A-Za-z0-9_-]/g, "");
+    if (!v) return;
+    localStorage.setItem("key", v);
+    KEY = v;
+    $("keygate").style.display = "none";
+    $("keyentry").style.display = "none";
+    loadSessions();
+  };
+});
 
 async function api(path) {
   const r = await fetch(path, { headers: { "x-key": KEY || "" } });
@@ -125,6 +149,7 @@ async function api(path) {
       : "No key stored on this device yet. Open the install link " +
         "(the one containing ?k=…) once.";
     $("keygate").style.display = "block";
+    $("keyentry").style.display = "block";
     $("sessions").innerHTML = "";
     throw new Error("401");
   }
