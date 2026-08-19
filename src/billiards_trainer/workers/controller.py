@@ -778,6 +778,9 @@ class PipelineController(QObject):
                 if non:
                     log.info("session close: actions labeled for %s: %s",
                              video, counts)
+                # Phone summary rides Dropbox sync to the cloud review app.
+                from ..vision.shots_export import export_shots_summary
+                export_shots_summary(video)
             except Exception:  # noqa: BLE001 - never disturb the app
                 log.exception("post-recording outcome derivation failed")
 

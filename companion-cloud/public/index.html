@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.png">
+<title>Billiards Review</title>
+<style>
+  :root { --bg:#0B0F14; --panel:#12161D; --line:#1D2530; --text:#E6EDF3;
+          --dim:#7D8590; --faint:#3E4A5A; --make:#3FB950; --scratch:#E3B341;
+          --accent:#58A6FF; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,
+         "Segoe UI", sans-serif; padding-bottom:env(safe-area-inset-bottom); }
+  header { padding:14px 16px 10px; display:flex; align-items:baseline; gap:10px;
+           border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; font-weight:700; letter-spacing:.4px; }
+  header .sub { color:var(--dim); font-size:12px; margin-left:auto; }
+  #update { display:none; padding:10px 16px; background:#122c1a;
+            border-bottom:1px solid var(--make); color:var(--make);
+            font-weight:600; }
+  #keygate { padding:40px 24px; text-align:center; color:var(--dim);
+             display:none; }
+  #sessions { padding:8px 0; }
+  .sess { display:flex; align-items:baseline; gap:10px; padding:12px 16px;
+          border-bottom:1px solid var(--line); }
+  .sess:active { background:var(--panel); }
+  .sess .d { font-weight:600; }
+  .sess .meta { margin-left:auto; color:var(--dim); font-size:13px;
+                text-align:right; }
+  .sess.stub .d { color:var(--faint); font-weight:400; }
+  #player { display:none; }
+  #topbar { display:flex; align-items:center; gap:12px; padding:10px 16px; }
+  #back { color:var(--accent); font-weight:600; background:none; border:none;
+          font-size:15px; }
+  #title { color:var(--dim); font-size:13px; margin-left:auto; }
+  video { width:100%; max-height:52vh; background:#000; display:block; }
+  #shotbar { padding:12px 16px; }
+  #shotinfo { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  #shotinfo .n { font-size:18px; font-weight:700; }
+  #shotinfo .oc { font-weight:700; }
+  #shotinfo .t { color:var(--dim); font-size:12px; margin-left:auto; }
+  #desc { color:var(--dim); font-size:13px; min-height:1.4em; margin-bottom:8px; }
+  #nav { display:flex; gap:8px; margin-bottom:10px; }
+  #nav button { flex:1; height:44px; background:var(--panel); color:var(--text);
+                border:1px solid var(--line); border-radius:4px; font-size:15px;
+                font-weight:600; }
+  #nav button:active { background:#1B2430; }
+  #chips { display:flex; gap:8px; overflow-x:auto; padding:4px 2px 12px;
+           -webkit-overflow-scrolling:touch; }
+  .chip { min-width:44px; height:44px; border-radius:4px; flex:0 0 auto;
+          display:flex; align-items:center; justify-content:center;
+          background:var(--panel); border:2px solid var(--line);
+          font-weight:700; }
+  .chip.make { border-color:var(--make); color:var(--make); }
+  .chip.miss { border-color:#39414d; color:var(--text); }
+  .chip.scratch { border-color:var(--scratch); color:var(--scratch); }
+  .chip.inhand { border-color:#242b35; color:var(--faint); opacity:.55;
+                 font-size:11px; }
+  .chip.cur { background:#1B2430; outline:2px solid var(--accent); }
+  .empty { padding:32px 16px; color:var(--dim); text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BILLIARDS REVIEW</h1>
+  <span class="sub" id="build"></span>
+</header>
+<div id="update">Update available — tap to reload</div>
+<div id="keygate">This app needs its key. Open the install link Joe was
+  given (the one containing <b>?k=…</b>) once on this device.</div>
+
+<div id="sessions"></div>
+
+<div id="player">
+  <div id="topbar">
+    <button id="back">‹ Sessions</button>
+    <span id="title"></span>
+  </div>
+  <video id="video" controls playsinline preload="metadata"></video>
+  <div id="shotbar">
+    <div id="shotinfo">
+      <span class="n" id="shot-n">–</span>
+      <span class="oc" id="shot-oc"></span>
+      <span class="t" id="shot-t"></span>
+    </div>
+    <div id="desc"></div>
+    <div id="nav">
+      <button id="prev">‹ Prev</button>
+      <button id="replay">↻ Replay</button>
+      <button id="next">Next ›</button>
+    </div>
+    <div id="chips"></div>
+  </div>
+</div>
+
+<script>
+const BUILD = "__BUILD_ID__";
+const PRE_ROLL = 5.0;
+const $ = id => document.getElementById(id);
+$("build").textContent = BUILD.slice(0, 10);
+
+// ---- key handling: arrives once as ?k=, lives in localStorage ----------
+const url = new URL(location.href);
+if (url.searchParams.get("k")) {
+  localStorage.setItem("key", url.searchParams.get("k"));
+  url.searchParams.delete("k");
+  history.replaceState(null, "", url.pathname);
+}
+const KEY = localStorage.getItem("key");
+
+async function api(path) {
+  const r = await fetch(path, { headers: { "x-key": KEY || "" } });
+  if (r.status === 401) { $("keygate").style.display = "block"; throw new Error("401"); }
+  if (!r.ok) throw new Error(path + " -> " + r.status);
+  return r.json();
+}
+
+// ---- self-update: poll version.json, offer one-tap reload --------------
+async function checkUpdate() {
+  try {
+    const r = await fetch("/version.json?ts=" + Date.now(), { cache: "no-store" });
+    const v = await r.json();
+    if (v.build && v.build !== BUILD) $("update").style.display = "block";
+  } catch (e) { /* offline is fine */ }
+}
+$("update").onclick = () => location.reload();
+document.addEventListener("visibilitychange",
+  () => { if (!document.hidden) checkUpdate(); });
+checkUpdate();
+
+// ---- sessions list ------------------------------------------------------
+function fmtDate(name, iso) {
+  const m = name.match(/session-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
+  if (!m) return name;
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`);
+  return d.toLocaleString([], { month: "short", day: "numeric",
+                                hour: "numeric", minute: "2-digit" });
+}
+async function loadSessions() {
+  const box = $("sessions");
+  box.innerHTML = "<div class='empty'>Loading sessions…</div>";
+  try {
+    const d = await api("/api/sessions");
+    box.innerHTML = "";
+    if (!d.sessions.length) box.innerHTML = "<div class='empty'>No sessions.</div>";
+    d.sessions.forEach(s => {
+      const el = document.createElement("div");
+      el.className = "sess" + (s.analyzed ? "" : " stub");
+      el.innerHTML = `<span class="d">${fmtDate(s.name, s.modified)}</span>
+        <span class="meta">${s.size_mb} MB${s.analyzed ? "" : " · no analysis"}</span>`;
+      el.onclick = () => openSession(s);
+      box.appendChild(el);
+    });
+  } catch (e) {
+    if (String(e.message) !== "401")
+      box.innerHTML = `<div class='empty'>Couldn't reach Dropbox (${e.message})</div>`;
+  }
+}
+
+// ---- player -------------------------------------------------------------
+let shots = [], cur = -1;
+const isAttempt = s => !s.action || s.action === "stroke" || s.action === "break";
+
+async function openSession(s) {
+  $("sessions").style.display = "none";
+  $("player").style.display = "block";
+  $("title").textContent = fmtDate(s.name, s.modified);
+  shots = []; cur = -1;
+  $("chips").innerHTML = ""; $("desc").textContent = "";
+  updateInfo();
+  try {
+    const [linkD, shotsD] = await Promise.all([
+      api("/api/link?name=" + encodeURIComponent(s.name)),
+      s.analyzed ? api("/api/shots?name=" + encodeURIComponent(s.name))
+                 : Promise.resolve({ shots: [] }),
+    ]);
+    $("video").src = linkD.link;
+    shots = shotsD.shots || [];
+    buildChips();
+    updateInfo();
+    const first = shots.findIndex(isAttempt);
+    if (first >= 0) gotoShot(first, false);
+  } catch (e) {
+    $("desc").textContent = "Load failed: " + e.message;
+  }
+}
+$("back").onclick = () => {
+  $("video").pause(); $("video").removeAttribute("src"); $("video").load();
+  $("player").style.display = "none";
+  $("sessions").style.display = "block";
+};
+
+function buildChips() {
+  const c = $("chips");
+  c.innerHTML = "";
+  shots.forEach((s, i) => {
+    const el = document.createElement("div");
+    el.className = isAttempt(s)
+      ? "chip " + (s.outcome || "miss")
+      : "chip inhand";
+    el.textContent = isAttempt(s)
+      ? (s.action === "break" ? "BRK" : i + 1)
+      : "✋";
+    el.onclick = () => gotoShot(i, true);
+    c.appendChild(el);
+  });
+}
+function gotoShot(i, play) {
+  if (i < 0 || i >= shots.length) return;
+  cur = i;
+  const v = $("video");
+  v.currentTime = Math.max(0, shots[i].start - PRE_ROLL);
+  if (play) v.play();
+  updateInfo();
+  const chip = $("chips").children[i];
+  if (chip) chip.scrollIntoView({ behavior: "smooth", inline: "center",
+                                  block: "nearest" });
+}
+$("prev").onclick = () => gotoShot(Math.max(0, cur - 1), true);
+$("next").onclick = () => gotoShot(Math.min(shots.length - 1, cur + 1), true);
+$("replay").onclick = () => gotoShot(Math.max(0, cur), true);
+
+function fmt(t) {
+  return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+}
+function updateInfo() {
+  [...$("chips").children].forEach((el, i) => el.classList.toggle("cur", i === cur));
+  if (cur < 0 || !shots[cur]) {
+    $("shot-n").textContent = shots.length ? `${shots.length} shots` : "–";
+    $("shot-oc").textContent = ""; $("shot-t").textContent = "";
+    return;
+  }
+  const s = shots[cur];
+  $("shot-n").textContent = `Shot ${cur + 1}/${shots.length}`;
+  const act = s.action || "stroke";
+  const label = act === "ball_in_hand" ? "BALL IN HAND"
+              : act === "nothing" ? "—"
+              : act === "break" ? "BREAK · " + (s.outcome || "").toUpperCase()
+              : (s.outcome || "").toUpperCase();
+  $("shot-oc").textContent = label + (s.corrected ? " ✓" : "");
+  $("shot-oc").style.color = s.outcome === "make" ? "var(--make)"
+                           : s.outcome === "scratch" ? "var(--scratch)"
+                           : "var(--dim)";
+  $("shot-t").textContent = `${fmt(s.start)} · ${(s.end - s.start).toFixed(1)}s`;
+  $("desc").textContent = s.text || "";
+}
+
+// keep "current shot" synced while playing
+setInterval(() => {
+  if ($("player").style.display === "none" || !shots.length) return;
+  const t = $("video").currentTime;
+  const i = shots.findIndex(s => t >= s.start - PRE_ROLL && t <= s.end + 0.5);
+  if (i >= 0 && i !== cur) { cur = i; updateInfo(); }
+}, 800);
+
+loadSessions();
+</script>
+</body>
+</html>

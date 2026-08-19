@@ -93,3 +93,25 @@ class TestComposeText:
              "duration_s": 4.0}
         assert "scratched" in compose_text(d)
         assert compose_text({"action": "ball_in_hand"}).startswith("Ball in hand")
+
+
+class TestShotsExport:
+    def test_summary_reflects_final_sidecar_state(self, tmp_path):
+        import json as _json
+        from billiards_trainer.vision.shots_export import (
+            export_shots_summary, summary_path)
+        vid = TestCorrectionRanking()._mismatched(tmp_path)
+        derive_and_correct(vid)                      # miss -> make (derived)
+        append_correction(vid, 8.0, "scratch", src="review")
+        out = export_shots_summary(vid)
+        assert out == summary_path(vid) and out.is_file()
+        doc = _json.loads(out.read_text())
+        assert doc["v"] == 1 and doc["session"] == "s.mp4"
+        assert doc["shots"][0]["outcome"] == "scratch"   # review verdict wins
+        assert doc["shots"][0]["corrected"] is True
+        assert doc["shots"][0]["action"] == "stroke"
+        assert doc["duration_s"] > 25
+
+    def test_no_sidecar_is_quiet_none(self, tmp_path):
+        from billiards_trainer.vision.shots_export import export_shots_summary
+        assert export_shots_summary(tmp_path / "nope.mp4") is None
