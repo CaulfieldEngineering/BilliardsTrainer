@@ -44,6 +44,7 @@ class TestShotTimeline:
                 from PySide6.QtCore import QPoint
                 return QPoint(int(600 * 101.0 / 600.0), 17)   # t=101s
         tl.mousePressEvent(Ev())
+        tl.mouseReleaseEvent(Ev())    # click semantics decide on release
         assert got and abs(got[0] - 95.0) < 0.6, f"expected routine start, got {got}"
 
     def test_live_duration_grows_with_shots(self, app):
@@ -68,10 +69,12 @@ class TestHoverCards:
         text = tl.hover_text(101.0)
         assert "Shot 1" in text and "MAKE" in text and "6.0s" in text
 
-    def test_hover_off_clip_gives_hint(self, app):
+    def test_hover_off_clip_is_quiet(self, app):
+        # Joe: "I don't need the tooltip to be so prevalent" — bare lane
+        # hovers say nothing now; only shot regions speak.
         tl = _tl(app)
         tl.add_shot(100.0, 106.0, "make", 1)
-        assert "Click to seek" in tl.hover_text(300.0)
+        assert tl.hover_text(300.0) is None
 
     def test_hover_marks_corrections(self, app):
         tl = _tl(app)
@@ -132,6 +135,7 @@ class TestZoomPan:
                 from PySide6.QtCore import QPoint
                 return QPoint(0, 17)          # left edge of the zoomed view
         tl.mousePressEvent(Ev())
+        tl.mouseReleaseEvent(Ev())    # click semantics decide on release
         assert got and abs(got[0] - 150.0) < 1.0
 
     def test_live_follow_lane_ignores_zoom(self, app):
@@ -180,3 +184,58 @@ class TestFilmstripV3:
         tl.repaint()          # must not request strips in live-follow
         tl.close()
         assert not tl._strip_pending
+
+
+class TestScrubOverhaul:
+    def _drag(self, tl, x0, x1):
+        from PySide6.QtCore import QPoint, Qt
+
+        class Press:
+            def button(self):
+                return Qt.LeftButton
+            def pos(self):
+                return QPoint(int(x0), 50)
+
+        class Move:
+            def buttons(self):
+                return Qt.LeftButton
+            def pos(self):
+                return QPoint(int(x1), 50)
+
+        class Release:
+            def button(self):
+                return Qt.LeftButton
+            def pos(self):
+                return QPoint(int(x1), 50)
+        tl.mousePressEvent(Press())
+        tl.mouseMoveEvent(Move())
+        tl.mouseReleaseEvent(Release())
+
+    def test_drag_scrubs_instead_of_clicking(self, app):
+        tl = _tl(app)
+        tl.add_shot(100.0, 106.0, "make")
+        started, scrubs, ended, clicks = [], [], [], []
+        tl.scrub_started.connect(lambda: started.append(1))
+        tl.scrubbed.connect(scrubs.append)
+        tl.scrub_ended.connect(lambda: ended.append(1))
+        tl.clicked.connect(clicks.append)
+        self._drag(tl, 100, 300)          # 200px drag = scrub
+        assert started and ended and scrubs, "drag must emit scrub sequence"
+        assert not clicks, "a drag is not a click"
+        assert abs(scrubs[-1] - 300.0) < 2.0   # 600px lane / 600s = 1s per px
+
+    def test_click_still_snaps_shot_to_routine(self, app):
+        tl = _tl(app)
+        tl.add_shot(100.0, 106.0, "make")
+        clicks, scrubs = [], []
+        tl.clicked.connect(clicks.append)
+        tl.scrubbed.connect(scrubs.append)
+        self._drag(tl, 101, 103)          # 2px = click, not drag
+        assert clicks and abs(clicks[0] - 95.0) < 1.0
+        assert not scrubs
+
+    def test_tooltip_quiet_off_shots(self, app):
+        tl = _tl(app)
+        tl.add_shot(100.0, 106.0, "make")
+        assert tl.hover_text(300.0) is None, "no tooltip on bare lane"
+        assert "Shot 1" in tl.hover_text(101.0)

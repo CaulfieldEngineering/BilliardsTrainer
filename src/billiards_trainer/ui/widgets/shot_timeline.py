@@ -32,6 +32,12 @@ class ShotTimeline(QWidget):
     """Clips on a ruler. ``clicked(seconds)`` asks the owner to seek."""
 
     clicked = Signal(float)
+    #: Editor scrubbing (v3.1): press-drag the lane to scrub. The page pauses
+    #: playback for the duration (no more playhead fighting) and every drag
+    #: position becomes a real seek — so Space afterwards resumes from THERE.
+    scrub_started = Signal()
+    scrubbed = Signal(float)          # seconds under the cursor
+    scrub_ended = Signal()
 
     #: Number of filmstrip thumbnails sampled across the visible range.
     STRIP_N = 12
@@ -63,6 +69,8 @@ class ShotTimeline(QWidget):
         self._media: str = ""
         self._strip: dict[int, object] = {}
         self._strip_pending: set[int] = set()
+        self._press_x: float | None = None
+        self._dragging = False
 
     # ------------------------------------------------------------------ #
     def set_duration(self, seconds: float) -> None:
@@ -227,26 +235,23 @@ class ShotTimeline(QWidget):
 
     # ------------------------------------------------------------------ #
     def hover_text(self, t: float) -> str | None:
-        """Hover-card text for time ``t`` (pure — the event handler is a
-        thin shell around this so it can be tested without fake QEvents)."""
+        """Hover-card text for time ``t`` — SHOT REGIONS ONLY (the always-on
+        instructional tooltip was noise; Joe: "I don't need the tooltip to
+        be so prevalent"). Pure, for tests."""
         if self._duration <= 0:
             return None
         s = self.shot_at(t)
         if s is None:
-            return ("Click to seek — clips replay from your pre-shot routine"
-                    "\nWheel: zoom · middle-drag: pan")
+            return None
         no = self._shots.index(s) + 1
         start = s["start"]
         mm, ss = int(start) // 60, int(start) % 60
         dur = max(0.0, s["end"] - start)
         pot = int(s.get("pocketed", 0))
-        nl = "\n"
         return (f"Shot {no} — {s['outcome'].upper()}"
                 + (" (corrected)" if s.get("corrected") else "")
-                + f"{nl}{mm}:{ss:02d} · {dur:.1f}s"
-                + (f" · {pot} potted" if pot else "")
-                + f"{nl}Click: replay from routine · "
-                  "Right-click list row: export/fix")
+                + f"  ·  {mm}:{ss:02d} · {dur:.1f}s"
+                + (f" · {pot} potted" if pot else ""))
 
     def wheelEvent(self, ev):  # noqa: N802 - Qt override
         x = ev.position().x() if hasattr(ev, "position") else ev.pos().x()
@@ -262,17 +267,37 @@ class ShotTimeline(QWidget):
             self.pan_by(float(pos.x()) - self._pan_anchor_x)
             self._pan_anchor_x = float(pos.x())
             return
+        if self._press_x is not None and (ev.buttons() & Qt.LeftButton):
+            if not self._dragging and abs(float(pos.x()) - self._press_x) > 4:
+                self._dragging = True
+                self.scrub_started.emit()
+            if self._dragging:
+                t = self._t(float(pos.x()))
+                self.set_playhead(t)          # the lane follows the finger
+                self.scrubbed.emit(t)
+                return
         text = self.hover_text(self._t(float(pos.x())))
         if text:
             QToolTip.showText(self.mapToGlobal(pos), text, self)
         else:
             QToolTip.hideText()
-        super().mouseMoveEvent(ev)
 
     def mouseReleaseEvent(self, ev):  # noqa: N802 - Qt override
         if ev.button() == Qt.MiddleButton:
             self._pan_anchor_x = None
-        super().mouseReleaseEvent(ev)
+        elif ev.button() == Qt.LeftButton and self._press_x is not None:
+            x = ev.position().x() if hasattr(ev, "position") else ev.pos().x()
+            if self._dragging:
+                t = self._t(float(x))
+                self.scrubbed.emit(t)
+                self.scrub_ended.emit()
+            else:
+                t = self._t(float(x))
+                s = self.shot_at(t)
+                # click -> routine start on a shot; raw time on bare lane
+                self.clicked.emit(max(0.0, s["start"] - self.pre_roll_s) if s else t)
+            self._press_x = None
+            self._dragging = False
 
     def mousePressEvent(self, ev):  # noqa: N802 - Qt override
         x = ev.position().x() if hasattr(ev, "position") else ev.pos().x()
@@ -281,10 +306,11 @@ class ShotTimeline(QWidget):
             return
         if ev.button() != Qt.LeftButton or self._duration <= 0:
             return
-        t = self._t(x)
-        s = self.shot_at(t)
-        # Clip click -> start of the pre-shot routine; bare-ruler click -> there.
-        self.clicked.emit(max(0.0, s["start"] - self.pre_roll_s) if s else t)
+        # Nothing is decided at press: a CLICK (release nearby) snaps a shot
+        # to its routine start; a DRAG scrubs raw time. Deciding on release
+        # lets both coexist.
+        self._press_x = float(x)
+        self._dragging = False
 
     def paintEvent(self, ev):  # noqa: N802 - Qt override
         p = QPainter(self)

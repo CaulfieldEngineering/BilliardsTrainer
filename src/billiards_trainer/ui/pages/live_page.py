@@ -166,6 +166,20 @@ class LivePage(QWidget):
         self._timeline = ShotTimeline(
             pre_roll_s=getattr(self._settings.ui, "pre_shot_s", 5.0))
         self._timeline.clicked.connect(self._on_timeline_clicked)
+        # Editor scrubbing on the lane (v3.1): pause for the drag so playback
+        # stops fighting the playhead, seek continuously, resume on release —
+        # and because every drag position is a REAL seek, Space afterwards
+        # resumes from where the finger left off, not from the beginning.
+        self._timeline.scrub_started.connect(self._on_seek_pressed)
+        self._timeline.scrubbed.connect(self._on_timeline_scrubbed)
+        self._timeline.scrub_ended.connect(self._on_seek_released)
+        # SPACE = play/pause, globally on this page. Transport buttons give
+        # up keyboard focus so Space can never double-fire through a focused
+        # button (the classic checkable-button + shortcut trap).
+        from PySide6.QtGui import QKeySequence, QShortcut
+        sc = QShortcut(QKeySequence(Qt.Key_Space), self)
+        sc.setContext(Qt.WindowShortcut)
+        sc.activated.connect(self._on_space)
         root.addWidget(self._timeline)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -433,6 +447,19 @@ class LivePage(QWidget):
         self._play_btn.setIcon(icon("play-solid" if paused else "rec-pause", PALETTE.text_dim))
         self.video_play_pause.emit(paused)
 
+    def _on_space(self) -> None:
+        """Space = play/pause on a loaded session; inert on live camera."""
+        if self._is_video and self._play_btn.isEnabled():
+            self._play_btn.toggle()
+            self._toggle_play()
+
+    def _on_timeline_scrubbed(self, seconds: float) -> None:
+        """Lane drag -> debounced frame seek (same machinery as the slider)."""
+        frame = int(seconds * (self._video_fps or 30.0))
+        self._pending_seek = max(0, min(self._seek.maximum(), frame))
+        if not self._seek_debounce.isActive():
+            self._seek_debounce.start()
+
     # --- seek-bar scrubbing -------------------------------------------------- #
     def _on_seek_pressed(self) -> None:
         """Drag started: stop the playback tick from fighting the thumb. If the
@@ -640,6 +667,10 @@ class LivePage(QWidget):
         btn.setIconSize(QSize(20, 20))
         btn.setToolTip(tip)
         btn.setCursor(Qt.PointingHandCursor)
+        # Media-app rule: transport buttons never hold keyboard focus, so
+        # Space always means play/pause (the page shortcut) instead of
+        # "click whichever button happens to be focused".
+        btn.setFocusPolicy(Qt.NoFocus)
         return btn
 
     def _stats_rail(self) -> QWidget:
