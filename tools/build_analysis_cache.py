@@ -30,6 +30,15 @@ def build(video: Path, force: bool = False) -> bool:
     if SidecarReader.exists(video) and not force:
         print(f"  {video.name}: sidecar exists, skipping")
         return True
+    if SidecarReader.exists(video) and force:
+        # NEVER destroy the only copy of an analysis: a --force re-run is an
+        # EXPERIMENT until proven better (loop 30 overwrote a live sidecar
+        # with a re-analysis that scored WORSE on the outcome audit). Keep
+        # the previous version beside it.
+        import shutil
+        sc = Path(str(video) + ".analysis.jsonl")
+        shutil.copy2(sc, str(sc) + ".prev")
+        print(f"  {video.name}: previous sidecar kept as .prev")
     cap = cv2.VideoCapture(str(video))
     if not cap.isOpened():
         print(f"  {video.name}: unreadable", file=sys.stderr)
