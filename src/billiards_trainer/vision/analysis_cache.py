@@ -213,9 +213,21 @@ class SidecarReader:
 
     @staticmethod
     def _to_track(r) -> Track:
+        # The sidecar stores no bgr (3 floats/ball/state saved); playback
+        # rendering uses the measured mean colour, so synthesize it from the
+        # NUMBER — without this every cached ball wore the default grey and
+        # the whole playback schematic looked white (Joe's report).
+        num = int(r[4])
+        if num == 0:
+            bgr = (250, 250, 250)
+        elif num > 0:
+            from .balls import pool_ball_bgr
+            bgr = pool_ball_bgr(num)
+        else:
+            bgr = (200, 200, 200)
         return Track(id=int(r[0]), x=float(r[1]), y=float(r[2]),
-                     radius=float(r[3]), number=int(r[4]),
-                     cls=BallClass(r[5]), active=bool(r[6]))
+                     radius=float(r[3]), number=num,
+                     cls=BallClass(r[5]), active=bool(r[6]), bgr=bgr)
 
     def _to_tracks(self, rows) -> list[Track]:
         return [self._to_track(r) for r in rows]

@@ -282,6 +282,11 @@ class LivePage(QWidget):
         # runs again at record start, when styling is final.
         self._size_rec_clock()
         self._rec_time.setAlignment(Qt.AlignCenter)
+        # Height-match the buttons: the clock label's font made it the
+        # tallest thing in the capsule, so showing it on record GREW the
+        # whole transport row and the timeline visibly jumped (Joe's
+        # report). Fixed height = show/hide changes width only.
+        self._rec_time.setFixedHeight(self._rec_btn.sizeHint().height())
         self._rec_time.hide()
         cap.addWidget(self._rec_time)
         lay.addWidget(self._rec_capsule)

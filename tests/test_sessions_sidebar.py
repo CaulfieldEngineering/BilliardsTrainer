@@ -36,7 +36,7 @@ class TestSessionTable:
         sb = _sidebar(app, tmp_path)
         t = sb._list
         assert [t.headerItem().text(i) for i in range(4)] == \
-            ["Session", "Date", "Length", "Shots"]
+            ["Name", "Date", "Len", "Shots"]
         first = t.topLevelItem(0)
         assert "session-b" in first.data(0, Qt.UserRole)   # newest on top
 
@@ -60,3 +60,24 @@ class TestSessionTable:
         sb.session_selected.connect(got.append)
         sb._on_item(sb._list.topLevelItem(0), 0)
         assert got and got[0].endswith(".mp4")
+
+
+class TestHeadersFit:
+    def test_all_four_headers_fit_at_minimum_width(self, app, tmp_path):
+        """Joe: '"Shots" is "Sho" and I can't expand it.' At the sidebar's
+        minimum width every header must have at least its text width."""
+        from PySide6.QtGui import QFontMetrics
+        sb = _sidebar(app, tmp_path)
+        sb.resize(sb.minimumWidth(), 600)
+        app.processEvents()
+        t = sb._list
+        fm = QFontMetrics(t.header().font())
+        for col in range(4):
+            need = fm.horizontalAdvance(t.headerItem().text(col)) + 12
+            assert t.header().sectionSize(col) >= need, \
+                f"column {col} ({t.headerItem().text(col)!r}) clips: " \
+                f"{t.header().sectionSize(col)}px < {need}px"
+
+    def test_sidebar_is_not_fixed_width(self, app, tmp_path):
+        sb = _sidebar(app, tmp_path)
+        assert sb.maximumWidth() > sb.minimumWidth(), "sidebar must be resizable"

@@ -145,18 +145,29 @@ class MainWindow(QMainWindow):
         root.setSpacing(0)
 
         # The sessions sidebar IS the navigation: LIVE + recordings + Settings.
+        # It lives in a SPLITTER so Joe can drag it wider — the fixed width
+        # clipped the session table's "Shots" header to "Sho" with no remedy.
+        from PySide6.QtWidgets import QSplitter
+
         from .widgets.sessions_sidebar import SessionsSidebar
         self._sidebar = SessionsSidebar()
         self._sidebar.recordings_dir = self._settings.recording.resolved_dir()
         self._sidebar.refresh()
-        root.addWidget(self._sidebar)
 
         self._stack = QStackedWidget()
         self._live = LivePage(self._settings)
         self._settings_page = SettingsPage(self._settings)
         for page in (self._live, self._settings_page):
             self._stack.addWidget(page)
-        root.addWidget(self._stack, 1)
+
+        split = QSplitter(Qt.Horizontal)
+        split.setChildrenCollapsible(False)
+        split.addWidget(self._sidebar)
+        split.addWidget(self._stack)
+        split.setStretchFactor(0, 0)   # dragging grows/shrinks the sidebar…
+        split.setStretchFactor(1, 1)   # …window resizes go to the content
+        split.setSizes([300, 1100])
+        root.addWidget(split, 1)
         self.setCentralWidget(central)
         self.statusBar().showMessage("Ready")
 

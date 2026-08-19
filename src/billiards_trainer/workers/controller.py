@@ -260,7 +260,15 @@ class PipelineController(QObject):
         # timeline populates instantly from the cache.
         if self._pipeline is not None:
             self._pipeline.playback_cache = None   # never leak into live mode
-        if getattr(self._source, "is_video", False):
+        # ORDER MATTERS: the UI clears its timeline/shot list when the mode
+        # signal lands, so the mode must be announced BEFORE the cached shots
+        # arrive — the old order delivered 11 shots and wiped them a
+        # millisecond later (Joe: the bar says "No shots" while the phone
+        # shows them).
+        is_vid = bool(getattr(self._source, "is_video", False))
+        self.source_is_video.emit(is_vid, getattr(self._source, "frame_count", 0) if is_vid else 0,
+                                  self._src_fps)
+        if is_vid:
             try:
                 from ..vision.analysis_cache import SidecarReader
                 if SidecarReader.exists(source_spec):
@@ -271,10 +279,6 @@ class PipelineController(QObject):
                     log.info("playback from analysis cache (%d states)", len(reader))
             except (OSError, ValueError) as exc:
                 log.warning("analysis cache unreadable (%s) — re-analyzing live", exc)
-        # tell the UI whether to show video transport controls
-        is_vid = bool(getattr(self._source, "is_video", False))
-        self.source_is_video.emit(is_vid, getattr(self._source, "frame_count", 0) if is_vid else 0,
-                                  self._src_fps)
         self._recover_orphan_recordings()
         log.info("Started: source=%s mode=%s detect=%s video=%s", source_spec, mode,
                  self._detection_enabled, is_vid)
@@ -1067,6 +1071,12 @@ class PipelineController(QObject):
             self._write_capture(frame)
 
         t = time.perf_counter() - self._t0
+        # Cached playback syncs to the DISPLAYED frame: wall-clock t drifts
+        # seconds away from the video position under pacing/frame drops, and
+        # the schematic animated ~3s behind the footage (Joe's report). For
+        # video sources, media time IS the truth.
+        if getattr(self._source, "is_video", False) and self._src_fps:
+            t = max(0.0, self._video_pos / float(self._src_fps))
         try:
             res = self._pipeline.process(frame, t, annotate=not self._label_mode, detect=detect)
         except Exception as exc:  # noqa: BLE001 - never let one bad frame kill the loop

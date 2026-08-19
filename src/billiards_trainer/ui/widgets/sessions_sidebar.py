@@ -34,9 +34,11 @@ class SessionsSidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        # Wider than the old list: four sortable columns need the room
-        # (Joe: "Session Name | Date | Length | # Shots ... can be sorted").
-        self.setFixedWidth(300)
+        # Resizable via the main-window splitter (a fixed width clipped the
+        # "Shots" header to "Sho" with no way to widen). The minimum keeps
+        # all four headers legible at the default drag stop.
+        self.setMinimumWidth(252)
+        self.setMaximumWidth(560)
         # Where recordings are listed from; main_window points this at the
         # configured recordings folder (Settings -> Recording).
         self.recordings_dir: Path = EXPORTS_DIR
@@ -66,13 +68,19 @@ class SessionsSidebar(QFrame):
         self._list = QTreeWidget()
         self._list.setFrameShape(QFrame.NoFrame)
         self._list.setRootIsDecorated(False)
-        self._list.setHeaderLabels(["Session", "Date", "Length", "Shots"])
+        self._list.setHeaderLabels(["Name", "Date", "Len", "Shots"])
         self._list.setSortingEnabled(True)
         self._list.sortByColumn(1, Qt.DescendingOrder)
         hdr = self._list.header()
-        hdr.resizeSection(0, 96)
-        hdr.resizeSection(1, 86)
-        hdr.resizeSection(2, 52)
+        # Tight defaults so ALL FOUR headers render fully at minimum width
+        # (the old defaults left the last column ~38px: "Shots" -> "Sho").
+        hdr.resizeSection(0, 78)
+        hdr.resizeSection(1, 74)
+        hdr.resizeSection(2, 48)
+        hdr.setMinimumSectionSize(40)
+        f = self._list.font()
+        f.setPointSizeF(max(7.5, f.pointSizeF() - 0.5))
+        self._list.setFont(f)
         self._list.itemClicked.connect(self._on_item)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._context_menu)
