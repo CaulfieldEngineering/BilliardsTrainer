@@ -65,6 +65,7 @@
   .region.miss { background:#4A5563; }
   .region.scratch { background:var(--scratch); }
   .region.inhand { background:var(--faint); opacity:.25; }
+  .region.lead { opacity:.22; }
   #playhead { position:absolute; top:0; bottom:0; width:2px;
               background:var(--text); pointer-events:none; }
   .chip { min-width:44px; height:44px; border-radius:4px; flex:0 0 auto;
@@ -117,9 +118,10 @@
     <div id="desc"></div>
     <div id="lane"><div id="playhead"></div></div>
     <div id="nav">
-      <button id="prev">‹ Prev</button>
-      <button id="replay">↻ Replay</button>
-      <button id="next">Next ›</button>
+      <button id="prev">‹</button>
+      <button id="replay">↻</button>
+      <button id="mode" title="playback mode">▸▸</button>
+      <button id="next">›</button>
     </div>
     <div id="chips"></div>
   </div>
@@ -294,6 +296,7 @@ function gotoShot(i, play) {
   const v = $("video");
   v.currentTime = Math.max(0, shots[i].start - PRE_ROLL);
   if (play) v.play();
+  buildLane();
   updateInfo();
   const chip = $("chips").children[i];
   if (chip) chip.scrollIntoView({ behavior: "smooth", inline: "center",
@@ -328,38 +331,74 @@ function updateInfo() {
   $("desc").textContent = s.text || "";
 }
 
-// ---- shot-aware scrub lane (Joe: "scrub the shot then < > between") ----
-let laneDur = 0;
+// ---- SHOT-scoped scrub lane (Joe: whole-session scale was unusable) ----
+// The lane covers just the current shot: routine lead-in -> settled,
+// plus a 1s tail. Scrubbing works within that window; < > moves between
+// shots; the mode button picks what happens at the end of the shot:
+//   ⟳  loop this shot          ▸▸  roll into the next shot (CD style)
+let win = null;                       // {t0, t1} of the visible window
+let mode = localStorage.getItem("mode") || "cd";   // "cd" | "loop"
+
+function modeLabel() {
+  $("mode").textContent = mode === "loop" ? "⟳" : "▸▸";
+  $("mode").style.color = mode === "loop" ? "var(--scratch)" : "var(--text)";
+  $("replay").style.color = "var(--dim)";
+}
+$("mode").onclick = () => {
+  mode = mode === "loop" ? "cd" : "loop";
+  localStorage.setItem("mode", mode);
+  modeLabel();
+};
+
 function buildLane() {
   const lane = $("lane");
   [...lane.querySelectorAll(".region")].forEach(el => el.remove());
-  const v = $("video");
-  laneDur = (isFinite(v.duration) && v.duration > 0) ? v.duration
-          : (shots.length ? shots[shots.length - 1].end + 5 : 0);
-  if (!laneDur) return;
-  shots.forEach(s => {
-    const el = document.createElement("div");
-    el.className = "region " + (isAttempt(s) ? (s.outcome || "miss") : "inhand");
-    el.style.left = (100 * Math.max(0, s.start) / laneDur) + "%";
-    el.style.width = Math.max(0.6,
-      100 * (Math.max(s.end, s.start + 0.5) - s.start) / laneDur) + "%";
-    lane.appendChild(el);
-  });
+  if (cur < 0 || !shots[cur]) { win = null; return; }
+  const s = shots[cur];
+  const t0 = Math.max(0, s.start - PRE_ROLL);
+  const t1 = Math.max(s.end, s.start + 0.5) + 1.0;
+  win = { t0, t1 };
+  const span = t1 - t0;
+  const lead = document.createElement("div");
+  lead.className = "region lead "
+    + (isAttempt(s) ? (s.outcome || "miss") : "inhand");
+  lead.style.left = "0%";
+  lead.style.width = (100 * (s.start - t0) / span) + "%";
+  lane.appendChild(lead);
+  const body = document.createElement("div");
+  body.className = "region "
+    + (isAttempt(s) ? (s.outcome || "miss") : "inhand");
+  body.style.left = (100 * (s.start - t0) / span) + "%";
+  body.style.width =
+    (100 * (Math.max(s.end, s.start + 0.5) - s.start) / span) + "%";
+  lane.appendChild(body);
 }
-$("video").addEventListener("loadedmetadata", buildLane);
+
 $("video").addEventListener("timeupdate", () => {
-  if (!laneDur) return;
-  $("playhead").style.left =
-    (100 * $("video").currentTime / laneDur) + "%";
+  const v = $("video");
+  if (win) {
+    const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
+    $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
+  }
+  // end-of-shot behavior: loop the shot, or roll on like a CD
+  if (win && !v.paused && cur >= 0 && v.currentTime >= win.t1 - 0.05) {
+    if (mode === "loop") {
+      v.currentTime = win.t0;
+    } else if (cur < shots.length - 1) {
+      gotoShot(cur + 1, true);
+    } else {
+      v.pause();
+    }
+  }
 });
 (() => {
   const lane = $("lane");
   let scrubbing = false;
   const seekTo = ev => {
-    if (!laneDur) return;
+    if (!win) return;
     const r = lane.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
-    $("video").currentTime = frac * laneDur;
+    $("video").currentTime = win.t0 + frac * (win.t1 - win.t0);
     $("playhead").style.left = (100 * frac) + "%";
   };
   lane.addEventListener("pointerdown", ev => {
@@ -371,13 +410,15 @@ $("video").addEventListener("timeupdate", () => {
   lane.addEventListener("pointerup", () => { scrubbing = false; });
   lane.addEventListener("pointercancel", () => { scrubbing = false; });
 })();
+modeLabel();
 
 // keep "current shot" synced while playing
 setInterval(() => {
   if ($("player").style.display === "none" || !shots.length) return;
   const t = $("video").currentTime;
+  if (win && t >= win.t0 && t <= win.t1) return;   // inside the window: stay
   const i = shots.findIndex(s => t >= s.start - PRE_ROLL && t <= s.end + 0.5);
-  if (i >= 0 && i !== cur) { cur = i; updateInfo(); }
+  if (i >= 0 && i !== cur) { cur = i; buildLane(); updateInfo(); }
 }, 800);
 
 loadSessions();
