@@ -216,17 +216,22 @@ class ShotTimeline(QWidget):
         self._strip[sec] = img
         self.update()
 
+    #: Horizontal inset so content respects the card's rounded border.
+    PAD = 6.0
+
     def _x(self, t: float) -> float:
         lo, hi = self._range()
         if hi <= lo:
-            return 0.0
-        return max(0.0, min(1.0, (t - lo) / (hi - lo))) * self.width()
+            return self.PAD
+        frac = max(0.0, min(1.0, (t - lo) / (hi - lo)))
+        return self.PAD + frac * max(1.0, self.width() - 2 * self.PAD)
 
     def _t(self, x: float) -> float:
         lo, hi = self._range()
-        if self.width() <= 0:
+        inner = self.width() - 2 * self.PAD
+        if inner <= 0:
             return lo
-        return lo + max(0.0, x / self.width()) * (hi - lo)
+        return lo + max(0.0, (x - self.PAD) / inner) * (hi - lo)
 
     def shot_at(self, t: float) -> dict | None:
         """The shot whose clip (including pre-roll) covers time ``t``."""
@@ -318,10 +323,17 @@ class ShotTimeline(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
+        # MASTER CONTAINER first (Joe: "the timeline has no master border —
+        # it just appears to be a massive negative space"): the whole lane
+        # is a card, same fill/border/radius family as every other card on
+        # the page, so an empty timeline reads as an empty strip, not void.
+        p.setPen(QPen(QColor(PALETTE.border_soft), 1))
+        p.setBrush(QColor(PALETTE.bg_elevated))
+        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1.0, h - 1.0), 10, 10)
         # ruler bed (below the filmstrip band)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.surface))
-        p.drawRoundedRect(QRectF(0, h * 0.66, w, h * 0.22), 4, 4)
+        p.drawRoundedRect(QRectF(6, h * 0.66, w - 12, h * 0.22), 4, 4)
         if self._duration > 0:
             lo, hi = self._range()
             span = max(1.0, hi - lo)
@@ -332,10 +344,11 @@ class ShotTimeline(QWidget):
             if self._media and self.follow_window_s <= 0:
                 times = self.strip_times(lo, hi)
                 self._request_strip(times)
-                slot_w = w / max(1, len(times))
+                slot_w = (w - 2 * self.PAD) / max(1, len(times))
                 for k, sec in enumerate(times):
                     img = self._strip.get(sec)
-                    slot = QRectF(k * slot_w, strip_top, slot_w - 1.0, strip_h)
+                    slot = QRectF(self.PAD + k * slot_w, strip_top,
+                                  slot_w - 1.0, strip_h)
                     if img is not None:
                         p.setOpacity(0.72)
                         p.drawImage(slot, img)

@@ -605,3 +605,16 @@ Rounds continue with Joe's visual feedback as the gate.
   test. Summaries thread emit guarded against mid-teardown refresh
   (the flaky RuntimeError warning is gone for good). 2 new pinned tests
   (compact lane height, help text stays gone); suite green both orders.
+- 2026-08-19 (Joe UI round 2, on screenshot feedback): the tightening
+  exposed three real design faults, all fixed. (1) The timeline floated
+  as void — it now paints a MASTER CARD (same fill/border/radius family
+  as the page's cards) with content inset inside the rounded border, so
+  an empty lane reads as an empty strip, not negative space. (2) The
+  splitter handles drew as solid rectangular slabs between rounded cards
+  — transparent now, gaps match the page rhythm. (3) My loop-earlier
+  "metrics-driven" header widths measured the PRE-THEME font, so every
+  sidebar column clipped in the running app (worse than the constant
+  widths they replaced) — columns 1-3 are now ResizeToContents, measured
+  by Qt with whatever font is live, Name stretches. 4 new pinned tests
+  (container paints, handles transparent, section modes, both test
+  orders); suite green.

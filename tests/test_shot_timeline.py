@@ -257,3 +257,27 @@ class TestCompactLane:
         src = Path(m.__file__).read_text(encoding="utf-8")
         assert "clips appear here" not in src, \
             "the empty-state help text Joe removed came back"
+
+
+class TestMasterContainer:
+    """Joe: 'the timeline has no master border. It just appears to be a
+    massive negative space.' The lane must paint a visible card — fill and
+    border — even when completely empty."""
+
+    def test_empty_lane_paints_a_container(self, app):
+        from billiards_trainer.ui.theme import PALETTE
+        from billiards_trainer.ui.widgets.shot_timeline import ShotTimeline
+        tl = ShotTimeline()
+        tl.resize(600, tl.height())
+        img = tl.grab().toImage()
+        top_centre = img.pixelColor(300, 3).name().lower()
+        assert top_centre == PALETTE.bg_elevated.lower(), \
+            f"empty lane top edge paints {top_centre}, not the card fill " \
+            f"({PALETTE.bg_elevated}) — the master container is missing"
+
+    def test_splitter_handles_are_invisible(self):
+        from billiards_trainer.ui.theme import build_stylesheet
+        qss = build_stylesheet()
+        assert "QSplitter::handle { background: transparent; }" in qss, \
+            "splitter slabs came back (Joe: 'rounded cards separated by " \
+            "rectangular dividers is bad design')"

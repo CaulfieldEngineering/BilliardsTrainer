@@ -75,19 +75,17 @@ class SessionsSidebar(QFrame):
         f = self._list.font()
         f.setPointSizeF(max(7.5, f.pointSizeF() - 0.5))
         self._list.setFont(f)
-        # Section floors from MEASURED header text, not constants: constants
-        # fit one theme's font and clip under another ("Shots" -> "Sho" was
-        # exactly this class of bug). Name gets whatever remains.
-        from PySide6.QtGui import QFontMetrics
-        fm = QFontMetrics(hdr.font())
-        widths = [fm.horizontalAdvance(t) + 14
-                  for t in ("Name", "Date", "Len", "Shots")]
+        # Qt fits the sections, permanently: build-time font metrics lied
+        # (the theme QSS lands AFTER construction, so measured widths were
+        # for the wrong font and EVERY column clipped — Joe saw it live).
+        # ResizeToContents re-measures header + cells with whatever font is
+        # actually in effect, on every change; Name takes the remainder.
+        from PySide6.QtWidgets import QHeaderView
+        hdr.setStretchLastSection(False)
+        hdr.setSectionResizeMode(0, QHeaderView.Stretch)
         for col in (1, 2, 3):
-            hdr.resizeSection(col, widths[col])
-        hdr.setMinimumSectionSize(min(widths))
-        hdr.resizeSection(0, max(78, widths[0]))
-        self.setMinimumWidth(max(252, sum(widths) + max(78, widths[0])
-                                 - widths[0] + 24))
+            hdr.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        hdr.setMinimumSectionSize(36)
         self._list.itemClicked.connect(self._on_item)
         self._list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._context_menu)

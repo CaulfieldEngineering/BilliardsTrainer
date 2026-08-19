@@ -81,3 +81,18 @@ class TestHeadersFit:
     def test_sidebar_is_not_fixed_width(self, app, tmp_path):
         sb = _sidebar(app, tmp_path)
         assert sb.maximumWidth() > sb.minimumWidth(), "sidebar must be resizable"
+
+
+class TestSectionsFitUnderAnyFont:
+    def test_sections_are_content_managed(self, app, tmp_path):
+        """Build-time width constants clip when the theme font lands after
+        construction (Joe: 'every column has cut off text'). Columns 1-3
+        must be ResizeToContents — measured live, whatever the font."""
+        from PySide6.QtWidgets import QHeaderView
+        sb = _sidebar(app, tmp_path)
+        hdr = sb._list.header()
+        assert hdr.sectionResizeMode(0) == QHeaderView.Stretch
+        for col in (1, 2, 3):
+            assert hdr.sectionResizeMode(col) == QHeaderView.ResizeToContents, \
+                f"column {col} is fixed-width again"
+        assert not hdr.stretchLastSection()

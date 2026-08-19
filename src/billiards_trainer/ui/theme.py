@@ -313,7 +313,7 @@ QMenu::item:selected {{ background: {accent}; color: #0A0E12; }}
 QProgressBar {{ background: {p.surface}; border: none; border-radius: 6px;
     text-align: center; height: 8px; }}
 QProgressBar::chunk {{ background: {accent}; border-radius: 6px; }}
-QSplitter::handle {{ background: {p.border_soft}; }}
+QSplitter::handle {{ background: transparent; }}
 QSplitter::handle:hover {{ background: {accent}; }}
 """
 
