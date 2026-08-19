@@ -56,6 +56,17 @@
   #nav button:active { background:#1B2430; }
   #chips { display:flex; gap:8px; overflow-x:auto; padding:4px 2px 12px;
            -webkit-overflow-scrolling:touch; }
+  #lane { position:relative; height:44px; margin:0 0 10px;
+          background:var(--panel); border:1px solid var(--line);
+          border-radius:4px; touch-action:none; overflow:hidden; }
+  .region { position:absolute; top:5px; bottom:5px; border-radius:2px;
+            opacity:.6; }
+  .region.make { background:var(--make); }
+  .region.miss { background:#4A5563; }
+  .region.scratch { background:var(--scratch); }
+  .region.inhand { background:var(--faint); opacity:.25; }
+  #playhead { position:absolute; top:0; bottom:0; width:2px;
+              background:var(--text); pointer-events:none; }
   .chip { min-width:44px; height:44px; border-radius:4px; flex:0 0 auto;
           display:flex; align-items:center; justify-content:center;
           background:var(--panel); border:2px solid var(--line);
@@ -104,6 +115,7 @@
       <span class="t" id="shot-t"></span>
     </div>
     <div id="desc"></div>
+    <div id="lane"><div id="playhead"></div></div>
     <div id="nav">
       <button id="prev">‹ Prev</button>
       <button id="replay">↻ Replay</button>
@@ -247,6 +259,7 @@ async function openSession(s) {
     $("video").src = linkD.link;
     shots = shotsD.shots || [];
     buildChips();
+    buildLane();
     updateInfo();
     const first = shots.findIndex(isAttempt);
     if (first >= 0) gotoShot(first, false);
@@ -314,6 +327,50 @@ function updateInfo() {
   $("shot-t").textContent = `${fmt(s.start)} · ${(s.end - s.start).toFixed(1)}s`;
   $("desc").textContent = s.text || "";
 }
+
+// ---- shot-aware scrub lane (Joe: "scrub the shot then < > between") ----
+let laneDur = 0;
+function buildLane() {
+  const lane = $("lane");
+  [...lane.querySelectorAll(".region")].forEach(el => el.remove());
+  const v = $("video");
+  laneDur = (isFinite(v.duration) && v.duration > 0) ? v.duration
+          : (shots.length ? shots[shots.length - 1].end + 5 : 0);
+  if (!laneDur) return;
+  shots.forEach(s => {
+    const el = document.createElement("div");
+    el.className = "region " + (isAttempt(s) ? (s.outcome || "miss") : "inhand");
+    el.style.left = (100 * Math.max(0, s.start) / laneDur) + "%";
+    el.style.width = Math.max(0.6,
+      100 * (Math.max(s.end, s.start + 0.5) - s.start) / laneDur) + "%";
+    lane.appendChild(el);
+  });
+}
+$("video").addEventListener("loadedmetadata", buildLane);
+$("video").addEventListener("timeupdate", () => {
+  if (!laneDur) return;
+  $("playhead").style.left =
+    (100 * $("video").currentTime / laneDur) + "%";
+});
+(() => {
+  const lane = $("lane");
+  let scrubbing = false;
+  const seekTo = ev => {
+    if (!laneDur) return;
+    const r = lane.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+    $("video").currentTime = frac * laneDur;
+    $("playhead").style.left = (100 * frac) + "%";
+  };
+  lane.addEventListener("pointerdown", ev => {
+    scrubbing = true;
+    lane.setPointerCapture(ev.pointerId);
+    seekTo(ev);
+  });
+  lane.addEventListener("pointermove", ev => { if (scrubbing) seekTo(ev); });
+  lane.addEventListener("pointerup", () => { scrubbing = false; });
+  lane.addEventListener("pointercancel", () => { scrubbing = false; });
+})();
 
 // keep "current shot" synced while playing
 setInterval(() => {

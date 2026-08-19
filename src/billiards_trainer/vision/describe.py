@@ -181,7 +181,6 @@ def compose_text(d: dict) -> str:
         bits.append("no ball fell")
     if scratch:
         bits.append("cue ball scratched")
-    ct = d.get("cue_travel_tw")
-    if ct is not None and ct > 0.1:
-        bits.append(f"cue travelled {ct:.1f} table-widths")
+    # cue_travel_tw stays in the structured dict for the future coach;
+    # Joe: the rendered line should stick to shot + make/miss facts.
     return "; ".join(bits).capitalize() + "."
