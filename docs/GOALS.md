@@ -292,6 +292,18 @@ Rounds continue with Joe's visual feedback as the gate.
   traced window now detect (one a MAKE w/ pot); 3 new tests; suite
   green; app restarted. NEXT: re-backfill sidecars with the new
   detector + re-run the audit for the G5 verdict (watch precision too).
+- 2026-08-18 (loop 30): the unseen-pot proof run REFUSED to prove — the
+  re-analyzed session scored WORSE on the outcome audit (6/11 vs 7/11)
+  and disagrees with the live run's outcomes too; ball-count deltas
+  swing +-2 on hand-heavy shots. Verdict, honestly: outcome accuracy is
+  ~60-70% and needs a DESIGN, not another heuristic — next approach is
+  identity-aware accounting (which NUMBERED ball left the table during
+  the shot, using the now-strong identity layer) instead of raw counts.
+  Also owned a process miss: --force overwrote Joe's live sidecar with
+  the unproven re-analysis (unrecoverable); build_analysis_cache now
+  keeps a .prev backup on every --force. The unseen-pot credit itself
+  stays (frame-verified scratch-as-miss is real, synthetic tests pass);
+  its real-footage validation waits for the identity-aware audit.
 - 2026-08-19 (loop 29): OUTCOME AUDIT built (Joe's progression: shots
   verified, now makes/misses). His 9-ball session: 7/11 outcomes agree
   with the table's ball-count deltas; frame inspection of the rest
