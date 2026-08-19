@@ -68,3 +68,16 @@ class TestRecClockNeverClips:
             if label.isVisible():
                 assert label.sizeHint().width() <= label.width(), \
                     f"clock clips at window width {w}"
+
+
+class TestStatsRailIsAList:
+    """Joe: 'just do a vertical stats list here... I don't need big blocks
+    for each number. And the SESSION dropdown doesn't make sense.'"""
+
+    def test_rows_not_blocks_and_no_session_fold(self):
+        from pathlib import Path
+        import billiards_trainer.ui.pages.live_page as m
+        src = Path(m.__file__).read_text(encoding="utf-8")
+        assert "class _StatRow" in src, "the vertical stat rows are gone"
+        assert '"SESSION", grid_holder' not in src, "SESSION fold came back"
+        assert "_big_stat" not in src, "big stat blocks came back"

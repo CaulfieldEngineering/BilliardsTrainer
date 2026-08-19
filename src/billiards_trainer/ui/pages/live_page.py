@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
 from ...config import Settings
 from ..icons import icon
 from ..theme import PALETTE
-from ..widgets.common import Badge, Card, StatCard
+from ..widgets.common import Badge, Card
 from ..widgets.shot_clock_widget import ShotClockWidget
 from ..widgets.video_view import VideoView
 
@@ -113,6 +113,34 @@ class _StatusPill(QLabel):
     def clear_status(self) -> None:
         """Nothing to report — keeps its footprint so the row never shifts."""
         self._blank()
+
+
+
+class _StatRow(QWidget):
+    """One line of the scoreboard: small caps label left, value right.
+    Joe: "just do a vertical stats list here? I don't need big blocks
+    for each number." set_value keeps the old StatCard call sites."""
+
+    def __init__(self, label: str, color: str, parent=None):
+        super().__init__(parent)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(2, 0, 2, 0)
+        lay.setSpacing(8)
+        lbl = QLabel(label)
+        lbl.setObjectName("StatLabel")
+        self.value_label = QLabel("—")
+        self.value_label.setProperty("statColor", color)
+        self.value_label.setStyleSheet(
+            f"font-size: 18px; font-weight: 700; color: {PALETTE.text_faint};")
+        lay.addWidget(lbl)
+        lay.addStretch(1)
+        lay.addWidget(self.value_label)
+
+    def set_value(self, value: str) -> None:
+        self.value_label.setText(str(value))
+        color = self.value_label.property("statColor")
+        self.value_label.setStyleSheet(
+            f"font-size: 18px; font-weight: 700; color: {color};")
 
 
 class LivePage(QWidget):
@@ -691,29 +719,21 @@ class LivePage(QWidget):
         # squeezing it.
         rail.setMaximumWidth(300)
 
-        # The headline: makes vs misses, big. Always visible — it IS the rail.
-        mm = QHBoxLayout()
-        mm.setSpacing(8)
-        self._makes_box, self._makes_val = self._big_stat("MAKES", PALETTE.success)
-        self._misses_box, self._misses_val = self._big_stat("MISSES", PALETTE.danger)
-        mm.addWidget(self._makes_box)
-        mm.addWidget(self._misses_box)
-        rail.layout().addLayout(mm)
+        # A VERTICAL LIST, not blocks (Joe: "I don't need big blocks for
+        # each number") — label left, value right, one compact row per
+        # stat. No "SESSION" fold either: everything here is per-session
+        # by definition, so the header said nothing.
+        self._makes_row = _StatRow("MAKES", PALETTE.success)
+        self._misses_row = _StatRow("MISSES", PALETTE.danger)
+        self._k_pct = _StatRow("MAKE %", PALETTE.accent)
+        self._k_streak = _StatRow("STREAK", PALETTE.text)
+        for row in (self._makes_row, self._misses_row,
+                    self._k_pct, self._k_streak):
+            rail.add(row)
+        self._makes_val = self._makes_row.value_label
+        self._misses_val = self._misses_row.value_label
 
-        # Everything below the headline folds (Joe's ask: collapsible sections
-        # for narrow view). Collapsed state persists per section.
         from ..widgets.collapsible import CollapsibleSection
-
-        grid_holder = QWidget()
-        grid = QHBoxLayout(grid_holder)
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(8)
-        self._k_pct = StatCard("Make %", "—", accent=True)
-        self._k_streak = StatCard("Streak", "—")
-        grid.addWidget(self._k_pct)
-        grid.addWidget(self._k_streak)
-        rail.layout().addWidget(CollapsibleSection(
-            "SESSION", grid_holder, "session", self._settings))
 
         # Cue-stroke stats (Bluetooth IMU) — hidden unless the sensor is enabled.
         self._stroke_holder = self._stroke_section()
@@ -739,18 +759,6 @@ class LivePage(QWidget):
 
         return rail
 
-    def _big_stat(self, label: str, color: str):
-        box = Card(padding=4, spacing=2)
-        box.setObjectName("StatTile")   # inside the rail panel: no chrome
-        lbl = QLabel(label)
-        lbl.setObjectName("StatLabel")
-        val = QLabel("—")
-        val.setProperty("statColor", color)
-        val.setStyleSheet(f"font-size: 40px; font-weight: 800; color: {PALETTE.text_faint};")
-        box.add(lbl)
-        box.add(val)
-        return box, val
-
     def _update_stats_active(self) -> None:
         """Stats belong to a RECORDING: coloured + counting only while the
         session recorder runs; greyed dashes any other time (Joe's rule)."""
@@ -760,7 +768,7 @@ class LivePage(QWidget):
         self._stats_active = active
         for val in (self._makes_val, self._misses_val):
             color = val.property("statColor") if active else PALETTE.text_faint
-            val.setStyleSheet(f"font-size: 40px; font-weight: 800; color: {color};")
+            val.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {color};")
         if not active:
             self._makes_val.setText("—")
             self._misses_val.setText("—")

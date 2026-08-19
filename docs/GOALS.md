@@ -627,3 +627,13 @@ Rounds continue with Joe's visual feedback as the gate.
   TIMELINE") exactly like BIRD'S-EYE / LIVE CAMERA, with a flat lane
   fill so it never reads as negative space. Verified by offscreen
   full-window render before shipping. 4 pinned tests; suite green.
+- 2026-08-19 (loop 36 + Joe mid-turn): LIBRARY-WIDE FRAME-TRUE OUTCOMES
+  — the derivation pass (11/11 vs frame truth) ran over the back
+  catalog: 335 outcomes re-derived across 24 sessions (the biggest:
+  108-shot session, 68 corrected; append-only, Joe's review verdicts
+  still win). Every session in the browser and phone app now shows
+  identity-derived outcomes. Plus Joe's rail feedback shipped: the
+  scoreboard is a VERTICAL LIST (label left, value right, one row per
+  stat — MAKES/MISSES/MAKE %/STREAK), big blocks and the meaningless
+  per-session "SESSION" fold removed; verified by offscreen render;
+  pinned test.
