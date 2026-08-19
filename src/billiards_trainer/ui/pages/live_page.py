@@ -724,11 +724,14 @@ class LivePage(QWidget):
         # each number") — label left, value right, one compact row per
         # stat. No "SESSION" fold either: everything here is per-session
         # by definition, so the header said nothing.
+        # SHOTS above MAKES (Joe: "so it's easy to deduce where MAKE %
+        # is coming from") — the denominator sits over its parts.
+        self._shots_row = _StatRow("SHOTS", PALETTE.text)
         self._makes_row = _StatRow("MAKES", PALETTE.success)
         self._misses_row = _StatRow("MISSES", PALETTE.danger)
         self._k_pct = _StatRow("MAKE %", PALETTE.accent)
         self._k_streak = _StatRow("STREAK", PALETTE.text)
-        for row in (self._makes_row, self._misses_row,
+        for row in (self._shots_row, self._makes_row, self._misses_row,
                     self._k_pct, self._k_streak):
             rail.add(row)
         self._makes_val = self._makes_row.value_label
@@ -773,6 +776,7 @@ class LivePage(QWidget):
         if not active:
             self._makes_val.setText("—")
             self._misses_val.setText("—")
+            self._shots_row.set_value("—")
             self._k_pct.set_value("—")
             self._k_streak.set_value("—")
 
@@ -1281,6 +1285,8 @@ class LivePage(QWidget):
     def on_stats(self, summary: dict) -> None:
         if not self._stats_active:
             return   # idle: keep the greyed dashes
+        self._shots_row.set_value(
+            str(summary.get("makes", 0) + summary.get("misses", 0)))
         self._makes_val.setText(str(summary.get("makes", 0)))
         self._misses_val.setText(str(summary.get("misses", 0)))
         self._k_pct.set_value(f"{summary.get('make_pct', 0):.0f}%")

@@ -656,3 +656,24 @@ Rounds continue with Joe's visual feedback as the gate.
   are transparent, so SHOT TIMELINE / BIRD'S-EYE / LIVE CAMERA captions
   and the stats list read as text on a panel, not boxes. Also "Len" ->
   "Length" per Joe. Pinned; verified by render; DESIGN.md rule holds.
+- 2026-08-19 (loop 37, Joe's shot-detection push #1): ACTION
+  CLASSIFICATION. Joe: false positive shots everywhere; priority 1 is
+  telling Shot / Break / Ball-in-hand apart. Built vision/actions.py —
+  recomputable append-only post-pass (same architecture as outcomes):
+  every sidecar event classifies as stroke / break / ball_in_hand /
+  nothing from motion+hand features. Ground truth: 135 frames dumped
+  for 27 stratified suspects, labeled by an 11-agent frame-reading
+  workflow. Fitted iteratively: hand-thrown balls fly free like struck
+  ones — the discriminator is hand-adjacency AT THE LAUNCH INSTANT;
+  breaks are synchronized bursts (launch spread <=2s) while
+  mass-gathering spreads over 20s+; and "nothing" is only believable
+  when the ball SET is unchanged (a blur-invisible fast ball leaves a
+  departure behind). Measured: 24/27 exact, 25/27 on the
+  attempt-vs-not binary, 11/11 frame-verified real strokes preserved
+  (two residual fails are mixed stroke-then-racking windows). Library
+  relabeled: 511 strokes, 70 ball_in_hand, 57 breaks, 4 empty windows
+  — in the 0812 session 11 of 12 "shots" were relocations. Sessions
+  without hand-context sidecars can't flag relocations until
+  re-analyzed. NEXT: shot counts/UI/dossier consume action labels;
+  live detector suppression; then #2 make/miss surfaces per action.
+  Also this loop: SHOTS row above MAKES in the stats rail (Joe).

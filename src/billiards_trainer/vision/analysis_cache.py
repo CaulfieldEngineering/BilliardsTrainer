@@ -143,6 +143,14 @@ class SidecarReader:
                             s["outcome"] = d.get("outcome", s.get("outcome"))
                             s["corrected"] = True
                             break
+                elif d.get("type") == "action":
+                    # same last-wins pattern: the event's classified action
+                    # (stroke / break / ball_in_hand / nothing). Absent
+                    # record = "stroke" (the historical default).
+                    for s in self.shots:
+                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            s["action"] = d.get("action", "stroke")
+                            break
         # LEGACY live sidecars recorded source-uptime, not recording time.
         # A recording's first state lands within ~2s of zero when times are
         # right; a first state minutes in means the offset bug — normalize
