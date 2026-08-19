@@ -128,3 +128,57 @@ class TestDerivedOutcomes:
                      [{"start": 8.0, "end": 12.0, "outcome": "miss",
                        "pocketed": 0}])
         assert audit(vid)[0]["derived"] == "scratch"
+
+
+class TestDeriveAndCorrect:
+    """The session-close pass: derivation appends corrections (append-only,
+    idempotent), and a human verdict appended later always wins."""
+
+    def _mismatched(self, tmp_path):
+        """Recorded says miss, but ball 5 demonstrably departs."""
+        five = (3, 200.0, 500.0, 5, "solid")
+        states = []
+        t = 0.0
+        while t <= 30.0:
+            tracks = [CUE, NINE] + ([five] if t < 8.0 else [])
+            states.append((round(t, 2), tracks, []))
+            t += 0.25
+        return _write(tmp_path, states,
+                      [{"start": 8.0, "end": 12.0, "outcome": "miss",
+                        "pocketed": 0}])
+
+    def test_mismatch_is_corrected_and_idempotent(self, tmp_path):
+        from billiards_trainer.vision.analysis_cache import SidecarReader
+        from billiards_trainer.vision.outcomes import derive_and_correct
+        vid = self._mismatched(tmp_path)
+        assert derive_and_correct(vid) == 1
+        r = SidecarReader(vid)
+        assert r.shots[0]["outcome"] == "make" and r.shots[0]["corrected"]
+        assert derive_and_correct(vid) == 0     # second pass changes nothing
+
+    def test_agreeing_outcome_is_left_alone(self, tmp_path):
+        from billiards_trainer.vision.outcomes import derive_and_correct
+        five = (3, 200.0, 500.0, 5, "solid")
+        states = []
+        t = 0.0
+        while t <= 30.0:
+            tracks = [CUE, NINE] + ([five] if t < 8.0 else [])
+            states.append((round(t, 2), tracks, []))
+            t += 0.25
+        vid = _write(tmp_path, states,
+                     [{"start": 8.0, "end": 12.0, "outcome": "make",
+                       "pocketed": 1}])
+        assert derive_and_correct(vid) == 0
+
+    def test_human_verdict_appended_later_wins(self, tmp_path):
+        from billiards_trainer.vision.analysis_cache import (
+            SidecarReader, append_correction)
+        from billiards_trainer.vision.outcomes import derive_and_correct
+        vid = self._mismatched(tmp_path)
+        derive_and_correct(vid)                  # derivation says make
+        append_correction(vid, 8.0, "miss")      # Joe's review says miss
+        assert SidecarReader(vid).shots[0]["outcome"] == "miss"
+
+    def test_missing_sidecar_is_a_quiet_zero(self, tmp_path):
+        from billiards_trainer.vision.outcomes import derive_and_correct
+        assert derive_and_correct(tmp_path / "nope.mp4") == 0

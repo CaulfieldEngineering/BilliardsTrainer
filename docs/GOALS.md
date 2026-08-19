@@ -558,3 +558,15 @@ Rounds continue with Joe's visual feedback as the gate.
   outcomes now match frame truth 11/11 with shot 8 through the numbered
   path (departed [6]). Remaining known gap: the navy 4 (in a basket most
   of that session) and end-of-session hand chaos.
+- 2026-08-19 (loop 34): OUTCOMES BORN TRUE. The identity-derived outcome
+  pass (11/11 vs frame truth; live detector 7/11) now runs automatically
+  when a recording closes: derivation core promoted from the audit tool
+  to vision/outcomes.py (single source of truth, tool is a thin CLI over
+  it), and _finalize_recording_file spawns a daemon thread that appends
+  corrections where the live attribution disagrees — off the recording
+  path, never raises, idempotent (reader applies corrections before
+  compare), and Joe's review verdicts appended later still win by file
+  order. 5 new tests (mismatch corrected + idempotent, agreement left
+  alone, human-verdict precedence, missing-sidecar quiet). Verified
+  end-to-end on the live 9-ball sidecar: derivation now reads 11/11
+  agreement against its corrected record and appends nothing.

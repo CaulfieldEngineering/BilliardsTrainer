@@ -753,6 +753,27 @@ class PipelineController(QObject):
         except OSError:
             log.exception("finalizing recording failed")
         self.replay_saved.emit(self._recording_path)
+        # Post-recording outcome derivation: the live detector's in-the-
+        # moment attribution measured 7/11 against frame truth; deriving
+        # from the finished identity record measured 11/11 (GOALS, loops
+        # 32-33). Runs OFF the recording path (daemon thread, never raises,
+        # sidecar already closed) and APPENDS corrections — Joe's own
+        # review verdicts, appended later, still win by file order.
+        import threading
+        video = self._recording_path
+
+        def _derive() -> None:
+            try:
+                from ..vision.outcomes import derive_and_correct
+                n = derive_and_correct(video)
+                if n:
+                    log.info("session close: %d outcome(s) re-derived for %s",
+                             n, video)
+            except Exception:  # noqa: BLE001 - never disturb the app
+                log.exception("post-recording outcome derivation failed")
+
+        threading.Thread(target=_derive, name="derive-outcomes",
+                         daemon=True).start()
 
     @Slot()
     def start_analysis_capture(self, seconds: float = 150.0) -> None:
