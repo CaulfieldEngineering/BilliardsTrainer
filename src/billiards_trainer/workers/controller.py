@@ -769,6 +769,15 @@ class PipelineController(QObject):
                 if n:
                     log.info("session close: %d outcome(s) re-derived for %s",
                              n, video)
+                # Joe's hierarchy #1 rides the same close pass: label every
+                # event stroke/break/ball_in_hand/nothing so relocations
+                # never pollute the finished session's shots.
+                from ..vision.actions import classify_and_mark
+                counts = classify_and_mark(video)
+                non = {k: v for k, v in counts.items() if k != "stroke"}
+                if non:
+                    log.info("session close: actions labeled for %s: %s",
+                             video, counts)
             except Exception:  # noqa: BLE001 - never disturb the app
                 log.exception("post-recording outcome derivation failed")
 

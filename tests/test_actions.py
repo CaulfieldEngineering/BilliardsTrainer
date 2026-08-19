@@ -150,3 +150,20 @@ class TestActionAwareSurfaces:
                                 "action": "ball_in_hand"}) + "\n")
         shots = read_shots(vid)
         assert shots[0]["action"] == "ball_in_hand"
+
+
+class TestClosePassWiring:
+    def test_controller_close_pass_classifies_actions(self):
+        """The post-recording daemon must run BOTH passes: outcomes and
+        action labels — a new recording is born fully labeled."""
+        from pathlib import Path
+        import billiards_trainer.workers.controller as m
+        src = Path(m.__file__).read_text(encoding="utf-8")
+        i = src.find("def _derive")
+        assert i > 0 and "classify_and_mark" in src[i:i + 1200], \
+            "session-close pass lost action classification"
+
+    def test_backfill_runs_both_passes(self):
+        from pathlib import Path
+        src = Path("tools/build_analysis_cache.py").read_text(encoding="utf-8")
+        assert "derive_and_correct" in src and "classify_and_mark" in src

@@ -66,6 +66,14 @@ def build(video: Path, force: bool = False) -> bool:
             print(f"    {t/60:.1f} min analyzed...")
     cap.release()
     writer.close()
+    # Post-passes, same as a live session close: identity-derived outcomes
+    # (11/11 vs frame truth) and action labels (stroke / break /
+    # ball_in_hand / nothing), so a backfilled sidecar is born complete.
+    from billiards_trainer.vision.actions import classify_and_mark
+    from billiards_trainer.vision.outcomes import derive_and_correct
+    n = derive_and_correct(video)
+    counts = classify_and_mark(video)
+    print(f"    outcomes re-derived: {n}; actions: {counts}")
     return True
 
 

@@ -58,6 +58,9 @@
   .chip.make    { border-color:var(--make);    color:var(--make); }
   .chip.miss    { border-color:#39414d;        color:var(--text); }
   .chip.scratch { border-color:var(--scratch); color:var(--scratch); }
+  /* non-attempts (ball-in-hand relocations / empty windows): ghosted */
+  .chip.inhand  { border-color:#242b35; color:var(--dim); opacity:.55;
+                  font-size:11px; }
   .chip.cur { background:var(--accent); border-color:var(--accent); color:#fff; }
   .note { color:var(--dim); text-align:center; padding:24px 16px; font-size:14px; }
 </style>
@@ -150,8 +153,9 @@ function buildChips(){
   c.innerHTML = "";
   shots.forEach((s, i) => {
     const el = document.createElement("div");
-    el.className = "chip " + (s.outcome || "miss");
-    el.textContent = i + 1;
+    const attempt = !s.action || s.action === "stroke" || s.action === "break";
+    el.className = attempt ? "chip " + (s.outcome || "miss") : "chip inhand";
+    el.textContent = attempt ? (i + 1) : "✋";
     el.onclick = () => gotoShot(i);
     c.appendChild(el);
   });
@@ -177,7 +181,12 @@ function updateInfo(){
   }
   const s = shots[cur];
   $("shot-n").textContent = `Shot ${cur + 1}/${shots.length}`;
-  $("shot-oc").textContent = (s.outcome || "").toUpperCase() + (s.corrected ? " ✓" : "");
+  const act = s.action || "stroke";
+  const label = act === "ball_in_hand" ? "BALL IN HAND"
+              : act === "nothing" ? "—"
+              : act === "break" ? "BREAK · " + (s.outcome || "").toUpperCase()
+              : (s.outcome || "").toUpperCase();
+  $("shot-oc").textContent = label + (s.corrected ? " ✓" : "");
   $("shot-oc").style.color = s.outcome === "make" ? "var(--make)"
                             : s.outcome === "scratch" ? "var(--scratch)" : "var(--dim)";
   $("shot-t").textContent = `${fmt(s.start)} · ${(s.end - s.start).toFixed(1)}s`
