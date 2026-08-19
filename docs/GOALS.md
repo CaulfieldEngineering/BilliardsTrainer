@@ -734,3 +734,20 @@ Rounds continue with Joe's visual feedback as the gate.
   down, legacy untagged lines rank as review; the 9-ball shots 5/6
   restored and proven to survive re-derivation. 8 new tests. Library
   re-analysis batch resumed this loop (was 2/17).
+- 2026-08-19 (Joe-directed: cloud companion): SHIPPED billiards-review
+  .vercel.app — phone review that works with the mini PC OFF. Close
+  pass now also exports a compact <video>.shots.json beside each
+  recording (32 backfilled); Dropbox syncs them; a Vercel serverless
+  proxy (read-only Dropbox refresh token in env, page-key gate) lists
+  sessions, serves summaries, and mints 4h Range-capable streaming
+  links; the PWA page does shot-by-shot review with action badges and
+  descriptions, and SELF-UPDATES (version.json poll -> one-tap reload;
+  Joe: "so I can always be working on this away from my computer").
+  Pre-handoff security review (12 agents): filename-XSS fixed
+  (textContent only), query-string keys rejected server-side,
+  constant-time compare, page key rotated after a verify agent was
+  caught probing the secrets file. End-to-end verified: 401/401/200
+  auth matrix, Dropbox listing, 206 range streaming. Also this session:
+  Tailscale set up (phone <-> mini-pc; instant remote review while the
+  PC is awake). Setup rounds included recovering from a wrong-account
+  Dropbox authorization (personal vs Pro).

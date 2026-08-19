@@ -7,7 +7,6 @@ via the Vercel CLI using the token in Joe's secrets folder.
 
 import json
 import re
-import secrets as pysecrets
 import subprocess
 import sys
 import time

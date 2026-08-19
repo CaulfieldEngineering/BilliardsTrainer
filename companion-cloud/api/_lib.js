@@ -21,9 +21,18 @@ async function dbxToken() {
   return cached.token;
 }
 
+const crypto = require("crypto");
+
 function checkKey(req, res) {
-  const k = req.headers["x-key"] || (req.query && req.query.k);
-  if (!process.env.PAGE_KEY || k !== process.env.PAGE_KEY) {
+  // HEADER ONLY: query-string keys land in edge logs and referrers, and
+  // the page never sends them anyway (security review). Constant-time
+  // compare; fail closed when PAGE_KEY is unset.
+  const k = req.headers["x-key"];
+  const expect = process.env.PAGE_KEY;
+  const ok = Boolean(expect) && typeof k === "string"
+    && k.length === expect.length
+    && crypto.timingSafeEqual(Buffer.from(k), Buffer.from(expect));
+  if (!ok) {
     res.status(401).json({ error: "unauthorized" });
     return false;
   }

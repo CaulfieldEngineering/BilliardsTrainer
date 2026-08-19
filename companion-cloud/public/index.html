@@ -150,8 +150,15 @@ async function loadSessions() {
     d.sessions.forEach(s => {
       const el = document.createElement("div");
       el.className = "sess" + (s.analyzed ? "" : " stub");
-      el.innerHTML = `<span class="d">${fmtDate(s.name, s.modified)}</span>
-        <span class="meta">${s.size_mb} MB${s.analyzed ? "" : " · no analysis"}</span>`;
+      // textContent only — a Dropbox filename is untrusted input and the
+      // fmtDate fallback returns it raw (security review: XSS sink).
+      const d = document.createElement("span");
+      d.className = "d";
+      d.textContent = fmtDate(s.name, s.modified);
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = `${s.size_mb} MB${s.analyzed ? "" : " · no analysis"}`;
+      el.append(d, meta);
       el.onclick = () => openSession(s);
       box.appendChild(el);
     });
