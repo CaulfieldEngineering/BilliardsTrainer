@@ -37,6 +37,11 @@ class _Internal:
     committed_cls: BallClass = BallClass.UNKNOWN  # sticky class for unnumbered balls
     cls_hist: deque = field(default_factory=lambda: deque(maxlen=15))
     num_hist: deque = field(default_factory=lambda: deque(maxlen=45))
+    # Measured-colour identity samples (nearest Lab reference per confident
+    # frame). A ball whose digit faces the FELT never lands a number vote its
+    # whole life — the 6 went unnamed for a full session — but its colour
+    # names it from any orientation. Arbitration adopts a mature consensus.
+    colour_hist: deque = field(default_factory=lambda: deque(maxlen=40))
     pos_hist: deque = field(default_factory=lambda: deque(maxlen=64))
 
     def predict(self) -> None:
@@ -306,7 +311,7 @@ class BallTracker:
                     # The identity rides the snap (revival exists for "the
                     # same ball reappearing"), but trim the history so votes
                     # read at the OLD spot cannot dominate a later re-vote.
-                    for hist in (t.num_hist, t.cls_hist):
+                    for hist in (t.num_hist, t.cls_hist, t.colour_hist):
                         recent = list(hist)[-3:]
                         hist.clear()
                         hist.extend(recent)
@@ -459,13 +464,25 @@ class BallTracker:
         cands: list[tuple[float, int, int]] = []   # (score, track_idx, number)
         for i, t in enumerate(tracks):
             votes = Counter(n for n in t.num_hist if n is not None and n >= 0)
-            colour_num = measured_identity(tuple(int(v) for v in t.bgr))
+            colour_num, colour_frac = self._colour_consensus(t)
             nums = set(votes) | ({colour_num} if colour_num > 0 else set())
             if t.committed_number >= 0:
                 nums.add(t.committed_number)
             for n in nums:
                 if t.committed_number < 0 and votes.get(n, 0) < 3:
-                    continue
+                    # COLOUR ADOPTION — the digit-down path. No vote majority
+                    # will ever form for a ball whose number faces the felt,
+                    # so a mature track may be named by colour alone, under
+                    # rack-churn guards: at rest, long-lived, a strong and
+                    # stable colour consensus, solids only (a stripe's band
+                    # is CNN-readable from any orientation; solids 1-7 are
+                    # the balls that go dark when the digit hides), and the
+                    # number free (uniqueness via the same greedy pool).
+                    if not (n == colour_num and colour_frac >= 0.8
+                            and len(t.colour_hist) >= 25
+                            and 1 <= n <= 7
+                            and not t.moving() and t.hits >= 60):
+                        continue
                 s = float(votes.get(n, 0))
                 if n == colour_num:
                     s += COLOUR_MAX
@@ -477,8 +494,26 @@ class BallTracker:
         taken: set[int] = set()
         assigned: dict[int, int] = {}
         no_rename: set[int] = set()
-        for i, t in enumerate(tracks):
-            if rest[i] and t.committed_number >= 0:
+        # When two RESTING tracks contest one number, the winner used to be
+        # whichever came first in the track list — rank, not evidence — so
+        # three stray misreads on a neighbour could strip a published
+        # colour-adopted identity at rest, permanently (review finding).
+        # Order claimants by evidence for their own claim instead: recent
+        # votes plus the measured-colour consensus agreeing.
+        def _claim_strength(idx: int) -> float:
+            t = tracks[idx]
+            n = t.committed_number
+            s = float(sum(1 for v in t.num_hist if v == n))
+            cn, cf = self._colour_consensus(t)
+            if cn == n and cf >= 0.8:
+                s += COLOUR_MAX
+            return s
+        order = sorted((i for i, t in enumerate(tracks)
+                        if rest[i] and t.committed_number >= 0),
+                       key=_claim_strength, reverse=True)
+        for i in order:
+            t = tracks[i]
+            if True:
                 if t.committed_number not in taken:
                     assigned[i] = t.committed_number
                     taken.add(t.committed_number)
@@ -500,6 +535,22 @@ class BallTracker:
             taken.add(n)
         for i, t in enumerate(tracks):
             t.committed_number = assigned.get(i, -1)
+
+    @staticmethod
+    def _colour_consensus(t: _Internal) -> tuple[int, float]:
+        """(majority colour identity, fraction of samples agreeing) over the
+        track's recent confident colour samples — the stable form of the old
+        single-frame measured_identity(t.bgr) (one glare frame no longer
+        swings the +COLOUR_MAX evidence). Falls back to the single current
+        sample (frac 0.0, so it can never satisfy the adoption gate) until
+        enough history exists."""
+        from .balls import measured_identity
+        hist = [n for n in t.colour_hist if n > 0]
+        if len(hist) >= 8:
+            num, k = Counter(hist).most_common(1)[0]
+            return num, k / len(t.colour_hist)
+        m = measured_identity(tuple(int(v) for v in t.bgr))
+        return (m if m > 0 else -1), 0.0
 
     @staticmethod
     def _colour_identity(t: _Internal, taken: set[int]) -> int:
@@ -588,6 +639,17 @@ class BallTracker:
         # confidently-sampled colour until a new confident one arrives.
         if d.cls != BallClass.UNKNOWN:
             t.bgr = d.bgr
+        # Colour evidence comes ONLY from measured pixels. Detection.bgr is
+        # usually a canonical palette constant, so sampling it built a
+        # consensus that merely ECHOED the classifier's guess — a ball
+        # misread 7 once every 23 frames adopted 7 by "colour" eventually
+        # (review finding). measured_bgr is set only by code that actually
+        # sampled the frame.
+        mb = getattr(d, "measured_bgr", None)
+        if mb is not None:
+            from .balls import measured_identity
+            t.colour_hist.append(
+                measured_identity(tuple(int(v) for v in mb)))
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
         t.pos_hist.append((t.x, t.y))
@@ -604,7 +666,7 @@ class BallTracker:
         if pub_step > 0.30 * max(6.0, t.radius, self._ball_r):
             t.move_streak += 1
             if t.move_streak == 3:
-                for hist in (t.num_hist, t.cls_hist):
+                for hist in (t.num_hist, t.cls_hist, t.colour_hist):
                     recent = list(hist)[-3:]
                     hist.clear()
                     hist.extend(recent)

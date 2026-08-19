@@ -67,6 +67,12 @@ class Detection:
     cls: BallClass = BallClass.UNKNOWN
     score: float = 1.0
     number: int = -1   # 0 = cue, 1..15 ball number, -1 = unknown
+    # Colour actually MEASURED from this frame's pixels (glare-trimmed crop
+    # median / stripe band), set only by code that sampled the frame. bgr
+    # above is usually a canonical palette constant — evidence built on it
+    # merely echoes the classifier's guess (review finding: the tracker's
+    # colour consensus was an echo chamber). None = no measurement made.
+    measured_bgr: tuple[int, int, int] | None = None
 
     @property
     def xy(self) -> tuple[float, float]:

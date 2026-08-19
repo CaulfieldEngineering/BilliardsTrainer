@@ -539,3 +539,22 @@ Rounds continue with Joe's visual feedback as the gate.
   recomputable outcomes from the sidecar beat live attribution; next
   bounded chunk is number COVERAGE (the 6 never read all session —
   digit-down; ball 4 read for 1s) so set-difference sees every ball.
+- 2026-08-19 (loop 33): NUMBER COVERAGE — the digit-down ball. The 6
+  (green on turquoise) was never named for an entire session: the CNN
+  can't read a hidden digit and the colour heuristic ERASES felt-hued
+  pixels, so its pot was invisible to identity. Two-layer fix, measured:
+  ensemble names unmatched unknown detections by measured Lab colour
+  (tight 18-unit bar + 12-unit decisive margin over ALL loaded refs,
+  fail-closed, frame-level uniqueness, solids 1-7); the tracker adopts a
+  mature measured-colour consensus for vote-less resting tracks (0.8
+  agreement over 25+ samples, 60+ hits, trims at motion episodes). An
+  adversarial review workflow (3 lenses, 19 agents) confirmed 13 real
+  defects in the first cut — echo-chamber colour evidence (Detection.bgr
+  is canonical, not measured -> new measured_bgr plumbing), rank-based
+  at-rest contests (now evidence-ordered), three unpinned guards (now
+  mutation-pinned), fail-open margin on sparse refs — all fixed, 13 new
+  tests. A/B on the 9-ball session: ball 6 coverage 0% -> 68% (named
+  from t=0 until its pot), 0 duplicate-identity states, and derived
+  outcomes now match frame truth 11/11 with shot 8 through the numbered
+  path (departed [6]). Remaining known gap: the navy 4 (in a basket most
+  of that session) and end-of-session hand chaos.

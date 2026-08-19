@@ -436,3 +436,99 @@ class TestFullShotTrails:
         assert 99 not in p._play_paths, "stale previous-play entry must clear"
         assert 1 in p._play_paths, "the stroke's opening must survive arming"
         assert p._play_paths[1]["pts"][:len(before)] == before
+
+
+class TestNameUnknownByMeasuredColour:
+    """Detection-level naming for balls neither model could identify (the
+    green 6 on turquoise felt): tight absolute Lab bar + decisive margin —
+    the real ball passes with 2x headroom, bare felt (64+) and half-felt
+    crops (25+) fail. Probed on real footage before the thresholds were set."""
+
+    FELT = (250, 210, 75)      # this table's bright turquoise (measured)
+    GREEN6 = (126, 152, 11)    # the 6's tight-crop median (measured)
+
+    def _det(self, x=30.0, y=30.0, r=10.0):
+        from billiards_trainer.vision.types import BallClass, Detection
+        return Detection(x=x, y=y, radius=r, cls=BallClass.UNKNOWN, number=-1)
+
+    def _frame(self, ball_bgr, felt_bgr=None, ball_r=10):
+        import numpy as np
+        f = np.zeros((60, 60, 3), np.uint8)
+        f[:] = felt_bgr or self.FELT
+        if ball_bgr is not None:
+            import cv2
+            cv2.circle(f, (30, 30), ball_r, ball_bgr, -1)
+        return f
+
+    def test_green6_on_felt_is_named(self, monkeypatch, tmp_path):
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        d = self._det()
+        FindIdEnsemble._name_unknown(self._frame(self.GREEN6), d)
+        assert d.number == 6
+
+    def test_bare_felt_is_never_named(self, monkeypatch, tmp_path):
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        d = self._det()
+        FindIdEnsemble._name_unknown(self._frame(None), d)
+        assert d.number == -1
+
+    def test_half_felt_crop_is_rejected(self, monkeypatch, tmp_path):
+        """An off-centre or oversized crop mixes felt into the median —
+        the tight absolute bar must reject it rather than guess."""
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        d = self._det(x=40.0, y=40.0)          # centred off the ball
+        FindIdEnsemble._name_unknown(self._frame(self.GREEN6, ball_r=7), d)
+        assert d.number == -1
+
+    def test_white_is_never_named(self, monkeypatch, tmp_path):
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        d = self._det()
+        FindIdEnsemble._name_unknown(self._frame((250, 250, 250)), d)
+        assert d.number == -1
+
+    def test_two_similar_blobs_one_number_per_frame(self, monkeypatch, tmp_path):
+        """Pin for frame-level uniqueness: two green blobs in one frame must
+        not BOTH be named 6 (parallel vote streams would commit two tracks
+        to one number and the at-rest contest demotes the real ball)."""
+        import numpy as np, cv2
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        f = np.zeros((60, 120, 3), np.uint8)
+        f[:] = self.FELT
+        cv2.circle(f, (30, 30), 10, self.GREEN6, -1)
+        cv2.circle(f, (90, 30), 10, self.GREEN6, -1)   # reflection twin
+        d1, d2 = self._det(30.0, 30.0), self._det(90.0, 30.0)
+        taken = set()
+        for d in (d1, d2):
+            FindIdEnsemble._name_unknown(f, d, taken)
+            if d.number > 0:
+                taken.add(d.number)
+        assert sorted(x.number for x in (d1, d2)) == [-1, 6]
+
+    def test_margin_fails_closed_on_sparse_refs(self, monkeypatch, tmp_path):
+        """Pin for fail-closed: with only ONE loaded reference there is no
+        runner-up to measure a margin against — the gate must abstain, not
+        wave the naming through (a sparse regenerated refs file must never
+        widen the gate)."""
+        import json
+        balls = _use_fixture_refs(monkeypatch, tmp_path)
+        refs = json.loads((tmp_path / "colour_refs.json").read_text())
+        (tmp_path / "colour_refs.json").write_text(json.dumps({"6": refs["6"]}))
+        balls._MEASURED_REFS = None                    # drop cache
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        d = self._det()
+        FindIdEnsemble._name_unknown(self._frame(self.GREEN6), d)
+        assert d.number == -1
+
+    def test_named_detection_carries_measured_colour(self, monkeypatch, tmp_path):
+        """The tracker's colour consensus samples measured_bgr ONLY — a
+        naming that didn't set it would silently fall out of the evidence."""
+        _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        d = self._det()
+        FindIdEnsemble._name_unknown(self._frame(self.GREEN6), d)
+        assert d.number == 6 and d.measured_bgr is not None

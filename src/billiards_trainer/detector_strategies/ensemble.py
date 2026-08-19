@@ -81,7 +81,67 @@ class FindIdEnsemble(DetectorStrategy):
             f.number, f.cls, f.bgr = src.number, src.cls, src.bgr
             self._fix_stripe_bit(frame_bgr, f)
             self._fix_colour(frame_bgr, f)
+        # Frame-level uniqueness for colour naming: numbers already worn by
+        # any detection this frame are off the menu, and each name we hand
+        # out joins the exclusion — two green blobs cannot both become the 6
+        # (review finding: parallel vote streams would commit two tracks to
+        # one number and the at-rest contest then demotes the REAL ball).
+        present = {f.number for f in found
+                   if f.number is not None and f.number > 0}
+        for fi, f in enumerate(found):
+            if fi not in used_f and (f.number is None or f.number < 0):
+                self._name_unknown(frame_bgr, f, present)
+                if f.number > 0:
+                    present.add(f.number)
         return found
+
+    @staticmethod
+    def _name_unknown(frame_bgr, f, taken=frozenset()) -> None:
+        """Name a ball NEITHER model could — the green 6 on turquoise felt.
+
+        The identifier misses digit-down felt-coloured balls, and the colour
+        heuristic ERASES their pixels along with the felt (UNKNOWN by
+        design), so the 6 went unnamed for an entire session and its pot
+        derived as a miss. This table's measured references know its real
+        colour: the 6's tight crop median measures 9 Lab units from its
+        reference while bare felt measures 64+ and a half-felt crop 25+
+        (probed on real footage) — so a TIGHT absolute bar plus a decisive
+        margin admits the ball and nothing else. Solids only (a stripe's
+        band is model-readable from any orientation; whites never name), and
+        the result is an ordinary per-frame READ: the tracker still demands
+        a 3-vote majority and global uniqueness before commitment."""
+        from ..vision.balls import lab_distance_to_ref, measured_identity
+        rr = max(2, int(round(f.radius * 0.7)))
+        y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
+        crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
+        if crop.size < 30:
+            return
+        import numpy as np
+        px = crop.reshape(-1, 3).astype(np.float32)
+        keep = px[px.mean(1) <= np.percentile(px.mean(1), 75)]   # trim glare
+        if len(keep) < 10:
+            return
+        med = tuple(int(v) for v in np.median(keep, axis=0))
+        m = measured_identity(med, taken=set(taken), max_dist=18.0)
+        if not 1 <= m <= 7:
+            return
+        best = lab_distance_to_ref(med, m)
+        # Margin against EVERY loaded reference, stripes included — the 14
+        # measures ~29 Lab from the 6 on this table, and a runner scan of
+        # solids only would never see it standing two units behind a "6"
+        # (review finding). And FAIL CLOSED: no runner-up reference to
+        # measure a margin against means no decisive naming, not a free
+        # pass — a sparse regenerated refs file must not widen the gate.
+        from ..vision.balls import _load_measured_refs
+        runner = min((d for k in _load_measured_refs() if k != m
+                      for d in [lab_distance_to_ref(med, k)] if d is not None),
+                     default=None)
+        if best is None or runner is None or runner - best < 12.0:
+            return
+        f.number = m
+        f.cls = BallClass.SOLID
+        f.bgr = med
+        f.measured_bgr = med
 
     @staticmethod
     def _fix_colour(frame_bgr, f) -> None:
@@ -131,6 +191,7 @@ class FindIdEnsemble(DetectorStrategy):
         f.number = m
         f.cls = BallClass.EIGHT if m == 8 else BallClass.SOLID
         f.bgr = pool_ball_bgr(m)
+        f.measured_bgr = med
 
     @staticmethod
     def _fix_stripe_colour(frame_bgr, f) -> None:
@@ -173,6 +234,7 @@ class FindIdEnsemble(DetectorStrategy):
         f.number = m + 8
         f.cls = BallClass.STRIPE
         f.bgr = pool_ball_bgr(f.number)
+        f.measured_bgr = band
 
     @staticmethod
     def _fix_stripe_bit(frame_bgr, f) -> None:

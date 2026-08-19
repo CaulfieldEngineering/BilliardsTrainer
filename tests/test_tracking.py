@@ -261,3 +261,137 @@ def test_first_identity_waits_for_three_agreeing_reads():
             published.append(out[0].number)
     assert out[0].number == 9
     assert 5 not in published, f"wobbly first read was published: {published}"
+
+
+class TestColourAdoption:
+    """Digit-down identity: a ball whose number never faces the camera must
+    still be named — by mature colour consensus — because an unnamed ball is
+    invisible to outcome derivation (the 6 went unnamed for a whole session
+    and its pot read as a miss). Guards: at rest, long-lived, stable colour,
+    solids only, uniqueness."""
+
+    GREEN6 = (128, 161, 18)     # this table's measured 6-ball colour (fixture)
+
+    def _refs(self, monkeypatch, tmp_path):
+        import shutil
+        from pathlib import Path
+
+        import billiards_trainer.config as cfg
+        from billiards_trainer.vision import balls
+        fixture = Path(__file__).parent / "fixtures" / "colour_refs.json"
+        shutil.copy2(fixture, tmp_path / "colour_refs.json")
+        monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
+        monkeypatch.setattr(balls, "_MEASURED_REFS", None)
+        return balls
+
+    def _settle(self, tr, bgr, n_frames, number=-1, x=100, y=100):
+        out = []
+        for _ in range(n_frames):
+            d = det(x, y)
+            d.bgr = bgr
+            d.measured_bgr = bgr    # the ensemble sets this from real pixels
+            d.number = number
+            out = tr.update([d], 400)
+        return out
+
+    def test_digit_down_solid_adopts_colour_identity(self, monkeypatch, tmp_path):
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        out = self._settle(tr, self.GREEN6, 70)   # never a number vote
+        assert out[0].number == 6
+
+    def test_young_track_does_not_adopt(self, monkeypatch, tmp_path):
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        out = self._settle(tr, self.GREEN6, 30)   # colour yes, maturity no
+        assert out[0].number == -1
+
+    def test_taken_number_is_never_duplicated(self, monkeypatch, tmp_path):
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        for _ in range(70):
+            real6 = det(300, 300)
+            real6.bgr = real6.measured_bgr = self.GREEN6
+            real6.number = 6                      # digit-read real 6
+            anon = det(100, 100)
+            anon.bgr = anon.measured_bgr = self.GREEN6   # same colour, digit down
+            anon.number = -1
+            out = tr.update([real6, anon], 400)
+        nums = sorted(t.number for t in out)
+        assert nums.count(6) == 1
+
+    def test_unstable_colour_never_adopts(self, monkeypatch, tmp_path):
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        maroon7 = (30, 14, 80)
+        out = []
+        for i in range(70):                       # alternating colour reads
+            d = det(100, 100)
+            d.bgr = d.measured_bgr = self.GREEN6 if i % 2 else maroon7
+            d.number = -1
+            out = tr.update([d], 400)
+        assert out[0].number == -1
+
+    def test_moving_track_never_adopts(self, monkeypatch, tmp_path):
+        """Pin for 'not t.moving()': identity must never be baptised
+        mid-flight (mutation deleting the guard survived the old suite)."""
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        out, x = [], 100.0
+        for _ in range(70):
+            d = det(x, 100)
+            d.bgr = d.measured_bgr = self.GREEN6
+            d.number = -1
+            out = tr.update([d], 400)
+            x += 8.0                              # > 0.30*radius every frame
+        assert out[0].number == -1
+
+    def test_sparse_colour_samples_never_adopt(self, monkeypatch, tmp_path):
+        """Pin for len(colour_hist) >= 25: a mature track whose colour was
+        confidently measured only a handful of times must not adopt
+        (mutation deleting the floor survived the old suite)."""
+        from billiards_trainer.vision.types import BallClass
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        out = []
+        for i in range(80):
+            d = det(100, 100)
+            d.number = -1
+            if i % 7 == 0:                        # ~11 measured samples
+                d.bgr = d.measured_bgr = self.GREEN6
+            else:
+                d.cls = BallClass.UNKNOWN         # no measurement this frame
+            out = tr.update([d], 400)
+        assert out[0].number == -1
+
+    def test_non_solid_colours_never_adopt(self, monkeypatch, tmp_path):
+        """Pin for '1 <= n <= 7': the 8 (any dark shadow matches its ref)
+        and stripe references must not be adoptable by colour (mutation
+        deleting the range guard survived the old suite)."""
+        self._refs(monkeypatch, tmp_path)
+        for bgr in ((39, 21, 16), (153, 146, 73)):   # 8-ref, 14-ref colours
+            tr = BallTracker(min_hits=2, still_frames=3)
+            out = self._settle(tr, bgr, 70)
+            assert out[0].number == -1, f"adopted from {bgr}"
+
+    def test_adopter_beats_stray_misreads_in_at_rest_contest(
+            self, monkeypatch, tmp_path):
+        """Two RESTING tracks contest one number: the ball whose measured
+        colour consensus backs the claim must win over a neighbour that
+        collected a few stray misread votes — evidence, not track-list rank
+        (review finding: rank resolution stripped the real 6 at rest)."""
+        self._refs(monkeypatch, tmp_path)
+        tr = BallTracker(min_hits=2, still_frames=3)
+        out = []
+        for i in range(110):
+            neigh = det(300, 300)                 # spawns first: earlier rank
+            neigh.bgr = neigh.measured_bgr = (30, 14, 80)   # maroon (a 7)
+            # 3 stray '6' misreads arriving AFTER the real 6 adopted (~i=60)
+            neigh.number = 6 if i in (75, 80, 85) else -1
+            green = det(100, 100)
+            green.bgr = green.measured_bgr = self.GREEN6
+            green.number = -1
+            out = tr.update([neigh, green], 400)
+        by_pos = {(round(t.x), round(t.y)): t.number for t in out}
+        assert by_pos.get((100, 100)) == 6, f"real 6 lost the contest: {by_pos}"
+        assert by_pos.get((300, 300)) != 6
