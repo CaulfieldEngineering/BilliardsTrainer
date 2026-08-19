@@ -123,6 +123,7 @@ class _StatRow(QWidget):
 
     def __init__(self, label: str, color: str, parent=None):
         super().__init__(parent)
+        self.setObjectName("StatRow")   # transparent: rows are not boxes
         lay = QHBoxLayout(self)
         lay.setContentsMargins(2, 0, 2, 0)
         lay.setSpacing(8)

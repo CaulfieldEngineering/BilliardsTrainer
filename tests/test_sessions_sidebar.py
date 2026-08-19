@@ -36,7 +36,7 @@ class TestSessionTable:
         sb = _sidebar(app, tmp_path)
         t = sb._list
         assert [t.headerItem().text(i) for i in range(3)] == \
-            ["Date", "Len", "Shots"]
+            ["Date", "Length", "Shots"]
         first = t.topLevelItem(0)
         assert "session-b" in first.data(0, Qt.UserRole)   # newest on top
 
@@ -126,3 +126,15 @@ class TestDesignLanguage:
         heads = [sb._list.headerItem().text(i) for i in range(3)]
         assert "Name" not in heads, \
             "the Name column (pure Date duplication) came back"
+
+
+class TestNoLabelBoxes:
+    """Joe (twice): dark boxes hugging captions and stat labels. The global
+    QWidget background rule must never bleed onto text — labels are
+    transparent over their panel."""
+
+    def test_labels_are_transparent(self):
+        from billiards_trainer.ui.theme import build_stylesheet
+        qss = build_stylesheet()
+        assert "QLabel { background: transparent; }" in qss
+        assert "QWidget#StatRow { background: transparent; }" in qss

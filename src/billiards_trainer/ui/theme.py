@@ -100,6 +100,13 @@ def build_stylesheet(accent: str = PALETTE.accent) -> str:
     outline: none;
 }}
 QWidget {{ background-color: {p.bg}; }}
+/* Text never carries its own background: the global QWidget rule above
+   made every QLabel paint the darkest page colour over its panel's
+   lighter fill — a dark box hugging every caption and stat label (the
+   "highlights" Joe kept seeing on SHOT TIMELINE / BIRD'S-EYE / the
+   stats rail). Labels and plain rows are TRANSPARENT, full stop. */
+QLabel {{ background: transparent; }}
+QWidget#StatRow {{ background: transparent; }}
 QMainWindow, QDialog {{ background-color: {p.bg}; }}
 
 QToolTip {{

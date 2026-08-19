@@ -648,3 +648,11 @@ Rounds continue with Joe's visual feedback as the gate.
   leaving Date · Len · Shots with room to breathe; row selection is a
   single subtle tint (per-cell accent boxes and focus rects removed
   from all list/table views); numerics right-aligned. Suite green.
+- 2026-08-19 (Joe UI round 5): THE LABEL BOXES, at the root. Every
+  caption and stat label was dragging a dark rectangle over its panel —
+  the global "QWidget { background: page }" rule painted LABELS with the
+  darkest colour instead of letting them sit transparent on their
+  parent's fill. One rule fixes the whole app: QLabel (and stat rows)
+  are transparent, so SHOT TIMELINE / BIRD'S-EYE / LIVE CAMERA captions
+  and the stats list read as text on a panel, not boxes. Also "Len" ->
+  "Length" per Joe. Pinned; verified by render; DESIGN.md rule holds.

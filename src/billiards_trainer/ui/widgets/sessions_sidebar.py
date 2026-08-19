@@ -72,7 +72,7 @@ class SessionsSidebar(QFrame):
         # Name column only ever duplicated Date while starving it of room
         # ("Aug…" clipped everywhere — Joe: "so much information yet all
         # of it is cut off"). Numbers right-align so digits line up.
-        self._list.setHeaderLabels(["Date", "Len", "Shots"])
+        self._list.setHeaderLabels(["Date", "Length", "Shots"])
         self._list.setSortingEnabled(True)
         self._list.sortByColumn(0, Qt.DescendingOrder)
         hdr = self._list.header()
