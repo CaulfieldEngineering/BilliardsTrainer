@@ -75,6 +75,16 @@ def read_shots(video: Path) -> list[dict]:
                             s["outcome"] = d.get("outcome", s["outcome"])
                             s["corrected"] = True
                             break
+                elif line.startswith('{"type":"action"') \
+                        or line.startswith('{"type": "action"'):
+                    try:
+                        d = json.loads(line)
+                    except ValueError:
+                        continue
+                    for s in shots:
+                        if abs(float(s["start"]) - float(d.get("start", -1))) < 0.2:
+                            s["action"] = d.get("action", "stroke")
+                            break
     except OSError:
         return []
     return shots

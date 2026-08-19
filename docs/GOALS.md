@@ -677,3 +677,14 @@ Rounds continue with Joe's visual feedback as the gate.
   re-analyzed. NEXT: shot counts/UI/dossier consume action labels;
   live detector suppression; then #2 make/miss surfaces per action.
   Also this loop: SHOTS row above MAKES in the stats rail (Joe).
+- 2026-08-19 (loop 38, shot-detection push #2): SURFACES CONSUME ACTION
+  LABELS. Shots now means ATTEMPTS everywhere: session-list counts sum
+  strokes+breaks only (the 0812 session drops from "12 shots" to 1);
+  the shot list badges relocations (IN HAND, dimmed) and empty windows,
+  labels breaks, and excludes non-attempts from Makes/Misses/Longest/
+  Streaks while keeping them visible in All; the timeline paints
+  non-attempts as a faint grey whisper (no outcome underline, no strike
+  tick); the phone app's shot JSON carries the action field. 3 new
+  tests; suite green. Remaining in the push: live-detector suppression,
+  re-analysis of pre-hand-context sessions, phone chip badges, then
+  hierarchy #3 (describe the make/miss).

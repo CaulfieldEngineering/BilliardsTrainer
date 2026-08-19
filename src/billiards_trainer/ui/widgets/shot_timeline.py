@@ -382,6 +382,12 @@ class ShotTimeline(QWidget):
             # while the lane is live (the "shot detected" highlight).
             for i, s in enumerate(self._shots):
                 colour = QColor(_OUTCOME_COLOURS.get(s["outcome"], PALETTE.text_dim))
+                # Non-attempts (ball-in-hand relocations, empty windows) are
+                # table admin, not shots: a faint grey whisper on the lane,
+                # no outcome underline, no strike tick.
+                attempt = s.get("action", "stroke") in ("stroke", "break")
+                if not attempt:
+                    colour = QColor(PALETTE.text_faint)
                 x0 = self._x(max(0.0, s["start"] - self.pre_roll_s))
                 x1 = self._x(s["start"])
                 x2 = self._x(max(s["end"], s["start"] + 0.5))
@@ -392,6 +398,14 @@ class ShotTimeline(QWidget):
                 # dimmer lead-in for the routine, a bright strike tick, and
                 # a solid outcome bar underlining the region.
                 region_top, region_h = 4.0, h * 0.56
+                if not attempt:
+                    ghost = QColor(colour)
+                    ghost.setAlpha(26)
+                    p.setPen(Qt.NoPen)
+                    p.setBrush(ghost)
+                    p.drawRect(QRectF(x1, region_top, max(3.0, x2 - x1),
+                                      region_h))
+                    continue
                 lead = QColor(colour)
                 lead.setAlpha(36)
                 p.setPen(Qt.NoPen)

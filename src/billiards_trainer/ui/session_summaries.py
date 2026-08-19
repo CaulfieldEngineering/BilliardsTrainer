@@ -37,15 +37,29 @@ def _sidecar_shot_count(path: Path) -> int | None:
     sc = Path(str(path) + ".analysis.jsonl")
     if not sc.is_file():
         return None
-    n = 0
+    starts: list[float] = []
+    actions: dict[float, str] = {}
     try:
         with open(sc, encoding="utf-8") as f:
             for line in f:
-                if line.startswith('{"type":"shot"') or line.startswith('{"type": "shot"'):
-                    n += 1
+                is_shot = line.startswith('{"type":"shot"')                     or line.startswith('{"type": "shot"')
+                is_action = line.startswith('{"type":"action"')                     or line.startswith('{"type": "action"')
+                if not (is_shot or is_action):
+                    continue
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if is_shot:
+                    starts.append(float(d.get("start", 0.0)))
+                else:
+                    actions[round(float(d.get("start", -1)), 1)] =                         d.get("action", "stroke")
     except OSError:
         return None
-    return n
+    # Count real ATTEMPTS (strokes + breaks): ball-in-hand relocations and
+    # empty windows were a third of "shots" in hand-tracked sessions.
+    return sum(1 for t in starts
+               if actions.get(round(t, 1), "stroke") in ("stroke", "break"))
 
 
 def load_cache() -> dict:

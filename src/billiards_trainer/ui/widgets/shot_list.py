@@ -81,15 +81,25 @@ def _outcome_dot(colour: str, corrected: bool) -> QIcon:
 VIEWS = ("All", "Misses", "Makes", "Longest", "Streaks")
 
 
+def is_attempt(s: dict) -> bool:
+    """A real offensive attempt: a stroke or a break. Ball-in-hand
+    relocations and empty windows stay visible in All (badged) but never
+    count as shots anywhere else (Joe's false-positive push)."""
+    return s.get("action", "stroke") in ("stroke", "break")
+
+
 def view_shots(shots: list[dict], view: str) -> list[tuple[int, dict]]:
     seq = [(i + 1, s) for i, s in enumerate(shots or [])]
     if view == "Misses":
-        return [(n, s) for n, s in seq if s.get("outcome") == "miss"]
+        return [(n, s) for n, s in seq
+                if is_attempt(s) and s.get("outcome") == "miss"]
     if view == "Makes":
-        return [(n, s) for n, s in seq if s.get("outcome") == "make"]
+        return [(n, s) for n, s in seq
+                if is_attempt(s) and s.get("outcome") == "make"]
     if view == "Longest":
-        return sorted(seq, key=lambda ns: (float(ns[1].get("end", 0))
-                                           - float(ns[1].get("start", 0))),
+        return sorted([(n, s) for n, s in seq if is_attempt(s)],
+                      key=lambda ns: (float(ns[1].get("end", 0))
+                                      - float(ns[1].get("start", 0))),
                       reverse=True)
     if view == "Streaks":
         # Shots that belong to a run of >=2 consecutive MAKES, chronological.
@@ -98,7 +108,7 @@ def view_shots(shots: list[dict], view: str) -> list[tuple[int, dict]]:
         out: list[tuple[int, dict]] = []
         run: list[tuple[int, dict]] = []
         for n, s in seq + [(0, {"outcome": "_end"})]:
-            if s.get("outcome") == "make":
+            if is_attempt(s) and s.get("outcome") == "make":
                 run.append((n, s))
                 continue
             if len(run) >= 2:
@@ -197,6 +207,13 @@ class ShotListPanel(QWidget):
         for no, s in viewed:
             colour, name = _OUTCOME.get(s.get("outcome", "miss"),
                                         (PALETTE.text_dim, "?"))
+            action = s.get("action", "stroke")
+            if action == "ball_in_hand":
+                colour, name = PALETTE.text_faint, "IN HAND"
+            elif action == "nothing":
+                colour, name = PALETTE.text_faint, "—"
+            elif action == "break":
+                name = "BREAK"
             corrected = bool(s.get("corrected"))
             start = float(s.get("start", 0.0))
             dur = max(0.0, float(s.get("end", start)) - start)
@@ -207,7 +224,9 @@ class ShotListPanel(QWidget):
                 text += f"   ×{pot}"
             item = QListWidgetItem(text)
             item.setIcon(_outcome_dot(colour, corrected))
-            item.setForeground(Qt.GlobalColor.white)
+            item.setForeground(QColor(PALETTE.text_faint)
+                               if not is_attempt(s)
+                               else Qt.GlobalColor.white)
             item.setData(Qt.UserRole, start)
             item.setToolTip(f"Shot {no}: {name.lower()}, {dur:.1f}s"
                             + (f", {pot} balls potted" if pot else "")

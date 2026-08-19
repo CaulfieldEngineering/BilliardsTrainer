@@ -96,3 +96,57 @@ class TestClassifierRules:
         assert Path(str(vid) + ".analysis.jsonl").read_text() == raw1
         append_action(vid, 8.0, "stroke")          # Joe's review verdict
         assert SidecarReader(vid).shots[0]["action"] == "stroke"
+
+
+class TestActionAwareSurfaces:
+    """Shots counts and views consume action labels: relocations stay
+    visible (badged) but never count as attempts anywhere."""
+
+    SHOTS = [
+        {"start": 10.0, "end": 14.0, "outcome": "make"},
+        {"start": 20.0, "end": 24.0, "outcome": "miss",
+         "action": "ball_in_hand"},
+        {"start": 30.0, "end": 34.0, "outcome": "make", "action": "break"},
+        {"start": 40.0, "end": 41.0, "outcome": "miss", "action": "nothing"},
+        {"start": 50.0, "end": 54.0, "outcome": "make"},
+    ]
+
+    def test_views_exclude_non_attempts(self):
+        from billiards_trainer.ui.widgets.shot_list import view_shots
+        makes = view_shots(self.SHOTS, "Makes")
+        assert [n for n, _ in makes] == [1, 3, 5]
+        misses = view_shots(self.SHOTS, "Misses")
+        assert misses == []                     # both misses are non-attempts
+        assert len(view_shots(self.SHOTS, "All")) == 5   # badged, not hidden
+        streaks = view_shots(self.SHOTS, "Streaks")
+        assert [n for n, _ in streaks] == []    # relocations break no streaks
+
+    def test_summary_counts_attempts_only(self, tmp_path):
+        import json
+        from billiards_trainer.ui.session_summaries import _sidecar_shot_count
+        vid = tmp_path / "s.mp4"
+        vid.write_bytes(b"0")
+        with open(str(vid) + ".analysis.jsonl", "w", encoding="utf-8") as f:
+            f.write(json.dumps({"type": "meta", "v": 1}) + "\n")
+            for s in self.SHOTS:
+                a = s.get("action")
+                f.write(json.dumps({"type": "shot", "start": s["start"],
+                                    "end": s["end"], "outcome": s["outcome"],
+                                    "pocketed": 0}) + "\n")
+                if a:
+                    f.write(json.dumps({"type": "action", "start": s["start"],
+                                        "action": a}) + "\n")
+        assert _sidecar_shot_count(vid) == 3    # 2 strokes + 1 break
+
+    def test_companion_attaches_action(self, tmp_path):
+        import json
+        from billiards_trainer.companion.server import read_shots
+        vid = tmp_path / "s.mp4"
+        vid.write_bytes(b"0")
+        with open(str(vid) + ".analysis.jsonl", "w", encoding="utf-8") as f:
+            f.write(json.dumps({"type": "shot", "start": 10.0, "end": 14.0,
+                                "outcome": "make", "pocketed": 1}) + "\n")
+            f.write(json.dumps({"type": "action", "start": 10.0,
+                                "action": "ball_in_hand"}) + "\n")
+        shots = read_shots(vid)
+        assert shots[0]["action"] == "ball_in_hand"
