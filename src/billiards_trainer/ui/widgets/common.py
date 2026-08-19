@@ -41,8 +41,9 @@ class StatCard(Card):
 
     def __init__(self, label: str, value: str = "—", accent: bool = False,
                  sub: str = "", parent=None):
-        super().__init__(parent, padding=16, spacing=4)
-        self.setMinimumWidth(140)
+        super().__init__(parent, padding=4, spacing=2)
+        self.setObjectName("StatTile")   # chromeless: label + number only
+        self.setMinimumWidth(96)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self._label = QLabel(label.upper())

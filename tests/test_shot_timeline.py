@@ -281,3 +281,20 @@ class TestMasterContainer:
         assert "QSplitter::handle { background: transparent; }" in qss, \
             "splitter slabs came back (Joe: 'rounded cards separated by " \
             "rectangular dividers is bad design')"
+
+
+class TestFlatPanelLanguage:
+    """Joe: 'do away with the round card method altogether' and 'label the
+    Shot Timeline window just like the others.'"""
+
+    def test_round_card_language_is_dead(self):
+        from billiards_trainer.ui.theme import build_stylesheet
+        qss = build_stylesheet()
+        assert "border-radius: 14px" not in qss, "rounded cards came back"
+        assert "QFrame#StatTile" in qss, "stat tiles regained chrome"
+
+    def test_timeline_panel_is_labeled(self):
+        from pathlib import Path
+        import billiards_trainer.ui.pages.live_page as m
+        src = Path(m.__file__).read_text(encoding="utf-8")
+        assert "SHOT TIMELINE" in src, "the timeline lost its caption"

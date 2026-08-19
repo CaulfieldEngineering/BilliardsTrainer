@@ -50,7 +50,8 @@ class ShotTimeline(QWidget):
         # "a tighter rectangle across the top... a little too much padding
         # and negative space"): compact lane — the filmstrip stays legible
         # at this height and the ruler proportions are relative already.
-        self.setFixedHeight(78)
+        self.setFixedHeight(64)   # the wrapping labeled panel adds its own
+        #                           caption row; total stays a tight strip
         #: While recording, the lane FOLLOWS: it shows the trailing window so
         #: clips stay readable in hour-long sessions, scrolling like a video
         #: editor capture lane (Joe's spec). 0 = show everything (playback).
@@ -323,13 +324,12 @@ class ShotTimeline(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
-        # MASTER CONTAINER first (Joe: "the timeline has no master border —
-        # it just appears to be a massive negative space"): the whole lane
-        # is a card, same fill/border/radius family as every other card on
-        # the page, so an empty timeline reads as an empty strip, not void.
-        p.setPen(QPen(QColor(PALETTE.border_soft), 1))
+        # MASTER CONTAINER first (Joe: "no master border... massive
+        # negative space"): flat fill matching the labeled panel that now
+        # wraps this lane — the lane always paints as a solid strip.
+        p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.bg_elevated))
-        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1.0, h - 1.0), 10, 10)
+        p.drawRect(self.rect())
         # ruler bed (below the filmstrip band)
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.surface))

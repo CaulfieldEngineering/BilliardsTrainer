@@ -618,3 +618,12 @@ Rounds continue with Joe's visual feedback as the gate.
   by Qt with whatever font is live, Name stretches. 4 new pinned tests
   (container paints, handles transparent, section modes, both test
   orders); suite green.
+- 2026-08-19 (Joe UI round 3): FLAT PANEL LANGUAGE. Joe called the
+  rounded-cards-in-void look insanity — the round card method is gone
+  entirely: panels are flat (one background step, hairline border,
+  near-square), stat tiles inside panels carry no chrome of their own
+  (the clipped MAKE%/STREA nested boxes), the splitter gaps stay
+  transparent, and the shot timeline is a LABELED panel ("SHOT
+  TIMELINE") exactly like BIRD'S-EYE / LIVE CAMERA, with a flat lane
+  fill so it never reads as negative space. Verified by offscreen
+  full-window render before shipping. 4 pinned tests; suite green.

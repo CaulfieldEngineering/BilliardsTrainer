@@ -110,13 +110,21 @@ QToolTip {{
     border-radius: 6px;
 }}
 
-/* ---- Cards / panels ---- */
+/* ---- Panels: FLAT (Joe: "do away with the round card method
+   altogether") — one background step, a hairline edge, near-square.
+   Regions read as labeled panes divided by hairlines, not floating
+   boxes. ---- */
 QFrame#Card, QFrame#Panel {{
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 {_adjust(p.bg_elevated, 1.16)}, stop:0.04 {p.bg_elevated},
-        stop:1 {p.bg_elevated});
+    background-color: {p.bg_elevated};
     border: 1px solid {p.border_soft};
-    border-radius: 14px;
+    border-radius: 2px;
+}}
+/* Stat tiles live INSIDE a panel: no chrome of their own. The nested
+   box-in-box look (clipped "MAKE%"/"STREA" tiles) was the complaint. */
+QFrame#StatTile {{
+    background: transparent;
+    border: none;
+    border-radius: 0;
 }}
 QFrame#Sidebar {{
     background-color: {p.bg_elevated};

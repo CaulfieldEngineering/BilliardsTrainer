@@ -182,7 +182,12 @@ class LivePage(QWidget):
         sc = QShortcut(QKeySequence(Qt.Key_Space), self)
         sc.setContext(Qt.WindowShortcut)
         sc.activated.connect(self._on_space)
-        root.addWidget(self._timeline)
+        # Labeled panel, same as every other pane (Joe: "at least label
+        # the Shot Timeline window somehow just like we did the others").
+        tl_card = Card(padding=6, spacing=2)
+        tl_card.add(self._caption("SHOT TIMELINE"))
+        tl_card.add(self._timeline)
+        root.addWidget(tl_card)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(8)
@@ -735,7 +740,8 @@ class LivePage(QWidget):
         return rail
 
     def _big_stat(self, label: str, color: str):
-        box = Card(padding=8, spacing=2)
+        box = Card(padding=4, spacing=2)
+        box.setObjectName("StatTile")   # inside the rail panel: no chrome
         lbl = QLabel(label)
         lbl.setObjectName("StatLabel")
         val = QLabel("—")
