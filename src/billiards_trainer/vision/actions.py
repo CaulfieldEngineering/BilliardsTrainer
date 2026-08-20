@@ -181,14 +181,17 @@ def classify(f: dict) -> str:
     return "stroke"
 
 
-def append_action(video_path, start: float, action: str) -> bool:
+def append_action(video_path, start: float, action: str,
+                  src: str = "derived") -> bool:
+    """``src`` ranks the verdict exactly like outcome corrections:
+    "review" (a human looked) is final; "derived" re-runs stand down."""
     p = sidecar_path(video_path)
     if not p.is_file():
         return False
     with open(p, "a", encoding="utf-8") as fh:
         fh.write(json.dumps({"type": "action",
                              "start": round(float(start), 3),
-                             "action": action}) + "\n")
+                             "action": action, "src": src}) + "\n")
     return True
 
 
@@ -209,6 +212,8 @@ def classify_and_mark(video_path) -> dict:
                           float(s.get("start", -1)))
             continue
         counts[action] = counts.get(action, 0) + 1
+        if s.get("_action_reviewed"):
+            continue        # a human labeled this clip; stand down
         if action != s.get("action", "stroke"):
             append_action(video_path, float(s["start"]), action)
     return counts

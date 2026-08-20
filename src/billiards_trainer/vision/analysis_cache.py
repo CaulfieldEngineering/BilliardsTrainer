@@ -156,12 +156,19 @@ class SidecarReader:
                                 s["_reviewed"] = True
                             break
                 elif d.get("type") == "action":
-                    # same last-wins pattern: the event's classified action
-                    # (stroke / break / ball_in_hand / nothing). Absent
-                    # record = "stroke" (the historical default).
+                    # same ranking as outcome corrections: a review-source
+                    # action is FINAL; derived re-labels stand down. Legacy
+                    # records (no src) are derived — they all came from the
+                    # classifier before the field existed.
                     for s in self.shots:
                         if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            asrc = d.get("src", "derived")
+                            if asrc == "derived" and s.get("_action_reviewed"):
+                                break
                             s["action"] = d.get("action", "stroke")
+                            if asrc != "derived":
+                                s["_action_reviewed"] = True
+                                s["action_corrected"] = True
                             break
         # LEGACY live sidecars recorded source-uptime, not recording time.
         # A recording's first state lands within ~2s of zero when times are

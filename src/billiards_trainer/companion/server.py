@@ -253,6 +253,9 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args()
     httpd = serve(args.port)
+    # phone review verdicts arrive via Dropbox sync; apply them here
+    from .corrections_watcher import start_watcher
+    start_watcher(_recordings_dir())
     print(f"Companion server on port {args.port} — open on your phone:")
     for ip in lan_addresses() or ["<this-pc-ip>"]:
         print(f"  http://{ip}:{args.port}/")

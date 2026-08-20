@@ -51,6 +51,19 @@
   #desc { color:var(--dim); font-size:13px; min-height:1.4em; margin-bottom:8px; }
   #nav { display:flex; gap:8px; margin-bottom:10px; }
   #nav #rate.on { color:var(--accent); border-color:var(--accent); }
+  #correct { width:100%; height:40px; margin-bottom:10px;
+             background:var(--panel); color:var(--dim);
+             border:1px solid var(--line); border-radius:4px;
+             font-size:14px; font-weight:600; }
+  #sheet { display:none; padding:10px; background:var(--panel);
+           border:1px solid var(--line); border-radius:4px;
+           margin-bottom:10px; }
+  #sheet .row { display:flex; gap:6px; margin-bottom:8px; }
+  #sheet .row:last-child { margin-bottom:0; }
+  #sheet button { flex:1; height:40px; background:var(--bg);
+                  color:var(--dim); border:1px solid var(--line);
+                  border-radius:4px; font-size:12px; font-weight:600; }
+  #sheet button.sel { color:var(--make); border-color:var(--make); }
   #nav button { flex:1; height:44px; background:var(--panel); color:var(--text);
                 border:1px solid var(--line); border-radius:4px; font-size:15px;
                 font-weight:600; }
@@ -123,6 +136,20 @@
       <button id="mode" title="repeat this shot">⟳ Repeat</button>
       <button id="rate" title="playback speed">1×</button>
       <button id="next">›</button>
+    </div>
+    <button id="correct">✎ Correct this clip</button>
+    <div id="sheet">
+      <div class="row" id="sh-outcome">
+        <button data-o="make">MAKE</button>
+        <button data-o="miss">MISS</button>
+        <button data-o="scratch">SCRATCH</button>
+      </div>
+      <div class="row" id="sh-action">
+        <button data-a="stroke">STROKE</button>
+        <button data-a="break">BREAK</button>
+        <button data-a="ball_in_hand">IN HAND</button>
+        <button data-a="rearrange">SHUFFLE</button>
+      </div>
     </div>
     <div id="chips"></div>
   </div>
@@ -247,6 +274,7 @@ let shots = [], cur = -1;
 const isAttempt = s => !s.action || s.action === "stroke" || s.action === "break";
 
 async function openSession(s) {
+  curSession = s.name;
   $("sessions").style.display = "none";
   $("player").style.display = "block";
   $("title").textContent = fmtDate(s.name, s.modified);
@@ -448,6 +476,7 @@ $("video").addEventListener("seeked", () => {
   lane.addEventListener("pointerdown", ev => {
     scrubbing = true;
     wasPlaying = !$("video").paused;
+    $("video").removeAttribute("controls");  // no dim/overlay mid-scrub (Joe)
     $("video").pause();          // decoder devotes itself to scrub frames
     lane.setPointerCapture(ev.pointerId);
     seekTo(ev);
@@ -456,6 +485,7 @@ $("video").addEventListener("seeked", () => {
   const end = () => {
     if (!scrubbing) return;
     scrubbing = false;
+    $("video").setAttribute("controls", "");
     if (wasPlaying) $("video").play();
   };
   lane.addEventListener("pointerup", end);
@@ -482,6 +512,44 @@ $("rate").onclick = () => {
 $("video").addEventListener("play", applyRate);
 applyRate();
 modeLabel();
+
+// ---- "Correct this clip" (Joe: human intervention) ---------------------
+let curSession = null;
+$("correct").onclick = () => {
+  const sh = $("sheet");
+  const open = sh.style.display !== "block";
+  sh.style.display = open ? "block" : "none";
+  if (open) syncSheet();
+};
+function syncSheet() {
+  const s = shots[cur] || {};
+  [...$("sh-outcome").children].forEach(b =>
+    b.classList.toggle("sel", b.dataset.o === s.outcome));
+  [...$("sh-action").children].forEach(b =>
+    b.classList.toggle("sel", b.dataset.a === (s.action || "stroke")));
+}
+async function sendVerdict(patch) {
+  const s = shots[cur];
+  if (!s || !curSession) return;
+  Object.assign(s, patch);              // optimistic: UI updates instantly
+  buildChips(); buildLane(); updateInfo(); syncSheet();
+  try {
+    const r = await fetch("/api/correct", {
+      method: "POST",
+      headers: { "x-key": KEY || "", "Content-Type": "application/json" },
+      body: JSON.stringify({ session: curSession, start: s.start, ...patch }),
+    });
+    if (!r.ok) throw new Error(r.status);
+    $("correct").textContent = "✓ queued — syncs to the PC via Dropbox";
+  } catch (e) {
+    $("correct").textContent = "⚠ send failed — try again";
+  }
+  setTimeout(() => { $("correct").textContent = "✎ Correct this clip"; }, 2500);
+}
+[...$("sh-outcome").children].forEach(b =>
+  b.onclick = () => sendVerdict({ outcome: b.dataset.o, corrected: true }));
+[...$("sh-action").children].forEach(b =>
+  b.onclick = () => sendVerdict({ action: b.dataset.a }));
 
 // keep "current shot" synced while playing
 setInterval(() => {
