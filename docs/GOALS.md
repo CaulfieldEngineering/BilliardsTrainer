@@ -896,3 +896,17 @@ Rounds continue with Joe's visual feedback as the gate.
   derived corrections as human verdicts (claiming 213 reviews) — the
   scoreboard now trusts only explicit src=review records. This is the
   metric future classifier/derivation changes get judged against.
+- 2026-08-20 (loop, 7am): REST-LINKING shipped — a numbered ball whose
+  track dies in motion (blur) hands its identity to the lone new track
+  that settles within ~30 frames, under strict uniqueness (one death,
+  one orphan, number unheld; any ambiguity = stay anonymous). 3 tests;
+  zero regressions (gold standard 11/11, hops 0.86/1k, suite green).
+  HONEST MISS: scored against Joe's 9 verdicts on session 005647, the
+  full re-analysis went from 0/7 to only 1/7 — the dominant error
+  there is NOT flyer identity loss but LONG-ADDRESS occlusion: Joe's
+  stance holds the stick over resting balls beyond the 60-frame vacancy
+  patience, and the tracks still die (phantom make/scratch cascade).
+  Next fix identified: SPOT-OCCUPANCY — before declaring a still spot
+  vacant, check the actual pixels (felt-coloured = empty; anything else
+  = occupied by ball or stick, not vacant). Needs the frame plumbed to
+  the vacancy test; next loop's chunk.

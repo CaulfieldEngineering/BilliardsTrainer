@@ -392,12 +392,27 @@ class BallTracker:
         # commits stopped handing those instant numbers (which the stale-
         # ghost cleanup used to reap them by), deny them the long budget or
         # they linger for a minute as unknown phantoms.
-        self._tracks = [
-            t for t in self._tracks
-            if t.misses <= (self.occluded_budget
-                            if t.settled and t.committed_number >= 0
-                            and not _at_pocket(t)
-                            else self.max_misses)]
+        # DEATH REGISTRY for rest-linking: a numbered ball whose track dies
+        # while (recently) in motion is a FLYER the camera lost to blur —
+        # its identity should survive to wherever it lands (Joe's shot-36:
+        # the struck 7 lost mid-roll). Record the loss; a lone new track
+        # settling soon after inherits it under strict uniqueness.
+        deaths = getattr(self, "_flyer_deaths", [])
+        keep = []
+        for t in self._tracks:
+            limit = (self.occluded_budget
+                     if t.settled and t.committed_number >= 0
+                     and not _at_pocket(t) else self.max_misses)
+            if t.misses <= limit:
+                keep.append(t)
+            elif (t.committed_number >= 0 and not _at_pocket(t)
+                  and (t.move_streak > 0 or not t.settled)):
+                deaths.append({"n": t.committed_number,
+                               "frame": self._frame_n,
+                               "x": t.x, "y": t.y})
+        self._tracks = keep
+        self._flyer_deaths = [d for d in deaths
+                              if self._frame_n - d["frame"] <= 30]
         # A track that came to rest PAST the cushion line inside a pocket zone
         # is a ball lying in the basket — pocketed, done. Without this the
         # occlusion budget keeps it as a ghost for another minute after the
@@ -412,6 +427,27 @@ class BallTracker:
                 if (bx0 <= t.x <= bx1 and by0 <= t.y <= by1)
                 or not any((t.x - px) ** 2 + (t.y - py) ** 2 <= cap_sq
                            for px, py in pockets)]
+        # REST-LINKING: exactly one fresh unnumbered settled track + exactly
+        # one recent flyer death whose number nobody holds -> inherit. Any
+        # ambiguity (two orphans, two deaths, number re-acquired) -> skip;
+        # wrong links are worse than anonymous balls.
+        deaths = getattr(self, "_flyer_deaths", [])
+        if deaths:
+            held = {t.committed_number for t in self._tracks
+                    if t.committed_number >= 0}
+            free_deaths = [d for d in deaths if d["n"] not in held]
+            orphans = [t for t in self._tracks
+                       if t.confirmed and t.settled
+                       and t.committed_number < 0
+                       and self._frame_n - getattr(t, "born_frame", 0) <= 45]
+            if len(free_deaths) == 1 and len(orphans) == 1:
+                d = free_deaths[0]
+                t = orphans[0]
+                t.committed_number = d["n"]
+                ledger = getattr(self, "_num_last", {})
+                ledger[d["n"]] = (self._frame_n, t.x, t.y)
+                self._num_last = ledger
+                self._flyer_deaths = [x for x in deaths if x is not d]
         self._arbitrate_numbers()
         return self._public()
 
@@ -726,6 +762,7 @@ class BallTracker:
 
     def _spawn(self, d: Detection) -> None:
         t = _Internal(id=self._next_id, x=d.x, y=d.y, radius=d.radius, bgr=d.bgr)
+        t.born_frame = getattr(self, "_frame_n", 0)
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
         # NO instant identity commit: the first read is the least reliable one

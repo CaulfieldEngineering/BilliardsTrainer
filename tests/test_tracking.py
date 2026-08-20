@@ -433,3 +433,57 @@ class TestReachabilityGate:
             out = tr.update([far], 675)
         assert any(t.number == 7 for t in out), \
             "re-emergence after a real gap must be allowed"
+
+
+class TestRestLinking:
+    """A numbered ball lost to motion blur keeps its identity where it
+    lands — under STRICT uniqueness (one recent flyer death, one fresh
+    orphan, number unheld). Joe's shot-36 family, constructive half."""
+
+    def _fly_and_die(self, tr):
+        d7 = det(100, 100, cls=BallClass.SOLID)
+        d7.number = 7
+        for _ in range(8):                       # settled as the 7
+            tr.update([d7], 675)
+        x = 100.0
+        for _ in range(4):                       # struck: real motion
+            x += 60.0
+            m = det(x, 100, cls=BallClass.SOLID)
+            m.number = 7
+            tr.update([m], 675)
+        for _ in range(26):                      # blur: gone past max_misses
+            tr.update([], 675)
+
+    def test_lone_orphan_inherits_the_flyer_number(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        self._fly_and_die(tr)
+        landed = det(520, 900, cls=BallClass.SOLID)   # lands far away
+        out = []
+        for _ in range(6):
+            out = tr.update([landed], 675)
+        assert any(t.number == 7 for t in out), \
+            "the flyer's identity died with its track"
+
+    def test_two_orphans_is_ambiguous_no_link(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        self._fly_and_die(tr)
+        a = det(520, 900, cls=BallClass.SOLID)
+        b = det(200, 600, cls=BallClass.SOLID)
+        out = []
+        for _ in range(6):
+            out = tr.update([a, b], 675)
+        assert not any(t.number == 7 for t in out), \
+            "ambiguous landing must stay anonymous"
+
+    def test_reacquired_number_blocks_the_link(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        self._fly_and_die(tr)
+        real7 = det(300, 300, cls=BallClass.SOLID)
+        real7.number = 7                          # digit read elsewhere
+        orphan = det(520, 900, cls=BallClass.SOLID)
+        out = []
+        for _ in range(8):
+            out = tr.update([real7, orphan], 675)
+        sevens = [t for t in out if t.number == 7]
+        assert len(sevens) == 1 and abs(sevens[0].x - 300) < 20, \
+            "the orphan stole a held number"
