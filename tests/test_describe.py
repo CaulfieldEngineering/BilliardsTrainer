@@ -84,7 +84,8 @@ class TestComposeText:
              "potted": [{"ball": 1, "pocket": "top-left"}],
              "duration_s": 5.0}
         line = compose_text(d)
-        assert "firm" in line and "the 1 into the top-left pocket" in line
+        assert "pace" not in line, "pace is retired from rendered lines"
+        assert "the 1 into the top-left pocket" in line
 
     def test_scratch_and_relocation_lines(self):
         d = {"outcome": "scratch", "action": "stroke", "pace": "soft",

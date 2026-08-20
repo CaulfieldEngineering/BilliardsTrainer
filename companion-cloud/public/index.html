@@ -483,7 +483,9 @@ function updateInfo() {
   });
   const frag = document.createElement("span");
   frag.className = "frag";
-  frag.textContent = (s.text || "").split(";")[0];
+  // skip the bare opener ("Stroke") — show the first INFORMATIVE clause
+  const clauses = (s.text || "").split(";").map(c => c.trim());
+  frag.textContent = clauses.length > 1 ? clauses[1] : clauses[0] || "";
   box.appendChild(frag);
 }
 

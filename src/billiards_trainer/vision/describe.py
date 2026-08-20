@@ -165,9 +165,10 @@ def compose_text(d: dict) -> str:
     if d.get("action") == "nothing":
         return "No table action."
     bits = []
-    pace = d.get("pace")
-    opener = "Break" if d.get("action") == "break" else "Stroke"
-    bits.append(f"{opener} at {pace} pace" if pace else opener)
+    # pace classes measured badly against Joe's eye — keep the raw speeds
+    # in the structured dict, say nothing in the rendered line until the
+    # thresholds are re-fit against his confirmed shots
+    bits.append("Break" if d.get("action") == "break" else "Stroke")
     fo = d.get("first_object")
     if fo is not None and fo >= 0 and fo != 0:
         bits.append(f"contact on {_BALL_NAMES.get(fo, f'ball {fo}')}")
