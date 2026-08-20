@@ -306,9 +306,11 @@ checkUpdate();
 function fmtDate(name, iso) {
   const m = name.match(/session-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
   if (!m) return name;
-  // The filename timestamp is the mini-PC's LOCAL clock — no "Z": with
-  // it, a 12:56 AM session displayed as "Aug 19 at 8:56 PM" (UTC-4).
-  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00`);
+  // Filename stamps are UTC (controller uses datetime.now(timezone.utc);
+  // verified against file mtime: a 14-min session ending 9:11 PM EDT is
+  // named 20260820-005647). The "Z" is CORRECT — Joe was not playing
+  // pool at 12:56 AM, and briefly "fixing" this said he was.
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`);
   return d.toLocaleString([], { month: "short", day: "numeric",
                                 hour: "numeric", minute: "2-digit" });
 }
