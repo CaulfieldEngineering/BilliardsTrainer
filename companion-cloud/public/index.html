@@ -53,8 +53,15 @@
   #back { color:var(--accent); font-weight:600; background:none; border:none;
           font-size:15px; }
   #title { color:var(--dim); font-size:13px; margin-left:auto; }
-  video { width:100%; flex:1 1 auto; min-height:120px; background:#000;
-          display:block; object-fit:contain; }
+  video { width:100%; height:100%; background:#000; display:block;
+          object-fit:contain; }
+  /* native controls are gone (Joe): tap the video to play/pause; a quiet
+     glyph marks the paused state */
+  #paused-glyph { position:absolute; inset:0; display:none;
+                  align-items:center; justify-content:center;
+                  font-size:44px; color:rgba(230,237,243,.55);
+                  pointer-events:none; }
+  #vwrap.paused #paused-glyph { display:flex; }
   #shotbar { padding:8px 16px calc(8px + env(safe-area-inset-bottom));
              flex:0 0 auto; }
   #shotinfo { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
@@ -150,7 +157,10 @@
     <button id="back">‹ Sessions</button>
     <span id="title"></span>
   </div>
-  <video id="video" controls playsinline preload="metadata"></video>
+  <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex;">
+    <video id="video" playsinline preload="metadata"></video>
+    <div id="paused-glyph">▶</div>
+  </div>
   <div id="shotbar">
     <div id="shotinfo">
       <span class="n" id="shot-n">–</span>
@@ -518,7 +528,6 @@ $("video").addEventListener("seeked", () => {
   lane.addEventListener("pointerdown", ev => {
     scrubbing = true;
     wasPlaying = !$("video").paused;
-    $("video").removeAttribute("controls");  // no dim/overlay mid-scrub (Joe)
     $("video").pause();          // decoder devotes itself to scrub frames
     lane.setPointerCapture(ev.pointerId);
     seekTo(ev);
@@ -527,7 +536,6 @@ $("video").addEventListener("seeked", () => {
   const end = () => {
     if (!scrubbing) return;
     scrubbing = false;
-    $("video").setAttribute("controls", "");
     if (wasPlaying) $("video").play();
   };
   lane.addEventListener("pointerup", end);
@@ -556,6 +564,14 @@ applyRate();
 modeLabel();
 
 $("desc").onclick = () => $("desc").classList.toggle("open");
+
+// no native controls: the video itself is the play/pause button
+$("video").addEventListener("click", () => {
+  const v = $("video");
+  if (v.paused) v.play(); else v.pause();
+});
+$("video").addEventListener("pause", () => $("vwrap").classList.add("paused"));
+$("video").addEventListener("play", () => $("vwrap").classList.remove("paused"));
 
 // ---- "Correct this clip" (Joe: human intervention) ---------------------
 let curSession = null;
