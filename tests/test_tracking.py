@@ -560,3 +560,39 @@ class TestAppearanceGatedAssociation:
         cue = next(t for t in out if t.cls == BallClass.CUE)
         assert cue.misses == 0, "blurred far cue failed to rebind"
         assert cue.x > 150, "rebound cue not moving toward its detection"
+
+
+class TestCueSizeFloor:
+    """005647 @209s: a persistent white felt speck (r10) kept winning the
+    freed cue number while the real cue lay in a pocket. The cue is white
+    and never reads small, so number 0 demands lifetime full-size evidence.
+    Real object balls DO live at r9-11 in places (frame-verified purple 4,
+    yellow 1) — the floor applies to number 0 only."""
+
+    def _lose_cue(self, tr, short):
+        cue = Detection(x=100, y=100, radius=16, cls=BallClass.CUE, number=0)
+        for _ in range(16):
+            out = tr.update([cue], short, ball_r=15.0)
+        cue_id = next(t.id for t in out if t.number == 0)
+        tr.remove_ids([cue_id])          # vacancy killed it (potted)
+        return tr
+
+    def test_speck_cannot_win_cue_number(self):
+        tr = self._lose_cue(BallTracker(min_hits=3), 400)
+        speck = Detection(x=300, y=300, radius=10, cls=BallClass.CUE,
+                          number=0)
+        out = []
+        for _ in range(30):
+            out = tr.update([speck], 400, ball_r=15.0)
+        assert not any(t.number == 0 for t in out), \
+            "chronic sub-ball speck won the cue number"
+
+    def test_real_returning_cue_still_wins_number(self):
+        tr = self._lose_cue(BallTracker(min_hits=3), 400)
+        ball = Detection(x=300, y=300, radius=15, cls=BallClass.CUE,
+                         number=0)
+        out = []
+        for _ in range(30):
+            out = tr.update([ball], 400, ball_r=15.0)
+        assert any(t.number == 0 for t in out), \
+            "full-size returning cue denied its number"

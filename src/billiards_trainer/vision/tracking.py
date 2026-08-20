@@ -29,6 +29,7 @@ class _Internal:
     misses: int = 0
     confirmed: bool = False
     bgr: tuple = (200, 200, 200)
+    r_max: float = 0.0         # lifetime max DETECTION radius (unsmoothed)
     still_count: int = 0       # consecutive ~stationary frames
     settled: bool = False      # confirmed AND has been still a while (a resting ball)
     move_streak: int = 0       # consecutive matched frames with real PUBLISHED motion
@@ -336,6 +337,13 @@ class BallTracker:
                     # between colliding balls (005647 forensics).
                     if _contradicts(t, d):
                         continue
+                    # Nor change SIZE: the coasting cue revived onto a
+                    # sub-ball white speck on the felt (r10 vs its 13-15)
+                    # while the real cue lay in the pocket — the rebind
+                    # gate alone left revival as the open door. Blur
+                    # inflates a fast blob, never shrinks it 20%.
+                    if not (0.8 * t.radius <= d.radius <= 1.6 * t.radius):
+                        continue
                     dist = math.hypot(t.x - d.x, t.y - d.y)
                     if dist <= r_gate:
                         revive.append((dist, ti, di))
@@ -542,6 +550,20 @@ class BallTracker:
         # rest" to #9 five votes later).
         rest = [not t.moving() for t in tracks]
         cands: list[tuple[float, int, int]] = []   # (score, track_idx, number)
+        # CUE-SIZE FLOOR (005647 @209s): a persistent white speck on the
+        # felt (drill sticker, r10) kept winning the freed cue number
+        # through arbitration while the real cue lay in a pocket — masking
+        # the scratch. Frame check on every chronically-small NUMBERED
+        # track shows real object balls do live at r9-11.5 in some table
+        # regions (a purple 4, a yellow 1 — digits visible), so a general
+        # radius floor would strip real identities. But the CUE is white
+        # and maximally reflective: it never reads small (observed minimum
+        # 12.2 vs the speck's lifetime 10.0). Number 0 therefore demands
+        # lifetime full-size evidence, measured against this session's own
+        # committed-ball population.
+        pop = sorted(t.radius for t in tracks if t.committed_number >= 0)
+        cue_floor = 0.9 * pop[len(pop) // 2] if len(pop) >= 3 else (
+            0.85 * self._ball_r if self._ball_r > 2.0 else 0.0)
         for i, t in enumerate(tracks):
             votes = Counter(n for n in t.num_hist if n is not None and n >= 0)
             colour_num, colour_frac = self._colour_consensus(t)
@@ -549,6 +571,8 @@ class BallTracker:
             if t.committed_number >= 0:
                 nums.add(t.committed_number)
             for n in nums:
+                if n == 0 and cue_floor and t.r_max < cue_floor:
+                    continue   # never full-size in its life: not the cue
                 if t.committed_number < 0 and votes.get(n, 0) < 3:
                     # COLOUR ADOPTION — the digit-down path. No vote majority
                     # will ever form for a ball whose number faces the felt,
@@ -608,6 +632,14 @@ class BallTracker:
         for i in order:
             t = tracks[i]
             if True:
+                if (t.committed_number == 0 and cue_floor
+                        and t.r_max < cue_floor):
+                    # vote-path commit (_commit_number) landed number 0 on
+                    # a track that has never once read full-size: the cue
+                    # is white and never reads small — this is the felt
+                    # speck, not the cue. Same floor as candidacy.
+                    t.committed_number = -1
+                    continue
                 if (t.shown_number != t.committed_number
                         and not _reachable(t, t.committed_number)):
                     # never published this number and it just teleported
@@ -768,6 +800,7 @@ class BallTracker:
                 measured_identity(tuple(int(v) for v in mb)))
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
+        t.r_max = max(t.r_max, d.radius)
         t.pos_hist.append((t.x, t.y))
         # Motion-episode bookkeeping from the PUBLISHED step — the quantity
         # the physics scorer measures. The bar sits ABOVE the scorer's rest
@@ -795,7 +828,8 @@ class BallTracker:
             t.confirmed = True
 
     def _spawn(self, d: Detection) -> None:
-        t = _Internal(id=self._next_id, x=d.x, y=d.y, radius=d.radius, bgr=d.bgr)
+        t = _Internal(id=self._next_id, x=d.x, y=d.y, radius=d.radius,
+                      bgr=d.bgr, r_max=d.radius)
         t.born_frame = getattr(self, "_frame_n", 0)
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)

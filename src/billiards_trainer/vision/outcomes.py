@@ -89,6 +89,100 @@ def anon_departures(reader: SidecarReader, t0: float, t1: float) -> tuple:
     return max(0, len(dead) - newborn), dead
 
 
+def _pockets(reader: SidecarReader) -> tuple:
+    """(pocket points, pocket radius, ball radius) estimated from the
+    sidecar's own coordinate cloud — the bed's extent IS the data's extent
+    over a session, and old sidecars never recorded table geometry."""
+    cached = getattr(reader, "_pockets_cache", None)
+    if cached is not None:
+        return cached
+    xs, ys, rs = [], [], []
+    for fr in reader._frames[:: max(1, len(reader._frames) // 400)]:
+        for row in fr:
+            xs.append(row[1])
+            ys.append(row[2])
+            rs.append(row[3])
+    if len(xs) < 20:
+        reader._pockets_cache = ([], 0.0, 12.0)
+        return reader._pockets_cache
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    ball_r = sorted(rs)[len(rs) // 2]
+    pts = [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]
+    if (y1 - y0) > (x1 - x0):      # side pockets on the LONG rails
+        pts += [(x0, (y0 + y1) / 2), (x1, (y0 + y1) / 2)]
+    else:
+        pts += [((x0 + x1) / 2, y0), ((x0 + x1) / 2, y1)]
+    reader._pockets_cache = (pts, 4.5 * ball_r, ball_r)
+    return reader._pockets_cache
+
+
+def _respot_departures(reader: SidecarReader, before: set, after: set,
+                       t0: float, t1: float) -> dict:
+    """Departures HIDDEN by a fast hand re-spot (005647 @275s): the cue
+    scratched into the right-middle pocket and Joe fished it out and
+    re-spotted it 2.4s later — INSIDE the still-open shot window — so the
+    same-number rebirth made the census read 'present at end' and the
+    scratch vanished. A number that is present after the shot only via a
+    track BORN during the shot, whose previous holder died at a pocket
+    while moving, with a hand over the table in the gap, was potted and
+    hand-returned: its departure stands. (Mirror of the tid-continuity
+    rule: continuity cancels departures; a pocket-death + hand + rebirth
+    discontinuity CONFIRMS one.)
+
+    Returns {num: {...evidence...}} for such numbers."""
+    out: dict = {}
+    for num in before & after:
+        # which track holds the number in the after-window?
+        holder = None
+        t = t1 + 0.2
+        while t <= t1 + 1.6 + 1e-9 and holder is None:
+            for tr in reader.tracks_at(t):
+                if tr.active and tr.number == num:
+                    holder = tr.id
+                    break
+            t += 0.3
+        if holder is None:
+            continue
+        # first and (pre-birth) previous sightings of the number
+        birth_t = None          # first time THIS tid carries the number
+        prev_rows: list = []    # (t, x, y) of the number on OTHER tids before
+        for ft, fr in zip(reader._times, reader._frames):
+            if ft > t1 + 1.8:
+                break
+            for row in fr:
+                if row[4] != num:
+                    continue
+                if row[0] == holder:
+                    if birth_t is None:
+                        birth_t = ft
+                elif birth_t is None:
+                    prev_rows.append((ft, row[1], row[2]))
+        if birth_t is None or birth_t <= t0 or not prev_rows:
+            continue            # holder predates the shot: no rebirth here
+        death_t, dx, dy = prev_rows[-1]
+        if birth_t - death_t < 0.8:
+            continue            # near-continuous handoff (an honest hop)
+        pts, pocket_r, ball_r = _pockets(reader)
+        if not pts or not any((dx - px) ** 2 + (dy - py) ** 2 <= pocket_r ** 2
+                              for px, py in pts):
+            continue            # previous holder did not die at a pocket
+        # ...and it ARRIVED there (moving in its final second) — a resting
+        # rail ball picked up by hand must not count as a departure
+        moved = 0.0
+        for ft, px_, py_ in reversed(prev_rows):
+            if death_t - ft > 1.0:
+                break
+            moved = max(moved, ((dx - px_) ** 2 + (dy - py_) ** 2) ** 0.5)
+        if moved < ball_r:
+            continue
+        carried, ff = reader.hand_context(death_t, birth_t)
+        if not carried and ff < 0.012:
+            continue            # no hand in the gap: not a re-spot
+        out[num] = {"died": [round(death_t, 1), round(dx), round(dy)],
+                    "reborn": round(birth_t, 1), "ff": round(ff, 3)}
+    return out
+
+
 def _tid_continuous(reader: SidecarReader, num: int, tid: int,
                     t0: float, t1: float) -> bool:
     """True when track `tid` carried `num` in every sampled state across
@@ -111,8 +205,19 @@ def departed_for_shot(reader: SidecarReader, s: dict) -> tuple:
     after = stable_numbers(reader, t1 + 0.2, t1 + 1.6)
     gone = before - after
     detail = {"before": sorted(before), "after": sorted(after)}
+    respot = _respot_departures(reader, before, after, t0, t1)
+    if respot:
+        gone |= set(respot)
+        detail["respot"] = {str(n): v for n, v in respot.items()}
     confirmed: set = set()
     for num in gone:
+        if num in respot:
+            # The pot AND the hand-return are both already established —
+            # the return-scan must not run: it would see the re-spotted
+            # ball riding one continuous post-shot track and cancel the
+            # very departure the re-spot evidence proved.
+            confirmed.add(num)
+            continue
         # Where was it last seen before vanishing?
         last_pos = None
         t = t0 - 0.2

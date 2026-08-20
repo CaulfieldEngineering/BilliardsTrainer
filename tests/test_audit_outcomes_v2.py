@@ -266,3 +266,56 @@ class TestTidContinuityCancellation:
         assert row["derived"] == "make", \
             "real pot-and-replace was wrongly cancelled"
         assert row["returned"][0]["mode"] == "replaced"
+
+
+class TestRespotDepartures:
+    """005647 @275s: the cue scratched into a pocket and Joe fished it out
+    and re-spotted it INSIDE the still-open shot window — the same-number
+    rebirth made the census read 'present at end' and the scratch
+    vanished. A pocket-death + hand-in-gap + fresh-tid rebirth CONFIRMS
+    the departure; a resting ball picked up by hand does not."""
+
+    def _sidecar(self, tmp_path, flight, rebirth_pos=(300.0, 400.0)):
+        # bed extremes defined by a far resident at (600,1200)
+        states = []
+        t = 0.0
+        while t <= 24.0:
+            tracks = [(2, 600.0, 1200.0, 9, "stripe", True)]
+            row = flight(t)
+            if row:
+                tracks.append(row)
+            carried = [9] if 11.5 < t < 13.0 else []   # hand in the gap
+            states.append((round(t, 2), tracks, carried))
+            t += 0.25
+        return _write_v2(tmp_path, states,
+                         [{"start": 8.0, "end": 16.0, "outcome": "make",
+                           "pocketed": 1}])
+
+    def test_pocket_death_and_respot_inside_window_is_departure(self, tmp_path):
+        def flight(t):
+            if t < 8.0:
+                return (1, 100.0, 100.0, 0, "cue", True)     # at rest
+            if t <= 9.0:                                     # rolls to pocket
+                f = (t - 8.0) / 1.0
+                return (1, 100 + 495 * f, 100 + 1095 * f, 0, "cue", True)
+            if t >= 14.0:                                    # hand re-spot
+                return (9, 300.0, 400.0, 0, "cue", True)
+            return None                                      # in the pocket
+        vid = self._sidecar(tmp_path, flight)
+        row = audit(vid)[0]
+        assert row["derived"] == "scratch", \
+            "fast hand re-spot inside the window hid the scratch"
+
+    def test_resting_ball_hand_moved_is_not_departure(self, tmp_path):
+        def flight(t):
+            # parked AT the pocket corner the whole time — never arrived
+            # by rolling; vanishes mid-shot; hand-returned mid-table
+            if t < 10.0:
+                return (1, 595.0, 1195.0, 0, "cue", True)
+            if t >= 14.0:
+                return (9, 300.0, 400.0, 0, "cue", True)
+            return None
+        vid = self._sidecar(tmp_path, flight)
+        row = audit(vid)[0]
+        assert row["derived"] == "miss", \
+            "a hand-moved resting ball was booked as a pot"
