@@ -224,15 +224,22 @@ class ShotListPanel(QWidget):
             text = f"{no:>3}   {name:<7} {mm}:{ss:02d}   {dur:.1f}s"
             if pot > 1:
                 text += f"   ×{pot}"
+            if s.get("reviewed_ok"):
+                text += "   ✓"          # Joe confirmed this one from review
             item = QListWidgetItem(text)
             item.setIcon(_outcome_dot(colour, corrected))
             item.setForeground(QColor(PALETTE.text_faint)
                                if not is_attempt(s)
                                else Qt.GlobalColor.white)
             item.setData(Qt.UserRole, start)
-            item.setToolTip(f"Shot {no}: {name.lower()}, {dur:.1f}s"
-                            + (f", {pot} balls potted" if pot else "")
-                            + (" — outcome corrected by you" if corrected else ""))
+            tip = (f"Shot {no}: {name.lower()}, {dur:.1f}s"
+                   + (f", {pot} balls potted" if pot else "")
+                   + (" — outcome corrected by you" if corrected else "")
+                   + (" — confirmed correct by you" if s.get("reviewed_ok")
+                      else ""))
+            if s.get("note"):
+                tip += "\nYour note: " + str(s["note"])
+            item.setToolTip(tip)
             self._list.addItem(item)
         total = len(getattr(self, "_all_shots", []))
         shown = len(self._shots)

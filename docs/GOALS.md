@@ -879,3 +879,9 @@ Rounds continue with Joe's visual feedback as the gate.
   session 8 -> 5 hops (0.95/1k); gold-standard 9-ball reproduced 11/11
   outcomes with identical coverage and 0 hops. 2 new tests. Residual
   hops are >12-frame re-emergences — the honest flyer-rework backlog.
+- 2026-08-20 (loop, 3am): identity-hop TRIPWIRE on the health board
+  (id_hops: GREEN 0.84/1k on the 3 newest sessions; AMBER >2, RED >4 —
+  a tracking regression on the shot-36 family now surfaces within the
+  watchdog hour instead of waiting for Joe's eye). Desktop review
+  parity: the shot list shows Joe's confirmed-correct check and carries
+  his notes in the tooltip, same data the phone writes. 2 tests.

@@ -256,3 +256,16 @@ class TestDossierMenu:
         # row 1 of the Misses view is original shot 3
         pnl.dossier_requested.emit(pnl._nos[1])
         assert got == [3]
+
+
+class TestReviewParity:
+    def test_reviewed_and_notes_surface_on_desktop(self, app):
+        from billiards_trainer.ui.widgets.shot_list import ShotListPanel
+        panel = ShotListPanel()
+        panel.add_shot({"start": 10.0, "end": 14.0, "outcome": "make",
+                        "pocketed": 1, "reviewed_ok": True,
+                        "note": "clean cut into the corner"})
+        item = panel._list.item(0)
+        assert "✓" in item.text(), "reviewed check missing from the row"
+        assert "confirmed correct by you" in item.toolTip()
+        assert "clean cut into the corner" in item.toolTip()

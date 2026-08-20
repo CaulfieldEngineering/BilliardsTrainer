@@ -250,6 +250,33 @@ def _check_corrections() -> tuple[str, str]:
     return GREEN, "queue clear, no new verdicts"
 
 
+def _check_identity_hops() -> tuple[str, str]:
+    """Identity-wander tripwire: numbers teleporting between tracks (the
+    shot-36 family, gated 2026-08-20). Baseline after the reachability
+    gate ~1/1k states; a regression pushes it back toward 2.4+."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import audit_identity_wander as aw
+    d = Path(Settings.load().recording.resolved_dir())
+    vids = sorted(d.glob("session-*.mp4"), key=lambda p: p.stat().st_mtime,
+                  reverse=True)[:3]
+    hops = states = 0
+    for v in vids:
+        try:
+            r = aw.audit(v)
+        except Exception:  # noqa: BLE001
+            continue
+        hops += len(r["hops"])
+        states += r["states"]
+    if not states:
+        return AMBER, "no sidecars to audit"
+    rate = 1000.0 * hops / states
+    if rate > 4.0:
+        return RED, f"identity hops {rate:.1f}/1k (gate regressed?)"
+    if rate > 2.0:
+        return AMBER, f"identity hops {rate:.1f}/1k (above gated baseline)"
+    return GREEN, f"identity hops {rate:.2f}/1k (3 newest sessions)"
+
+
 CHECKS = {
     "app": _check_app_running,
     "app_log": _check_app_log,
@@ -261,6 +288,7 @@ CHECKS = {
     "autonomy": _check_autonomy,
     "cue_sensor": _check_cue_sensor,
     "corrections": _check_corrections,
+    "id_hops": _check_identity_hops,
     "disk": _check_disk,
 }
 
