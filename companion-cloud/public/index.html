@@ -50,6 +50,11 @@
   #shotinfo .t { color:var(--dim); font-size:12px; margin-left:auto; }
   #desc { color:var(--dim); font-size:13px; min-height:1.4em; margin-bottom:8px; }
   #nav { display:flex; gap:8px; margin-bottom:10px; }
+  #speed { display:flex; gap:8px; margin-bottom:10px; }
+  #speed button { flex:1; height:36px; background:var(--panel);
+                  color:var(--dim); border:1px solid var(--line);
+                  border-radius:4px; font-size:13px; font-weight:600; }
+  #speed button.on { color:var(--accent); border-color:var(--accent); }
   #nav button { flex:1; height:44px; background:var(--panel); color:var(--text);
                 border:1px solid var(--line); border-radius:4px; font-size:15px;
                 font-weight:600; }
@@ -121,6 +126,11 @@
       <button id="prev">‹</button>
       <button id="mode" title="repeat this shot">⟳ Repeat</button>
       <button id="next">›</button>
+    </div>
+    <div id="speed">
+      <button data-rate="0.25">¼×</button>
+      <button data-rate="0.5">½×</button>
+      <button data-rate="1" class="on">1×</button>
     </div>
     <div id="chips"></div>
   </div>
@@ -411,25 +421,70 @@ function advanceSeamless(i) {
     }
   }
 })();
+// Latest-wins seek chaining: firing currentTime on every pointermove
+// queues seeks inside the decoder and the picture lags the thumb by
+// seconds. Issue ONE seek at a time; when it lands, jump straight to
+// wherever the thumb is NOW (Joe: "more frame resolution... really
+// look closely at frame timing").
+let seekBusy = false, seekPending = null;
+function requestSeek(t) {
+  const v = $("video");
+  if (seekBusy) { seekPending = t; return; }
+  seekBusy = true;
+  v.currentTime = t;
+}
+$("video").addEventListener("seeked", () => {
+  if (seekPending != null) {
+    const t = seekPending;
+    seekPending = null;
+    $("video").currentTime = t;
+  } else {
+    seekBusy = false;
+  }
+});
+
 (() => {
   const lane = $("lane");
-  let scrubbing = false;
+  let scrubbing = false, wasPlaying = false;
   const seekTo = ev => {
     if (!win) return;
     const r = lane.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
-    $("video").currentTime = win.t0 + frac * (win.t1 - win.t0);
+    requestSeek(win.t0 + frac * (win.t1 - win.t0));
     $("playhead").style.left = (100 * frac) + "%";
   };
   lane.addEventListener("pointerdown", ev => {
     scrubbing = true;
+    wasPlaying = !$("video").paused;
+    $("video").pause();          // decoder devotes itself to scrub frames
     lane.setPointerCapture(ev.pointerId);
     seekTo(ev);
   });
   lane.addEventListener("pointermove", ev => { if (scrubbing) seekTo(ev); });
-  lane.addEventListener("pointerup", () => { scrubbing = false; });
-  lane.addEventListener("pointercancel", () => { scrubbing = false; });
+  const end = () => {
+    if (!scrubbing) return;
+    scrubbing = false;
+    if (wasPlaying) $("video").play();
+  };
+  lane.addEventListener("pointerup", end);
+  lane.addEventListener("pointercancel", end);
 })();
+
+// ---- slow motion (Joe): ¼× / ½× / 1×; iOS resets rate on new media, so
+// reapply on every play ------------------------------------------------
+let rate = parseFloat(localStorage.getItem("rate") || "1") || 1;
+function applyRate() {
+  $("video").playbackRate = rate;
+  [...$("speed").children].forEach(b =>
+    b.classList.toggle("on", parseFloat(b.dataset.rate) === rate));
+}
+[...$("speed").children].forEach(b => b.onclick = () => {
+  rate = parseFloat(b.dataset.rate);
+  localStorage.setItem("rate", rate);
+  applyRate();
+});
+$("video").addEventListener("play", applyRate);
+applyRate();
 modeLabel();
 
 // keep "current shot" synced while playing
