@@ -996,3 +996,23 @@ Rounds continue with Joe's visual feedback as the gate.
   attribution accuracy (which ball was potted/contacted, shots 26/44
   notes); residual segment [443.6-449.0] (episode-start stroke, no
   verdict targets it); pace re-fit once confirms accumulate.
+- 2026-08-20 (loop, 6pm): LIVE LIBRARY REBUILD BEGUN with verdict
+  carryover. A --force re-backfill used to silently discard every
+  correction, note and confirm Joe ever filed (machine data is
+  recomputable; his review is not) — carry_review_verdicts() now moves
+  the human records onto the rebuilt sidecar in original order, where
+  containment matching re-attaches them across shifted segmentation
+  (2 tests). Rebuilt LIVE: 005647 (26 verdicts carried) and 212207 (2).
+  The payoff was immediate: on the fresh identity record most of Joe's
+  corrections became NO-OPS — the machine now agrees with him outright —
+  and the ATTRIBUTION notes largely resolved themselves: @100 reads
+  "contact on the 7" (his note: 7 contacted), @444 "potted the 9" (his
+  note verbatim), @208 "potted the 7, scratch" ("cue followed the 7 in").
+  Residual: @819 says contact on the 5, Joe says the 3. Scoreboard tool
+  taught the same exact->containment->nearest attachment as the reader
+  (it had gone blind to 12/13 verdicts post-rebuild). NEXT LOOPS: rebuild
+  the REST of the library overnight (any sidecar older than Aug 20 18:00
+  UTC needs the new pipeline; one session per health-checked slot, never
+  during recording activity, verdicts carry automatically now); cron
+  renewal window opens Aug 22; @819 contact attribution; fresh-footage
+  generalization once Joe plays again.
