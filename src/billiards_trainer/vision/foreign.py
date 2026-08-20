@@ -31,16 +31,22 @@ _MIN_BLOB_FRAC = 0.004
 
 def foreign_mask(rect_bgr: np.ndarray,
                  cloth_hsv: tuple[float, float, float] | None
-                 ) -> tuple[float, np.ndarray | None]:
-    """(covered fraction, binary mask) of large non-felt objects.
+                 ) -> tuple[float, np.ndarray | None, np.ndarray | None]:
+    """(covered fraction, blob mask, raw non-felt mask).
 
     ``cloth_hsv`` is the calibrated cloth colour (median H, S, V); without it
     the estimate falls back to the frame's own median, which is the cloth on
-    any frame that isn't mostly covered already. The mask is in the input's
+    any frame that isn't mostly covered already. Masks are in the input's
     own (downscaled) geometry — callers map coordinates by scale.
+
+    The blob mask keeps only hand/arm-scale regions (the size floor exists
+    so lone balls never read as "arm over the table"). The RAW mask is the
+    same non-felt test BEFORE the floor: it answers "is there anything at
+    this spot at all" — ball, stick, hand — which is a different question
+    with a different customer (spot-occupancy in vacancy pruning).
     """
     if rect_bgr is None or rect_bgr.size == 0:
-        return 0.0, None
+        return 0.0, None, None
     h = max(1, int(rect_bgr.shape[0] * _W / max(1, rect_bgr.shape[1])))
     small = cv2.resize(rect_bgr, (_W, h), interpolation=cv2.INTER_AREA)
     hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV).astype(np.int16)
@@ -70,7 +76,7 @@ def foreign_mask(rect_bgr: np.ndarray,
         if area >= floor:
             keep[labels == i] = 1
             covered += area
-    return covered / total, keep
+    return covered / total, keep, mask
 
 
 def foreign_fraction(rect_bgr: np.ndarray,

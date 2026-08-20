@@ -141,9 +141,11 @@ def main() -> int:
     for k, v_ in board.items():
         print(f"  {k}: {v_}")
     if confirms == 0 and rows:
-        print("  NOTE: zero confirms yet — Joe has only filed corrections,"
+        # ASCII only: Windows consoles are cp1252 and a checkmark here
+        # crashed the whole report after printing the board.
+        print("  NOTE: zero confirms yet -- Joe has only filed corrections,"
               " so 'accuracy among reviewed' is selection-biased low."
-              " It becomes meaningful as ✓ confirms accumulate.")
+              " It becomes meaningful as confirms accumulate.")
     print("\nledger:")
     for r in rows:
         bits = [f"{r['session']} @{r['start']:.0f}s"]

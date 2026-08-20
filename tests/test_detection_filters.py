@@ -653,3 +653,49 @@ class TestVacancyPruning:
         tracks = self._feed(p, calib, [], 40)         # long occlusion
         assert any(t.number == 0 for t in tracks), \
             "occluded ball was killed — the budget exists for exactly this"
+
+    def test_spot_occupancy_protects_numbered_ball_under_stick(self):
+        # The 005647 lesson: a long address holds the stick over a resting
+        # ball past ANY patience counter, and a stick is too thin for the
+        # blob-floored foreign mask. If the spot's pixels are non-felt,
+        # the ball is still there — no matter how long detection is lost.
+        import numpy as np
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
+        self._feed(p, calib, [ball], 12)
+        raw = np.zeros((700, 700), np.uint8)          # non-felt AT the spot
+        raw[195:206, 195:206] = 1
+        p._nonfelt_last = (raw, 1.0, 0.0, 0.0)
+        tracks = self._feed(p, calib, [], 150)        # 2.5x the old budget
+        assert any(t.number == 0 for t in tracks), \
+            "numbered ball killed while its spot was visibly occupied"
+
+    def test_spot_occupancy_does_not_immortalize_unnumbered_blob(self):
+        # Ghosts are overwhelmingly unnumbered; a shadowed patch must not
+        # grant one eternal life. Occupancy protects numbered tracks only.
+        import numpy as np
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        blob = _mk(400, 600, exp, cls=BallClass.UNKNOWN, number=-1, score=0.8)
+        self._feed(p, calib, [blob], 12)
+        raw = np.ones((700, 700), np.uint8)           # everything non-felt
+        p._nonfelt_last = (raw, 1.0, 0.0, 0.0)
+        tracks = self._feed(p, calib, [], 9)
+        assert not tracks, "unnumbered ghost immortalized by spot-occupancy"
+
+    def test_felt_spot_still_kills_numbered_lingerer(self):
+        # A genuinely bare spot (felt-coloured pixels) must keep the
+        # original pruning behaviour: the assumed position dies at 60.
+        import numpy as np
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
+        self._feed(p, calib, [ball], 12)
+        p._nonfelt_last = (np.zeros((700, 700), np.uint8), 1.0, 0.0, 0.0)
+        tracks = self._feed(p, calib, [], 61)
+        assert not any(t.number == 0 for t in tracks), \
+            "lingerer survived a spot whose pixels are plainly felt"

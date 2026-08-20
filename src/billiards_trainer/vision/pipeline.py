@@ -526,6 +526,30 @@ class Pipeline:
                     return True
             return False
 
+        nonfelt = getattr(self, "_nonfelt_last", None)
+
+        def _spot_occupied(x: float, y: float) -> bool:
+            # SPOT-OCCUPANCY (the 005647 lesson): Joe's address routine
+            # holds the stick over resting balls LONGER than any patience
+            # counter we dare set, and a stick is too thin for the blob-
+            # floored foreign mask — so "no detection + no foreign cover"
+            # still killed real resting balls and derived phantom
+            # departures (machine 1/7 vs Joe's verdicts). Vacancy is a
+            # claim about PIXELS, so ask the pixels: felt-coloured means
+            # truly empty; anything else — ball, stick, ball-under-stick —
+            # means the spot is NOT vacant, whatever the detector thinks.
+            if nonfelt is None:
+                return False
+            rmask, rs, rx0, ry0 = nonfelt
+            mh, mw = rmask.shape[:2]
+            mx, my = int((x - rx0) * rs), int((y - ry0) * rs)
+            if not (0 <= mx < mw and 0 <= my < mh):
+                return False
+            win = rmask[max(0, my - 1):my + 2, max(0, mx - 1):mx + 2]
+            # a ball spans ~5px in the 160px-wide mask, so a centred 3x3
+            # window lies inside its disc; 1/3 non-felt tolerates edge noise
+            return win.size > 0 and float(win.mean()) >= 0.34
+
         near_r2 = (2.2 * max(exp_r, 6.0)) ** 2
         doomed: list[int] = []
         live_ids: set[int] = set()
@@ -534,7 +558,12 @@ class Pipeline:
             still = (abs(tr.vx) + abs(tr.vy)) < 1.0
             has_det = any((d.x - tr.x) ** 2 + (d.y - tr.y) ** 2 <= near_r2
                           for d in detections)
-            if still and not has_det and not _covered(tr.x, tr.y):
+            # Spot-occupancy protects NUMBERED residents only: an unnumbered
+            # blob on a shadowed patch must not become immortal — ghosts are
+            # overwhelmingly unnumbered, real long-occluded balls numbered.
+            protected = _covered(tr.x, tr.y) or (
+                tr.number >= 0 and _spot_occupied(tr.x, tr.y))
+            if still and not has_det and not protected:
                 self._vacant[tr.id] = self._vacant.get(tr.id, 0) + 1
             else:
                 self._vacant[tr.id] = 0
@@ -788,13 +817,17 @@ class Pipeline:
         w, h = tbl.x1 - x0, tbl.y1 - y0
         if w <= 0 or h <= 0:
             self._foreign_last = (0.0, None, 1.0, 0.0, 0.0)
+            self._nonfelt_last = None
             return self._foreign_last
         s = 160.0 / w
         S = np.array([[s, 0.0, -x0 * s], [0.0, s, -y0 * s], [0.0, 0.0, 1.0]])
         tiny = cv2.warpPerspective(frame, S @ calib.H, (160, max(1, int(h * s))),
                                    flags=cv2.INTER_LINEAR)
-        frac, mask = foreign_mask(tiny, None)
+        frac, mask, raw = foreign_mask(tiny, None)
         self._foreign_last = (frac, mask, s, x0, y0)
+        # Raw non-felt snapshot (pre-floor): vacancy pruning's spot-occupancy
+        # test reads it — "is there ANYTHING at this spot", ball-sized or not.
+        self._nonfelt_last = (raw, s, x0, y0) if raw is not None else None
         return self._foreign_last
 
     def _carried_ids(self, tracks, foreign) -> set[int]:
