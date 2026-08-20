@@ -43,7 +43,8 @@
   #player { display:none; flex-direction:column; height:100dvh;
             overflow:hidden; }
   #player.open { display:flex; }
-  #topbar { display:flex; align-items:center; gap:12px; padding:10px 16px; }
+  #topbar { display:flex; align-items:center; gap:12px;
+            padding:calc(8px + env(safe-area-inset-top)) 16px 8px; }
   #back { color:var(--accent); font-weight:600; background:none; border:none;
           font-size:15px; }
   #title { color:var(--dim); font-size:13px; margin-left:auto; }
@@ -441,15 +442,13 @@ function advanceSeamless(i) {
     if (mode === "loop") {
       v.currentTime = win.t0;
     } else if (cur < shots.length - 1) {
-      const nextT0 = Math.max(0, shots[cur + 1].start - PRE_ROLL);
-      if (nextT0 <= win.t1 + 0.75) {
-        advanceSeamless(cur + 1);   // contiguous: keep rolling, no seek
-      } else {
-        gotoShot(cur + 1, true);    // real dead time: skip it
-      }
-    } else {
-      v.pause();
+      // PURE continuity (Joe: "all clips run seamlessly into each other,
+      // down to the frame... watch the thing in its entirety"): never
+      // seek — playback rolls straight through, the clip indicator and
+      // lane just follow. Skipping is what the › button is for.
+      advanceSeamless(cur + 1);
     }
+    // last clip: keep rolling to the end of the video, no pause
   }
 })();
 // Latest-wins seek chaining: firing currentTime on every pointermove
