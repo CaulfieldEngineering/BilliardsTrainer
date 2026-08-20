@@ -974,3 +974,25 @@ Rounds continue with Joe's visual feedback as the gate.
   under the new tracker so verdicts must match by CONTAINMENT (not
   boundary-within-3s), then the rolled-in-birth feature classifies
   pocket-side ball re-introduction as rearrange. That is the next chunk.
+- 2026-08-20 (loop, 2pm): 9/9 — EVERY verdict Joe filed on session
+  005647, outcomes AND actions, now derives correctly. The two action
+  verdicts were pocket-side ball re-introduction, invisible to every
+  hand cue by construction (rolled balls are born only after leaving the
+  hand; pocket-mouth reaches stay under the ff gate). New ROLLED-IN
+  BIRTH feature: a track that first appears already rolling and
+  decelerates to rest is physically impossible for a struck ball — two
+  such births classify the episode rearrange regardless of cue
+  involvement. And review verdicts now survive re-segmentation: the
+  reader attaches them by exact start, then CONTAINMENT, then nearest-
+  within-8s (Joe's @214s verdict had been orphaned 3.4s outside a
+  boundary that moved under the improved tracker). All real strokes
+  stay strokes; gold 11 strokes + 11/11 outcomes; suite green; +5
+  tests. The day's campaign, driven entirely by Joe's phone verdicts +
+  frame forensics: outcomes 0/7 -> 7/7, actions 0/2 -> 2/2, identity
+  hops 2.41 -> 0.29/1k. The review loop WORKS — Joe files verdicts from
+  his phone, the machine learns the mechanism, ships the fix, and his
+  next session gets a better scoreboard. NEXT: fresh verdicts on NEW
+  footage (the real generalization test — 005647 is now in-sample);
+  attribution accuracy (which ball was potted/contacted, shots 26/44
+  notes); residual segment [443.6-449.0] (episode-start stroke, no
+  verdict targets it); pace re-fit once confirms accumulate.
