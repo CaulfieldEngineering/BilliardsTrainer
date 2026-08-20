@@ -177,7 +177,6 @@
       <span class="oc" id="shot-oc"></span>
       <span class="t" id="shot-t"></span>
     </div>
-    <div id="desc"></div>
     <div id="lane"><div id="playhead"></div></div>
     <div id="nav">
       <button id="prev">‹</button>
@@ -343,7 +342,7 @@ async function openSession(s) {
   $("player").classList.add("open");
   $("title").textContent = fmtDate(s.name, s.modified);
   shots = []; cur = -1;
-  $("chips").innerHTML = ""; $("desc").textContent = "";
+  $("chips").innerHTML = "";
   updateInfo();
   try {
     const [linkD, shotsD] = await Promise.all([
@@ -376,7 +375,7 @@ async function openSession(s) {
     if (shots.length) gotoShot(0, true);
     else $("video").play().catch(() => {});
   } catch (e) {
-    $("desc").textContent = "Load failed: " + e.message;
+    $("shot-oc").textContent = "Load failed: " + e.message;
   }
 }
 $("back").onclick = () => {
@@ -443,7 +442,6 @@ function updateInfo() {
                            : s.outcome === "scratch" ? "var(--scratch)"
                            : "var(--dim)";
   $("shot-t").textContent = `${fmt(s.start)} · ${(s.end - s.start).toFixed(1)}s`;
-  $("desc").textContent = s.text || "";
 }
 
 // ---- SHOT-scoped scrub lane (Joe: whole-session scale was unusable) ----
@@ -595,7 +593,7 @@ $("video").addEventListener("play", applyRate);
 applyRate();
 modeLabel();
 
-$("desc").onclick = () => $("correct").click();
+
 
 // no native controls: video tap and the ⏯ button both toggle
 function togglePlay() {
