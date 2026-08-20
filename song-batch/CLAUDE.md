@@ -84,6 +84,16 @@ once. **Push everything you possibly can down to this layer:**
   it, and it is a global asset. Generating it from `maps/ssd.json` means the map
   propagates to all 20 projects for free.
 
+### `template.yaml`
+
+The template described as data: track names, MixConsole order, and which build
+target feeds which track (`role`). Generated session files take their track
+names and ordering from here.
+
+> **STATUS: PLACEHOLDER.** The current track list is a guess at a rock template
+> so the machinery has something to run against. Replace it with the real
+> MixConsole order, top to bottom, and set `verified: true`.
+
 ### Template revisions
 
 Each song's `spec.yaml` records `template.revision` and
@@ -154,6 +164,32 @@ requires Export Audio Mixdown, which is a modal dialog - i.e. the brittle tier.
 MIDI-in / audio-out through our own headless host is the reliable path. This is
 the reason Tier 3 is last and thin.
 
+### The session file - what a build is actually for
+
+`./sb build` writes one importable file per song: `build/<slug>.mid`. This is
+the deliverable. It is a Type 1 MIDI file carrying:
+
+- **Track 0, the conductor track** - tempo, time signature, and one marker per
+  arrangement section ("Intro", "Verse 1", "Chorus"). Cubase reads these into
+  its Tempo and Marker tracks.
+- **One named instrument track per build target**, named from `template.yaml`
+  and ordered by MixConsole position, so imported tracks line up with the
+  template instead of arriving as "MIDI 01".
+
+Section names come from `spec.yaml`. `./sb sections <slug> --write` proposes an
+arrangement from the source's repeat structure and writes it there as `A B C`;
+renaming those to Intro/Verse/Chorus is a human judgement and those names become
+the markers. Detection only ever proposes.
+
+**What this does not do:** it cannot place parts onto tracks in an *already
+open* Cubase project. Nothing offline can - that is Tier 3, and it is last and
+thin for good reason. The offline answer is to generate a session that already
+has the tracks, rather than to reach into one that exists. `.dawproject` is the
+next step up: same idea, but able to carry routing, colours and device chains
+too. It is an interchange format with a lossy round trip, so validate it on a
+throwaway project before trusting it. The Type 1 MIDI session file needs no such
+validation, which is why it exists first.
+
 ### Preview mapping - important
 
 Once MIDI is remapped to SSD note numbers, playing it through a **General MIDI**
@@ -184,6 +220,8 @@ intermediate `.wav` is gitignored.
 ./sb build                       # build every song
 ./sb build example-riff          # build one
 ./sb build --no-render           # skip audio (fast)
+./sb sections example-riff       # propose an arrangement from repeat structure
+./sb sections example-riff --write   # ...and write it into spec.yaml to rename
 ./sb inspect path/to.mid         # what is actually in a MIDI file
 ./sb map show                    # the GM->SSD map as a table
 ./sb map doctor                  # what in the map is unverified or unfilled
@@ -211,6 +249,7 @@ One per song. `songs/_template/spec.yaml` is the annotated blank;
 | `template.revision` | Which template revision this song derives from. |
 | `template.pending_migrations` | Migrations owed but not yet applied. |
 | `musical.bpm` | Flattens the source's tempo map to this single tempo. |
+| `sections` | The arrangement. Becomes the markers in the session file. `label` plus 1-indexed `start_bar` and `length_bars`. |
 | `sources` | Immutable inputs, relative to the song directory. |
 | `build.seed` | Seed for deterministic transforms. Defaults to the slug. Change it to reroll humanisation. |
 | `build.targets.<name>.transforms` | The ordered transform chain. |

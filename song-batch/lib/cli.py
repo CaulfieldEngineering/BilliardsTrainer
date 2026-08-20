@@ -17,7 +17,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lib.drummap import DrumMap, DrumMapError  # noqa: E402
-from lib.pipeline import PipelineError, build_song  # noqa: E402
+from lib.pipeline import PipelineError, build_song, write_session  # noqa: E402
+from lib.template import Template  # noqa: E402
 from lib.spec import STAGES, Spec, discover  # noqa: E402
 
 SONGS_DIR = REPO_ROOT / "songs"
@@ -44,6 +45,43 @@ def _select(slugs: List[str]) -> List[Spec]:
             raise SystemExit(2)
         chosen.append(by_slug[slug])
     return chosen
+
+
+# ------------------------------------------------------------------ sections
+
+def cmd_sections(args) -> int:
+    """Propose an arrangement from the source MIDI, optionally into spec.yaml."""
+    import mido
+
+    from lib.midi_io import to_events
+    from lib.sections import detect_sections, summarise
+
+    for spec in _select(args.slugs):
+        sources = spec.sources()
+        if not sources:
+            print(f"{spec.slug}: no sources")
+            continue
+        source = list(sources.values())[0]
+        mid = mido.MidiFile(str(source))
+        events = []
+        for track in mid.tracks:
+            events.extend(to_events(track))
+        detected = detect_sections(events, mid.ticks_per_beat, spec.beats_per_bar, channel=args.channel)
+
+        print(f"{spec.slug}: {summarise(detected)}")
+        for section in detected:
+            fill = "  (ends with a fill)" if section.is_fill else ""
+            print(f"  bar {section.start_bar + 1:>3}  {section.label}  x{section.length_bars} bars{fill}")
+
+        if args.write:
+            if spec.declared_sections() and not args.force:
+                print("  ! spec.yaml already has sections; pass --force to overwrite")
+                continue
+            spec.raw["sections"] = [s.as_dict() for s in detected]
+            spec.save()
+            print(f"  written to {spec.path.relative_to(REPO_ROOT)}")
+            print("  now rename the labels to Intro / Verse 1 / Chorus - those become the markers")
+    return 0
 
 
 # --------------------------------------------------------------------- build
@@ -95,6 +133,21 @@ def cmd_build(args) -> int:
                     print(f"    -> {out.relative_to(REPO_ROOT)}")
             for warning in result.warnings:
                 print(f"    ! {warning}")
+
+        template = Template.load()
+        session = write_session(spec, results, template)
+        if session:
+            names = ", ".join(template.track_name_for(r.target) for r in results if r.midi_out)
+            sections = spec.declared_sections() or (results[0].sections if results else [])
+            marks = " ".join(sec.label for sec in sections) or "(none)"
+            print(f"  session -> {session.relative_to(REPO_ROOT)}")
+            print(f"    tracks:  {names}")
+            print(f"    markers: {marks}")
+            if not spec.declared_sections():
+                print("    ! markers are structural labels - run `./sb sections "
+                      f"{spec.slug} --write` and rename them to Verse/Chorus in spec.yaml")
+            if not template.verified:
+                print("    ! template.yaml is a placeholder - track names are guesses")
 
     return 1 if failures else 0
 
@@ -335,6 +388,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--ready-for", help="songs whose next stage is this")
     p_status.add_argument("--json", action="store_true")
     p_status.set_defaults(func=cmd_status)
+
+    p_sections = sub.add_parser("sections", help="propose an arrangement from the source MIDI")
+    p_sections.add_argument("slugs", nargs="*")
+    p_sections.add_argument("--write", action="store_true", help="write into spec.yaml")
+    p_sections.add_argument("--force", action="store_true", help="overwrite existing sections")
+    p_sections.add_argument("--channel", type=int, default=9)
+    p_sections.set_defaults(func=cmd_sections)
 
     p_validate = sub.add_parser("validate", help="check the drum map and every spec")
     p_validate.set_defaults(func=cmd_validate)

@@ -20,7 +20,9 @@ from . import transforms as T
 from .drummap import DrumMap
 from .midi_io import Event, describe, map_tracks, save, to_events, to_track
 from .remap import DRUM_CHANNEL, RemapReport, remap_events, to_gm_preview
-from .sections import detect_sections, summarise
+from .assemble import NamedTrack, assemble, tracks_from_file
+from .sections import Section, detect_sections, summarise
+from .template import Template
 from .spec import Spec
 from . import tempo as tempo_mod
 
@@ -248,3 +250,48 @@ def build_song(
             continue
         results.append(build_target(spec, name, config, drum_map, render_audio))
     return results
+
+
+def write_session(
+    spec: Spec,
+    results: List[BuildResult],
+    template: Optional[Template] = None,
+) -> Optional[Path]:
+    """Write the single importable session file for a song.
+
+    Track 0 carries tempo, time signature and section markers. Each build target
+    becomes one track, named from template.yaml and ordered by its position in
+    the Cubase template's MixConsole order.
+
+    Section names come from spec.yaml when the operator has written them
+    ("Verse 1", "Chorus"). Otherwise the detector's structural labels (A, B, C)
+    are used, which is honest about the fact that nothing has named them yet.
+    """
+    usable = [r for r in results if r.midi_out and r.midi_out.exists()]
+    if not usable:
+        return None
+
+    template = template or Template.load()
+
+    sections = spec.declared_sections()
+    if not sections:
+        for result in usable:
+            if result.sections:
+                sections = list(result.sections)
+                break
+
+    tracks: List[NamedTrack] = []
+    for result in sorted(usable, key=lambda r: template.order_key(r.target)):
+        mid = mido.MidiFile(str(result.midi_out))
+        tracks.extend(tracks_from_file(mid, template.track_name_for(result.target)))
+
+    reference = mido.MidiFile(str(usable[0].midi_out))
+    session = assemble(
+        tracks=tracks,
+        sections=sections,
+        ticks_per_beat=reference.ticks_per_beat,
+        beats_per_bar=spec.beats_per_bar,
+        bpm=spec.bpm,
+        time_signature=spec.time_signature,
+    )
+    return save(session, spec.build_dir / f"{spec.slug}.mid")

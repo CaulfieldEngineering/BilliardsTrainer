@@ -1,0 +1,51 @@
+# The Cubase template, described as data.
+#
+# This file is the repo's model of the one Cubase template all 20 projects
+# derive from. It does two jobs:
+#
+#   1. Names and orders the tracks in generated session files, so an imported
+#      file lines up with what is already in the project.
+#   2. Records the channel order as an enforceable invariant. Cubase's only
+#      batch-update mechanism (Save/Load Selected Channels, .vmx) applies
+#      settings POSITIONALLY, left to right - not by name. If one project's
+#      order drifts from this list, that project silently receives the wrong
+#      settings on every future push, with no error message.
+#
+# >>> STATUS: PLACEHOLDER. <<<
+# These names are a guess at a rock/metal template so the machinery has
+# something to run against. Replace `tracks:` with the real MixConsole order,
+# top to bottom, and bump `revision`. Nothing downstream is trustworthy until
+# you do - `./sb template check` will keep saying so.
+
+revision: 1
+verified: false
+
+# MixConsole order, top to bottom. ORDER IS LOAD-BEARING - see above.
+# `role` links a track to a build target in spec.yaml. A track with no role is
+# part of the template but not something this pipeline generates MIDI for.
+tracks:
+  - name: Drums SSD
+    role: drums
+    channel: 9
+    type: instrument
+  - name: Bass
+    role: bass
+    channel: 0
+    type: instrument
+  - name: Gtr L
+    type: audio
+  - name: Gtr R
+    type: audio
+  - name: Gtr Lead
+    type: audio
+  - name: Scratch Vox
+    type: audio
+  - name: Lead Vox
+    type: audio
+
+# Rules that generated projects must not break. Documented here so they are
+# reviewable rather than folklore.
+invariants:
+  - Never delete a template track. Disable or hide it instead.
+  - Never reorder tracks.
+  - Song-specific tracks go at the far right, past the shared block.

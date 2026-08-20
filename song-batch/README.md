@@ -29,10 +29,17 @@ example-riff - Example Riff  [drums-programmed]
     GM  38 == SSD  38  x32    Acoustic Snare
     ...
     arrangement: A A B A  |  4 bars each, 16 bars total  (* = fill)
-    -> songs/example-riff/build/drums.mid          <- for Cubase
+    -> songs/example-riff/build/drums.mid          <- the transformed part
     -> songs/example-riff/build/drums.preview.mid  <- reverse-mapped to GM
     -> songs/example-riff/build/drums.mp3          <- listen on your phone
+  session -> songs/example-riff/build/example-riff.mid
+    tracks:  Drums SSD
+    markers: Intro Verse 1 Chorus Verse 2
 ```
+
+That last file is the deliverable: one import, and the session arrives with the
+tempo map set, markers on every section, and MIDI already sitting on correctly
+named tracks.
 
 ## What is here
 
@@ -41,6 +48,7 @@ example-riff - Example Riff  [drums-programmed]
 | `CLAUDE.md` | **Start here.** Conventions, the SSD map, Cubase template invariants, how to operate this from a phone. |
 | `lib/` | The transform library. Deterministic MIDI transforms, GM→SSD remapping, section detection, the `spec.yaml` schema. |
 | `maps/ssd.json` | Single source of truth for GM→SSD note translation. |
+| `template.yaml` | The Cubase template as data — track names and MixConsole order. |
 | `songs/<slug>/` | Per song: `spec.yaml` (status + build config), `suno/` (immutable inputs), `build/` (derived), `notes.md`. |
 | `render/` | fluidsynth wrapper today; a headless JUCE VST3 host later. |
 | `pm/`, `bridge/` | Design notes for the parts not built yet. Read before building them. |

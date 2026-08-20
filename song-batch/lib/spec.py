@@ -139,6 +139,32 @@ class Spec:
                 out[str(name)] = self.dir / str(rel)
         return out
 
+    def declared_sections(self) -> List[Any]:
+        """Sections the operator wrote in spec.yaml, as Section objects.
+
+        These are the arrangement's real names - "Verse 1", "Chorus" - and they
+        beat anything detection infers. Detection only ever proposes; this is
+        what actually becomes markers. Empty means "fall back to detection".
+        """
+        from .sections import Section
+
+        out = []
+        for entry in self.raw.get("sections") or []:
+            if not isinstance(entry, dict) or not entry.get("label"):
+                continue
+            start = int(entry.get("start_bar", 1)) - 1  # spec.yaml is 1-indexed
+            length = int(entry.get("length_bars", 4))
+            out.append(
+                Section(
+                    label=str(entry["label"]),
+                    start_bar=max(0, start),
+                    end_bar=max(0, start) + max(1, length),
+                    fingerprint="",
+                    is_fill=bool(entry.get("fill", False)),
+                )
+            )
+        return out
+
     def build_targets(self) -> Dict[str, Dict[str, Any]]:
         return dict(self.raw.get("build", {}).get("targets") or {})
 
