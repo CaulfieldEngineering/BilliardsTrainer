@@ -1,0 +1,14 @@
+[project]
+name = "song-batch"
+version = "0.1.0"
+description = "Remote-operable music production pipeline"
+requires-python = ">=3.10"
+dependencies = ["mido>=1.3.0", "PyYAML>=6.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110

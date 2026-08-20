@@ -1,0 +1,84 @@
+{
+  "map_version": 1,
+  "id": "ssd",
+  "title": "GM -> Steven Slate Drums note map",
+  "target": {
+    "product": "Steven Slate Drums 5.5",
+    "kit": "UNVERIFIED - operator to supply",
+    "verified": false
+  },
+  "verified": false,
+  "comment": [
+    "SINGLE SOURCE OF TRUTH for GM -> SSD note translation. Everything downstream",
+    "(the .mid transforms, the .drm drum map writer, the .dawproject writer, the",
+    "renderer's preview mapping) reads THIS file. Change a note here, rebuild, done.",
+    "",
+    "STATUS: PROVISIONAL. The core-kit entries below assume SSD's GM-compatible",
+    "layout, which is the correct starting guess but has NOT been checked against",
+    "the operator's actual kit. Entries marked 'awaiting-operator' have no target",
+    "at all and are inert until filled in.",
+    "",
+    "To verify: in SSD, play each pad and read the note number, then set 'to' and",
+    "flip 'confidence' to 'verified'. Run `./sb map doctor` to see what's left."
+  ],
+  "unmapped_policy": "keep",
+  "entries": [
+    {"gm": 35, "to": 36, "articulation": "kick", "confidence": "provisional", "note": "GM has two kicks; both fold to the one SSD kick."},
+    {"gm": 36, "to": 36, "articulation": "kick", "confidence": "provisional"},
+
+    {"gm": 37, "to": 37, "articulation": "snare_sidestick", "confidence": "provisional"},
+    {"gm": 38, "to": 38, "articulation": "snare_center", "confidence": "provisional"},
+    {"gm": 40, "to": 38, "articulation": "snare_center", "confidence": "provisional", "note": "GM 'Electric Snare' folded onto the acoustic snare."},
+    {"gm": 39, "to": 39, "articulation": "handclap", "confidence": "provisional"},
+
+    {"gm": 42, "to": 42, "articulation": "hihat_closed", "confidence": "provisional"},
+    {"gm": 44, "to": 44, "articulation": "hihat_pedal", "confidence": "provisional"},
+    {"gm": 46, "to": 46, "articulation": "hihat_open", "confidence": "provisional"},
+
+    {"gm": 41, "to": 41, "articulation": "tom_floor_low", "confidence": "provisional"},
+    {"gm": 43, "to": 43, "articulation": "tom_floor_high", "confidence": "provisional"},
+    {"gm": 45, "to": 45, "articulation": "tom_low", "confidence": "provisional"},
+    {"gm": 47, "to": 47, "articulation": "tom_mid_low", "confidence": "provisional"},
+    {"gm": 48, "to": 48, "articulation": "tom_mid_high", "confidence": "provisional"},
+    {"gm": 50, "to": 50, "articulation": "tom_high", "confidence": "provisional"},
+
+    {"gm": 49, "to": 49, "articulation": "crash_1", "confidence": "provisional"},
+    {"gm": 57, "to": 57, "articulation": "crash_2", "confidence": "provisional"},
+    {"gm": 55, "to": 55, "articulation": "splash", "confidence": "provisional"},
+    {"gm": 52, "to": 52, "articulation": "china", "confidence": "provisional"},
+    {"gm": 51, "to": 51, "articulation": "ride_bow", "confidence": "provisional"},
+    {"gm": 59, "to": 51, "articulation": "ride_bow", "confidence": "provisional", "note": "Second GM ride folded onto the one SSD ride bow."},
+    {"gm": 53, "to": 53, "articulation": "ride_bell", "confidence": "provisional"},
+
+    {"gm": 54, "to": 54, "articulation": "tambourine", "confidence": "provisional"},
+    {"gm": 56, "to": 56, "articulation": "cowbell", "confidence": "provisional"}
+  ],
+  "articulations": {
+    "_comment": "SSD articulations with no GM equivalent. They have no 'gm' key so they are never hit by a straight remap - the transforms reference them BY NAME (e.g. ghost_notes uses 'snare_ghost'). Fill 'to' in and they light up.",
+    "snare_ghost": {"to": null, "confidence": "awaiting-operator", "used_by": "transforms.add_ghost_notes"},
+    "snare_rimshot": {"to": null, "confidence": "awaiting-operator", "used_by": "spec: accents.rimshot"},
+    "snare_roll": {"to": null, "confidence": "awaiting-operator"},
+    "hihat_tight": {"to": null, "confidence": "awaiting-operator"},
+    "hihat_quarter": {"to": null, "confidence": "awaiting-operator"},
+    "hihat_half": {"to": null, "confidence": "awaiting-operator", "used_by": "transforms.open_hat_degrees"},
+    "ride_edge": {"to": null, "confidence": "awaiting-operator"},
+    "crash_1_choke": {"to": null, "confidence": "awaiting-operator"},
+    "crash_2_choke": {"to": null, "confidence": "awaiting-operator"}
+  },
+  "conditional": {
+    "_comment": "Velocity-conditional routing, applied BEFORE the flat entries above. First match wins. Disabled until the referenced articulation has a real note number - a disabled rule is skipped silently, so this is safe to ship unverified.",
+    "rules": [
+      {
+        "enabled": false,
+        "gm": 38,
+        "when": {"velocity": [1, 34]},
+        "to_articulation": "snare_ghost",
+        "note": "Route quiet GM snares to SSD's dedicated ghost articulation instead of relying on velocity alone."
+      }
+    ]
+  },
+  "choke_groups": {
+    "_comment": "Notes that mutually cut each other off. Used by the .drm writer and by transforms.resolve_chokes to stop overlapping hi-hat states ringing together.",
+    "hihat": ["hihat_closed", "hihat_pedal", "hihat_open", "hihat_tight", "hihat_quarter", "hihat_half"]
+  }
+}

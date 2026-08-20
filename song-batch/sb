@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# song-batch entry point. Run from anywhere: ./sb status
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+exec python3 -m lib.cli "$@"

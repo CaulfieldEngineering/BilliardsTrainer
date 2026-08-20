@@ -1,0 +1,22 @@
+# Intermediate render artifacts. The .mp3 IS committed - that is how a render
+# becomes reachable from a phone - but the .wav it was encoded from is not.
+*.wav
+
+# song-batch currently lives inside a host repo whose root .gitignore excludes
+# `build/`. That rule would swallow every render and defeat the point, so
+# re-include the song build directories explicitly. Harmless once this becomes
+# its own repository.
+!songs/*/build/
+!songs/*/build/**
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+
+# JUCE headless host build output (render/juce-host/), once it exists.
+render/juce-host/build/
+render/juce-host/Builds/

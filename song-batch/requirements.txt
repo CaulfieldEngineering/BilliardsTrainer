@@ -1,0 +1,2 @@
+mido>=1.3.0        # MIDI file read/write. The whole of Tier 1 rests on this.
+PyYAML>=6.0        # spec.yaml

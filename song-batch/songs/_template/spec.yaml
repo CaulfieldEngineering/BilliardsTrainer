@@ -1,0 +1,59 @@
+# song-batch song spec. This file is the source of truth for this song:
+# its status, its musical facts, and how its build is produced.
+# Everything under build/ is derived from this and is safe to delete.
+
+slug: TEMPLATE
+title: Untitled
+
+status:
+  # One of: idea, arranged, drums-programmed, scratch-tracked,
+  #         guitars-tracked, vocals, mixed, mastered, done
+  stage: idea
+  # Free text, or null. A non-null value means this song is BLOCKED and it
+  # shows up in `./sb status --blocked`.
+  blocked_by: null
+  # The single next thing to do. Written for a version of me with no context.
+  next_action: Drop the Suno MIDI export into suno/ and set the tempo.
+  updated: null
+
+template:
+  # Which revision of the Cubase template this project was derived from.
+  # See CLAUDE.md > Template invariants.
+  revision: 1
+  # Migrations that apply to this song but have not been performed yet.
+  # Applied lazily, next time the project is opened in Cubase.
+  pending_migrations: []
+
+musical:
+  bpm: null
+  time_signature: [4, 4]
+  key: null
+
+# Immutable inputs. Never edited in place - if Suno gives you a better export,
+# add it as a new file rather than overwriting.
+sources: {}
+#  drums: suno/drums.mid
+
+build:
+  # Seed for every deterministic transform in this song. Defaults to the slug.
+  # Change it to reroll humanisation; leave it to keep builds byte-stable.
+  seed: null
+  targets: {}
+#  drums:
+#    source: drums
+#    channel: 9
+#    render: true
+#    transforms:
+#      - name: remap
+#      - name: resolve_chokes
+#      - name: shape_velocity
+#        accents: {downbeat: 1.12, offbeat: 0.82}
+#      - name: ghost_notes
+#        density: 0.3
+#      - name: humanize
+#        timing_ticks: 6
+#        velocity_spread: 12
+
+# Arrangement. `./sb build` prints a detected structure - paste a corrected
+# version here and it becomes the truth for markers and .dawproject export.
+sections: []

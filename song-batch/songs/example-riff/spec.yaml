@@ -1,0 +1,49 @@
+# Worked example. The Suno export here is synthetic (tools/make_fixture.py) so
+# that the whole pipeline runs before any real material exists. Delete this song
+# once real songs are in - or keep it as a regression canary.
+
+slug: example-riff
+title: Example Riff
+
+status:
+  stage: drums-programmed
+  blocked_by: null
+  next_action: Replace the synthetic drum MIDI with a real Suno export.
+  updated: 2026-08-20
+
+template:
+  revision: 1
+  pending_migrations: []
+
+musical:
+  bpm: 148
+  time_signature: [4, 4]
+  key: E minor
+
+sources:
+  drums: suno/drums.mid
+
+build:
+  seed: null
+  targets:
+    drums:
+      source: drums
+      channel: 9
+      render: true
+      transforms:
+        # Order matters. Remap first so every later step is thinking in SSD
+        # note numbers, then fix the things Suno gets wrong.
+        - name: remap
+        - name: resolve_chokes
+        - name: shape_velocity
+          accents:
+            downbeat: 1.12
+            offbeat: 0.82
+        - name: ghost_notes
+          density: 0.3
+          velocity: 24
+        - name: humanize
+          timing_ticks: 6
+          velocity_spread: 12
+
+sections: []
