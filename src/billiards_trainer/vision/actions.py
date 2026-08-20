@@ -115,6 +115,29 @@ def shot_features(reader: SidecarReader, s: dict) -> dict:
                     if tr.id == i), -2)
         mover_nums.add(num)
     n_obj_movers = sum(1 for n in mover_nums if n != 0)
+    # ROLLED-IN BIRTHS (Joe's @214/@466 verdicts): retrieving balls from
+    # the pockets and rolling them back onto the felt births tracks that
+    # FIRST APPEAR already moving at sub-stroke speed and decelerate to
+    # rest — physically impossible for a struck ball, which accelerates
+    # from an already-tracked rest position. The launch test can't catch
+    # these (the track is born only after the ball leaves the hand and
+    # clears the rail shadow), and pocket-mouth reaches keep ff under the
+    # hand gate — the birth pattern is the honest signal.
+    pre_ids = set()
+    for tp in (t0 - 2.5, t0 - 2.0):
+        for tr in reader.tracks_at(max(0.0, tp)):
+            pre_ids.add(tr.id)
+    rolled_in = 0
+    for i, h in speed_hist.items():
+        if i in pre_ids or not h:
+            continue
+        vmax = max(v for _, v in h)
+        # under 40: never really rolled (born at rest); over 400: a blur
+        # respawn of a genuinely struck flyer snapping to its new spot
+        if not (40.0 < vmax < 400.0):
+            continue
+        if h[-1][1] < max(60.0, 0.5 * vmax):      # decelerated to rest
+            rolled_in += 1
     a = {tr.number: (tr.x, tr.y) for tr in reader.tracks_at(max(0.0, t0 - 0.5))
          if tr.active and tr.number >= 0}
     b = {tr.number: (tr.x, tr.y) for tr in reader.tracks_at(t1 + 1.0)
@@ -139,6 +162,7 @@ def shot_features(reader: SidecarReader, s: dict) -> dict:
         "fast_sync": fast_sync,
         "set_changed": set_changed,
         "n_states": n_states,
+        "rolled_in": rolled_in,
     }
 
 
@@ -164,6 +188,12 @@ def classify(f: dict) -> str:
     if handled:
         objs = max(f.get("n_obj_movers", 0), f.get("displaced_obj", 0))
         return "rearrange" if objs >= 1 else "ball_in_hand"
+    # Pocket-side re-introduction: two or more tracks born mid-window
+    # already rolling and decelerating to rest is Joe returning balls to
+    # the felt — rearranging, regardless of cue involvement (he returns
+    # the cue too) and regardless of what the hand gate saw.
+    if f.get("rolled_in", 0) >= 2:
+        return "rearrange"
     # Mass re-spread: many OBJECT balls moving under sustained hands with
     # unsynchronized launches — gathering, not a stroke (a break's burst
     # is synchronized and was taken above; real strokes keep hands off

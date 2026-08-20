@@ -190,3 +190,74 @@ class TestQuietShuffle:
              "carried_at_launch": False, "fast_sync": 0.0,
              "set_changed": True, "n_states": 28}
         assert classify(f) == "stroke"
+
+
+class TestRolledInBirths:
+    """Joe's @214/@466 verdicts: returning balls from the pockets births
+    tracks that FIRST APPEAR already rolling and decelerate to rest —
+    impossible for a struck ball, which accelerates from a tracked rest
+    position. Two such births classify the episode as rearrange no matter
+    what the hand gate saw (pocket-mouth reaches stay under it)."""
+
+    def _episode(self, tmp_path, rollers):
+        """rollers: list of (birth_t, x0, y0). Each decelerates to rest
+        over ~3s after its birth; nothing exists for them before it."""
+        states = []
+        t = 0.0
+        while t <= 20.0:
+            tracks = [(1, 300.0, 700.0, 9, "stripe")]
+            for k, (bt, x0, y0) in enumerate(rollers):
+                if t < bt:
+                    continue
+                age = min(3.0, t - bt)
+                # decelerating roll: fast at birth, at rest by +3s
+                d = 150.0 * age - 25.0 * age * age
+                tracks.append((10 + k, x0 + d, y0, 2 + k, "solid"))
+            states.append((round(t, 2), tracks, []))
+            t += 0.1
+        return _write(tmp_path, states,
+                      [{"start": 8.0, "end": 16.0, "outcome": "miss",
+                        "pocketed": 0}])
+
+    def test_two_rolled_in_births_classify_rearrange(self, tmp_path):
+        vid = self._episode(tmp_path, [(9.0, 100.0, 200.0),
+                                       (12.0, 100.0, 900.0)])
+        assert classify_and_mark(vid) == {"rearrange": 1}
+
+    def test_single_birth_stays_default(self, tmp_path):
+        vid = self._episode(tmp_path, [(9.0, 100.0, 200.0)])
+        assert classify_and_mark(vid) == {"stroke": 1}
+
+
+class TestVerdictContainmentMatching:
+    """A verdict anchored to an OLD segmentation start must survive
+    re-analysis: attach by containment, then nearest-within-8s; farther
+    stays unattached (never guess)."""
+
+    def _vid(self, tmp_path, verdict_t):
+        states = []
+        t = 0.0
+        while t <= 40.0:
+            states.append((round(t, 2), [(1, 300.0, 700.0, 9, "stripe")], []))
+            t += 0.25
+        vid = _write(tmp_path, states,
+                     [{"start": 10.0, "end": 18.0, "outcome": "miss",
+                       "pocketed": 0}])
+        with open(str(vid) + ".analysis.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"type": "action", "start": verdict_t,
+                                "action": "rearrange", "src": "review"})
+                    + "\n")
+        return vid
+
+    def test_contained_verdict_attaches(self, tmp_path):
+        r = SidecarReader(self._vid(tmp_path, 14.0))   # inside [10,18]
+        assert r.shots[0]["action"] == "rearrange"
+        assert r.shots[0]["_action_reviewed"]
+
+    def test_nearby_verdict_attaches(self, tmp_path):
+        r = SidecarReader(self._vid(tmp_path, 5.5))    # 4.5s before start
+        assert r.shots[0]["action"] == "rearrange"
+
+    def test_distant_verdict_stays_unattached(self, tmp_path):
+        r = SidecarReader(self._vid(tmp_path, 35.0))   # 17s past end
+        assert r.shots[0].get("action", "stroke") == "stroke"

@@ -114,6 +114,32 @@ class SidecarWriter:
             pass
 
 
+def _shot_for(shots: list, start: float) -> dict | None:
+    """The shot a review/derived record at ``start`` belongs to.
+
+    Exact start match first (the phone always anchors verdicts to the
+    shot's own start). But segmentation MOVES when the tracker improves
+    and the library is re-backfilled — Joe's verdicts must survive that
+    (his @214s/@466s rearrange verdicts orphaned when boundaries shifted
+    3.1s under the appearance-gated tracker). Fall back to CONTAINMENT
+    (the verdict's moment lies inside the re-segmented shot), then to the
+    nearest start within 8s; farther than that, stay unattached rather
+    than guess."""
+    for s in shots:
+        if abs(float(s.get("start", -1)) - start) < 0.2:
+            return s
+    for s in shots:
+        if (float(s.get("start", 0)) - 1.0 <= start
+                <= float(s.get("end", 0)) + 1.0):
+            return s
+    best, bd = None, 8.0
+    for s in shots:
+        d = abs(float(s.get("start", -1)) - start)
+        if d < bd:
+            best, bd = s, d
+    return best
+
+
 class SidecarReader:
     """Loads a sidecar and answers 'tracks at time t' with interpolation."""
 
@@ -146,60 +172,54 @@ class SidecarReader:
                     # once a review-source correction lands, derived re-runs
                     # can no longer change the outcome. Legacy corrections
                     # (no src field) are treated as review — the safe rank.
-                    for s in self.shots:
-                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
-                            csrc = d.get("src", "review")
-                            if csrc == "derived" and s.get("_reviewed"):
-                                break
+                    s = _shot_for(self.shots, float(d["start"]))
+                    if s is not None:
+                        csrc = d.get("src", "review")
+                        if not (csrc == "derived" and s.get("_reviewed")):
                             s["outcome"] = d.get("outcome", s.get("outcome"))
                             if csrc != "derived":
                                 s["corrected"] = True
                                 s["_reviewed"] = True
-                            break
                 elif d.get("type") == "reviewed":
                     # Joe confirmed the machine got this one RIGHT: lock
                     # outcome and action at review rank (derived re-runs
                     # stand down) without changing either value.
-                    for s in self.shots:
-                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
-                            s["_reviewed"] = True
-                            s["_action_reviewed"] = True
-                            s["reviewed_ok"] = True
-                            break
+                    s = _shot_for(self.shots, float(d["start"]))
+                    if s is not None:
+                        s["_reviewed"] = True
+                        s["_action_reviewed"] = True
+                        s["reviewed_ok"] = True
                 elif d.get("type") == "correction_clear":
                     # Joe removed his verdict: restore the shot-line
                     # original and drop every review flag; derived records
                     # appended AFTER this line re-apply normally (the
                     # watcher re-runs derivation right after a clear).
-                    for s in self.shots:
-                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
-                            s["outcome"] = s.get("_orig_outcome", "miss")
-                            for k in ("corrected", "_reviewed", "action",
-                                      "action_corrected", "_action_reviewed",
-                                      "note", "reviewed_ok"):
-                                s.pop(k, None)
-                            break
+                    s = _shot_for(self.shots, float(d["start"]))
+                    if s is not None:
+                        s["outcome"] = s.get("_orig_outcome", "miss")
+                        for k in ("corrected", "_reviewed", "action",
+                                  "action_corrected", "_action_reviewed",
+                                  "note", "reviewed_ok"):
+                            s.pop(k, None)
                 elif d.get("type") == "note":
                     # plain-text review note (phone correction Details)
-                    for s in self.shots:
-                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
-                            s["note"] = str(d.get("text", ""))[:500]
-                            break
+                    s = _shot_for(self.shots, float(d["start"]))
+                    if s is not None:
+                        s["note"] = str(d.get("text", ""))[:500]
                 elif d.get("type") == "action":
                     # same ranking as outcome corrections: a review-source
                     # action is FINAL; derived re-labels stand down. Legacy
                     # records (no src) are derived — they all came from the
                     # classifier before the field existed.
-                    for s in self.shots:
-                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
-                            asrc = d.get("src", "derived")
-                            if asrc == "derived" and s.get("_action_reviewed"):
-                                break
+                    s = _shot_for(self.shots, float(d["start"]))
+                    if s is not None:
+                        asrc = d.get("src", "derived")
+                        if not (asrc == "derived"
+                                and s.get("_action_reviewed")):
                             s["action"] = d.get("action", "stroke")
                             if asrc != "derived":
                                 s["_action_reviewed"] = True
                                 s["action_corrected"] = True
-                            break
         # LEGACY live sidecars recorded source-uptime, not recording time.
         # A recording's first state lands within ~2s of zero when times are
         # right; a first state minutes in means the offset bug — normalize
