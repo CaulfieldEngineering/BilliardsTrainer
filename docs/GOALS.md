@@ -799,3 +799,14 @@ Rounds continue with Joe's visual feedback as the gate.
   calibration H is re-acquirable per video, inverse maps sidecar rect
   coords to video pixels — next loop builds the export + phone canvas
   overlay with visual verification. Cron renewal window opens Aug 22.
+- 2026-08-19 (night, Joe's live report): VACANCY PRUNING. False positive
+  cue balls + lingering assumed positions on the live schematic: the
+  occlusion budget (built for arms) was keeping picked-up balls parked
+  for minutes, and confirmed glove-born white blobs lived as phantom
+  cues. New rule at the pipeline seam: a STILL track whose spot is
+  plainly VISIBLE and EMPTY — no detection nearby, no foreign blob
+  covering it — dies fast (numbered: 20 detect frames ~3s; unnumbered:
+  8 ~1s); hand-covered balls keep the full budget (test-pinned all
+  three ways). Also: app gets its own taskbar identity + icon (was the
+  python logo — AppUserModelID + window icon), always-latest launcher
+  shortcut on Start/Desktop.

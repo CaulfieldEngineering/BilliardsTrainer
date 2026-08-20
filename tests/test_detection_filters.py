@@ -593,3 +593,63 @@ class TestSizePriorCornerInflation:
     def test_marker_floor_unchanged(self):
         lo, hi = self._band()
         assert lo >= 0.7, "sticker/marker floor must hold"
+
+
+class TestVacancyPruning:
+    """Joe: 'false positive cue balls and lingering cue ball assumed
+    positions.' A STILL track whose spot is plainly visible and empty (no
+    detection near it, no hand covering it) must die quickly instead of
+    coasting on the minutes-long occlusion budget."""
+
+    def _pipeline(self):
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FakeStrategy:
+            model_based = True
+        p._strategy = FakeStrategy()
+        p.settings.balls.parallax_correction = False
+        return p
+
+    def _feed(self, p, calib, raw, n):
+        tracks = None
+        for _ in range(n):
+            tracks, _dets = p._apply_detections(raw, calib, (1271, 675, 3))
+        return tracks
+
+    def test_lingering_numbered_track_dies_when_spot_is_bare(self):
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
+        self._feed(p, calib, [ball], 12)              # establish + settle
+        tracks = self._feed(p, calib, [], 19)         # picked up by hand...
+        assert any(t.number == 0 for t in tracks), "died too early"
+        tracks = self._feed(p, calib, [], 2)          # ...20th bare frame
+        assert not any(t.number == 0 for t in tracks), \
+            "lingering assumed position survived a visibly empty spot"
+
+    def test_unnumbered_blob_dies_faster(self):
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        blob = _mk(400, 600, exp, cls=BallClass.UNKNOWN, number=-1, score=0.8)
+        self._feed(p, calib, [blob], 12)
+        tracks = self._feed(p, calib, [], 9)
+        assert not tracks, "unnumbered ghost survived 9 bare frames"
+
+    def test_hand_cover_protects_the_occluded_ball(self):
+        import numpy as np
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
+        self._feed(p, calib, [ball], 12)
+        # a foreign blob covers the spot: full-frame mask at scale 1
+        mask = np.zeros((1271, 675), np.uint8)
+        mask[150:260, 150:260] = 1
+        p._foreign_last = (0.05, mask, 1.0, 0.0, 0.0)
+        tracks = self._feed(p, calib, [], 40)         # long occlusion
+        assert any(t.number == 0 for t in tracks), \
+            "occluded ball was killed — the budget exists for exactly this"

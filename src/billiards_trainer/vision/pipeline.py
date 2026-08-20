@@ -497,6 +497,45 @@ class Pipeline:
             pocket_r=float(tbl.pocket_radius),
             ball_r=float(exp_r),
         )
+        # VACANCY PRUNING (Joe: "false positive cue balls and lingering cue
+        # ball assumed positions"): a STILL track whose spot is plainly
+        # visible — no detection near it AND no hand/foreign blob covering
+        # it — is a ghost, not an occluded ball. The occlusion budget
+        # exists for balls hidden by arms; it must not keep a picked-up
+        # ball parked for minutes, nor keep a glove-born white blob alive
+        # after the glove moves on. Numbered settled balls get patience
+        # (flicker happens); unnumbered blobs get very little.
+        self._vacant = getattr(self, "_vacant", {})
+        foreign = getattr(self, "_foreign_last", None)
+
+        def _covered(x: float, y: float) -> bool:
+            if not foreign or foreign[1] is None:
+                return False
+            _ff, fmask, fs, fx0, fy0 = foreign
+            mh, mw = fmask.shape[:2]
+            mx, my = int((x - fx0) * fs), int((y - fy0) * fs)
+            return 0 <= mx < mw and 0 <= my < mh and bool(fmask[my, mx])
+
+        near_r2 = (2.2 * max(exp_r, 6.0)) ** 2
+        doomed: list[int] = []
+        live_ids: set[int] = set()
+        for tr in tracks:
+            live_ids.add(tr.id)
+            still = (abs(tr.vx) + abs(tr.vy)) < 1.0
+            has_det = any((d.x - tr.x) ** 2 + (d.y - tr.y) ** 2 <= near_r2
+                          for d in detections)
+            if still and not has_det and not _covered(tr.x, tr.y):
+                self._vacant[tr.id] = self._vacant.get(tr.id, 0) + 1
+            else:
+                self._vacant[tr.id] = 0
+            if self._vacant[tr.id] >= (20 if tr.number >= 0 else 8):
+                doomed.append(tr.id)
+        self._vacant = {k: v for k, v in self._vacant.items()
+                        if k in live_ids}
+        if doomed:
+            self.tracker.remove_ids(doomed)
+            tracks = [t for t in tracks if t.id not in doomed]
+
         # The PUBLISHED state must obey physics too. The detection-level repair
         # moves interpenetrating pairs apart, but a settled track's anti-shimmer
         # lock swallows that few-pixel correction as jitter, so the track pair

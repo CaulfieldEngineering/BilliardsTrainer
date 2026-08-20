@@ -79,6 +79,24 @@ def main() -> int:
     app.setOrganizationName(ORG_NAME)
     app.setApplicationVersion(__version__)
 
+    # Own taskbar identity + icon: run under pythonw and Windows groups the
+    # window beneath the PYTHON icon unless the process claims its own
+    # AppUserModelID and the app sets a window icon (Joe: "its currently
+    # the python logo").
+    if sys.platform == "win32":
+        import ctypes
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "CaulfieldEngineering.BilliardsTrainer")
+        except OSError:
+            pass
+    from pathlib import Path as _Path
+
+    from PySide6.QtGui import QIcon
+    _ico = _Path(__file__).parent / "ui" / "assets" / "app.ico"
+    if _ico.is_file():
+        app.setWindowIcon(QIcon(str(_ico)))
+
     # We reached a live QApplication => the Python runtime + Qt DLLs loaded.
     # Tell the self-update swap batch the new exe started OK (so it won't roll
     # back). Done as early as possible after the window system is up.

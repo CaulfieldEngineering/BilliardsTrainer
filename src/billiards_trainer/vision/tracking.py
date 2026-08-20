@@ -177,6 +177,15 @@ class BallTracker:
         self._next_id = 1
 
     # ------------------------------------------------------------------ #
+    def remove_ids(self, ids) -> None:
+        """Hard-drop tracks by id — the pipeline's vacancy pruning calls
+        this when a still track's spot is plainly VISIBLE and EMPTY (no
+        detection, no hand covering it): the ball is gone, and coasting on
+        the occlusion budget would park a ghost at its old position for
+        minutes (Joe: "lingering cue ball assumed positions")."""
+        ids = set(ids)
+        self._tracks = [t for t in self._tracks if t.id not in ids]
+
     def update(self, detections: list[Detection], short_side: float,
                bounds: tuple[float, float, float, float] | None = None,
                pockets: list[tuple[float, float]] | None = None,
