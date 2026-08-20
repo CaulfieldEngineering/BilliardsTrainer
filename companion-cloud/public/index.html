@@ -264,8 +264,8 @@ async function openSession(s) {
     buildChips();
     buildLane();
     updateInfo();
-    const first = shots.findIndex(isAttempt);
-    if (first >= 0) gotoShot(first, false);
+    // start at the FIRST clip, rearranges included (Joe: don't skip them)
+    if (shots.length) gotoShot(0, false);
   } catch (e) {
     $("desc").textContent = "Load failed: " + e.message;
   }
