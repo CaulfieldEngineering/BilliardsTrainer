@@ -822,3 +822,10 @@ Rounds continue with Joe's visual feedback as the gate.
   the PC ({"src": "review"} in the sidecar), archived to done/. Phone
   UI updates optimistically; iOS control chrome no longer appears
   mid-scrub; sessions open on clip 1 including rearranges. 3 new tests.
+- 2026-08-19 (Joe): watchdog now REVIEWS CORRECTIONS each pass — the
+  health board's new "corrections" check reports fresh phone verdicts
+  since the last pass and, as backstop, applies queue stragglers itself
+  if the companion watcher is dead (>2 min old pending file), which
+  doubles as the long-queued companion-liveness signal. Verified live:
+  board shows "1 new phone verdict since last pass" from the end-to-end
+  test.

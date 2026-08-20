@@ -207,6 +207,49 @@ def _check_tests() -> tuple[str, str]:
     return RED, f"TEST FAILURES: {last[:120]}"
 
 
+def _check_corrections() -> tuple[str, str]:
+    """Phone review verdicts (Joe: "the watchdog should review for new
+    corrections each time"). Reports fresh verdicts since the last pass
+    and — the backstop — applies any STRAGGLERS itself if the companion
+    watcher isn't eating the queue (which doubles as the companion
+    liveness signal)."""
+    import time
+    d = Path(Settings.load().recording.resolved_dir())
+    box = d / "corrections"
+    if not box.is_dir():
+        return GREEN, "no corrections yet"
+    # stragglers older than 2 min mean the companion watcher is dead;
+    # apply them here so Joe's verdicts never rot in the queue
+    stale = [f for f in box.glob("*.json")
+             if time.time() - f.stat().st_mtime > 120]
+    applied = 0
+    if stale:
+        import sys as _s
+        _s.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+        from billiards_trainer.companion.corrections_watcher import scan_once
+        applied = scan_once(d)
+    # fresh-verdict count since the last watchdog pass
+    stamp = Path(__file__).resolve().parents[1] / "_eval" / "corrections_seen.txt"
+    last = 0.0
+    try:
+        last = float(stamp.read_text().strip())
+    except (OSError, ValueError):
+        pass
+    done = d / "corrections" / "done"
+    fresh = [f for f in done.glob("*.json")
+             if f.stat().st_mtime > last] if done.is_dir() else []
+    try:
+        stamp.write_text(str(time.time()))
+    except OSError:
+        pass
+    if stale and applied:
+        return AMBER, (f"companion watcher stalled — watchdog applied "
+                       f"{applied} verdict(s) itself")
+    if fresh:
+        return GREEN, f"{len(fresh)} new phone verdict(s) since last pass"
+    return GREEN, "queue clear, no new verdicts"
+
+
 CHECKS = {
     "app": _check_app_running,
     "app_log": _check_app_log,
@@ -217,6 +260,7 @@ CHECKS = {
     "champion": _check_champion,
     "autonomy": _check_autonomy,
     "cue_sensor": _check_cue_sensor,
+    "corrections": _check_corrections,
     "disk": _check_disk,
 }
 
