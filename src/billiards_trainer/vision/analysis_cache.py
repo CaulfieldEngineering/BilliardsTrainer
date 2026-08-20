@@ -155,6 +155,12 @@ class SidecarReader:
                                 s["corrected"] = True
                                 s["_reviewed"] = True
                             break
+                elif d.get("type") == "note":
+                    # plain-text review note (phone correction Details)
+                    for s in self.shots:
+                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            s["note"] = str(d.get("text", ""))[:500]
+                            break
                 elif d.get("type") == "action":
                     # same ranking as outcome corrections: a review-source
                     # action is FINAL; derived re-labels stand down. Legacy

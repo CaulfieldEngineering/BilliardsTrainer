@@ -135,3 +135,21 @@ class TestCorrectionsWatcher:
             {"session": "../../secrets.mp4", "start": 1, "outcome": "make"}))
         assert scan_once(tmp_path) == 2
         assert not list(box.glob("*.json"))
+
+    def test_note_flows_into_sidecar_and_summary(self, tmp_path):
+        import json
+        from billiards_trainer.companion.corrections_watcher import scan_once
+        from billiards_trainer.vision.analysis_cache import SidecarReader
+        from billiards_trainer.vision.shots_export import summary_path
+        vid = self._session(tmp_path)
+        box = tmp_path / "corrections"
+        box.mkdir()
+        (box / "n.json").write_text(json.dumps(
+            {"session": "session-test.mp4", "start": 8.0,
+             "action": "rearrange", "note": "was racking for the next drill"}))
+        assert scan_once(tmp_path) == 1
+        s = SidecarReader(vid).shots[0]
+        assert s["note"] == "was racking for the next drill"
+        doc = json.loads(summary_path(vid).read_text())
+        assert doc["shots"][0]["note"].startswith("was racking")
+        assert doc["shots"][0]["corrected"] is True

@@ -16,13 +16,15 @@ module.exports = async (req, res) => {
   const start = Number(b.start);
   const outcome = OUTCOMES.has(b.outcome) ? b.outcome : undefined;
   const action = ACTIONS.has(b.action) ? b.action : undefined;
-  if (!name || !isFinite(start) || (!outcome && !action)) {
+  const note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 500);
+  if (!name || !isFinite(start) || (!outcome && !action && !note)) {
     return res.status(400).json({ error: "bad verdict" });
   }
   const doc = { session: name, start: Math.round(start * 100) / 100,
                 ts: new Date().toISOString() };
   if (outcome) doc.outcome = outcome;
   if (action) doc.action = action;
+  if (note) doc.note = note;
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
     const token = await dbxToken();

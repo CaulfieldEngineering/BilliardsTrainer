@@ -63,15 +63,23 @@
              background:var(--panel); color:var(--dim);
              border:1px solid var(--line); border-radius:4px;
              font-size:14px; font-weight:600; }
-  #sheet { display:none; padding:10px; background:var(--panel);
-           border:1px solid var(--line); border-radius:4px;
-           margin-bottom:10px; }
+  #sheet { display:none; }
   #sheet .row { display:flex; gap:6px; margin-bottom:8px; }
-  #sheet .row:last-child { margin-bottom:0; }
-  #sheet button { flex:1; height:40px; background:var(--bg);
+  #sheet button { flex:1; height:42px; background:var(--panel);
                   color:var(--dim); border:1px solid var(--line);
                   border-radius:4px; font-size:12px; font-weight:600; }
   #sheet button.sel { color:var(--make); border-color:var(--make); }
+  #sheet textarea { width:100%; height:64px; padding:8px 10px;
+                    background:var(--panel); color:var(--text);
+                    border:1px solid var(--line); border-radius:4px;
+                    font:14px/1.4 inherit; resize:none; margin-bottom:8px; }
+  #sheet #sh-save { color:var(--make); border-color:var(--make);
+                    font-size:14px; }
+  /* corrected clips: a subtle accent dot on the chip corner */
+  .chip { position:relative; }
+  .chip.fixed::after { content:""; position:absolute; top:3px; right:3px;
+                       width:5px; height:5px; border-radius:50%;
+                       background:var(--accent); }
   #nav button { flex:1; height:44px; background:var(--panel); color:var(--text);
                 border:1px solid var(--line); border-radius:4px; font-size:15px;
                 font-weight:600; }
@@ -145,7 +153,10 @@
       <button id="rate" title="playback speed">1×</button>
       <button id="next">›</button>
     </div>
-    <button id="correct">✎ Correct this clip</button>
+    <div id="lower">
+      <button id="correct">✎ Correct this clip</button>
+      <div id="chips"></div>
+    </div>
     <div id="sheet">
       <div class="row" id="sh-outcome">
         <button data-o="make">MAKE</button>
@@ -158,8 +169,12 @@
         <button data-a="ball_in_hand">IN HAND</button>
         <button data-a="rearrange">SHUFFLE</button>
       </div>
+      <textarea id="sh-note" placeholder="Details — what did the system get wrong?"></textarea>
+      <div class="row">
+        <button id="sh-cancel">Cancel</button>
+        <button id="sh-save">Save correction</button>
+      </div>
     </div>
-    <div id="chips"></div>
   </div>
 </div>
 
@@ -321,9 +336,9 @@ function buildChips() {
   c.innerHTML = "";
   shots.forEach((s, i) => {
     const el = document.createElement("div");
-    el.className = isAttempt(s)
+    el.className = (isAttempt(s)
       ? "chip " + (s.outcome || "miss")
-      : "chip inhand";
+      : "chip inhand") + (s.corrected ? " fixed" : "");
     el.textContent = isAttempt(s)
       ? (s.action === "break" ? "BRK" : i + 1)
       : (s.action === "rearrange" ? "⇄" : "✋");
@@ -525,25 +540,43 @@ modeLabel();
 
 // ---- "Correct this clip" (Joe: human intervention) ---------------------
 let curSession = null;
+let pending = {};
+function setSheet(open) {
+  $("sheet").style.display = open ? "block" : "none";
+  $("nav").style.display = open ? "none" : "flex";
+  $("lower").style.display = open ? "none" : "block";
+}
 $("correct").onclick = () => {
-  const sh = $("sheet");
-  const open = sh.style.display !== "block";
-  sh.style.display = open ? "block" : "none";
-  $("chips").style.display = open ? "none" : "flex";   // no vertical growth
-  if (open) syncSheet();
+  pending = {};
+  const s = shots[cur] || {};
+  $("sh-note").value = s.note || "";
+  setSheet(true);
+  syncSheet();
 };
+$("sh-cancel").onclick = () => setSheet(false);
 function syncSheet() {
   const s = shots[cur] || {};
+  const o = pending.outcome || s.outcome;
+  const a = pending.action || s.action || "stroke";
   [...$("sh-outcome").children].forEach(b =>
-    b.classList.toggle("sel", b.dataset.o === s.outcome));
+    b.classList.toggle("sel", b.dataset.o === o));
   [...$("sh-action").children].forEach(b =>
-    b.classList.toggle("sel", b.dataset.a === (s.action || "stroke")));
+    b.classList.toggle("sel", b.dataset.a === a));
 }
-async function sendVerdict(patch) {
+[...$("sh-outcome").children].forEach(b =>
+  b.onclick = () => { pending.outcome = b.dataset.o; syncSheet(); });
+[...$("sh-action").children].forEach(b =>
+  b.onclick = () => { pending.action = b.dataset.a; syncSheet(); });
+$("sh-save").onclick = async () => {
   const s = shots[cur];
-  if (!s || !curSession) return;
-  Object.assign(s, patch);              // optimistic: UI updates instantly
-  buildChips(); buildLane(); updateInfo(); syncSheet();
+  if (!s || !curSession) return setSheet(false);
+  const note = $("sh-note").value.trim();
+  const patch = { ...pending };
+  if (note && note !== (s.note || "")) patch.note = note;
+  if (!patch.outcome && !patch.action && !patch.note) return setSheet(false);
+  Object.assign(s, patch, { corrected: true });   // optimistic
+  setSheet(false);
+  buildChips(); buildLane(); updateInfo();
   try {
     const r = await fetch("/api/correct", {
       method: "POST",
@@ -551,16 +584,12 @@ async function sendVerdict(patch) {
       body: JSON.stringify({ session: curSession, start: s.start, ...patch }),
     });
     if (!r.ok) throw new Error(r.status);
-    $("correct").textContent = "✓ queued — syncs to the PC via Dropbox";
+    $("correct").textContent = "✓ saved — syncs to the PC via Dropbox";
   } catch (e) {
-    $("correct").textContent = "⚠ send failed — try again";
+    $("correct").textContent = "⚠ save failed — try again";
   }
   setTimeout(() => { $("correct").textContent = "✎ Correct this clip"; }, 2500);
-}
-[...$("sh-outcome").children].forEach(b =>
-  b.onclick = () => sendVerdict({ outcome: b.dataset.o, corrected: true }));
-[...$("sh-action").children].forEach(b =>
-  b.onclick = () => sendVerdict({ action: b.dataset.a }));
+};
 
 // keep "current shot" synced while playing
 setInterval(() => {

@@ -52,6 +52,14 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         did |= append_correction(video, start, d["outcome"], src="review")
     if d.get("action") in _ACTIONS:
         did |= append_action(video, start, d["action"], src="review")
+    note = str(d.get("note", "")).strip()[:500]
+    if note:
+        import json as _json
+        from ..vision.analysis_cache import sidecar_path as _sp
+        with open(_sp(video), "a", encoding="utf-8") as fh:
+            fh.write(_json.dumps({"type": "note", "start": round(start, 3),
+                                  "text": note, "src": "review"}) + "\n")
+        did = True
     if did:
         export_shots_summary(video)
         export_library_index(recordings)

@@ -42,8 +42,10 @@ def export_shots_summary(video_path) -> Path | None:
             "action": s.get("action", "stroke"),
             "pocketed": int(s.get("pocketed", 0)),
         }
-        if s.get("corrected"):
+        if s.get("corrected") or s.get("action_corrected"):
             entry["corrected"] = True
+        if s.get("note"):
+            entry["note"] = s["note"]
         try:
             from .describe import compose_text, describe_shot
             entry["text"] = compose_text(describe_shot(reader, s))
