@@ -936,3 +936,20 @@ Rounds continue with Joe's visual feedback as the gate.
   rolled_in_births>=2 feature should classify rearrange regardless of
   cue involvement, verdicts should match shots by containment not
   boundary-within-3s, and rail-reach ff peaks at exactly the 0.02 gate.
+- 2026-08-20 (loop, 10am): APPEARANCE-GATED ASSOCIATION shipped — 005647
+  5/7 (from 4/7) and identity hops HALVED to 0.43/1k. Four gates in the
+  tracker: category contradiction (cue vs object) costs 0.3*short in the
+  greedy sort so agreeing pairs win ties (@526 stop-shot make restored);
+  a coasting NUMBERED ball can neither re-match nor revive across
+  categories (@209's 7 no longer follows the cue into the pocket); the
+  single-cue rebind binds at any distance but only to a cue-sized
+  detection (the 560px felt-speck snap is dead). Healthy tracks exempt
+  from the hard vetoes so class flicker can't starve live tracking.
+  Gold 11/11 zero mismatches, suite green, +4 tests. REMAINING on
+  005647: @209 is now miss-not-scratch because the white SPECK at
+  (465,1046) wins the cue number via ARBITRATION after the real cue
+  pockets — needs static-false-detection suppression (persistent
+  sub-ball stationary blob map) or arbitration radius sanity; @275
+  re-spot rebirth; @214/@466 rearrange episodes (segmentation shifted —
+  verdict matching should be by containment, then rolled-in-birth
+  feature classifies the episode).
