@@ -374,23 +374,43 @@ function buildLane() {
   lane.appendChild(body);
 }
 
-$("video").addEventListener("timeupdate", () => {
+// Advance WITHOUT seeking — used when the next shot's window adjoins the
+// current one, so playback rolls straight through (Joe: "no time jumps
+// if one clip plays into the next"). Only real dead time gets skipped.
+function advanceSeamless(i) {
+  cur = i;
+  buildLane();
+  updateInfo();
+  const chip = $("chips").children[i];
+  if (chip) chip.scrollIntoView({ behavior: "smooth", inline: "center",
+                                  block: "nearest" });
+}
+
+// A render loop, not timeupdate: iOS fires timeupdate ~4x/s and the
+// playhead visibly stepped (Joe). rAF moves it every frame.
+(function tick() {
+  requestAnimationFrame(tick);
   const v = $("video");
+  if ($("player").style.display === "none") return;
   if (win) {
     const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
     $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
   }
-  // end-of-shot behavior: loop the shot, or roll on like a CD
   if (win && !v.paused && cur >= 0 && v.currentTime >= win.t1 - 0.05) {
     if (mode === "loop") {
       v.currentTime = win.t0;
     } else if (cur < shots.length - 1) {
-      gotoShot(cur + 1, true);
+      const nextT0 = Math.max(0, shots[cur + 1].start - PRE_ROLL);
+      if (nextT0 <= win.t1 + 0.75) {
+        advanceSeamless(cur + 1);   // contiguous: keep rolling, no seek
+      } else {
+        gotoShot(cur + 1, true);    // real dead time: skip it
+      }
     } else {
       v.pause();
     }
   }
-});
+})();
 (() => {
   const lane = $("lane");
   let scrubbing = false;
