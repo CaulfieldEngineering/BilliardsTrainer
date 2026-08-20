@@ -37,21 +37,28 @@
   .sess.head { padding:8px 16px 6px; border-bottom:1px solid var(--line); }
   .sess.head span { color:var(--dim); font-size:11px; font-weight:600;
                     letter-spacing:.8px; }
-  #player { display:none; }
+  /* the player is a fixed-height column: video flexes to absorb what
+     remains after the control stack, so every button fits on screen
+     with zero scrolling (Joe) */
+  #player { display:none; flex-direction:column; height:100dvh;
+            overflow:hidden; }
+  #player.open { display:flex; }
   #topbar { display:flex; align-items:center; gap:12px; padding:10px 16px; }
   #back { color:var(--accent); font-weight:600; background:none; border:none;
           font-size:15px; }
   #title { color:var(--dim); font-size:13px; margin-left:auto; }
-  video { width:100%; max-height:52vh; background:#000; display:block; }
-  #shotbar { padding:12px 16px; }
-  #shotinfo { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  video { width:100%; flex:1 1 auto; min-height:120px; background:#000;
+          display:block; object-fit:contain; }
+  #shotbar { padding:8px 16px calc(8px + env(safe-area-inset-bottom));
+             flex:0 0 auto; }
+  #shotinfo { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
   #shotinfo .n { font-size:18px; font-weight:700; }
   #shotinfo .oc { font-weight:700; }
   #shotinfo .t { color:var(--dim); font-size:12px; margin-left:auto; }
-  #desc { color:var(--dim); font-size:13px; min-height:1.4em; margin-bottom:8px; }
-  #nav { display:flex; gap:8px; margin-bottom:10px; }
+  #desc { color:var(--dim); font-size:13px; min-height:1.3em; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #nav { display:flex; gap:8px; margin-bottom:8px; }
   #nav #rate.on { color:var(--accent); border-color:var(--accent); }
-  #correct { width:100%; height:40px; margin-bottom:10px;
+  #correct { width:100%; height:38px; margin-bottom:8px;
              background:var(--panel); color:var(--dim);
              border:1px solid var(--line); border-radius:4px;
              font-size:14px; font-weight:600; }
@@ -68,9 +75,9 @@
                 border:1px solid var(--line); border-radius:4px; font-size:15px;
                 font-weight:600; }
   #nav button:active { background:#1B2430; }
-  #chips { display:flex; gap:8px; overflow-x:auto; padding:4px 2px 12px;
+  #chips { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 4px;
            -webkit-overflow-scrolling:touch; }
-  #lane { position:relative; height:44px; margin:0 0 10px;
+  #lane { position:relative; height:40px; margin:0 0 8px;
           background:var(--panel); border:1px solid var(--line);
           border-radius:4px; touch-action:none; overflow:hidden; }
   .region { position:absolute; top:5px; bottom:5px; border-radius:2px;
@@ -82,7 +89,7 @@
   .region.lead { opacity:.22; }
   #playhead { position:absolute; top:0; bottom:0; width:2px;
               background:var(--text); pointer-events:none; }
-  .chip { min-width:44px; height:44px; border-radius:4px; flex:0 0 auto;
+  .chip { min-width:42px; height:42px; border-radius:4px; flex:0 0 auto;
           display:flex; align-items:center; justify-content:center;
           background:var(--panel); border:2px solid var(--line);
           font-weight:700; }
@@ -276,7 +283,9 @@ const isAttempt = s => !s.action || s.action === "stroke" || s.action === "break
 async function openSession(s) {
   curSession = s.name;
   $("sessions").style.display = "none";
-  $("player").style.display = "block";
+  document.querySelector("header").style.display = "none";
+  $("update").style.display = "none";
+  $("player").classList.add("open");
   $("title").textContent = fmtDate(s.name, s.modified);
   shots = []; cur = -1;
   $("chips").innerHTML = ""; $("desc").textContent = "";
@@ -300,8 +309,10 @@ async function openSession(s) {
 }
 $("back").onclick = () => {
   $("video").pause(); $("video").removeAttribute("src"); $("video").load();
-  $("player").style.display = "none";
+  $("player").classList.remove("open");
+  document.querySelector("header").style.display = "flex";
   $("sessions").style.display = "block";
+  checkUpdate();
 };
 
 function buildChips() {
@@ -421,7 +432,7 @@ function advanceSeamless(i) {
 (function tick() {
   requestAnimationFrame(tick);
   const v = $("video");
-  if ($("player").style.display === "none") return;
+  if (!$("player").classList.contains("open")) return;
   if (win) {
     const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
     $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
@@ -519,6 +530,7 @@ $("correct").onclick = () => {
   const sh = $("sheet");
   const open = sh.style.display !== "block";
   sh.style.display = open ? "block" : "none";
+  $("chips").style.display = open ? "none" : "flex";   // no vertical growth
   if (open) syncSheet();
 };
 function syncSheet() {
@@ -553,7 +565,7 @@ async function sendVerdict(patch) {
 
 // keep "current shot" synced while playing
 setInterval(() => {
-  if ($("player").style.display === "none" || !shots.length) return;
+  if (!$("player").classList.contains("open") || !shots.length) return;
   const t = $("video").currentTime;
   if (win && t >= win.t0 && t <= win.t1) return;   // inside the window: stay
   const i = shots.findIndex(s => t >= s.start - PRE_ROLL && t <= s.end + 0.5);
