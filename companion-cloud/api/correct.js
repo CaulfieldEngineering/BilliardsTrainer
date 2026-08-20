@@ -18,12 +18,15 @@ module.exports = async (req, res) => {
   const action = ACTIONS.has(b.action) ? b.action : undefined;
   const note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 500);
   const clear = b.clear === true;
-  if (!name || !isFinite(start) || (!outcome && !action && !note && !clear)) {
+  const confirm = b.confirm === true;
+  if (!name || !isFinite(start)
+      || (!outcome && !action && !note && !clear && !confirm)) {
     return res.status(400).json({ error: "bad verdict" });
   }
   const doc = { session: name, start: Math.round(start * 100) / 100,
                 ts: new Date().toISOString() };
   if (clear) doc.clear = true;
+  if (confirm) doc.confirm = true;
   if (outcome) doc.outcome = outcome;
   if (action) doc.action = action;
   if (note) doc.note = note;

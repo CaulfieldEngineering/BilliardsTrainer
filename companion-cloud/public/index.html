@@ -110,6 +110,9 @@
   .chip.fixed::after { content:""; position:absolute; top:3px; right:3px;
                        width:5px; height:5px; border-radius:50%;
                        background:var(--accent); }
+  .chip.seen::after { content:""; position:absolute; top:3px; right:3px;
+                      width:5px; height:5px; border-radius:50%;
+                      background:var(--make); }
   #nav button { flex:1; height:44px; background:var(--panel); color:var(--text);
                 border:1px solid var(--line); border-radius:4px; font-size:15px;
                 font-weight:600; }
@@ -206,6 +209,10 @@
         <button data-a="rearrange">SHUFFLE</button>
       </div>
       <textarea id="sh-note" placeholder="Details — what did the system get wrong?"></textarea>
+      <div class="row">
+        <button id="sh-confirm" style="color:var(--make);
+                border-color:var(--make);">✓ Looks right — mark reviewed</button>
+      </div>
       <div class="row">
         <button id="sh-cancel">Cancel</button>
         <button id="sh-save">Save correction</button>
@@ -396,7 +403,8 @@ function buildChips() {
     const el = document.createElement("div");
     el.className = (isAttempt(s)
       ? "chip " + (s.outcome || "miss")
-      : "chip inhand") + (s.corrected ? " fixed" : "");
+      : "chip inhand")
+      + (s.corrected ? " fixed" : s.reviewed ? " seen" : "");
     el.textContent = isAttempt(s)
       ? (s.action === "break" ? "BRK" : i + 1)
       : (s.action === "rearrange" ? "⇄" : "✋");
@@ -425,7 +433,8 @@ function fmt(t) {
 function updateInfo() {
   const cs = shots[cur];
   $("correct").textContent = (cs && cs.corrected)
-    ? "🛈 Details · corrected" : "🛈 Details";
+    ? "🛈 Details · corrected"
+    : (cs && cs.reviewed) ? "🛈 Details · reviewed ✓" : "🛈 Details";
   [...$("chips").children].forEach((el, i) => el.classList.toggle("cur", i === cur));
   if (cur < 0 || !shots[cur]) {
     $("shot-n").textContent = shots.length ? `${shots.length} shots` : "–";
@@ -701,7 +710,8 @@ $("correct").onclick = () => {
   $("sh-desc").textContent =
     `Shot ${no}: ${target.text || "(no description)"}`;
   $("sh-note").value = target.note || "";
-  $("sh-clear").style.display = target.corrected ? "block" : "none";
+  $("sh-clear").style.display =
+    (target.corrected || target.reviewed) ? "block" : "none";
   setSheet(true);
   syncSheet();
 };
@@ -751,10 +761,16 @@ $("sh-save").onclick = () => {
   if (!patch.outcome && !patch.action && !patch.note) return setSheet(false);
   postVerdict(s, patch, { ...patch, corrected: true });
 };
+$("sh-confirm").onclick = () => {
+  const s = target;
+  if (!s || !curSession) return setSheet(false);
+  postVerdict(s, { confirm: true }, { reviewed: true });
+};
 $("sh-clear").onclick = () => {
   const s = target;
   if (!s || !curSession) return setSheet(false);
-  postVerdict(s, { clear: true }, { corrected: false, note: "" });
+  postVerdict(s, { clear: true },
+              { corrected: false, reviewed: false, note: "" });
 };
 
 // keep "current shot" synced while playing

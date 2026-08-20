@@ -156,6 +156,16 @@ class SidecarReader:
                                 s["corrected"] = True
                                 s["_reviewed"] = True
                             break
+                elif d.get("type") == "reviewed":
+                    # Joe confirmed the machine got this one RIGHT: lock
+                    # outcome and action at review rank (derived re-runs
+                    # stand down) without changing either value.
+                    for s in self.shots:
+                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            s["_reviewed"] = True
+                            s["_action_reviewed"] = True
+                            s["reviewed_ok"] = True
+                            break
                 elif d.get("type") == "correction_clear":
                     # Joe removed his verdict: restore the shot-line
                     # original and drop every review flag; derived records
@@ -166,7 +176,7 @@ class SidecarReader:
                             s["outcome"] = s.get("_orig_outcome", "miss")
                             for k in ("corrected", "_reviewed", "action",
                                       "action_corrected", "_action_reviewed",
-                                      "note"):
+                                      "note", "reviewed_ok"):
                                 s.pop(k, None)
                             break
                 elif d.get("type") == "note":

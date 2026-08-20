@@ -47,6 +47,16 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         start = float(d["start"])
     except (KeyError, TypeError, ValueError):
         return True
+    if d.get("confirm"):
+        import json as _json
+        from ..vision.analysis_cache import sidecar_path as _sp
+        with open(_sp(video), "a", encoding="utf-8") as fh:
+            fh.write(_json.dumps({"type": "reviewed",
+                                  "start": round(start, 3)}) + chr(10))
+        export_shots_summary(video)
+        export_library_index(recordings)
+        log.info("shot CONFIRMED reviewed: %s @ %.1fs", name, start)
+        return True
     if d.get("clear"):
         import json as _json
         from ..vision.actions import classify_and_mark

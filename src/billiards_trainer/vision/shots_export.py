@@ -143,6 +143,8 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
         }
         if s.get("corrected") or s.get("action_corrected"):
             entry["corrected"] = True
+        if s.get("reviewed_ok"):
+            entry["reviewed"] = True
         if s.get("note"):
             entry["note"] = s["note"]
         try:

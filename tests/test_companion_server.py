@@ -174,3 +174,27 @@ class TestCorrectionsWatcher:
         # post-clear the watcher re-derived: the still-cue synthetic session
         # derives "nothing"-action/original outcome without review overrides
         assert not s.get("_reviewed")
+
+    def test_confirm_locks_and_marks_reviewed(self, tmp_path):
+        import json
+        from billiards_trainer.companion.corrections_watcher import scan_once
+        from billiards_trainer.vision.actions import classify_and_mark
+        from billiards_trainer.vision.analysis_cache import SidecarReader
+        from billiards_trainer.vision.outcomes import derive_and_correct
+        from billiards_trainer.vision.shots_export import summary_path
+        vid = self._session(tmp_path)
+        box = tmp_path / "corrections"
+        box.mkdir()
+        (box / "ok.json").write_text(json.dumps(
+            {"session": "session-test.mp4", "start": 8.0, "confirm": True}))
+        assert scan_once(tmp_path) == 1
+        s = SidecarReader(vid).shots[0]
+        assert s["reviewed_ok"] and not s.get("corrected")
+        doc = json.loads(summary_path(vid).read_text())
+        assert doc["shots"][0]["reviewed"] is True
+        # locked: derived passes stand down on both channels
+        before = (s["outcome"], s.get("action", "stroke"))
+        derive_and_correct(vid)
+        classify_and_mark(vid)
+        s2 = SidecarReader(vid).shots[0]
+        assert (s2["outcome"], s2.get("action", "stroke")) == before
