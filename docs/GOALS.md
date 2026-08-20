@@ -810,3 +810,15 @@ Rounds continue with Joe's visual feedback as the gate.
   three ways). Also: app gets its own taskbar identity + icon (was the
   python logo — AppUserModelID + window icon), always-latest launcher
   shortcut on Start/Desktop.
+- 2026-08-19 (Joe: "we probably need a Correct this clip button"):
+  PHONE CORRECTIONS, END-TO-END VERIFIED. The phone's correction sheet
+  (outcome + action rows) posts a verdict; the cloud proxy (Dropbox app
+  re-authorized with write scope, token rotated into Vercel) writes it
+  into a server-enforced corrections/ queue; Dropbox syncs it to the
+  mini PC; the companion's new watcher applies it REVIEW-ranKED to the
+  sidecar (actions now carry src exactly like outcomes — derived
+  re-runs stand down), re-exports the phone summaries, archives the
+  file. Round-trip proven live: verdict posted from the API, applied on
+  the PC ({"src": "review"} in the sidecar), archived to done/. Phone
+  UI updates optimistically; iOS control chrome no longer appears
+  mid-scrub; sessions open on clip 1 including rearranges. 3 new tests.
