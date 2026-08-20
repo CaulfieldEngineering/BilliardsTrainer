@@ -793,3 +793,9 @@ Rounds continue with Joe's visual feedback as the gate.
   scratch strokes protected by cue_displaced. Library now: 641 strokes
   / 143 rearrange / 59 breaks / 38 ball-in-hand / 6 empty. 2 pinned
   tests.
+- 2026-08-19 (night): always-latest launcher (Start Menu + Desktop
+  shortcut -> git pull --ff-only -> start; Joe pins to taskbar with one
+  right-click), app restarted on latest. Trails groundwork confirmed:
+  calibration H is re-acquirable per video, inverse maps sidecar rect
+  coords to video pixels — next loop builds the export + phone canvas
+  overlay with visual verification. Cron renewal window opens Aug 22.
