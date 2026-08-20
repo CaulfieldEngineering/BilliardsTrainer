@@ -131,6 +131,10 @@
   .region.lead { opacity:.22; }
   #playhead { position:absolute; top:0; bottom:0; width:2px;
               background:var(--text); pointer-events:none; }
+  /* between clips (continuity mode): the lane owns no time yet, so the
+     playhead waits visibly instead of looking stuck */
+  #playhead.waiting { opacity:.35; animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.1; } }
   .chip { min-width:42px; height:42px; border-radius:4px; flex:0 0 auto;
           display:flex; align-items:center; justify-content:center;
           background:var(--panel); border:2px solid var(--line);
@@ -568,6 +572,17 @@ function drawTrails() {
   if (win) {
     const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
     $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
+    // in the dead time BETWEEN clips the lane owns no time: pulse the
+    // playhead and count down to the next shot (Joe: "video is playing
+    // but the playhead isn't moving — time isn't accounted for")
+    const inGap = !v.paused && v.currentTime < win.t0 - 0.25;
+    $("playhead").classList.toggle("waiting", inGap);
+    if (inGap) {
+      const s = Math.ceil(win.t0 - v.currentTime);
+      $("shot-t").textContent = `next shot in ${s}s`;
+    } else if ($("shot-t").textContent.startsWith("next shot")) {
+      updateInfo();
+    }
   }
   if (win && !v.paused && cur >= 0 && v.currentTime >= win.t1 - 0.05) {
     if (mode === "loop") {
