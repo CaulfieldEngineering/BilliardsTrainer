@@ -1450,6 +1450,7 @@ class LivePage(QWidget):
             # Styling is final by now (repolish above) — re-measure so the
             # fixed width matches what THIS style actually renders.
             self._rec_time.setStyleSheet(f"color: {PALETTE.danger};")
+            self._log_geometry("record-start")
             # the lane becomes a rolling capture timeline while recording
             self._timeline.clear()
             self._timeline.follow_window_s = 120.0
@@ -1462,6 +1463,23 @@ class LivePage(QWidget):
             self._rec_time.setText("0:00")
             self._rec_time.setStyleSheet(f"color: {PALETTE.text_faint};")
             self._timeline.follow_window_s = 0.0   # back to show-everything
+
+    def _log_geometry(self, tag: str) -> None:
+        """One log line of root-child geometry — Joe sees a first-record
+        layout jump that offscreen probes cannot reproduce; this captures
+        the truth from the real environment when it next happens."""
+        try:
+            import logging
+            lay = self.layout()
+            parts = [f"{type(lay.itemAt(k).widget()).__name__}="
+                     f"{lay.itemAt(k).widget().height()}"
+                     for k in range(lay.count()) if lay.itemAt(k).widget()]
+            parts.append(f"tl={self._timeline.height()}")
+            parts.append(f"win={self.window().width()}x{self.window().height()}")
+            logging.getLogger("ui.geometry").info(
+                "%s: %s", tag, " ".join(parts))
+        except Exception:  # noqa: BLE001 - diagnostics only
+            pass
 
     def _tick_rec_time(self) -> None:
         import time

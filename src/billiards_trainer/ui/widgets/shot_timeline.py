@@ -364,10 +364,15 @@ class ShotTimeline(QWidget):
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.bg_elevated))
         p.drawRect(self.rect())
-        # ruler bed (below the filmstrip band)
+        # ruler bed (below the filmstrip band) — painted in EVERY state,
+        # duration or not, so hitting record adds only the playhead and
+        # labels instead of popping a whole skeleton into an empty panel
+        # (Joe kept seeing that pop as a layout jump).
         p.setPen(Qt.NoPen)
         p.setBrush(QColor(PALETTE.surface))
         p.drawRoundedRect(QRectF(6, h * 0.66, w - 12, h * 0.22), 4, 4)
+        p.setBrush(QColor(PALETTE.bg_elevated).lighter(112))
+        p.drawRect(QRectF(6, 6.0, w - 12, h * 0.52))   # filmstrip band bed
         if self._duration > 0:
             lo, hi = self._range()
             span = max(1.0, hi - lo)
