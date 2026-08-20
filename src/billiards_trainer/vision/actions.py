@@ -171,6 +171,13 @@ def classify(f: dict) -> str:
     if (f.get("n_obj_movers", 0) >= 4 and f["hand_frac"] >= 0.6
             and f["fast_sync"] > 2.0):
         return "rearrange"
+    # Quiet shuffle: multiple object balls ended somewhere new while the
+    # CUE never moved and nothing ever moved at stroke speed — nobody
+    # struck anything. Catches rearranging the hand mask barely saw
+    # (bare arm, top-of-frame reach; Joe's report, hand_frac 0.11).
+    if (f["n_fast"] == 0 and not f.get("cue_displaced", True)
+            and f.get("displaced_obj", 0) >= 2):
+        return "rearrange"
     return "stroke"
 
 

@@ -167,3 +167,26 @@ class TestClosePassWiring:
         from pathlib import Path
         src = Path("tools/build_analysis_cache.py").read_text(encoding="utf-8")
         assert "derive_and_correct" in src and "classify_and_mark" in src
+
+
+class TestQuietShuffle:
+    def test_objects_displaced_cue_still_nothing_fast_is_rearrange(self):
+        """Joe's report: slow-shuffled object balls with the hand mask
+        barely firing must not read as a stroke — the cue never moved and
+        nothing reached stroke speed."""
+        f = {"dur": 6.7, "peak": 114.0, "n_movers": 1, "n_obj_movers": 1,
+             "displaced_obj": 3, "cue_displaced": False, "n_fast": 0,
+             "hand_frac": 0.11, "carried_frac": 0.0,
+             "carried_at_launch": False, "fast_sync": 0.0,
+             "set_changed": True, "n_states": 45}
+        assert classify(f) == "rearrange"
+
+    def test_blur_invisible_scratch_stroke_is_protected(self):
+        """A real stroke whose cue vanished into a pocket has
+        cue_displaced=True — the quiet-shuffle rule must not eat it."""
+        f = {"dur": 4.3, "peak": 1.0, "n_movers": 0, "n_obj_movers": 0,
+             "displaced_obj": 2, "cue_displaced": True, "n_fast": 0,
+             "hand_frac": 0.0, "carried_frac": 0.0,
+             "carried_at_launch": False, "fast_sync": 0.0,
+             "set_changed": True, "n_states": 28}
+        assert classify(f) == "stroke"

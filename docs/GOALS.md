@@ -782,3 +782,14 @@ Rounds continue with Joe's visual feedback as the gate.
   seamless adjacent-shot roll-on (seeks only across real dead time),
   and the loop control became a proper Repeat TOGGLE (Joe: engage a
   repeat function, don't restart the clip).
+- 2026-08-19 (Joe's phone-review catch): QUIET SHUFFLE rule. The first
+  "shot" of his newest session was a slow rearrange the hand mask
+  barely saw (hand_frac 0.11) — no hand rule could fire. New signature:
+  multiple object balls displaced across the window while the CUE never
+  moved and nothing reached stroke speed = nobody struck anything.
+  Frame-verified the rule's 3 reclassifications in the earlier field
+  session (all genuinely shuffles/empty — I had over-credited that
+  session as "all strokes"); fine truth stays 17/19, blur-invisible
+  scratch strokes protected by cue_displaced. Library now: 641 strokes
+  / 143 rearrange / 59 breaks / 38 ball-in-hand / 6 empty. 2 pinned
+  tests.
