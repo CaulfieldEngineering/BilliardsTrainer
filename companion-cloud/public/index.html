@@ -20,9 +20,14 @@
            border-bottom:1px solid var(--line); }
   header h1 { font-size:17px; font-weight:700; letter-spacing:.4px; }
   header .sub { color:var(--dim); font-size:12px; margin-left:auto; }
-  #update { display:none; padding:10px 16px; background:#122c1a;
-            border-bottom:1px solid var(--make); color:var(--make);
-            font-weight:600; }
+  /* floating pill BELOW the island — as a top bar it hid behind the
+     clock (Joe's screenshot) */
+  #update { display:none; position:fixed; z-index:20;
+            top:calc(env(safe-area-inset-top) + 8px);
+            left:16px; right:16px; padding:12px 16px;
+            background:#122c1a; border:1px solid var(--make);
+            border-radius:6px; color:var(--make); font-weight:600;
+            text-align:center; }
   #keygate { padding:40px 24px; text-align:center; color:var(--dim);
              display:none; }
   #sessions { padding:8px 0; }
