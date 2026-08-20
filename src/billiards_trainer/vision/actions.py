@@ -7,7 +7,10 @@ some zero-motion windows. Each sidecar shot is post-classified as:
 
     stroke        a real offensive attempt (cue stick strikes the ball)
     break         the opening smash into a racked cluster
-    ball_in_hand  hand relocating balls; no strike
+    ball_in_hand  hand placing THE CUE BALL (position play, post-scratch)
+    rearrange     hand shuffling OBJECT balls (re-spreading, gathering,
+                  racking between drills — Joe: "different than ball in
+                  hand")
     nothing       no meaningful ball activity in the window
 
 Like outcomes, actions are RECOMPUTABLE and append-only: the classifier
@@ -99,10 +102,36 @@ def shot_features(reader: SidecarReader, s: dict) -> dict:
     from .outcomes import numbers_at
     set_changed = (numbers_at(reader, max(0.0, t0 - 0.5))
                    != numbers_at(reader, t1 + 1.0))
+    # WHO did the hand move? Cue-only handling is ball-in-hand; object
+    # balls moving under hands is rearranging (a different practice act).
+    # Racking/gathering occludes everything, so tracked "movers" can be
+    # empty — DISPLACEMENT across the window (who ended somewhere new)
+    # is the robust signal, with mover identities as the fast path.
+    mover_nums = set()
+    for i in movers:
+        num = next((tr.number for t_ in (t0,)
+                    for tr in reader.tracks_at((speed_hist[i][0][0]
+                                                if speed_hist.get(i) else t0))
+                    if tr.id == i), -2)
+        mover_nums.add(num)
+    n_obj_movers = sum(1 for n in mover_nums if n != 0)
+    a = {tr.number: (tr.x, tr.y) for tr in reader.tracks_at(max(0.0, t0 - 0.5))
+         if tr.active and tr.number >= 0}
+    b = {tr.number: (tr.x, tr.y) for tr in reader.tracks_at(t1 + 1.0)
+         if tr.active and tr.number >= 0}
+    moved_nums = {n for n in a if n in b
+                  and ((a[n][0] - b[n][0]) ** 2
+                       + (a[n][1] - b[n][1]) ** 2) ** 0.5 > 30.0}
+    changed = moved_nums | (set(a) ^ set(b))
+    displaced_obj = sum(1 for n in changed if n != 0)
+    cue_displaced = 0 in changed
     return {
         "dur": t1 - t0,
         "peak": max(peaks.values(), default=0.0),
         "n_movers": len(movers),
+        "n_obj_movers": n_obj_movers,
+        "displaced_obj": displaced_obj,
+        "cue_displaced": cue_displaced,
         "n_fast": len(fast),
         "hand_frac": hand_states / max(1, n_states),
         "carried_frac": carried_frac,
@@ -127,11 +156,21 @@ def classify(f: dict) -> str:
         return "nothing"
     # Hand relocations: the mover rode in a hand, LAUNCHED from a hand
     # (thrown/rolled balls fly free but start in the palm), or hands
-    # owned a window where little else happened.
-    if f["carried_frac"] >= 0.5 or f["carried_at_launch"]:
-        return "ball_in_hand"
-    if f["hand_frac"] >= 0.85 and f["n_movers"] <= 2:
-        return "ball_in_hand"
+    # owned a window where little else happened. WHICH kind depends on
+    # what the hand moved: cue only = ball-in-hand (position play);
+    # object balls = rearranging (re-spreads, gathering, racking).
+    handled = (f["carried_frac"] >= 0.5 or f["carried_at_launch"]
+               or (f["hand_frac"] >= 0.85 and f["n_movers"] <= 2))
+    if handled:
+        objs = max(f.get("n_obj_movers", 0), f.get("displaced_obj", 0))
+        return "rearrange" if objs >= 1 else "ball_in_hand"
+    # Mass re-spread: many OBJECT balls moving under sustained hands with
+    # unsynchronized launches — gathering, not a stroke (a break's burst
+    # is synchronized and was taken above; real strokes keep hands off
+    # the felt for most of the window).
+    if (f.get("n_obj_movers", 0) >= 4 and f["hand_frac"] >= 0.6
+            and f["fast_sync"] > 2.0):
+        return "rearrange"
     return "stroke"
 
 

@@ -767,3 +767,18 @@ Rounds continue with Joe's visual feedback as the gate.
   shots skipped). Queued next for the companion: trails overlay
   (per-shot ball paths pre-mapped to video pixels PC-side), review
   corrections from the phone.
+- 2026-08-19 (late, Joe's asks): REARRANGE vs BALL-IN-HAND split. Joe:
+  shuffling object balls between drills "is different than ball in
+  hand". The discriminator is WHO the hand moved — but racking occludes
+  tracking, so displacement across the window (who ended somewhere new)
+  backs up mover identity, and a mass-respread rule (4+ object movers,
+  sustained hands, unsynchronized launches) catches gathering that read
+  as strokes. Validated against the frame-truth labels re-read at fine
+  grain: 17/19, zero regressions on verified strokes/breaks. Library
+  re-labeled: 658 strokes / 123 rearrange / 58 breaks / 38 ball_in_hand
+  / 6 nothing — most "hand events" were indeed shuffling, exactly Joe's
+  read. All surfaces speak the new word (desktop SHUFFLE badge, phone
+  ⇄ chips + REARRANGING). Phone player: continuous rAF playhead,
+  seamless adjacent-shot roll-on (seeks only across real dead time),
+  and the loop control became a proper Repeat TOGGLE (Joe: engage a
+  repeat function, don't restart the clip).

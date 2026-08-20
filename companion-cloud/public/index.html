@@ -119,8 +119,7 @@
     <div id="lane"><div id="playhead"></div></div>
     <div id="nav">
       <button id="prev">‹</button>
-      <button id="replay">↻</button>
-      <button id="mode" title="playback mode">▸▸</button>
+      <button id="mode" title="repeat this shot">⟳ Repeat</button>
       <button id="next">›</button>
     </div>
     <div id="chips"></div>
@@ -285,7 +284,7 @@ function buildChips() {
       : "chip inhand";
     el.textContent = isAttempt(s)
       ? (s.action === "break" ? "BRK" : i + 1)
-      : "✋";
+      : (s.action === "rearrange" ? "⇄" : "✋");
     el.onclick = () => gotoShot(i, true);
     c.appendChild(el);
   });
@@ -304,7 +303,6 @@ function gotoShot(i, play) {
 }
 $("prev").onclick = () => gotoShot(Math.max(0, cur - 1), true);
 $("next").onclick = () => gotoShot(Math.min(shots.length - 1, cur + 1), true);
-$("replay").onclick = () => gotoShot(Math.max(0, cur), true);
 
 function fmt(t) {
   return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
@@ -320,6 +318,7 @@ function updateInfo() {
   $("shot-n").textContent = `Shot ${cur + 1}/${shots.length}`;
   const act = s.action || "stroke";
   const label = act === "ball_in_hand" ? "BALL IN HAND"
+              : act === "rearrange" ? "REARRANGING"
               : act === "nothing" ? "—"
               : act === "break" ? "BREAK · " + (s.outcome || "").toUpperCase()
               : (s.outcome || "").toUpperCase();
@@ -340,9 +339,10 @@ let win = null;                       // {t0, t1} of the visible window
 let mode = localStorage.getItem("mode") || "cd";   // "cd" | "loop"
 
 function modeLabel() {
-  $("mode").textContent = mode === "loop" ? "⟳" : "▸▸";
-  $("mode").style.color = mode === "loop" ? "var(--scratch)" : "var(--text)";
-  $("replay").style.color = "var(--dim)";
+  // a TOGGLE, not an action: engaged = this shot repeats until you move
+  const on = mode === "loop";
+  $("mode").style.color = on ? "var(--make)" : "var(--dim)";
+  $("mode").style.borderColor = on ? "var(--make)" : "var(--line)";
 }
 $("mode").onclick = () => {
   mode = mode === "loop" ? "cd" : "loop";

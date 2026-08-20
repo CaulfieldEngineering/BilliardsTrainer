@@ -159,7 +159,9 @@ def describe_shot(reader: SidecarReader, s: dict) -> dict:
 def compose_text(d: dict) -> str:
     """One factual line from a description dict."""
     if d.get("action") == "ball_in_hand":
-        return "Ball in hand — balls repositioned."
+        return "Ball in hand — cue ball placed."
+    if d.get("action") == "rearrange":
+        return "Rearranging — object balls shuffled by hand."
     if d.get("action") == "nothing":
         return "No table action."
     bits = []

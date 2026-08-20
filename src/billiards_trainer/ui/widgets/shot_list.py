@@ -210,6 +210,8 @@ class ShotListPanel(QWidget):
             action = s.get("action", "stroke")
             if action == "ball_in_hand":
                 colour, name = PALETTE.text_faint, "IN HAND"
+            elif action == "rearrange":
+                colour, name = PALETTE.text_faint, "SHUFFLE"
             elif action == "nothing":
                 colour, name = PALETTE.text_faint, "—"
             elif action == "break":
