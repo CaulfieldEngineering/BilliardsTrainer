@@ -625,17 +625,31 @@ let pending = {};
 let target = null;    // the clip being corrected, FROZEN at sheet-open —
                       // playback keeps rolling and cur keeps advancing,
                       // which used to save the verdict to the wrong clip
+let prevMode = null;  // mode to restore when Details closes
 function setSheet(open) {
   $("sheet").style.display = open ? "block" : "none";
   $("nav").style.display = open ? "none" : "flex";
   $("lower").style.display = open ? "none" : "block";
-  if (!open) target = null;
+  if (!open) {
+    target = null;
+    if (prevMode !== null) {    // Details borrowed loop mode; hand it back
+      mode = prevMode;
+      prevMode = null;
+      modeLabel();
+    }
+  }
 }
 $("correct").onclick = () => {
   pending = {};
   target = shots[cur] || null;
   if (!target) return;
   const no = shots.indexOf(target) + 1;
+  // Details LOOPS the clip under judgment; the previous mode returns on
+  // close (Joe). Snap playback onto the clip if it has rolled past.
+  prevMode = mode;
+  mode = "loop";
+  modeLabel();
+  if (cur !== no - 1) gotoShot(no - 1, !$("video").paused);
   $("sh-desc").textContent =
     `Shot ${no}: ${target.text || "(no description)"}`;
   $("sh-note").value = target.note || "";
