@@ -94,7 +94,8 @@ def _check_playback_speed() -> tuple[str, str]:
     d = Path(Settings.load().recording.resolved_dir())
     vids = [v for v in sorted(d.glob("session-*.mp4"),
                               key=lambda p: p.stat().st_mtime, reverse=True)
-            if SidecarReader.exists(v)]
+            if SidecarReader.exists(v)
+            and v.stat().st_size > 20e6]   # skip record-button test stubs
     if not vids:
         return AMBER, "no sidecar'd session to benchmark"
     v = vids[0]
