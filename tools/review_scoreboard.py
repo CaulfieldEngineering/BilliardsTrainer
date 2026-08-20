@@ -29,13 +29,15 @@ def ledger_for(video: Path) -> list[dict]:
     sc = sidecar_path(video)
     if not sc.is_file():
         return []
-    shots: dict[float, dict] = {}
+    shots: list[dict] = []
 
     def entry(start: float) -> dict | None:
-        for k in shots:
-            if abs(k - start) < 0.2:
-                return shots[k]
-        return None
+        # Same attachment rule as the product reader (exact -> containment
+        # -> nearest-8s): after a re-backfill shifts segmentation, carried
+        # verdicts anchor to OLD starts — ±0.2s matching made the
+        # scoreboard blind to 12 of Joe's 13 verdicts post-rebuild.
+        from billiards_trainer.vision.analysis_cache import _shot_for
+        return _shot_for(shots, start)
 
     for line in sc.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
@@ -44,12 +46,13 @@ def ledger_for(video: Path) -> list[dict]:
             continue
         t = d.get("type")
         if t == "shot":
-            shots[float(d["start"])] = {
+            shots.append({
                 "start": float(d["start"]),
+                "end": float(d.get("end", d["start"])),
                 "machine_outcome": d.get("outcome", "miss"),
                 "machine_action": "stroke",
                 "events": [],
-            }
+            })
         elif t in ("correction", "action", "note", "reviewed",
                    "correction_clear"):
             e = entry(float(d.get("start", -1)))
@@ -76,7 +79,7 @@ def ledger_for(video: Path) -> list[dict]:
                 e["events"].append(("confirm", None))
             elif t == "correction_clear":
                 e["events"] = [("cleared", None)]
-    return [e for e in shots.values() if e["events"]]
+    return [e for e in shots if e["events"]]
 
 
 def main() -> int:
