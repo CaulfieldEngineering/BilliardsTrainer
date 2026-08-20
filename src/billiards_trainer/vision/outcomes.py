@@ -9,7 +9,14 @@ sets), with two mechanisms frame truth forced:
 
   * return-mode discrimination — a departed ball that returns hands-free
     at the same spot merely flickered; one returning near a hand or at a
-    new spot was potted and REPLACED (re-spread drills);
+    new spot was potted and REPLACED (re-spread drills). One more rule
+    outranks both (the 005647 forensics): a return riding the SAME track
+    id that existed continuously — coasting counts — since the shot ended
+    was never off the bed at all. A potted ball's track dies in the
+    pocket; an occluded ball's track survives on spot-occupancy, even
+    when a bridge hand rests ON it or a stick-nudge moves it before its
+    first re-detection (both defeated the same-spot-hands-free test and
+    turned Joe's misses into phantom makes/scratches);
   * anonymous residents — a ball whose digit never faced the camera
     carries no number, but its settled track id dying during a shot
     (not hand-carried, no newborn re-ID) is a pot the number layer
@@ -82,6 +89,21 @@ def anon_departures(reader: SidecarReader, t0: float, t1: float) -> tuple:
     return max(0, len(dead) - newborn), dead
 
 
+def _tid_continuous(reader: SidecarReader, num: int, tid: int,
+                    t0: float, t1: float) -> bool:
+    """True when track `tid` carried `num` in every sampled state across
+    [t0, t1] — active or coasting. A track that never died was never in
+    a pocket: vacancy pruning keeps it alive only while its spot's
+    pixels show something ball-like, so its ball never left the bed."""
+    t = t0
+    while t <= t1 + 1e-9:
+        if not any(tr.id == tid and tr.number == num
+                   for tr in reader.tracks_at(t)):
+            return False
+        t += 0.5
+    return True
+
+
 def departed_for_shot(reader: SidecarReader, s: dict) -> tuple:
     """(confirmed departed numbers, detail dict) for one shot record."""
     t0, t1 = float(s["start"]), float(s["end"])
@@ -116,6 +138,15 @@ def departed_for_shot(reader: SidecarReader, s: dict) -> tuple:
                              < 2.0 * max(6.0, last_pos[2]))
                 hands, _ = reader.hand_context(max(t1, t - 2.5), t + 0.3)
                 flicker = same_spot and not hands
+                if not flicker and _tid_continuous(reader, num, hit.id,
+                                                   t1 + 0.2, t):
+                    # Same never-died track the whole gap: occlusion, not
+                    # a pot — cancel no matter the distance or the hands.
+                    # (A bridge hand resting ON the coasting ball, or a
+                    # stick-nudge before first re-detection, both defeat
+                    # the same-spot-hands-free test; a genuinely potted-
+                    # and-replaced ball returns on a FRESH track id.)
+                    flicker = True
                 detail.setdefault("returned", []).append(
                     {"num": num, "t": round(t, 1),
                      "mode": "flicker" if flicker else "replaced"})

@@ -184,3 +184,85 @@ class TestDeriveAndCorrect:
         from billiards_trainer.vision.outcomes import derive_and_correct
         assert derive_and_correct(tmp_path / "nope.mp4") == 0
 
+
+
+def _write_v2(tmp_path, states, shots):
+    """Like _write but tracks carry an explicit active flag:
+    (id, x, y, num, cls, active)."""
+    vid = tmp_path / "s.mp4"
+    vid.write_bytes(b"0")
+    with open(str(vid) + ".analysis.jsonl", "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "meta", "v": 1, "fps": 30}) + "\n")
+        for t, tracks, carried in states:
+            d = {"type": "f", "t": t,
+                 "tracks": [[i, x, y, 12.0, n, c, a]
+                            for i, x, y, n, c, a in tracks]}
+            if carried:
+                d["c"] = carried
+            f.write(json.dumps(d) + "\n")
+        for s in shots:
+            f.write(json.dumps({"type": "shot", **s}) + "\n")
+    return vid
+
+
+class TestTidContinuityCancellation:
+    """The 005647 forensics: a returning ball that rode the SAME never-died
+    track through the whole gap (coasting on spot-occupancy) was never off
+    the bed — even when a bridge hand rests on it or a stick-nudge moves it
+    before its first re-detection. A truly potted-and-replaced ball returns
+    on a FRESH track id, which must still count as a departure."""
+
+    def _states(self, five_row):
+        """five_row(t) -> track tuple or None; residents always present."""
+        cue = (1, 100.0, 100.0, 0, "cue", True)
+        nine = (2, 300.0, 700.0, 9, "stripe", True)
+        states = []
+        t = 0.0
+        while t <= 30.0:
+            tracks = [cue, nine]
+            row = five_row(t)
+            if row:
+                tracks.append(row)
+            # hand over the table around the return, like Joe's next-shot
+            # address / re-spot reach
+            carried = [3] if 14.0 < t < 17.0 else []
+            states.append((round(t, 2), tracks, carried))
+            t += 0.25
+        return states
+
+    def test_occluded_coasting_return_cancels_departure(self, tmp_path):
+        # 5-ball active at rest until the shot ends, coasts (active=False)
+        # through the after-window, re-activates on the SAME tid at a NEW
+        # spot with a hand present (stick-nudge + bridge hand): old rule
+        # said 'replaced' -> make; tid continuity says occlusion -> miss.
+        def five(t):
+            if t <= 12.2:
+                return (3, 200.0, 500.0, 5, "solid", True)
+            if t < 16.0:
+                return (3, 200.0, 500.0, 5, "solid", False)   # coasting
+            return (3, 260.0, 560.0, 5, "solid", True)        # nudged
+        vid = _write_v2(tmp_path, self._states(five),
+                        [{"start": 8.0, "end": 12.0, "outcome": "miss",
+                          "pocketed": 0}])
+        row = audit(vid)[0]
+        assert row["derived"] == "miss", \
+            "occluded coasting ball booked as a pot"
+        assert row["returned"][0]["mode"] == "flicker"
+
+    def test_fresh_tid_return_near_hand_still_departs(self, tmp_path):
+        # Control: the 5's track DIES at the shot (real pot); a fresh tid
+        # brings the number back near a hand (Joe re-spotting) -> the
+        # departure must stand (make), exactly as before this rule.
+        def five(t):
+            if t < 12.2:
+                return (3, 200.0, 500.0, 5, "solid", True)
+            if t >= 16.0:
+                return (9, 260.0, 560.0, 5, "solid", True)    # fresh tid
+            return None                                        # track dead
+        vid = _write_v2(tmp_path, self._states(five),
+                        [{"start": 8.0, "end": 12.0, "outcome": "miss",
+                          "pocketed": 0}])
+        row = audit(vid)[0]
+        assert row["derived"] == "make", \
+            "real pot-and-replace was wrongly cancelled"
+        assert row["returned"][0]["mode"] == "replaced"
