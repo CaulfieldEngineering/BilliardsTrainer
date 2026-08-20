@@ -509,12 +509,22 @@ class Pipeline:
         foreign = getattr(self, "_foreign_last", None)
 
         def _covered(x: float, y: float) -> bool:
+            # NEIGHBORHOOD test, not a single pixel: at address the stick
+            # and bridge hand hide the cue while the exact centre pixel
+            # stays outside the foreign blob — that killed a real resting
+            # cue mid-address and derived a phantom scratch (Joe's shot 31,
+            # first field session after this feature shipped).
             if not foreign or foreign[1] is None:
                 return False
             _ff, fmask, fs, fx0, fy0 = foreign
             mh, mw = fmask.shape[:2]
-            mx, my = int((x - fx0) * fs), int((y - fy0) * fs)
-            return 0 <= mx < mw and 0 <= my < mh and bool(fmask[my, mx])
+            r = 1.5 * max(exp_r, 6.0)
+            for dx, dy in ((0, 0), (r, 0), (-r, 0), (0, r), (0, -r)):
+                mx = int((x + dx - fx0) * fs)
+                my = int((y + dy - fy0) * fs)
+                if 0 <= mx < mw and 0 <= my < mh and fmask[my, mx]:
+                    return True
+            return False
 
         near_r2 = (2.2 * max(exp_r, 6.0)) ** 2
         doomed: list[int] = []
@@ -528,7 +538,11 @@ class Pipeline:
                 self._vacant[tr.id] = self._vacant.get(tr.id, 0) + 1
             else:
                 self._vacant[tr.id] = 0
-            if self._vacant[tr.id] >= (20 if tr.number >= 0 else 8):
+            # numbered balls get LONG patience: a cue at address sits
+            # under the stick for many seconds with no detection and no
+            # (blob-sized) foreign cover — 60 detect frames still kills a
+            # true lingerer 25x faster than the occlusion budget did
+            if self._vacant[tr.id] >= (60 if tr.number >= 0 else 8):
                 doomed.append(tr.id)
         self._vacant = {k: v for k, v in self._vacant.items()
                         if k in live_ids}

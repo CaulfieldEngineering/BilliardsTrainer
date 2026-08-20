@@ -624,9 +624,9 @@ class TestVacancyPruning:
         exp = expected_ball_radius_px(calib.table, p.settings.table.size)
         ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
         self._feed(p, calib, [ball], 12)              # establish + settle
-        tracks = self._feed(p, calib, [], 19)         # picked up by hand...
+        tracks = self._feed(p, calib, [], 59)         # picked up by hand...
         assert any(t.number == 0 for t in tracks), "died too early"
-        tracks = self._feed(p, calib, [], 2)          # ...20th bare frame
+        tracks = self._feed(p, calib, [], 2)          # ...60th bare frame
         assert not any(t.number == 0 for t in tracks), \
             "lingering assumed position survived a visibly empty spot"
 

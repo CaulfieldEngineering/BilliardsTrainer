@@ -846,3 +846,21 @@ Rounds continue with Joe's visual feedback as the gate.
   zero-seek continuity, island-safe layout everywhere, one-screen
   no-scroll player. The phone app went from install link to a complete
   review tool in one evening of field iteration.
+- 2026-08-20 (Joe's first review batch — 5 verdicts on tonight's
+  session, reviewed): (1) Shots 31/36 were PHANTOM DEPARTURES and shot
+  31 is a confirmed vacancy-pruning regression: at address the stick +
+  bridge hide the resting cue while the exact-centre pixel stays
+  outside the foreign blob — the cue's track died mid-address and
+  derivation read a scratch ("Not a scratch." — Joe). Fixed: coverage
+  is now a 5-point NEIGHBORHOOD test and numbered patience rises 20->60
+  detect frames (still ~25x faster than the old occlusion budget on
+  true lingerers); test-pinned. (2) Shot 36's family is fast-motion
+  identity wander (the struck 7 lost mid-roll, its number landing on
+  garbage tracks across the table) — QUEUED, needs the flyer-credit
+  rework. (3) Shot 26: departure identity misattributed (machine
+  credited "the 3", Joe: "Potted the 9"). (4) Shot 44: contact
+  misattributed (Joe: "contacted the 3 and fluked the 5 in") — both
+  logged as identity/attribution ground truth. Trails overlay paused on
+  the phone per Joe (data still exports; one flag re-enables). Joe's
+  notes are working exactly as designed: every verdict above came from
+  his phone.

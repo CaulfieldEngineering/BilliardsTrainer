@@ -597,7 +597,11 @@ function drawTrails() {
   requestAnimationFrame(tick);
   const v = $("video");
   if (!$("player").classList.contains("open")) return;
-  drawTrails();
+  // trails paused per Joe ("I don't want the animated trails on here
+  // yet") — data still exports; flip TRAILS_ON to re-enable
+  if (window.TRAILS_ON) drawTrails();
+  else { const c = $("trails");
+         c.getContext("2d").clearRect(0, 0, c.width, c.height); }
   if (win) {
     const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
     $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
