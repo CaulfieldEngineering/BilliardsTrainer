@@ -132,6 +132,16 @@ def describe_shot(reader: SidecarReader, s: dict) -> dict:
     # must not put "scratched" in the description.
     if s.get("outcome") != "scratch":
         gone = {n for n in gone if n != 0}
+    # And a ranked MISS means NOTHING fell: phantom object departures in
+    # old tracking data must not keep "potted the 5" in the text after
+    # Joe corrected the shot to miss (his screenshot: outcome fixed,
+    # description still claiming the pot).
+    if s.get("outcome") == "miss":
+        gone = set()
+    # Symmetrically, a ranked SCRATCH the old derivation missed must
+    # still read "cue ball scratched".
+    if s.get("outcome") == "scratch":
+        gone = gone | {0}
     potted = []
     for num in sorted(gone):
         e = next((e for e in paths.values() if e["num"] == num), None)

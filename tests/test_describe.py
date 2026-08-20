@@ -116,3 +116,28 @@ class TestShotsExport:
     def test_no_sidecar_is_quiet_none(self, tmp_path):
         from billiards_trainer.vision.shots_export import export_shots_summary
         assert export_shots_summary(tmp_path / "nope.mp4") is None
+
+
+def test_ranked_miss_clears_phantom_pots(tmp_path):
+    """Joe's screenshot: he corrected a shot to MISS but the description
+    still read 'potted the 5' — describe recomputes departures from the
+    OLD tracking data and only the scratch case was guarded. A ranked
+    miss means NOTHING fell; a ranked scratch must say so even when the
+    old derivation missed it."""
+    from billiards_trainer.vision.describe import compose_text, describe_shot
+
+    class R:                                    # minimal reader stand-in
+        _times = []
+        _frames = []
+        def tracks_at(self, t):
+            return []
+        def hand_context(self, a, b):
+            return set(), 0.0
+
+    base = {"start": 8.0, "end": 12.0, "action": "stroke"}
+    d = describe_shot(R(), {**base, "outcome": "miss"})
+    assert d["potted"] == [], "ranked miss kept a phantom pot"
+    assert "no ball fell" in compose_text(d)
+    d = describe_shot(R(), {**base, "outcome": "scratch"})
+    assert any(p["ball"] == 0 for p in d["potted"])
+    assert "scratched" in compose_text(d)
