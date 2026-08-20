@@ -66,6 +66,16 @@ def build(video: Path, force: bool = False) -> bool:
             print(f"    {t/60:.1f} min analyzed...")
     cap.release()
     writer.close()
+    # CARRY JOE'S VERDICTS FORWARD before the post-passes: machine data is
+    # recomputable, his phone review is not. Derivation then stands down
+    # wherever a review-ranked record locks a shot.
+    prev = Path(str(video) + ".analysis.jsonl.prev")
+    if force and prev.is_file():
+        from billiards_trainer.vision.analysis_cache import (
+            carry_review_verdicts)
+        kept = carry_review_verdicts(prev, Path(str(video) + ".analysis.jsonl"))
+        if kept:
+            print(f"    review verdicts carried forward: {kept}")
     # Post-passes, same as a live session close: identity-derived outcomes
     # (11/11 vs frame truth) and action labels (stroke / break /
     # ball_in_hand / nothing), so a backfilled sidecar is born complete.

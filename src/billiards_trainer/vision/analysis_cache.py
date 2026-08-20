@@ -310,6 +310,41 @@ class SidecarReader:
         return [self._to_track(r) for r in rows]
 
 
+def carry_review_verdicts(prev_sidecar: str | Path,
+                          new_sidecar: str | Path) -> int:
+    """Append the HUMAN records from an old sidecar onto a rebuilt one.
+
+    A --force re-backfill rewrites the sidecar from scratch — machine data
+    is recomputable, but Joe's phone verdicts are not: without this, a
+    library re-analysis would silently discard every correction, note and
+    confirm he ever filed (they'd survive only in the .prev backup).
+    Carried in original order (append order IS rank resolution). Only
+    explicitly review-sourced corrections/actions move: legacy UNTAGGED
+    corrections are the old derived pass wearing review rank for reader
+    safety — carrying them would freeze stale machine outcomes over the
+    new derivation. Notes, confirms and clears are always human. Shifted
+    segmentation is fine: the reader re-attaches by containment."""
+    prev_p, new_p = Path(prev_sidecar), Path(new_sidecar)
+    if not prev_p.is_file() or not new_p.is_file():
+        return 0
+    kept = 0
+    with open(new_p, "a", encoding="utf-8") as out:
+        for line in prev_p.read_text(encoding="utf-8",
+                                     errors="replace").splitlines():
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            t = d.get("type")
+            keep = (t in ("note", "reviewed", "correction_clear")
+                    or (t == "correction" and d.get("src") == "review")
+                    or (t == "action" and d.get("src") == "review"))
+            if keep:
+                out.write(json.dumps(d, separators=(",", ":")) + "\n")
+                kept += 1
+    return kept
+
+
 def clip_export_cmd(video_path: str | Path, start: float, end: float,
                     pre_roll_s: float = 5.0, tail_s: float = 1.0,
                     shot_no: int | None = None) -> tuple[list[str], Path]:

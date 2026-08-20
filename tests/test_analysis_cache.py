@@ -130,3 +130,66 @@ class TestRecordingTimebase:
         r = SidecarReader(video)
         assert r._times[0] == 0.0
         assert abs(r.shots[0]["start"] - 8.3) < 0.01
+
+
+class TestVerdictCarryover:
+    """A --force re-backfill rewrites the sidecar; Joe's phone verdicts
+    must ride across (and re-attach by containment when segmentation
+    shifted) while legacy machine records must NOT."""
+
+    def _old_sidecar(self, tmp_path):
+        import json
+        p = tmp_path / "old.analysis.jsonl"
+        rows = [
+            {"type": "meta", "v": 1, "fps": 30},
+            {"type": "shot", "start": 10.0, "end": 14.0, "outcome": "make"},
+            {"type": "correction", "start": 10.0, "outcome": "miss",
+             "src": "derived"},                       # machine: stays behind
+            {"type": "correction", "start": 10.0, "outcome": "miss"},
+                                                      # legacy untagged: stays
+            {"type": "correction", "start": 10.0, "outcome": "scratch",
+             "src": "review"},                        # human: carries
+            {"type": "action", "start": 10.0, "action": "rearrange",
+             "src": "review"},                        # human: carries
+            {"type": "note", "start": 10.0, "text": "my comment"},  # carries
+            {"type": "reviewed", "start": 10.0},                    # carries
+        ]
+        p.write_text("\n".join(json.dumps(r) for r in rows) + "\n",
+                     encoding="utf-8")
+        return p
+
+    def test_only_human_records_carry(self, tmp_path):
+        import json
+        from billiards_trainer.vision.analysis_cache import (
+            carry_review_verdicts)
+        old = self._old_sidecar(tmp_path)
+        vid = tmp_path / "session-x.mp4"
+        _write_sample(vid)
+        new = tmp_path / "session-x.mp4.analysis.jsonl"
+        n = carry_review_verdicts(old, new)
+        assert n == 4
+        carried = [json.loads(x) for x in
+                   new.read_text(encoding="utf-8").splitlines()][-4:]
+        assert [c["type"] for c in carried] == ["correction", "action",
+                                                "note", "reviewed"]
+        assert all(c.get("src") != "derived" for c in carried)
+
+    def test_carried_verdict_reattaches_by_containment(self, tmp_path):
+        import json
+        from billiards_trainer.vision.analysis_cache import (
+            carry_review_verdicts)
+        vid = tmp_path / "session-x.mp4"
+        vid.write_bytes(b"0")
+        new = tmp_path / "session-x.mp4.analysis.jsonl"
+        # rebuilt sidecar: segmentation shifted — shot now [8.5, 13.0]
+        new.write_text(json.dumps({"type": "meta", "v": 1, "fps": 30}) + "\n"
+                       + json.dumps({"type": "shot", "start": 8.5,
+                                     "end": 13.0, "outcome": "make"}) + "\n",
+                       encoding="utf-8")
+        carry_review_verdicts(self._old_sidecar(tmp_path), new)
+        r = SidecarReader(vid)
+        s = r.shots[0]
+        assert s["outcome"] == "scratch", "review verdict lost in rebuild"
+        assert s["action"] == "rearrange"
+        assert s["note"] == "my comment"
+        assert s["_reviewed"] and s["_action_reviewed"]
