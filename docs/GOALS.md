@@ -829,3 +829,20 @@ Rounds continue with Joe's visual feedback as the gate.
   doubles as the long-queued companion-liveness signal. Verified live:
   board shows "1 new phone verdict since last pass" from the end-to-end
   test.
+- 2026-08-19 (loop, late night): ANIMATED TRAILS ON THE PHONE — Joe's
+  ask, frame-verified before shipping (the rendered 1-ball trail lands
+  exactly in its pocket; the cue trail ends at the resting cue).
+  Per-shot polylines export into shots.json pre-mapped to normalized
+  video pixels via each video's own re-acquired calibration (transform
+  cached in the summary; verdict-sync re-exports reuse it); the phone
+  draws the last 4s with a fade on a canvas over the video, synced to
+  playback and scrubbing. Library backfilled. Also this stretch, all
+  Joe-directed: unified Details sheet (description + corrections + note,
+  loops the clip while open, restores mode on close), Remove Correction
+  (clear records; watcher re-derives immediately), frozen correction
+  targets (verdicts landed on the wrong clip when playback rolled on),
+  local verdict overlay across the Dropbox round-trip, native video
+  chrome fully disabled (tap-to-play + spinner + transport ▶), pure
+  zero-seek continuity, island-safe layout everywhere, one-screen
+  no-scroll player. The phone app went from install link to a complete
+  review tool in one evening of field iteration.
