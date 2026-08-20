@@ -953,3 +953,24 @@ Rounds continue with Joe's visual feedback as the gate.
   re-spot rebirth; @214/@466 rearrange episodes (segmentation shifted —
   verdict matching should be by containment, then rolled-in-birth
   feature classifies the episode).
+- 2026-08-20 (loop, 12pm): 7/7. Every outcome verdict Joe filed on
+  session 005647 now derives correctly — the day's arc was 0/7 (rest-
+  linking baseline) -> 1 -> 2 -> 4 -> 5 -> 7/7 across five verified
+  fixes, each mechanism pinned by frame forensics before coding. This
+  loop's three: revival now demands radius agreement [0.8,1.6] (the
+  coasting cue had revived onto the r10 felt speck); number 0 demands
+  lifetime full-size evidence — frame-checking every chronically-small
+  numbered track FIRST proved real object balls live at r9-11 (purple 4,
+  yellow 1, digits visible), so the floor is cue-only, self-calibrated
+  against the session's committed-ball population, enforced at candidacy
+  AND the at-rest pass (vote-path commits included); and the deriver
+  grew the RE-SPOT rule — a number present-after only via a track born
+  during the shot, prior holder dead AT a pocket while MOVING, hand in
+  the gap, is a pot-and-hand-return: departure stands (mirror of tid-
+  continuity; resting rail balls picked up stay non-departures).
+  Hops 0.29/1k (2.41 at the start of this campaign); gold 11/11 zero
+  mismatches; suite green; +4 tests. REMAINING on 005647: the two
+  ACTION verdicts (@214/@466 rearrange) — episode segmentation shifted
+  under the new tracker so verdicts must match by CONTAINMENT (not
+  boundary-within-3s), then the rolled-in-birth feature classifies
+  pocket-side ball re-introduction as rearrange. That is the next chunk.
