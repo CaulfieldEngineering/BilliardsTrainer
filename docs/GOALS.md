@@ -910,3 +910,29 @@ Rounds continue with Joe's visual feedback as the gate.
   vacant, check the actual pixels (felt-coloured = empty; anything else
   = occupied by ball or stick, not vacant). Needs the frame plumbed to
   the vacancy test; next loop's chunk.
+- 2026-08-20 (loop, 8am): SPOT-OCCUPANCY + TID-CONTINUITY shipped, and
+  Joe's verdicts on 005647 went 1/7 -> 4/7. Two commits: (1) vacancy
+  pruning now asks the PIXELS before killing a still numbered ball —
+  foreign_mask exposes its pre-floor non-felt mask, and a spot that
+  reads ball/stick is not vacant (unnumbered blobs keep the fast path
+  so shadows can't immortalize ghosts). (2) The outcome deriver now
+  honors track-id continuity: a "departed" ball that returns riding the
+  SAME never-died track (coasting counts) was occluded, never potted —
+  cancels regardless of distance or hands, because a real pot's track
+  dies in the pocket (control test pins that pot-and-replace on a fresh
+  tid still departs). Gold standard 11/11 both times with zero new
+  corrections; hops steady 0.86/1k; +5 tests. An 8-agent frame-forensics
+  workflow diagnosed every remaining 005647 error with frame evidence;
+  the ranked queue is now: (a) APPEARANCE-GATED ASSOCIATION (@209,
+  @526): a numbered track must not adopt a detection whose class/colour/
+  radius contradict it — the maroon 7 adopted the white cue into the
+  pocket, and a num-3 track grabbed the stopped cue at contact (radius
+  15.5->17.5) inverting make into scratch; tracking-layer, next loop's
+  chunk. (b) RE-SPOT REBIRTH (@275): a fresh-tid same-number birth
+  right after a pocket-mouth death + hand blip is Joe re-spotting a
+  scratched cue — the departure must stand (mirror of the tid rule).
+  (c) ROLLED-IN BIRTHS (@214, @466): balls returned from pockets are
+  born mid-felt already decelerating — impossible for a struck ball; a
+  rolled_in_births>=2 feature should classify rearrange regardless of
+  cue involvement, verdicts should match shots by containment not
+  boundary-within-3s, and rail-reach ff peaks at exactly the 0.02 gate.
