@@ -81,18 +81,8 @@
   #desc { color:var(--dim); font-size:13px; min-height:1.3em;
           margin-bottom:6px; white-space:nowrap; overflow:hidden;
           text-overflow:ellipsis; }
-  /* tap opens the full text in a modal (Joe) */
-  #modal { display:none; position:fixed; inset:0; z-index:30;
-           background:rgba(0,0,0,.65); align-items:center;
-           justify-content:center; padding:24px; }
-  #modal.open { display:flex; }
-  #modal .box { background:var(--panel); border:1px solid var(--line);
-                border-radius:6px; padding:16px; max-width:420px;
-                width:100%; }
-  #modal .box h3 { font-size:13px; color:var(--dim); font-weight:600;
-                   letter-spacing:.6px; margin-bottom:8px; }
-  #modal .box p { font-size:15px; line-height:1.5; }
-  #modal .box p.note { color:var(--scratch); margin-top:10px; }
+  #sheet #sh-desc { font-size:14px; line-height:1.45; color:var(--text);
+                    margin-bottom:8px; }
   #nav { display:flex; gap:8px; margin-bottom:8px; }
   #nav #rate.on { color:var(--accent); border-color:var(--accent); }
   #correct { width:100%; height:38px; margin-bottom:8px;
@@ -171,8 +161,6 @@
 
 <div id="sessions"></div>
 
-<div id="modal"><div class="box"><h3 id="m-title"></h3>
-  <p id="m-text"></p><p class="note" id="m-note"></p></div></div>
 <div id="player">
   <div id="topbar">
     <button id="back">‹ Sessions</button>
@@ -203,6 +191,7 @@
       <div id="chips"></div>
     </div>
     <div id="sheet">
+      <p id="sh-desc"></p>
       <div class="row" id="sh-outcome">
         <button data-o="make">MAKE</button>
         <button data-o="miss">MISS</button>
@@ -434,7 +423,7 @@ function fmt(t) {
 function updateInfo() {
   const cs = shots[cur];
   $("correct").textContent = (cs && cs.corrected)
-    ? "✎ Edit correction" : "✎ Correct this clip";
+    ? "🛈 Details · corrected" : "🛈 Details";
   [...$("chips").children].forEach((el, i) => el.classList.toggle("cur", i === cur));
   if (cur < 0 || !shots[cur]) {
     $("shot-n").textContent = shots.length ? `${shots.length} shots` : "–";
@@ -606,15 +595,7 @@ $("video").addEventListener("play", applyRate);
 applyRate();
 modeLabel();
 
-$("desc").onclick = () => {
-  const s = shots[cur];
-  if (!s) return;
-  $("m-title").textContent = `SHOT ${cur + 1}`;
-  $("m-text").textContent = s.text || "(no description)";
-  $("m-note").textContent = s.note ? `Your note: ${s.note}` : "";
-  $("modal").classList.add("open");
-};
-$("modal").onclick = () => $("modal").classList.remove("open");
+$("desc").onclick = () => $("correct").click();
 
 // no native controls: video tap and the ⏯ button both toggle
 function togglePlay() {
@@ -654,6 +635,9 @@ $("correct").onclick = () => {
   pending = {};
   target = shots[cur] || null;
   if (!target) return;
+  const no = shots.indexOf(target) + 1;
+  $("sh-desc").textContent =
+    `Shot ${no}: ${target.text || "(no description)"}`;
   $("sh-note").value = target.note || "";
   $("sh-clear").style.display = target.corrected ? "block" : "none";
   setSheet(true);
@@ -694,7 +678,7 @@ async function postVerdict(s, body, optimistic) {
   } catch (e) {
     $("correct").textContent = "⚠ save failed — try again";
   }
-  setTimeout(() => { $("correct").textContent = "✎ Correct this clip"; }, 2500);
+  setTimeout(updateInfo, 2500);
 }
 $("sh-save").onclick = () => {
   const s = target;
