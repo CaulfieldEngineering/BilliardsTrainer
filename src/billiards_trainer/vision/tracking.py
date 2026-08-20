@@ -240,6 +240,25 @@ class BallTracker:
         # Build all (track, det) pairs within the gate, then assign greedily. The
         # gate WIDENS with a track's speed so a hard-struck ball — which jumps far
         # in one frame — can still match its detection instead of being left behind.
+        #
+        # APPEARANCE GATING (005647 forensics): identity must survive contact.
+        # On a stop shot the cue parks in the object ball's vacated spot, and
+        # closest-first handed the WHITE detection to the settled num-3 track
+        # by a 2px margin over the cue's own track — inverting a make into a
+        # scratch. So category contradiction (cue vs object) COSTS: agreeing
+        # pairs always sort first, and a contradicting pair only wins when
+        # nothing that agrees is in reach. Harder still: a COASTING numbered
+        # ball cannot change category while unseen — the maroon 7, coasting at
+        # a pocket, adopted the arriving white cue and followed it in, booking
+        # the cue's pocket entry as the 7's departure. Healthy tracks
+        # (misses == 0) are exempt from the veto so one-frame class flicker
+        # never starves live tracking.
+        def _contradicts(t, d) -> bool:
+            tc = t.cls
+            return (d.cls != BallClass.UNKNOWN and tc != BallClass.UNKNOWN
+                    and (tc == BallClass.CUE) != (d.cls == BallClass.CUE))
+
+        cls_pen = 0.30 * self._short_side
         pairs = []
         for ti, t in enumerate(self._tracks):
             t_speed = (t.vx * t.vx + t.vy * t.vy) ** 0.5
@@ -255,7 +274,10 @@ class BallTracker:
                 d = detections[di]
                 dist = math.hypot(t.x - d.x, t.y - d.y)
                 if dist <= t_gate:
-                    pairs.append((dist, ti, di))
+                    contra = t.confirmed and _contradicts(t, d)
+                    if contra and t.committed_number >= 0 and t.misses >= 1:
+                        continue
+                    pairs.append((dist + (cls_pen if contra else 0.0), ti, di))
         pairs.sort(key=lambda p: p[0])
 
         matched_tracks = set()
@@ -278,9 +300,16 @@ class BallTracker:
                   if di not in matched_dets and detections[di].cls == BallClass.CUE]
         if len(cue_ti) == 1 and len(cue_di) == 1:
             ti, di = cue_ti[0], cue_di[0]
-            matched_tracks.add(ti)
-            matched_dets.add(di)
-            self._apply_match(self._tracks[ti], detections[di])
+            t, d = self._tracks[ti], detections[di]
+            # Radius sanity (005647 @209s): the lost cue snapped 560px onto a
+            # sub-ball white SPECK on the felt (r~10 vs the cue's 15-17) and
+            # sat there while the real cue lay in a pocket — masking the
+            # scratch. Blur INFLATES a fast ball's blob, never shrinks it
+            # 30%: bind at any distance, but only to a cue-sized detection.
+            if 0.7 * t.radius <= d.radius <= 1.5 * t.radius:
+                matched_tracks.add(ti)
+                matched_dets.add(di)
+                self._apply_match(t, d)
 
         # Second-chance revival: a fast ball motion-blurs out of detection and
         # reappears FEET away a few frames later — far beyond the primary gate.
@@ -302,6 +331,11 @@ class BallTracker:
                     if di in matched_dets:
                         continue
                     d = detections[di]
+                    # A ball cannot change category (cue vs object) while
+                    # unseen — reviving across one is how identities leak
+                    # between colliding balls (005647 forensics).
+                    if _contradicts(t, d):
+                        continue
                     dist = math.hypot(t.x - d.x, t.y - d.y)
                     if dist <= r_gate:
                         revive.append((dist, ti, di))

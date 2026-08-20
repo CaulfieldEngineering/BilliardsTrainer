@@ -487,3 +487,76 @@ class TestRestLinking:
         sevens = [t for t in out if t.number == 7]
         assert len(sevens) == 1 and abs(sevens[0].x - 300) < 20, \
             "the orphan stole a held number"
+
+
+class TestAppearanceGatedAssociation:
+    """The 005647 forensics: identity must survive contact. A numbered track
+    must not adopt a detection whose category (cue vs object) contradicts
+    it, and the single-cue rebind must not glue the cue onto felt debris."""
+
+    def _settle(self, tr, dets, short, n=12):
+        for _ in range(n):
+            out = tr.update(dets, short)
+        return out
+
+    def test_stop_shot_cue_wins_the_white_detection(self):
+        # A settled solid sits at (500,500); the cue rests at (500,470).
+        # After contact the ONE white detection lands at (500,498) — 2px
+        # closer to the solid's track than to the cue's. Closest-first gave
+        # it to the solid (@526s: make inverted into scratch); the class
+        # penalty must give it to the cue.
+        tr = BallTracker(min_hits=3)
+        short = 400
+        self._settle(tr, [det(500, 500, cls=BallClass.SOLID, r=15),
+                          det(500, 470, cls=BallClass.CUE, r=15)], short)
+        out = tr.update([det(500, 498, cls=BallClass.CUE, r=16)], short)
+        cue = next(t for t in out if t.cls == BallClass.CUE)
+        assert cue.misses == 0, "cue track lost the white detection"
+        assert abs(cue.y - 490) < 6, "cue track not moved onto the white det"
+        # the solid must NOT have taken it: it either coasts unmatched or
+        # (this tight layout) is deduped away as an overlapping duplicate
+        solids = [t for t in out if t.cls == BallClass.SOLID]
+        assert all(t.misses > 0 for t in solids), \
+            "solid track stole the white detection"
+
+    def test_coasting_numbered_track_rejects_cross_category(self):
+        # A numbered solid coasts at a pocket; the white cue arrives at its
+        # spot (@209s: the 7 adopted the cue and followed it into the
+        # pocket). The coasting veto must leave the white detection to
+        # spawn/match elsewhere, never re-attach the 7 to it.
+        tr = BallTracker(min_hits=3)
+        short = 400
+        seven = Detection(x=300, y=300, radius=15, cls=BallClass.SOLID,
+                          number=7)
+        self._settle(tr, [seven], short, n=16)
+        tr.update([], short)                     # goes coasting (misses=1)
+        out = tr.update([det(302, 302, cls=BallClass.CUE, r=15)], short)
+        # The 7 must NOT ride the white ball: the veto leaves the detection
+        # to spawn a fresh track; the stale coasting 7 may then be deduped
+        # away (number freed for honest re-arbitration) — either way, no
+        # ACTIVE track may carry number 7 on the cue's detection.
+        assert not any(t.number == 7 and t.misses == 0 for t in out), \
+            "coasting numbered ball re-attached across categories"
+
+    def test_single_cue_rebind_rejects_speck(self):
+        # The lost cue must NOT bind to a sub-ball white speck (r~10 vs the
+        # cue's 15-17) at any distance (@209s: masked the real scratch)...
+        tr = BallTracker(min_hits=3)
+        short = 400
+        self._settle(tr, [det(100, 100, cls=BallClass.CUE, r=16)], short)
+        tr.update([], short)
+        out = tr.update([det(350, 350, cls=BallClass.CUE, r=10)], short)
+        cue = next(t for t in out if t.cls == BallClass.CUE)
+        assert cue.misses > 0, "cue bound to a sub-ball speck"
+
+    def test_single_cue_rebind_still_takes_blurred_cue(self):
+        # ...but a genuinely fast cue whose blob blur INFLATES the radius
+        # must still bind across the table (the rebind's whole purpose).
+        tr = BallTracker(min_hits=3)
+        short = 400
+        self._settle(tr, [det(100, 100, cls=BallClass.CUE, r=16)], short)
+        tr.update([], short)
+        out = tr.update([det(350, 350, cls=BallClass.CUE, r=20)], short)
+        cue = next(t for t in out if t.cls == BallClass.CUE)
+        assert cue.misses == 0, "blurred far cue failed to rebind"
+        assert cue.x > 150, "rebound cue not moving toward its detection"
