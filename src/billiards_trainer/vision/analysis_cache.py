@@ -139,6 +139,7 @@ class SidecarReader:
                     self._carried.append(d.get("c") or [])
                     self._foreign.append(float(d.get("ff", 0.0)))
                 elif d.get("type") == "shot":
+                    d["_orig_outcome"] = d.get("outcome", "miss")
                     self.shots.append(d)
                 elif d.get("type") == "correction":
                     # last-wins WITHIN a rank, but a human verdict is FINAL:
@@ -154,6 +155,19 @@ class SidecarReader:
                             if csrc != "derived":
                                 s["corrected"] = True
                                 s["_reviewed"] = True
+                            break
+                elif d.get("type") == "correction_clear":
+                    # Joe removed his verdict: restore the shot-line
+                    # original and drop every review flag; derived records
+                    # appended AFTER this line re-apply normally (the
+                    # watcher re-runs derivation right after a clear).
+                    for s in self.shots:
+                        if abs(float(s.get("start", -1)) - float(d["start"])) < 0.2:
+                            s["outcome"] = s.get("_orig_outcome", "miss")
+                            for k in ("corrected", "_reviewed", "action",
+                                      "action_corrected", "_action_reviewed",
+                                      "note"):
+                                s.pop(k, None)
                             break
                 elif d.get("type") == "note":
                     # plain-text review note (phone correction Details)

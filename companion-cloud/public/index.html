@@ -181,6 +181,11 @@
         <button id="sh-cancel">Cancel</button>
         <button id="sh-save">Save correction</button>
       </div>
+      <div class="row">
+        <button id="sh-clear"
+                style="display:none; color:var(--scratch);
+                       border-color:var(--scratch);">Remove correction</button>
+      </div>
     </div>
   </div>
 </div>
@@ -550,21 +555,27 @@ $("desc").onclick = () => $("desc").classList.toggle("open");
 // ---- "Correct this clip" (Joe: human intervention) ---------------------
 let curSession = null;
 let pending = {};
+let target = null;    // the clip being corrected, FROZEN at sheet-open —
+                      // playback keeps rolling and cur keeps advancing,
+                      // which used to save the verdict to the wrong clip
 function setSheet(open) {
   $("sheet").style.display = open ? "block" : "none";
   $("nav").style.display = open ? "none" : "flex";
   $("lower").style.display = open ? "none" : "block";
+  if (!open) target = null;
 }
 $("correct").onclick = () => {
   pending = {};
-  const s = shots[cur] || {};
-  $("sh-note").value = s.note || "";
+  target = shots[cur] || null;
+  if (!target) return;
+  $("sh-note").value = target.note || "";
+  $("sh-clear").style.display = target.corrected ? "block" : "none";
   setSheet(true);
   syncSheet();
 };
 $("sh-cancel").onclick = () => setSheet(false);
 function syncSheet() {
-  const s = shots[cur] || {};
+  const s = target || {};
   const o = pending.outcome || s.outcome;
   const a = pending.action || s.action || "stroke";
   [...$("sh-outcome").children].forEach(b =>
@@ -576,21 +587,15 @@ function syncSheet() {
   b.onclick = () => { pending.outcome = b.dataset.o; syncSheet(); });
 [...$("sh-action").children].forEach(b =>
   b.onclick = () => { pending.action = b.dataset.a; syncSheet(); });
-$("sh-save").onclick = async () => {
-  const s = shots[cur];
-  if (!s || !curSession) return setSheet(false);
-  const note = $("sh-note").value.trim();
-  const patch = { ...pending };
-  if (note && note !== (s.note || "")) patch.note = note;
-  if (!patch.outcome && !patch.action && !patch.note) return setSheet(false);
-  Object.assign(s, patch, { corrected: true });   // optimistic
+async function postVerdict(s, body, optimistic) {
+  Object.assign(s, optimistic);
   setSheet(false);
   buildChips(); buildLane(); updateInfo();
   try {
     const r = await fetch("/api/correct", {
       method: "POST",
       headers: { "x-key": KEY || "", "Content-Type": "application/json" },
-      body: JSON.stringify({ session: curSession, start: s.start, ...patch }),
+      body: JSON.stringify({ session: curSession, start: s.start, ...body }),
     });
     if (!r.ok) throw new Error(r.status);
     $("correct").textContent = "✓ saved — syncs to the PC via Dropbox";
@@ -598,6 +603,20 @@ $("sh-save").onclick = async () => {
     $("correct").textContent = "⚠ save failed — try again";
   }
   setTimeout(() => { $("correct").textContent = "✎ Correct this clip"; }, 2500);
+}
+$("sh-save").onclick = () => {
+  const s = target;
+  if (!s || !curSession) return setSheet(false);
+  const note = $("sh-note").value.trim();
+  const patch = { ...pending };
+  if (note && note !== (s.note || "")) patch.note = note;
+  if (!patch.outcome && !patch.action && !patch.note) return setSheet(false);
+  postVerdict(s, patch, { ...patch, corrected: true });
+};
+$("sh-clear").onclick = () => {
+  const s = target;
+  if (!s || !curSession) return setSheet(false);
+  postVerdict(s, { clear: true }, { corrected: false, note: "" });
 };
 
 // keep "current shot" synced while playing

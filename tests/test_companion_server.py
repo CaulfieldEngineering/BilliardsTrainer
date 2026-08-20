@@ -153,3 +153,24 @@ class TestCorrectionsWatcher:
         doc = json.loads(summary_path(vid).read_text())
         assert doc["shots"][0]["note"].startswith("was racking")
         assert doc["shots"][0]["corrected"] is True
+
+    def test_clear_restores_derived_authority(self, tmp_path):
+        import json
+        from billiards_trainer.companion.corrections_watcher import scan_once
+        from billiards_trainer.vision.analysis_cache import SidecarReader
+        vid = self._session(tmp_path)
+        box = tmp_path / "corrections"
+        box.mkdir()
+        (box / "v.json").write_text(json.dumps(
+            {"session": "session-test.mp4", "start": 8.0,
+             "outcome": "make", "note": "oops wrong"}))
+        assert scan_once(tmp_path) == 1
+        assert SidecarReader(vid).shots[0]["outcome"] == "make"
+        (box / "clear.json").write_text(json.dumps(
+            {"session": "session-test.mp4", "start": 8.0, "clear": True}))
+        assert scan_once(tmp_path) == 1
+        s = SidecarReader(vid).shots[0]
+        assert not s.get("corrected") and not s.get("note")
+        # post-clear the watcher re-derived: the still-cue synthetic session
+        # derives "nothing"-action/original outcome without review overrides
+        assert not s.get("_reviewed")
