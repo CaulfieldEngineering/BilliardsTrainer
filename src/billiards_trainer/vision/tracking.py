@@ -192,6 +192,7 @@ class BallTracker:
                pocket_r: float = 0.0,
                ball_r: float = 0.0) -> list[Track]:
         self._short_side = max(1.0, short_side)
+        self._frame_n = getattr(self, "_frame_n", 0) + 1
         # Table-wide expected ball radius: the FLOOR for the motion-streak
         # bar. A shrunken ghost's own radius would put its bar below the
         # scorer's rest threshold, silently re-opening the at-rest identity
@@ -503,6 +504,20 @@ class BallTracker:
         taken: set[int] = set()
         assigned: dict[int, int] = {}
         no_rename: set[int] = set()
+        ledger = getattr(self, "_num_last", {})
+
+        def _reachable(t, n) -> bool:
+            seen = ledger.get(n)
+            if seen is None:
+                return True
+            df = self._frame_n - seen[0]
+            if not 0 < df <= 12:
+                return True
+            reach = df * 0.35 * self._short_side + 3.0 * max(
+                6.0, self._ball_r if hasattr(self, "_ball_r") else 12.0)
+            return ((t.x - seen[1]) ** 2
+                    + (t.y - seen[2]) ** 2) ** 0.5 <= reach
+
         # When two RESTING tracks contest one number, the winner used to be
         # whichever came first in the track list — rank, not evidence — so
         # three stray misreads on a neighbour could strip a published
@@ -523,6 +538,13 @@ class BallTracker:
         for i in order:
             t = tracks[i]
             if True:
+                if (t.shown_number != t.committed_number
+                        and not _reachable(t, t.committed_number)):
+                    # never published this number and it just teleported
+                    # here (first-commit on a garbage track): refuse, and
+                    # drop the commitment so votes must re-earn it in place
+                    t.committed_number = -1
+                    continue
                 if t.committed_number not in taken:
                     assigned[i] = t.committed_number
                     taken.add(t.committed_number)
@@ -537,13 +559,28 @@ class BallTracker:
                     # measured colour is the "two sevens" fix, and a
                     # -1 -> n transition is never impossible.
                     no_rename.add(i)
+        # REACHABILITY GATE (Joe's shot-36 family, measured at 2.41
+        # hops/1k states library-wide): a number may only MOVE BETWEEN
+        # tracks as fast as a ball travels. A candidate track farther from
+        # the number's last published position than ~0.35 short-sides per
+        # frame (a hard-struck ball) is an assignment jump, not motion —
+        # rejected. Re-emergence after occlusion has a large frame gap, so
+        # its reach is table-wide and unaffected.
         for s, i, n in sorted(cands, key=lambda c: -c[0]):
             if i in assigned or i in no_rename or n in taken or s < 2.0:
+                continue
+            t = tracks[i]
+            if t.committed_number != n and not _reachable(t, n):
                 continue
             assigned[i] = n
             taken.add(n)
         for i, t in enumerate(tracks):
             t.committed_number = assigned.get(i, -1)
+        # refresh the ledger with what is now published
+        for t in tracks:
+            if t.committed_number >= 0:
+                ledger[t.committed_number] = (self._frame_n, t.x, t.y)
+        self._num_last = ledger
 
     @staticmethod
     def _colour_consensus(t: _Internal) -> tuple[int, float]:

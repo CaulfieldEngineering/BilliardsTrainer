@@ -864,3 +864,18 @@ Rounds continue with Joe's visual feedback as the gate.
   the phone per Joe (data still exports; one flag re-enables). Joe's
   notes are working exactly as designed: every verdict above came from
   his phone.
+- 2026-08-20 (loop, 1am): IDENTITY-WANDER measured and gated. Built
+  tools/audit_identity_wander.py — Joe's shot-36 family quantified at
+  401 hops / 2.41 per 1k states library-wide (a number teleporting >8
+  ball-diameters between DIFFERENT tracks in <1.2s — an assignment
+  jump, not motion). Fix: a REACHABILITY GATE in arbitration — a number
+  may only move between tracks at ball speed (~0.35 short-sides/frame,
+  12-frame recency window; occlusion re-emergence unaffected). First
+  version only covered greedy reassignment and measured NO improvement
+  — the hops enter via the FIRST-COMMIT path (3 stray votes commit on a
+  garbage track, and the at-rest pre-pass grants it untested), so the
+  gate now also vets first-time publications there, dropping unreachable
+  commitments so votes must re-earn the number in place. A/B: hop-heavy
+  session 8 -> 5 hops (0.95/1k); gold-standard 9-ball reproduced 11/11
+  outcomes with identical coverage and 0 hops. 2 new tests. Residual
+  hops are >12-frame re-emergences — the honest flyer-rework backlog.

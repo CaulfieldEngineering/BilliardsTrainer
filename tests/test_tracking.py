@@ -395,3 +395,41 @@ class TestColourAdoption:
         by_pos = {(round(t.x), round(t.y)): t.number for t in out}
         assert by_pos.get((100, 100)) == 6, f"real 6 lost the contest: {by_pos}"
         assert by_pos.get((300, 300)) != 6
+
+
+class TestReachabilityGate:
+    """A number may only move between tracks at ball speed (Joe's shot-36
+    family: the lost 7's number landed on garbage tracks across the table
+    within a frame — 401 hops measured library-wide)."""
+
+    def test_number_cannot_teleport_across_the_table(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        d7 = det(100, 100, cls=BallClass.SOLID)
+        d7.number = 7
+        for _ in range(8):                       # the real 7, settled
+            tr.update([d7], 675)
+        # the 7's track vanishes; a far blob starts collecting 7-votes
+        far = det(600, 1100, cls=BallClass.SOLID)
+        far.number = 7
+        out = []
+        for _ in range(4):                       # within the recent window
+            out = tr.update([far], 675)
+        thief = next((t for t in out if t.x > 400), None)
+        assert thief is not None and thief.number != 7, \
+            "the 7 teleported 1100px in 4 frames"
+
+    def test_reemergence_after_a_gap_is_allowed(self):
+        tr = BallTracker(min_hits=2, still_frames=3)
+        d7 = det(100, 100, cls=BallClass.SOLID)
+        d7.number = 7
+        for _ in range(8):
+            tr.update([d7], 675)
+        for _ in range(15):                      # long occlusion, no 7 seen
+            tr.update([], 675)
+        far = det(600, 1100, cls=BallClass.SOLID)
+        far.number = 7
+        out = []
+        for _ in range(6):
+            out = tr.update([far], 675)
+        assert any(t.number == 7 for t in out), \
+            "re-emergence after a real gap must be allowed"
