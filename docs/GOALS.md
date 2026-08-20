@@ -1016,3 +1016,11 @@ Rounds continue with Joe's visual feedback as the gate.
   during recording activity, verdicts carry automatically now); cron
   renewal window opens Aug 22; @819 contact attribution; fresh-footage
   generalization once Joe plays again.
+- 2026-08-20 (loop, 10pm): OVERNIGHT LIBRARY REBUILD launched — 35
+  stale sessions re-analyzing under the day's pipeline via
+  tools/rebuild_batch.py (recording-guarded before every session,
+  resumable by staleness, _eval/rebuild_batch.lock marks the heavy job
+  for other loops). Verdicts carry automatically. Verification when it
+  lands: hops audit + review scoreboard across the WHOLE library, spot
+  outcome checks vs Joe's July-session notes. Loops while the batch
+  runs: NO other heavy jobs (check the lock first); light work only.
