@@ -885,3 +885,14 @@ Rounds continue with Joe's visual feedback as the gate.
   watchdog hour instead of waiting for Joe's eye). Desktop review
   parity: the shot list shows Joe's confirmed-correct check and carries
   his notes in the tooltip, same data the phone writes. 2 tests.
+- 2026-08-20 (loop, 5am): REVIEW SCOREBOARD — tools/review_scoreboard.py
+  aggregates every human verdict from the sidecar ledgers into
+  accuracy-by-channel (writes _eval/review_scoreboard.json for trends).
+  First honest reading: 11 human-reviewed shots (Joe's 9 phone verdicts
+  + 2 frame-verified restorations), all corrections — 100% of reviews
+  are fixes because until yesterday there was no way to say "the
+  machine was right"; the ✓ confirm button unbiases this as it gets
+  used. First draft of the tool had counted the 200+ legacy UNTAGGED
+  derived corrections as human verdicts (claiming 213 reviews) — the
+  scoreboard now trusts only explicit src=review records. This is the
+  metric future classifier/derivation changes get judged against.
