@@ -135,14 +135,20 @@ def cmd_build(args) -> int:
                 print(f"    ! {warning}")
 
         template = Template.load()
-        session = write_session(spec, results, template)
+        session = write_session(spec, results, template, render_audio=not args.no_render)
         if session:
-            names = ", ".join(template.track_name_for(r.target) for r in results if r.midi_out)
-            sections = spec.declared_sections() or (results[0].sections if results else [])
-            marks = " ".join(sec.label for sec in sections) or "(none)"
-            print(f"  session -> {session.relative_to(REPO_ROOT)}")
-            print(f"    tracks:  {names}")
-            print(f"    markers: {marks}")
+            print(f"  session -> {session.midi.relative_to(REPO_ROOT)}")
+            print(f"    tracks:  {', '.join(session.tracks)}")
+            print(f"    markers: {' '.join(session.markers) or '(none)'}")
+            if session.mastered:
+                print(f"    master -> {session.mastered.relative_to(REPO_ROOT)}"
+                      f"  [{' -> '.join(session.master_stages)}]")
+                print(f"      before: {session.loudness_before}")
+                print(f"      after:  {session.loudness_after}")
+            elif session.audio:
+                print(f"    audio  -> {session.audio.relative_to(REPO_ROOT)}")
+            for warning in session.warnings:
+                print(f"    ! {warning}")
             if not spec.declared_sections():
                 print("    ! markers are structural labels - run `./sb sections "
                       f"{spec.slug} --write` and rename them to Verse/Chorus in spec.yaml")
@@ -343,6 +349,39 @@ def cmd_render(args) -> int:
     return 0
 
 
+# -------------------------------------------------------------------- master
+
+def cmd_master(args) -> int:
+    """Show or apply the master chain."""
+    from render.master import (
+        MasterError, build_filter_chain, load_chain, master as do_master, measure, stage_names,
+    )
+
+    chain = load_chain(args.chain)
+    if not chain:
+        print("no master chain defined (expected master.yaml)", file=sys.stderr)
+        return 1
+
+    if args.check or not args.audio:
+        print(f"master chain: {' -> '.join(stage_names(chain))}\n")
+        print(build_filter_chain(chain))
+        return 0
+
+    if not args.out:
+        print("error: need AUDIO and OUT (or --check)", file=sys.stderr)
+        return 2
+    try:
+        result = do_master(args.audio, args.out, chain, two_pass=not args.no_two_pass)
+    except MasterError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote {result.output}"
+          f"{'  (two-pass)' if result.two_pass else ''}")
+    print(f"  before: {result.before}")
+    print(f"  after:  {result.after}")
+    return 0
+
+
 # ----------------------------------------------------------------------- new
 
 def cmd_new(args) -> int:
@@ -415,6 +454,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_render.add_argument("--soundfont")
     p_render.add_argument("--gain", type=float, default=0.6)
     p_render.set_defaults(func=cmd_render)
+
+    p_master = sub.add_parser("master", help="show or apply the master chain")
+    p_master.add_argument("audio", nargs="?")
+    p_master.add_argument("out", nargs="?")
+    p_master.add_argument("--check", action="store_true", help="print the chain, do nothing")
+    p_master.add_argument("--chain", help="path to a chain file (default master.yaml)")
+    p_master.add_argument("--no-two-pass", action="store_true")
+    p_master.set_defaults(func=cmd_master)
 
     p_new = sub.add_parser("new", help="scaffold a new song from the template")
     p_new.add_argument("slug")

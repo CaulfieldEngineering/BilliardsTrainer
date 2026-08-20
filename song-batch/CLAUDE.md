@@ -190,6 +190,65 @@ too. It is an interchange format with a lossy round trip, so validate it on a
 throwaway project before trusting it. The Type 1 MIDI session file needs no such
 validation, which is why it exists first.
 
+### The master chain
+
+`master.yaml` defines a master chain as **data** - a list of stages with
+parameters. `./sb build` renders the preview session and runs the chain over it,
+so what lands on the phone is a *mastered* preview at consistent loudness rather
+than a raw one. Per-song overrides go in `spec.yaml` under `build.master`.
+
+> **It is a preview master, not the master.** Generic ffmpeg DSP applied to
+> audio that came out of a General MIDI soundfont. It answers "does this
+> arrangement hold up at competitive loudness". It says nothing about how real
+> plugins on a real mix will behave, and no audio from this path ever ships.
+
+It is data rather than code because the same definition is meant to have more
+than one consumer: rendered here today, and pushed onto the Cubase Stereo Out
+later. Write the chain once; the destinations are renderers of it.
+
+Two measured facts baked into `master.yaml`, both worth not rediscovering:
+
+- **loudnorm runs two-pass.** Single-pass is a live estimator and lands over a
+  LU off target, which makes twenty previews unfair to A/B. The first pass
+  measures what actually reaches the loudness stage (through the upstream
+  stages, not off the raw file); the second supplies those measurements.
+- **1 dB of codec headroom.** The DSP chain hits exactly -1.0 dBTP pre-encode,
+  and the 192k mp3 comes out at -0.3 - a 0.7 dB overshoot from lossy encoding.
+  So the limiter and loudness stages are set to -2.0, which lands the encoded
+  file at -1.4 dBTP, safely under the ceiling.
+
+Unit traps, handled once in `render/master.py`: ffmpeg's `acompressor` `makeup`
+is a **linear factor 1-64** and `alimiter` `limit` is **linear 0.0625-1**.
+Neither takes a dB suffix - passing dB straight through silently clamps and you
+get no limiting at all. `threshold` does take `dB`.
+
+### Getting a master into Cubase - three routes, in ascending risk
+
+The operator expects the master chain to be applied in Cubase too, not only
+offline. Three ways there, and they are not equally hard:
+
+1. **FX Chain preset (Tier 2, recommended next).** FX chain presets live in
+   user preferences, not the project, so one generated preset propagates to all
+   20 projects and is applied to the Stereo Out in one click. No scripting, no
+   MIDI bridge, no Cubase running while it is generated. *Verify first:* whether
+   the preset format is cleanly writable, or must be saved once from the GUI and
+   templated - same open question as `.drm`. Assume templated until proven
+   otherwise.
+2. **`.dawproject` device chain (Tier 2).** Device chains can be written into
+   the project XML directly. Lossy round trip; validate on a throwaway.
+3. **MIDI Remote `trySetSlotPlugin` (Tier 3, last).** Genuinely possible in API
+   1.3 but freshly trodden, and it needs the SysEx bridge finished first.
+   **Additional unknown specific to mastering:** the API exposes
+   `mHostAccess.mTrackSelection.mMixerChannel` - the *selected track*. Whether
+   an output bus like Stereo Out is addressable that way at all is unverified.
+   Check that before budgeting any time here.
+
+**And the thing that does not change:** a scripted master you cannot hear is
+worthless, and the audio to judge it by can never come from Cubase - the script
+sandbox cannot render, and Export Audio Mixdown is a modal dialog. Verification
+always comes back through our own render path. That is the reason Tier 3 is last
+and thin, and it applies to mastering exactly as it applies to everything else.
+
 ### Preview mapping - important
 
 Once MIDI is remapped to SSD note numbers, playing it through a **General MIDI**
@@ -227,6 +286,7 @@ intermediate `.wav` is gitignored.
 ./sb map doctor                  # what in the map is unverified or unfilled
 ./sb render in.mid out.mp3
 ./sb render --check              # is rendering possible on this machine?
+./sb master --check              # show the master chain as an ffmpeg filter string
 ./sb new my-song --title "My Song"
 python3 -m pytest                # 69 tests
 ```

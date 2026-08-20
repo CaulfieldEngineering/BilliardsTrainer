@@ -1,0 +1,64 @@
+# The master chain, described as data.
+#
+# One definition, several destinations. Today it is rendered offline with
+# ffmpeg so that the phone preview is a *mastered* preview. Later the same
+# definition drives the Cubase Stereo Out - as a generated FX Chain preset, or
+# via the MIDI Remote script. Keeping it as data is what stops those from
+# drifting apart.
+#
+# >>> This is a PREVIEW master, not the master. <<<
+# It is generic ffmpeg DSP applied to audio that came out of a General MIDI
+# soundfont. It answers "does this arrangement hold up at competitive
+# loudness". It says nothing about how your plugins on your real mix behave,
+# and no audio from this path ever ships.
+#
+# Per-song overrides go in spec.yaml under `build.master`.
+
+target:
+  # Streaming-normalisation territory. Loud enough to judge, not crushed.
+  lufs: -14
+  # The ceiling the DELIVERED mp3 must not exceed.
+  true_peak_db: -1.0
+  # ...which is why the limiter and loudness stages below are set to -2.0, not
+  # -1.0. Lossy encoding raises true peak: measured on this material, the DSP
+  # chain lands at exactly -1.0 dBTP pre-encode and the 192k mp3 comes out at
+  # -0.3, a 0.7 dB overshoot. 1 dB of codec headroom lands the encoded file at
+  # -1.4 dBTP, safely under. Over-shooting is a real defect; under-shooting
+  # costs nothing at preview loudness.
+  codec_headroom_db: 1.0
+
+chain:
+  - stage: highpass
+    frequency: 30
+    poles: 2
+    comment: Nothing musical lives below this; it only eats limiter headroom.
+
+  - stage: eq
+    frequency: 250
+    gain_db: -1.5
+    q: 0.9
+    comment: Shave the boxiness that GM drum samples always have.
+
+  - stage: eq
+    frequency: 8000
+    gain_db: 1.0
+    q: 0.7
+    comment: A little air so cymbals read on a phone speaker.
+
+  - stage: compressor
+    threshold_db: -18
+    ratio: 2.5
+    attack_ms: 25       # slow enough to let transients through
+    release_ms: 180
+    makeup_db: 2
+    knee_db: 4
+
+  - stage: limiter
+    ceiling_db: -2.0      # -1.0 ceiling + 1.0 dB codec headroom, see target above
+    attack_ms: 5
+    release_ms: 50
+
+  - stage: loudness
+    target_lufs: -14
+    true_peak_db: -2.0    # as above
+    range_lu: 11

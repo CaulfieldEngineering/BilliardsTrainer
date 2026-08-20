@@ -35,6 +35,9 @@ example-riff - Example Riff  [drums-programmed]
   session -> songs/example-riff/build/example-riff.mid
     tracks:  Drums SSD
     markers: Intro Verse 1 Chorus Verse 2
+    master -> songs/example-riff/build/example-riff.master.mp3
+      before: -26.5 LUFS, peak -8.1 dBTP, range 4.7 LU
+      after:  -15.2 LUFS, peak -1.4 dBTP, range 4.3 LU
 ```
 
 That last file is the deliverable: one import, and the session arrives with the
@@ -49,6 +52,7 @@ named tracks.
 | `lib/` | The transform library. Deterministic MIDI transforms, GM→SSD remapping, section detection, the `spec.yaml` schema. |
 | `maps/ssd.json` | Single source of truth for GM→SSD note translation. |
 | `template.yaml` | The Cubase template as data — track names and MixConsole order. |
+| `master.yaml` | The master chain as data. Rendered offline today; destined for the Cubase Stereo Out later. |
 | `songs/<slug>/` | Per song: `spec.yaml` (status + build config), `suno/` (immutable inputs), `build/` (derived), `notes.md`. |
 | `render/` | fluidsynth wrapper today; a headless JUCE VST3 host later. |
 | `pm/`, `bridge/` | Design notes for the parts not built yet. Read before building them. |

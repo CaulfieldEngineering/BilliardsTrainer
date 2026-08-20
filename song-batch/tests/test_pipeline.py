@@ -126,3 +126,22 @@ def test_target_pointing_at_undefined_source_is_a_clear_error(song):
 def test_disabled_target_is_skipped(song):
     song.raw["build"]["targets"]["drums"]["enabled"] = False
     assert build_song(song, DrumMap.load(), render_audio=False) == []
+
+
+def test_build_prunes_stale_artifacts(song):
+    """build/ is entirely derived. A target turned off must not leave its last
+    output sitting there looking current - especially as build/ is committed."""
+    build_song(song, DrumMap.load(), render_audio=False)
+    stale = song.build_dir / "drums.mp3"
+    stale.write_bytes(b"an old render nobody regenerates any more")
+    build_song(song, DrumMap.load(), render_audio=False)
+    assert not stale.exists()
+
+
+def test_targeted_build_does_not_prune_other_targets(song):
+    """--target rebuilds one thing; it must not delete the others' outputs."""
+    build_song(song, DrumMap.load(), render_audio=False)
+    other = song.build_dir / "bass.mid"
+    other.write_bytes(b"another target's output")
+    build_song(song, DrumMap.load(), render_audio=False, only=["drums"])
+    assert other.exists()

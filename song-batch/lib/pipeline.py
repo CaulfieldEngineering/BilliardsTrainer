@@ -236,12 +236,35 @@ def build_target(
     return result
 
 
+def clean_build_dir(spec: Spec) -> int:
+    """Delete the song's derived artifacts. Returns how many files went.
+
+    build/ is entirely derived, so a build starts from empty. Without this,
+    turning a target off leaves its last output sitting there looking current -
+    and since build/ is committed, a stale render can be listened to, or
+    reviewed, weeks after the thing that made it stopped existing.
+    """
+    build_dir = spec.build_dir
+    if not build_dir.exists():
+        return 0
+    removed = 0
+    for path in build_dir.iterdir():
+        if path.is_file():
+            path.unlink()
+            removed += 1
+    return removed
+
+
 def build_song(
     spec: Spec,
     drum_map: DrumMap,
     render_audio: bool = True,
     only: Optional[List[str]] = None,
 ) -> List[BuildResult]:
+    # Only safe to wipe when building everything; a --target run would
+    # otherwise delete the outputs of targets it is not rebuilding.
+    if only is None:
+        clean_build_dir(spec)
     results: List[BuildResult] = []
     for name, config in spec.build_targets().items():
         if only and name not in only:
@@ -252,20 +275,60 @@ def build_song(
     return results
 
 
+@dataclass
+class SessionResult:
+    """The song-level artifacts: the file you import, and the one you listen to."""
+
+    midi: Path
+    preview_midi: Optional[Path] = None
+    audio: Optional[Path] = None
+    mastered: Optional[Path] = None
+    tracks: List[str] = field(default_factory=list)
+    markers: List[str] = field(default_factory=list)
+    master_stages: List[str] = field(default_factory=list)
+    loudness_before: Optional[Any] = None
+    loudness_after: Optional[Any] = None
+    warnings: List[str] = field(default_factory=list)
+
+
+def _assemble_from(results, attr, spec, template, sections, reference_tpb):
+    tracks: List[NamedTrack] = []
+    for result in sorted(results, key=lambda r: template.order_key(r.target)):
+        path = getattr(result, attr)
+        if not path or not path.exists():
+            continue
+        tracks.extend(tracks_from_file(mido.MidiFile(str(path)), template.track_name_for(result.target)))
+    if not tracks:
+        return None
+    return assemble(
+        tracks=tracks,
+        sections=sections,
+        ticks_per_beat=reference_tpb,
+        beats_per_bar=spec.beats_per_bar,
+        bpm=spec.bpm,
+        time_signature=spec.time_signature,
+    )
+
+
 def write_session(
     spec: Spec,
     results: List[BuildResult],
     template: Optional[Template] = None,
-) -> Optional[Path]:
-    """Write the single importable session file for a song.
+    render_audio: bool = True,
+) -> Optional[SessionResult]:
+    """Write the song-level artifacts.
 
-    Track 0 carries tempo, time signature and section markers. Each build target
-    becomes one track, named from template.yaml and ordered by its position in
-    the Cubase template's MixConsole order.
+    Three files come out of here:
 
-    Section names come from spec.yaml when the operator has written them
-    ("Verse 1", "Chorus"). Otherwise the detector's structural labels (A, B, C)
-    are used, which is honest about the fact that nothing has named them yet.
+    * ``<slug>.mid``          - SSD note numbers. **This is what goes into Cubase.**
+    * ``<slug>.preview.mid``  - the same session reverse-mapped to General MIDI.
+    * ``<slug>.master.mp3``   - that preview rendered and run through the master
+      chain, so what lands on the phone is judged at realistic loudness.
+
+    Track 0 of both MIDI files is a conductor track carrying tempo, meter and
+    one marker per arrangement section. Section names come from spec.yaml when
+    the operator has written them; otherwise the detector's structural labels
+    are used, which is honest about nothing having named them yet.
     """
     usable = [r for r in results if r.midi_out and r.midi_out.exists()]
     if not usable:
@@ -280,18 +343,58 @@ def write_session(
                 sections = list(result.sections)
                 break
 
-    tracks: List[NamedTrack] = []
-    for result in sorted(usable, key=lambda r: template.order_key(r.target)):
-        mid = mido.MidiFile(str(result.midi_out))
-        tracks.extend(tracks_from_file(mid, template.track_name_for(result.target)))
+    reference_tpb = mido.MidiFile(str(usable[0].midi_out)).ticks_per_beat
+    session = _assemble_from(usable, "midi_out", spec, template, sections, reference_tpb)
+    if session is None:
+        return None
 
-    reference = mido.MidiFile(str(usable[0].midi_out))
-    session = assemble(
-        tracks=tracks,
-        sections=sections,
-        ticks_per_beat=reference.ticks_per_beat,
-        beats_per_bar=spec.beats_per_bar,
-        bpm=spec.bpm,
-        time_signature=spec.time_signature,
+    out = SessionResult(
+        midi=save(session, spec.build_dir / f"{spec.slug}.mid"),
+        tracks=[template.track_name_for(r.target) for r in usable],
+        markers=[s.label for s in sections],
     )
-    return save(session, spec.build_dir / f"{spec.slug}.mid")
+
+    preview = _assemble_from(usable, "preview_midi", spec, template, sections, reference_tpb)
+    if preview is not None:
+        out.preview_midi = save(preview, spec.build_dir / f"{spec.slug}.preview.mid")
+
+    if render_audio and out.preview_midi:
+        _render_and_master(spec, out)
+
+    return out
+
+
+def _render_and_master(spec: Spec, session: SessionResult) -> None:
+    """Render the preview session, then run the master chain over it."""
+    from render.fluidsynth import RenderError, preflight, render as do_render
+    from render.master import MasterError, load_chain, master, stage_names
+
+    problems = preflight()
+    blocking = [p for p in problems if "fluidsynth" in p or "soundfont" in p]
+    if blocking:
+        session.warnings.extend(blocking)
+        return
+
+    try:
+        rendered = do_render(session.preview_midi, spec.build_dir / f"{spec.slug}.mp3")
+        session.audio = rendered.output
+    except RenderError as exc:
+        session.warnings.append(f"render failed: {exc}")
+        return
+
+    chain = spec.raw.get("build", {}).get("master")
+    if chain is None:
+        chain = load_chain()
+    if chain is False or not chain:
+        return
+
+    try:
+        result = master(session.audio, spec.build_dir / f"{spec.slug}.master.mp3", chain)
+    except MasterError as exc:
+        session.warnings.append(f"master failed: {exc}")
+        return
+
+    session.mastered = result.output
+    session.master_stages = result.stages
+    session.loudness_before = result.before
+    session.loudness_after = result.after

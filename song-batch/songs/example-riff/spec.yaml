@@ -22,7 +22,7 @@ build:
     drums:
       source: drums
       channel: 9
-      render: true
+      render: false   # the song-level session render supersedes the per-part one
       transforms:
       - name: remap
       - name: resolve_chokes
