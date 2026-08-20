@@ -50,11 +50,7 @@
   #shotinfo .t { color:var(--dim); font-size:12px; margin-left:auto; }
   #desc { color:var(--dim); font-size:13px; min-height:1.4em; margin-bottom:8px; }
   #nav { display:flex; gap:8px; margin-bottom:10px; }
-  #speed { display:flex; gap:8px; margin-bottom:10px; }
-  #speed button { flex:1; height:36px; background:var(--panel);
-                  color:var(--dim); border:1px solid var(--line);
-                  border-radius:4px; font-size:13px; font-weight:600; }
-  #speed button.on { color:var(--accent); border-color:var(--accent); }
+  #nav #rate.on { color:var(--accent); border-color:var(--accent); }
   #nav button { flex:1; height:44px; background:var(--panel); color:var(--text);
                 border:1px solid var(--line); border-radius:4px; font-size:15px;
                 font-weight:600; }
@@ -125,12 +121,8 @@
     <div id="nav">
       <button id="prev">‹</button>
       <button id="mode" title="repeat this shot">⟳ Repeat</button>
+      <button id="rate" title="playback speed">1×</button>
       <button id="next">›</button>
-    </div>
-    <div id="speed">
-      <button data-rate="0.25">¼×</button>
-      <button data-rate="0.5">½×</button>
-      <button data-rate="1" class="on">1×</button>
     </div>
     <div id="chips"></div>
   </div>
@@ -470,19 +462,23 @@ $("video").addEventListener("seeked", () => {
   lane.addEventListener("pointercancel", end);
 })();
 
-// ---- slow motion (Joe): ¼× / ½× / 1×; iOS resets rate on new media, so
-// reapply on every play ------------------------------------------------
+// ---- slow motion (Joe): ONE button on the transport line, tap to
+// cycle 1x -> 1/2x -> 1/4x -> 1x. iOS resets rate on new media, so
+// reapply on every play.
+const RATES = [1, 0.5, 0.25];
+const RATE_LABEL = { 1: "1×", 0.5: "½×", 0.25: "¼×" };
 let rate = parseFloat(localStorage.getItem("rate") || "1") || 1;
+if (!RATES.includes(rate)) rate = 1;
 function applyRate() {
   $("video").playbackRate = rate;
-  [...$("speed").children].forEach(b =>
-    b.classList.toggle("on", parseFloat(b.dataset.rate) === rate));
+  $("rate").textContent = RATE_LABEL[rate];
+  $("rate").classList.toggle("on", rate !== 1);
 }
-[...$("speed").children].forEach(b => b.onclick = () => {
-  rate = parseFloat(b.dataset.rate);
+$("rate").onclick = () => {
+  rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length];
   localStorage.setItem("rate", rate);
   applyRate();
-});
+};
 $("video").addEventListener("play", applyRate);
 applyRate();
 modeLabel();
