@@ -201,9 +201,11 @@
     <div id="lane"><div id="playhead"></div></div>
     <div id="nav">
       <button id="prev">‹</button>
+      <button id="fprev" title="back one frame">‹·</button>
       <button id="play" title="play / pause">▶</button>
       <button id="mode" title="repeat this shot">⟳</button>
       <button id="rate" title="playback speed">1×</button>
+      <button id="fnext" title="forward one frame">·›</button>
       <button id="next">›</button>
     </div>
     <div id="lower">
@@ -669,12 +671,18 @@ $("video").addEventListener("seeked", () => {
 (() => {
   const lane = $("lane");
   let scrubbing = false, wasPlaying = false, lastT = null;
+  const FPS = 30;                        // recording cadence (~29.996)
   const seekTo = ev => {
     if (!win) return;
     const r = lane.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
-    lastT = win.t0 + frac * (win.t1 - win.t0);
-    requestSeek(lastT, true);            // keyframe-fast while dragging
+    // PRECISE seeks quantized to frame boundaries. fastSeek felt fast
+    // but lands on KEYFRAMES 1-2s apart — the picture skipped whole
+    // seconds (Joe: "very jumpy, can't thumb scroll frame by frame").
+    // Quantizing dedupes sub-frame drag events so the latest-wins chain
+    // spends its budget only on frames that actually differ.
+    lastT = Math.round((win.t0 + frac * (win.t1 - win.t0)) * FPS) / FPS;
+    requestSeek(lastT, false);
     $("playhead").style.left = (100 * frac) + "%";
   };
   lane.addEventListener("pointerdown", ev => {
@@ -695,6 +703,18 @@ $("video").addEventListener("seeked", () => {
   };
   lane.addEventListener("pointerup", end);
   lane.addEventListener("pointercancel", end);
+})();
+
+// ---- frame stepping (Joe: "thumb scroll frame by frame"): single-
+// frame nudges with precise seeks; pauses playback so the frame holds.
+(() => {
+  const step = dir => {
+    const v = $("video");
+    v.pause();
+    requestSeek(Math.max(0, v.currentTime + dir / 30), false);
+  };
+  $("fprev").onclick = () => step(-1);
+  $("fnext").onclick = () => step(1);
 })();
 
 // ---- slow motion (Joe): ONE button on the transport line, tap to
