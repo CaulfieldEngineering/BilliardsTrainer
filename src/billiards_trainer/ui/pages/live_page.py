@@ -384,6 +384,17 @@ class LivePage(QWidget):
         self._speed_combo.activated.connect(
             lambda _i: self.video_speed.emit(float(self._speed_combo.currentText().rstrip("×"))))
         lay.addWidget(self._speed_combo)
+        # Analysis overlays (Joe): SAME stored geometry the phone draws.
+        self._aim_btn = QPushButton("Aim")
+        self._paths_btn = QPushButton("Paths")
+        for b, attr in ((self._aim_btn, "overlay_aim"),
+                        (self._paths_btn, "overlay_paths")):
+            b.setObjectName("Ghost")
+            b.setCheckable(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setChecked(bool(getattr(self._settings.ui, attr, False)))
+            b.toggled.connect(lambda on, a=attr: self._set_overlay(a, on))
+            lay.addWidget(b)
         self._fix_labels_btn = QPushButton("Train AI")
         self._fix_labels_btn.setObjectName("Ghost")
         self._fix_labels_btn.setCheckable(True)
@@ -1049,6 +1060,39 @@ class LivePage(QWidget):
                                                           "perspective", None) is not None:
                 self._ingest_label_frame(self._last_packet)
 
+    def _set_overlay(self, attr: str, on: bool) -> None:
+        setattr(self._settings.ui, attr, bool(on))
+        try:
+            self._settings.save()
+        except Exception:  # noqa: BLE001 - persistence is best-effort
+            pass
+
+    def on_overlays_loaded(self, doc) -> None:
+        """Playback overlay geometry (shots.json) for the open video —
+        the same summary the phone reads (compute-once, never diverges)."""
+        self._overlay_doc = doc
+
+    def _feed_analysis_overlays(self, packet) -> None:
+        doc = getattr(self, "_overlay_doc", None)
+        t = getattr(packet, "media_t", -1.0)
+        ui = self._settings.ui
+        want_aim = bool(getattr(ui, "overlay_aim", False))
+        want_paths = bool(getattr(ui, "overlay_paths", False))
+        if doc is None or t < 0 or not (want_aim or want_paths):
+            self._persp.set_analysis(None, None, -1.0)
+            return
+        shot = None
+        for sh in doc.get("shots", []):
+            if sh.get("start", 0) - 5.0 <= t <= sh.get("end", 0) + 1.5:
+                shot = sh
+                break
+        if shot is None:
+            self._persp.set_analysis(None, None, -1.0)
+            return
+        aim = (shot.get("aim") or {}).get("p") if want_aim else None
+        trails = shot.get("trails") if want_paths else None
+        self._persp.set_analysis(aim, trails, t)
+
     def _ingest_label_frame(self, packet) -> None:
         try:
             import threading
@@ -1211,6 +1255,7 @@ class LivePage(QWidget):
             if self._training:
                 self._ingest_label_frame(packet)   # draw the labelling overlay
             else:
+                self._feed_analysis_overlays(packet)
                 self._persp.set_frame(packet.perspective)
         if packet.birdseye is not None:
             self._bird.set_frame(packet.birdseye)

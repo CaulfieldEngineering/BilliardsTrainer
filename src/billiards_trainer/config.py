@@ -290,6 +290,8 @@ class UiSettings:
     # Rail sections the user has folded (CollapsibleSection keys)
     collapsed_sections: list[str] = field(default_factory=list)
     schematic_birdseye: bool = True  # clean rendered overhead vs warped camera
+    overlay_aim: bool = False        # playback: draw the stored aim line
+    overlay_paths: bool = False      # playback: draw the stored ball paths
     mirror_preview: bool = False
     # Render balls in their MEASURED mean colour (a blue ball looks blue), with a
     # neutral grey "?" when the class is uncertain — instead of a fixed per-class

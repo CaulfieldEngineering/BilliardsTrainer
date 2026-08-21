@@ -58,6 +58,7 @@ class FramePacket:
     clock_enabled: bool = False
     clock_warning: bool = False
     deviated: bool = False
+    media_t: float = -1.0          # video playback seconds (-1 when live)
     tracks: list = field(default_factory=list)
     raw_dets: list = field(default_factory=list)   # camera-coord dets + guessed numbers (labelling)
     feed_sd: bool = False   # camera fell back to the 480p HDMI mode (re-arm ML)
@@ -79,6 +80,7 @@ class PipelineController(QObject):
     detection_changed = Signal(bool)    # auto-detection on/off
     capture_progress = Signal(str)      # analysis-capture status text
     capture_saved = Signal(str)         # path to a finished analysis-capture zip
+    overlays_loaded = Signal(object)    # playback: shots.json doc (aim/trails)
     failure_flagged = Signal(str)       # path to a staged debug bundle
     source_is_video = Signal(bool, int, float)  # (seekable video?, frame_count, fps)
     video_state = Signal(int, int, bool)  # (current frame, total frames, playing)
@@ -276,6 +278,18 @@ class PipelineController(QObject):
                     if self._pipeline is not None:
                         self._pipeline.playback_cache = reader
                     self.cached_shots.emit(list(reader.shots))
+                    # the compute-once overlay geometry (aim lines, ball
+                    # paths) rides the SAME summary the phone reads — the
+                    # two surfaces can never disagree (Joe's requirement)
+                    try:
+                        import json as _json
+                        from pathlib import Path as _P
+                        sj = _P(str(source_spec) + ".shots.json")
+                        if sj.is_file():
+                            self.overlays_loaded.emit(
+                                _json.loads(sj.read_text(encoding="utf-8")))
+                    except (OSError, ValueError):
+                        pass
                     log.info("playback from analysis cache (%d states)", len(reader))
             except (OSError, ValueError) as exc:
                 log.warning("analysis cache unreadable (%s) — re-analyzing live", exc)
@@ -1217,6 +1231,7 @@ class PipelineController(QObject):
             clock_enabled=self._clock.enabled and self._clock_allowed,
             clock_warning=self._clock.is_warning(t),
             deviated=res.deviated, tracks=res.tracks, raw_dets=res.raw_dets,
+            media_t=(t if getattr(self._source, "is_video", False) else -1.0),
         ))
         if getattr(self._source, "is_video", False):
             self.video_state.emit(self._video_pos, self._source.frame_count,

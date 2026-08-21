@@ -99,3 +99,30 @@ class TestStatsRailIsAList:
         assert "class _StatRow" in src, "the vertical stat rows are gone"
         assert '"SESSION", grid_holder' not in src, "SESSION fold came back"
         assert "_big_stat" not in src, "big stat blocks came back"
+
+
+def test_video_view_draws_stored_aim_line(app):
+    """Desktop parity pin: VideoView must render the SAME stored aim
+    geometry the phone draws (compute-once contract). Offscreen render,
+    then assert green tracer pixels along the segment."""
+    import numpy as np
+    from PySide6.QtGui import QImage
+    from billiards_trainer.ui.widgets.video_view import VideoView
+
+    v = VideoView()
+    v.resize(400, 300)
+    v.show()                     # set_frame() skips hidden views by design
+    frame = np.zeros((300, 400, 3), np.uint8)
+    frame[:] = (60, 60, 60)
+    v.set_frame(frame)
+    v.set_analysis([[0.1, 0.5], [0.9, 0.5]], None, 0.0)
+    img = v.grab().toImage().convertToFormat(QImage.Format_RGB888)
+    hits = 0
+    for fx in (0.3, 0.5, 0.7):
+        x = int(img.width() * fx)
+        for y in range(int(img.height() * 0.42), int(img.height() * 0.58)):
+            c = img.pixelColor(x, y)
+            if c.green() > 150 and c.green() > c.red() + 40:
+                hits += 1
+                break
+    assert hits == 3, f"aim tracer not painted along the segment ({hits}/3)"

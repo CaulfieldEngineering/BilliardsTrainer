@@ -59,6 +59,55 @@ class VideoView(QWidget):
             self.update()
         super().leaveEvent(event)
 
+    def set_analysis(self, aim, trails, t: float) -> None:
+        """Playback analysis overlays from the SAME shots.json the phone
+        reads (compute-once: the two surfaces can never disagree).
+        ``aim`` = [[x1,y1],[x2,y2]] video-normalized or None; ``trails`` =
+        [{"n": ball, "p": [[t,x,y],...]}] or None; ``t`` = media seconds."""
+        self._aim = aim
+        self._trails = trails
+        self._media_t = float(t)
+        # no forced repaint — set_frame() drives the per-frame update
+
+    #: same fade window as the phone player (parity is the contract)
+    _TRAIL_TAIL_S = 4.0
+    _BALL_COL = {0: "#F2F2F2", 1: "#F5D90A", 2: "#2F81F7", 3: "#E5484D",
+                 4: "#8250DF", 5: "#F0883E", 6: "#3FB950", 7: "#A16207",
+                 8: "#161B22", 9: "#F5D90A"}
+
+    def _draw_analysis(self, p: QPainter) -> None:
+        r = self._draw_rect
+        if r is None:
+            return
+        aim = getattr(self, "_aim", None)
+        trails = getattr(self, "_trails", None)
+        t = getattr(self, "_media_t", -1.0)
+        X = lambda q: r.x() + q[1] * r.width()   # noqa: E731
+        Y = lambda q: r.y() + q[2] * r.height()  # noqa: E731
+        if trails and t >= 0:
+            p.setBrush(Qt.NoBrush)
+            for tr in trails:
+                pts = [q for q in tr.get("p", [])
+                       if t - self._TRAIL_TAIL_S <= q[0] <= t]
+                col = QColor(self._BALL_COL.get(tr.get("n", -1), "#9AA4B2"))
+                for i in range(1, len(pts)):
+                    age = (t - pts[i][0]) / self._TRAIL_TAIL_S
+                    col.setAlphaF(max(0.0, 0.85 * (1.0 - age)))
+                    p.setPen(QPen(col, 3))
+                    p.drawLine(QPointF(X(pts[i - 1]), Y(pts[i - 1])),
+                               QPointF(X(pts[i]), Y(pts[i])))
+        if aim:
+            a = (0.0, aim[0][0], aim[0][1])
+            b = (0.0, aim[1][0], aim[1][1])
+            halo = QColor(10, 25, 12)
+            halo.setAlphaF(0.4)
+            p.setPen(QPen(halo, 4.0, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(X(a), Y(a)), QPointF(X(b), Y(b)))
+            core = QColor("#7DF29B")
+            core.setAlphaF(0.8)
+            p.setPen(QPen(core, 1.6, Qt.SolidLine, Qt.RoundCap))
+            p.drawLine(QPointF(X(a), Y(a)), QPointF(X(b), Y(b)))
+
     def set_balls(self, balls: list) -> None:
         """Ball markers for hover-to-reveal: [(x, y, r, label)] in image pixels.
         Hovering a ball shows its number in a small chip (numbers are deliberately
@@ -152,6 +201,7 @@ class VideoView(QWidget):
                     p.setFont(QFont("Arial", max(8, int(rr)), QFont.Bold))
                     p.drawText(QRectF(cx - rr, cy - rr - 22, 2 * rr + 60, 20),
                                Qt.AlignLeft | Qt.AlignVCenter, text)
+        self._draw_analysis(p)
         self._draw_hover_label(p, rect)
         p.end()
 
