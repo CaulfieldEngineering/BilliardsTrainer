@@ -162,14 +162,30 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             entry["reviewed"] = True
         if s.get("note"):
             entry["note"] = s["note"]
+        desc = None
         try:
             from .describe import compose_text, describe_shot
-            entry["text"] = compose_text(describe_shot(reader, s))
+            desc = describe_shot(reader, s)
+            entry["text"] = compose_text(desc)
         except Exception:  # noqa: BLE001 - description is enrichment
             pass
         if tf is not None:
             try:
                 entry["trails"] = _shot_trails(reader, s, tf)
+                # The badge row must NEVER contradict the description
+                # (Joe: "it even knows potted the 6, but marks the 2"):
+                # every ball the FACTS name — potted, first contact —
+                # appears as a badge even when its trail was lost or
+                # mislabeled. Empty polyline = badge only, no drawn path.
+                if desc is not None:
+                    named = {p.get("ball") for p in desc.get("potted", [])}
+                    if desc.get("first_object") is not None:
+                        named.add(desc["first_object"])
+                    named.discard(0)
+                    named.discard(None)
+                    have = {e["n"] for e in entry["trails"]}
+                    for n in sorted(named - have):
+                        entry["trails"].append({"n": int(n), "p": []})
             except Exception:  # noqa: BLE001 - trails are enrichment
                 pass
         shots.append(entry)
