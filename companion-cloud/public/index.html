@@ -191,6 +191,7 @@
     <div id="spinner"><div></div></div>
     <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
     <canvas id="trails"></canvas>
+    <canvas id="drawcv" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none"></canvas>
   </div>
   <div id="shotbar">
     <div id="shotinfo">
@@ -210,8 +211,26 @@
       <button id="next">›</button>
     </div>
     <div id="lower">
+      <button id="ovbtn" title="overlays &amp; drawing"
+              style="flex:0 0 auto;min-width:52px">☰</button>
       <button id="correct">✎ Correct this clip</button>
       <div id="chips"></div>
+    </div>
+    <div id="ovmenu" style="display:none;position:absolute;left:12px;right:12px;
+         bottom:90px;z-index:40;background:#151A21;border:1px solid #2A323D;
+         border-radius:2px;padding:10px 12px">
+      <div style="font-size:12px;letter-spacing:.08em;color:#8A94A2;
+           margin-bottom:8px">DRAWING</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="d-line">＋ Line</button>
+        <button id="d-angle">＋ Protractor</button>
+        <button id="d-show">👁 Shown</button>
+        <button id="d-del" disabled>Remove selected</button>
+        <button id="d-clear">Clear shot</button>
+      </div>
+      <div style="font-size:12px;color:#5A6472;margin-top:10px">
+        Aim line &amp; ball paths arrive here with the analysis overlays.
+      </div>
     </div>
     <div id="sheet">
       <p id="sh-desc"></p>
@@ -609,6 +628,7 @@ function drawTrails() {
   if (window.TRAILS_ON) drawTrails();
   else { const c = $("trails");
          c.getContext("2d").clearRect(0, 0, c.width, c.height); }
+  Draw.render();
   if (win) {
     // while the thumb owns the playhead, the video's lagging seek time
     // must NOT fight it (Joe: "still sticky when I drag") — the drag
@@ -795,6 +815,167 @@ const FrameCache = (() => {
   }
   return { draw, hide: () => { $("scrubcv").style.display = "none"; } };
 })();
+
+// ---- DRAWING SUITE (Joe: "straight lines that can be drawn and moved
+// around, persistent across frames of a shot... maybe a protractor").
+// Objects live in coordinates NORMALIZED to the video's content box, so
+// they stay pinned to the table through resizes and across every frame
+// of the shot. Saved per session+shot on this device.
+const Draw = (() => {
+  let objs = [], sel = -1, show = true, loadedKey = "";
+  const cv = $("drawcv");
+  const key = () => `draw:${typeof curSession !== "undefined" ? curSession : ""}:${cur}`;
+  const save = () => { try { localStorage.setItem(key(), JSON.stringify(objs)); } catch (e) {} };
+  const load = () => {
+    loadedKey = key();
+    sel = -1;
+    try { objs = JSON.parse(localStorage.getItem(loadedKey) || "[]"); }
+    catch (e) { objs = []; }
+    syncUI();
+  };
+  function box() {                       // video CONTENT rect in canvas px
+    const v = $("video"), r = v.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width * dpr);
+    cv.height = Math.round(r.height * dpr);
+    if (!v.videoWidth) return { ox: 0, oy: 0, w: cv.width, h: cv.height };
+    const s = Math.min(cv.width / v.videoWidth, cv.height / v.videoHeight);
+    const w = v.videoWidth * s, h = v.videoHeight * s;
+    return { ox: (cv.width - w) / 2, oy: (cv.height - h) / 2, w, h };
+  }
+  const toPx = (b, p) => [b.ox + p[0] * b.w, b.oy + p[1] * b.h];
+  const toN = (b, x, y) => [(x - b.ox) / b.w, (y - b.oy) / b.h];
+  function render() {
+    if (loadedKey !== key()) load();
+    const g = cv.getContext("2d");
+    const b = box();
+    g.clearRect(0, 0, cv.width, cv.height);
+    cv.style.pointerEvents = (show && objs.length) ? "auto" : "none";
+    if (!show) return;
+    const dpr = window.devicePixelRatio || 1;
+    objs.forEach((o, i) => {
+      const P = o.pts.map(p => toPx(b, p));
+      const tracer = (a, c) => {
+        g.lineCap = "round";
+        g.strokeStyle = "rgba(10,25,12,.55)"; g.lineWidth = 4.5 * dpr;
+        g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.stroke();
+        g.strokeStyle = i === sel ? "#FFD54A" : "#7DF29B"; g.lineWidth = 1.8 * dpr;
+        g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.stroke();
+      };
+      if (o.type === "line") tracer(P[0], P[1]);
+      else {                              // protractor: vertex + two rays
+        tracer(P[0], P[1]); tracer(P[0], P[2]);
+        const a1 = Math.atan2(P[1][1] - P[0][1], P[1][0] - P[0][0]);
+        const a2 = Math.atan2(P[2][1] - P[0][1], P[2][0] - P[0][0]);
+        let d = Math.abs(a2 - a1) * 180 / Math.PI;
+        if (d > 180) d = 360 - d;
+        const rr = 34 * dpr;
+        g.strokeStyle = i === sel ? "#FFD54A" : "#7DF29B"; g.lineWidth = 1.2 * dpr;
+        g.beginPath(); g.arc(P[0][0], P[0][1], rr, Math.min(a1, a2), Math.max(a1, a2));
+        g.stroke();
+        const mid = (a1 + a2) / 2, lx = P[0][0] + Math.cos(mid) * (rr + 16 * dpr),
+              ly = P[0][1] + Math.sin(mid) * (rr + 16 * dpr);
+        const label = d.toFixed(1) + "°";
+        g.font = `${12 * dpr}px -apple-system, sans-serif`;
+        const tw = g.measureText(label).width;
+        g.fillStyle = "rgba(13,17,23,.82)";
+        g.fillRect(lx - tw / 2 - 5 * dpr, ly - 9 * dpr, tw + 10 * dpr, 18 * dpr);
+        g.fillStyle = "#EAF2EA";
+        g.textAlign = "center"; g.textBaseline = "middle";
+        g.fillText(label, lx, ly);
+      }
+      if (i === sel) {
+        P.forEach(p => {
+          g.fillStyle = "rgba(255,213,74,.28)";
+          g.beginPath(); g.arc(p[0], p[1], 14 * dpr, 0, 7); g.fill();
+          g.fillStyle = "#FFD54A";
+          g.beginPath(); g.arc(p[0], p[1], 4 * dpr, 0, 7); g.fill();
+        });
+      }
+    });
+  }
+  // ---- touch: drag handles, drag bodies, tap-through to play toggle
+  let drag = null;                       // {obj, pt|-1 (=whole), lx, ly}
+  const near = (x, y, p, r) => (x - p[0]) ** 2 + (y - p[1]) ** 2 <= r * r;
+  const segDist = (x, y, a, c) => {
+    const dx = c[0] - a[0], dy = c[1] - a[1];
+    const L2 = dx * dx + dy * dy || 1e-6;
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
+    return Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy));
+  };
+  cv.addEventListener("pointerdown", ev => {
+    const dpr = window.devicePixelRatio || 1;
+    const r = cv.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * dpr, y = (ev.clientY - r.top) * dpr;
+    const b = box();
+    const HR = 22 * dpr;
+    // selected object's handles win first
+    if (sel >= 0) {
+      const P = objs[sel].pts.map(p => toPx(b, p));
+      for (let k = 0; k < P.length; k++) {
+        if (near(x, y, P[k], HR)) {
+          drag = { obj: sel, pt: k }; cv.setPointerCapture(ev.pointerId); return;
+        }
+      }
+    }
+    for (let i = objs.length - 1; i >= 0; i--) {
+      const P = objs[i].pts.map(p => toPx(b, p));
+      const hit = objs[i].type === "line"
+        ? segDist(x, y, P[0], P[1]) < HR
+        : (segDist(x, y, P[0], P[1]) < HR || segDist(x, y, P[0], P[2]) < HR);
+      if (hit) {
+        sel = i; syncUI();
+        drag = { obj: i, pt: -1, lx: x, ly: y };
+        cv.setPointerCapture(ev.pointerId);
+        return;
+      }
+    }
+    if (sel >= 0) { sel = -1; syncUI(); }   // tap-away deselects...
+    else togglePlay();                       // ...or acts like the video
+  });
+  cv.addEventListener("pointermove", ev => {
+    if (!drag) return;
+    const dpr = window.devicePixelRatio || 1;
+    const r = cv.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * dpr, y = (ev.clientY - r.top) * dpr;
+    const b = box(), o = objs[drag.obj];
+    if (drag.pt >= 0) {
+      o.pts[drag.pt] = toN(b, x, y);
+    } else {
+      const dxn = (x - drag.lx) / b.w, dyn = (y - drag.ly) / b.h;
+      o.pts = o.pts.map(p => [p[0] + dxn, p[1] + dyn]);
+      drag.lx = x; drag.ly = y;
+    }
+  });
+  const endDrag = () => { if (drag) { drag = null; save(); } };
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+  function add(type) {
+    const o = type === "line"
+      ? { type: "line", pts: [[0.3, 0.45], [0.7, 0.45]] }
+      : { type: "angle", pts: [[0.5, 0.5], [0.28, 0.36], [0.72, 0.36]] };
+    objs.push(o); sel = objs.length - 1; save(); syncUI();
+  }
+  function syncUI() {
+    $("d-del").disabled = sel < 0;
+    $("d-show").textContent = show ? "👁 Shown" : "👁 Hidden";
+  }
+  return {
+    render, add,
+    toggleShow: () => { show = !show; syncUI(); },
+    removeSel: () => { if (sel >= 0) { objs.splice(sel, 1); sel = -1; save(); syncUI(); } },
+    clear: () => { objs = []; sel = -1; save(); syncUI(); },
+  };
+})();
+$("ovbtn").onclick = () => {
+  const m = $("ovmenu");
+  m.style.display = m.style.display === "none" ? "block" : "none";
+};
+$("d-line").onclick = () => { Draw.add("line"); $("ovmenu").style.display = "none"; };
+$("d-angle").onclick = () => { Draw.add("angle"); $("ovmenu").style.display = "none"; };
+$("d-show").onclick = () => Draw.toggleShow();
+$("d-del").onclick = () => Draw.removeSel();
+$("d-clear").onclick = () => Draw.clear();
 
 // ---- frame stepping (Joe: "thumb scroll frame by frame"): single-
 // frame nudges with precise seeks; pauses playback so the frame holds.
