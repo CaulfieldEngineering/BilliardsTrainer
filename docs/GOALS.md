@@ -1082,3 +1082,14 @@ Rounds continue with Joe's visual feedback as the gate.
   every change, whole-doc LWW so deletes propagate. Verified end-to-end
   against the live deployment. NEXT: RIFE slow-mo prototype; @819
   contact attribution; fresh verdicts on new footage.
+- 2026-08-21 (loop, 4pm): RIFE SLOW-MO PROTOTYPE delivered — rife-ncnn-
+  vulkan (v4.6 model) runs on the mini PC's Radeon 780M iGPU: a 6s shot
+  clip interpolates 180 -> 720 frames in 35s at half-res (full-res
+  OOMs the iGPU while the live app holds it; half-res matches the
+  phone's display size anyway). Side-by-side naive-vs-RIFE quarter-
+  speed sample sent to Joe for judgment. If approved, productization =
+  per-shot "smooth slo-mo" render on demand (companion request ->
+  PC renders ~35s -> clip appears in player), recording-guarded like
+  every heavy job. Binary cached in the session scratchpad; wiring
+  would vendor it under tools/. NEXT: Joe's verdict on the sample;
+  @819 contact attribution; fresh verdicts on new footage.
