@@ -120,6 +120,44 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     return result
 
 
+def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
+    """Where the cue STICK pointed at address, as a video-normalized
+    segment. Computed ONCE here — desktop and phone draw this same
+    stored geometry, so the two can never disagree (Joe's requirement).
+    Decodes one address frame per shot; cached in the summary across
+    re-exports."""
+    import cv2
+    import numpy as np
+
+    from .cue_aim import aim_ray_end, detect_cue_aim
+    t0 = float(s.get("start", 0.0))
+    hinv = np.asarray(tf["hinv"], dtype=float)
+    w, h = float(tf["w"]), float(tf["h"])
+    for dt in (0.4, 1.0, 1.8):          # scan the address backwards
+        tp = max(0.0, t0 - dt)
+        cue = next((tr for tr in reader.tracks_at(tp) if tr.number == 0),
+                   None)
+        if cue is None:
+            continue
+        cap.set(cv2.CAP_PROP_POS_MSEC, tp * 1000.0)
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        rect = cv2.warpPerspective(frame, H, (700, 1300))
+        got = detect_cue_aim(rect, (cue.x, cue.y), cue.radius)
+        if got is None or got[1] < 0.35:
+            continue
+        ang, q, (ax, ay) = got
+        ex, ey = aim_ray_end(ax, ay, ang, (30.0, 30.0, 670.0, 1270.0))
+        seg = []
+        for (x, y) in ((ax, ay), (ex, ey)):
+            v = hinv @ np.array([x, y, 1.0])
+            seg.append([round(min(1.2, max(-0.2, v[0] / v[2] / w)), 4),
+                        round(min(1.2, max(-0.2, v[1] / v[2] / h)), 4)])
+        return {"p": seg, "q": round(float(q), 2), "t": round(tp, 2)}
+    return None
+
+
 def summary_path(video_path) -> Path:
     return Path(str(video_path) + SUMMARY_SUFFIX)
 
@@ -138,15 +176,21 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
     except OSError:
         return None
     tf = None
+    old_aims: dict = {}
     if with_trails:
         try:
             old_doc = json.loads(summary_path(video_path).read_text(
                 encoding="utf-8"))
             tf = old_doc.get("transform")
+            for o in old_doc.get("shots", []):
+                if o.get("aim"):
+                    old_aims[round(float(o.get("start", -1)), 2)] = o["aim"]
         except (OSError, ValueError):
             tf = None
         if tf is None:
             tf = _video_transform(video_path)
+    aim_cap = None
+    aim_H = None
     shots = []
     for s in reader.shots:
         entry = {
@@ -188,7 +232,29 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                         entry["trails"].append({"n": int(n), "p": []})
             except Exception:  # noqa: BLE001 - trails are enrichment
                 pass
+            # AIM LINE (Joe's analysis tool): where the stick pointed at
+            # address. Cached across re-exports (verdict syncs must not
+            # re-decode the whole session); strokes and breaks only.
+            try:
+                if entry["action"] in ("stroke", "break"):
+                    cached = old_aims.get(entry["start"])
+                    if cached:
+                        entry["aim"] = cached
+                    else:
+                        if aim_cap is None:
+                            import cv2
+                            import numpy as np
+                            aim_cap = cv2.VideoCapture(str(video_path))
+                            aim_H = np.linalg.inv(
+                                np.asarray(tf["hinv"], dtype=float))
+                        aim = _shot_aim(aim_cap, reader, s, tf, aim_H)
+                        if aim:
+                            entry["aim"] = aim
+            except Exception:  # noqa: BLE001 - aim is enrichment
+                pass
         shots.append(entry)
+    if aim_cap is not None:
+        aim_cap.release()
     doc = {
         "v": 2 if tf is not None else 1,
         "transform": tf,
