@@ -189,6 +189,7 @@
     <video id="video" playsinline preload="metadata"></video>
     <div id="paused-glyph">▶</div>
     <div id="spinner"><div></div></div>
+    <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
     <canvas id="trails"></canvas>
   </div>
   <div id="shotbar">
@@ -672,6 +673,7 @@ $("video").addEventListener("seeked", () => {
   const lane = $("lane");
   let scrubbing = false, wasPlaying = false, lastT = null;
   const FPS = 30;                        // recording cadence (~29.996)
+  let drawSeq = 0;
   const seekTo = ev => {
     if (!win) return;
     const r = lane.getBoundingClientRect();
@@ -682,8 +684,14 @@ $("video").addEventListener("seeked", () => {
     // Quantizing dedupes sub-frame drag events so the latest-wins chain
     // spends its budget only on frames that actually differ.
     lastT = Math.round((win.t0 + frac * (win.t1 - win.t0)) * FPS) / FPS;
-    requestSeek(lastT, false);
     $("playhead").style.left = (100 * frac) + "%";
+    // cache first: a harvested frame draws instantly with NO seek at
+    // all; only gaps hit the decoder (and self-heal once harvested)
+    const seq = ++drawSeq;
+    FrameCache.draw(lastT).then(hit => {
+      if (seq !== drawSeq) return;       // a newer thumb position won
+      if (!hit) requestSeek(lastT, false);
+    });
   };
   lane.addEventListener("pointerdown", ev => {
     scrubbing = true;
@@ -698,11 +706,94 @@ $("video").addEventListener("seeked", () => {
     if (!scrubbing) return;
     scrubbing = false;
     window.scrubActive = false;
-    if (lastT != null) requestSeek(lastT, false);  // one precise landing
+    drawSeq++;                                     // cancel in-flight draws
+    if (lastT != null) {
+      requestSeek(lastT, false);                   // one precise landing
+      // keep the cached frame up until the REAL video catches up, so
+      // release never flashes a stale frame
+      const v = $("video");
+      const off = () => { FrameCache.hide(); v.removeEventListener("seeked", off); };
+      v.addEventListener("seeked", off);
+      setTimeout(off, 700);                        // belt and suspenders
+    } else {
+      FrameCache.hide();
+    }
     if (wasPlaying) $("video").play();
   };
   lane.addEventListener("pointerup", end);
   lane.addEventListener("pointercancel", end);
+})();
+
+// ---- FRAME CACHE (Joe: "scrub really slowly or the video does not
+// follow"): iOS precise seeks into long-keyframe video have a ~100-
+// 300ms floor — no seek strategy can glide. So HARVEST every frame the
+// video actually presents (requestVideoFrameCallback fires on playback
+// AND on landed seeks) into JPEG blobs, and let the thumb draw straight
+// from memory on a canvas over the video. After one viewing of a clip,
+// scrubbing it is instant; gaps fall back to seeking and self-heal as
+// the seeks land and get harvested too.
+const FrameCache = (() => {
+  const FPS = 30, CAP = 700;              // ~23s of unique frames
+  let blobs = new Map(), bitmaps = new Map(), lastSrc = "";
+  const idx = t => Math.round(t * FPS);
+  const cap0 = document.createElement("canvas");
+  function harvest(now, meta) {
+    const v = $("video");
+    v.requestVideoFrameCallback(harvest);
+    if (v.currentSrc !== lastSrc) {       // new session video: reset
+      lastSrc = v.currentSrc;
+      blobs = new Map(); bitmaps = new Map();
+    }
+    const i = idx(meta.mediaTime);
+    if (blobs.has(i) || !v.videoWidth) return;
+    const scale = Math.min(1, 720 / v.videoHeight);
+    cap0.width = Math.round(v.videoWidth * scale);
+    cap0.height = Math.round(v.videoHeight * scale);
+    cap0.getContext("2d").drawImage(v, 0, 0, cap0.width, cap0.height);
+    cap0.toBlob(b => {
+      if (!b) return;
+      blobs.set(i, b);
+      if (blobs.size > CAP) {             // evict farthest from playhead
+        const cur = idx($("video").currentTime);
+        let far = -1, fd = -1;
+        for (const k of blobs.keys()) {
+          const d = Math.abs(k - cur);
+          if (d > fd) { fd = d; far = k; }
+        }
+        blobs.delete(far); bitmaps.delete(far);
+      }
+    }, "image/jpeg", 0.7);
+  }
+  if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
+    $("video").requestVideoFrameCallback(harvest);
+  async function draw(t) {                // true = drawn from cache
+    const v = $("video");
+    let i = idx(t), hit = null;
+    for (let d = 0; d <= 2 && hit == null; d++)   // tolerate tiny gaps
+      hit = blobs.has(i + d) ? i + d : blobs.has(i - d) ? i - d : null;
+    if (hit == null) return false;
+    let bm = bitmaps.get(hit);
+    if (!bm) {
+      bm = await createImageBitmap(blobs.get(hit));
+      bitmaps.set(hit, bm);
+      if (bitmaps.size > 90) {            // decoded LRU stays small
+        const first = bitmaps.keys().next().value;
+        if (first !== hit) { bitmaps.get(first).close(); bitmaps.delete(first); }
+      }
+    }
+    const cv = $("scrubcv"), box = v.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(box.width * dpr);
+    cv.height = Math.round(box.height * dpr);
+    // contain-fit exactly like the <video> renders itself
+    const s = Math.min(cv.width / bm.width, cv.height / bm.height);
+    const dw = bm.width * s, dh = bm.height * s;
+    cv.getContext("2d").drawImage(bm, (cv.width - dw) / 2,
+                                  (cv.height - dh) / 2, dw, dh);
+    cv.style.display = "block";
+    return true;
+  }
+  return { draw, hide: () => { $("scrubcv").style.display = "none"; } };
 })();
 
 // ---- frame stepping (Joe: "thumb scroll frame by frame"): single-
