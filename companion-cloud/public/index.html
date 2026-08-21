@@ -474,8 +474,8 @@ let sessCache = [];                       // last /api/sessions payload
 // playlists header, drop downs with indented content, entries slidable
 // to delete")
 const HOME = {
-  sess: localStorage.getItem("home_sess") !== "0",
-  pl: localStorage.getItem("home_pl") !== "0",
+  sess: localStorage.getItem("home_sess") === "1",   // start collapsed (Joe)
+  pl: localStorage.getItem("home_pl") === "1",
 };
 function _accHeader(box, key, title, count) {
   const h = document.createElement("div");
