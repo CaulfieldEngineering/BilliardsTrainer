@@ -42,7 +42,12 @@ class TestDetectCueAim:
             cv2.circle(img, (350, 650), 15, (255, 255, 255), -1)
             got = detect_cue_aim(img, (350, 650), 15.0)
             assert got is not None, f"no aim at {want} deg"
-            ang, q = got
+            ang, q, anchor = got
+            # anchor must sit on the stick, behind the ball, not on it
+            import math as _m
+            d_axis = abs(_m.sin(ang) * (anchor[0] - 350)
+                         - _m.cos(ang) * (anchor[1] - 650))
+            assert d_axis < 6.0, "anchor off the stick axis" 
             assert self._angle_err(ang, want) < 2.0, \
                 f"aim off by {self._angle_err(ang, want):.1f} deg at {want}"
             assert q > 0.2

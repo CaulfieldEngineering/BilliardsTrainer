@@ -30,13 +30,17 @@ _CLUSTER_DEG = 3.0
 
 
 def detect_cue_aim(rect_bgr: np.ndarray, cue_xy: tuple, cue_r: float,
-                   ) -> tuple[float, float] | None:
-    """(aim angle radians, quality 0..1) in rect space, or None.
+                   ) -> tuple[float, float, tuple[float, float]] | None:
+    """(aim angle radians, quality 0..1, anchor point) in rect space.
 
-    ``rect_bgr`` is the rectified table image; ``cue_xy`` the cue ball
-    centre in the same coordinates. Quality reflects how much collinear
-    stick evidence backs the angle — callers should demand a few
-    consistent samples across the address before trusting one.
+    The anchor lies ON the stick's fitted axis — the extension is drawn
+    through the CUE (Joe's spec), never re-anchored at the ball centre:
+    forcing the ray through the ball would hide exactly the error being
+    hunted (a stick that isn't actually lined up through the ball).
+    ``cue_xy`` is used only to FIND the stick (a stick being aimed passes
+    near the ball). Quality reflects how much collinear stick evidence
+    backs the angle — callers should demand a few consistent samples
+    across the address before trusting one.
     """
     if rect_bgr is None or rect_bgr.size == 0:
         return None
@@ -89,9 +93,15 @@ def detect_cue_aim(rect_bgr: np.ndarray, cue_xy: tuple, cue_r: float,
                for length, _, mx, my in members)
     if proj > 0:                   # mass is on the +ang side: aim is -ang
         ang += math.pi
+    # ANCHOR on the stick's axis: length-weighted centroid of the cluster
+    # segments. Rendering extends the line THROUGH this point — the
+    # stick's true axis — so any lateral offset from the ball shows.
+    wsum = sum(length for length, _, _, _ in members)
+    ax = sum(length * mx for length, _, mx, _ in members) / wsum
+    ay = sum(length * my for length, _, _, my in members) / wsum
     total = sum(length for length, _, _, _ in cand)
     quality = min(1.0, best_w / max(1e-6, total)) * min(1.0, best_w / 400.0)
-    return ang % (2 * math.pi), quality
+    return ang % (2 * math.pi), quality, (ax, ay)
 
 
 def aim_ray_end(cx: float, cy: float, ang: float,
