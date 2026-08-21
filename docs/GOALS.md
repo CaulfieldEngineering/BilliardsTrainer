@@ -1104,3 +1104,11 @@ Rounds continue with Joe's visual feedback as the gate.
   main — with just the app open, requests waited for the hourly
   backstop; the app now starts the watcher at launch. UI-redesign
   research done (4 sources + spec) — present to Joe before rebuilding.
+- 2026-08-21 (loop, 8pm): CLIP-UI V2 SPEC committed to
+  docs/design/CLIP_UI_V2.md — four-state player (Watch/Inspect/
+  Annotate/Verdict), 4 persistent buttons, conventional gestures,
+  two-resolution scrubbing, verdict sheet. AWAITING JOE'S APPROVAL
+  before the rebuild (it reshapes the whole player). Implementation
+  plan once approved: state machine + gesture layer first behind the
+  current DOM, then layout swap, feature-parity checklist from the
+  spec's §7 two-tap table. Meanwhile: @819 attribution next.
