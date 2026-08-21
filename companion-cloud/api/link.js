@@ -2,7 +2,10 @@ const { dbxToken, checkKey, safeName, FOLDER } = require("./_lib.js");
 
 module.exports = async (req, res) => {
   if (!checkKey(req, res)) return;
-  const name = safeName(req.query && req.query.name);
+  let name = safeName(req.query && req.query.name);
+  // slow-mo renders live in a subfolder the sessions list never shows
+  const raw = String((req.query && req.query.name) || "");
+  if (!name && /^slowmo\/[A-Za-z0-9._-]{1,80}\.mp4$/.test(raw)) name = raw;
   if (!name) return res.status(400).json({ error: "bad name" });
   try {
     const token = await dbxToken();

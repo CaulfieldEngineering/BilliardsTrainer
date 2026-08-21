@@ -198,3 +198,58 @@ class TestCorrectionsWatcher:
         classify_and_mark(vid)
         s2 = SidecarReader(vid).shots[0]
         assert (s2["outcome"], s2.get("action", "stroke")) == before
+
+
+class TestRifeRequests:
+    def test_rife_request_renders_and_playlists(self, tmp_path, monkeypatch):
+        """A {rife:true} request renders the clip (mocked), appends it to
+        the PC-owned Slow-mo playlist, and archives the request."""
+        import json
+        import os
+        import time
+        from billiards_trainer.companion import corrections_watcher as cw
+        from billiards_trainer.companion import rife_render
+        vid = tmp_path / "session-x.mp4"
+        vid.write_bytes(b"0")
+        old = time.time() - 3600
+        os.utime(vid, (old, old))          # not a live recording
+        (tmp_path / (vid.name + ".analysis.jsonl")).write_text(
+            json.dumps({"type": "meta", "v": 1, "fps": 30}) + "\n",
+            encoding="utf-8")
+        box = tmp_path / "corrections"
+        box.mkdir()
+        (box / "r1.json").write_text(json.dumps(
+            {"session": vid.name, "start": 10.0, "end": 16.0,
+             "rife": True}), encoding="utf-8")
+        rendered = {}
+        def fake_render(video, start, end):
+            out = tmp_path / "slowmo" / rife_render.slowmo_name(video, start)
+            out.parent.mkdir(exist_ok=True)
+            out.write_bytes(b"clip")
+            rendered["ok"] = (video.name, start, end)
+            return out
+        monkeypatch.setattr(rife_render, "render_slowmo", fake_render)
+        n = cw.scan_once(tmp_path)
+        assert n == 1 and rendered["ok"][0] == vid.name
+        doc = json.loads((tmp_path / "playlists.json").read_text())
+        pl = next(q for q in doc["playlists"] if q["name"] == "Slow-mo")
+        assert pl["clips"][0]["slowmo"].startswith("slowmo-session-x")
+        assert (box / "done" / "r1.json").is_file()
+
+    def test_rife_deferred_while_recording(self, tmp_path):
+        """Joe's presence outranks renders: an active recording keeps the
+        request queued (not archived)."""
+        import json
+        from billiards_trainer.companion import corrections_watcher as cw
+        vid = tmp_path / "session-x.mp4"
+        vid.write_bytes(b"0")     # fresh mtime = active recording
+        (tmp_path / (vid.name + ".analysis.jsonl")).write_text(
+            json.dumps({"type": "meta", "v": 1, "fps": 30}) + "\n",
+            encoding="utf-8")
+        box = tmp_path / "corrections"
+        box.mkdir()
+        (box / "r1.json").write_text(json.dumps(
+            {"session": vid.name, "start": 10.0, "end": 16.0,
+             "rife": True}), encoding="utf-8")
+        assert cw.scan_once(tmp_path) == 0
+        assert (box / "r1.json").is_file()      # still queued

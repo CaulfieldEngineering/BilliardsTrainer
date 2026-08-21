@@ -19,12 +19,17 @@ module.exports = async (req, res) => {
   const note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 500);
   const clear = b.clear === true;
   const confirm = b.confirm === true;
+  const rife = b.rife === true;
   if (!name || !isFinite(start)
-      || (!outcome && !action && !note && !clear && !confirm)) {
+      || (!outcome && !action && !note && !clear && !confirm && !rife)) {
     return res.status(400).json({ error: "bad verdict" });
   }
   const doc = { session: name, start: Math.round(start * 100) / 100,
                 ts: new Date().toISOString() };
+  if (rife) {
+    doc.rife = true;
+    if (isFinite(Number(b.end))) doc.end = Math.round(Number(b.end) * 100) / 100;
+  }
   if (clear) doc.clear = true;
   if (confirm) doc.confirm = true;
   if (outcome) doc.outcome = outcome;

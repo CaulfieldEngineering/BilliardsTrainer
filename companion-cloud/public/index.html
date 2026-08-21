@@ -285,6 +285,8 @@
       <div class="grab"></div>
       <button id="pl-save" class="lrow">☆ Save clip to playlist
         <span class="chev">›</span></button>
+      <button id="rife-req" class="lrow">✨ Smooth slo-mo (renders ~1 min)
+        <span class="chev">›</span></button>
       <div id="pl-pick" style="display:none"></div>
       <h3>Drawing tools</h3>
       <div class="tools">
@@ -463,8 +465,17 @@ const PL = {
         localStorage.setItem("playlistsMod", String(doc.mod));
         if ($("player").classList.contains("open") === false)
           renderHome();
-      } else if (localMod > (Number(doc.mod) || 0) && PL.all().length) {
-        PL.push();                 // local is newer: heal the server copy
+      } else if (localMod > (Number(doc.mod) || 0)) {
+        // local wins — but the Slow-mo playlist is PC-OWNED (the render
+        // watcher appends to it): adopt the server's copy of it before
+        // healing, or the push would erase fresh renders
+        const srv = (doc.playlists || []).find(q => q.name === "Slow-mo");
+        if (srv) {
+          const ls = PL.all().filter(q => q.name !== "Slow-mo");
+          ls.push(srv);
+          localStorage.setItem("playlists", JSON.stringify(ls));
+        }
+        if (PL.all().length) PL.push();
       }
     } catch (e) { /* offline is fine */ }
   },
@@ -490,6 +501,7 @@ function _accHeader(box, key, title, count) {
   h.onclick = () => {
     HOME[key] = !HOME[key];
     localStorage.setItem("home_" + key, HOME[key] ? "1" : "0");
+    if (key === "pl" && HOME.pl) PL.pull();
     renderHome();
   };
   box.appendChild(h);
@@ -639,7 +651,14 @@ async function openPlaylist(pl) {
   // resolve each saved clip against its session's summary (grouped per
   // session so each summary is fetched once), preserving playlist order
   const bySess = {};
-  pl.clips.forEach(c => (bySess[c.session] = bySess[c.session] || []).push(c));
+  pl.clips.forEach(c => {
+    if (c.slowmo) {                    // rendered clip: plays standalone
+      c._resolved = { _slowmo: c.slowmo, text: c.label || c.slowmo,
+                      start: 0, end: 0, outcome: "", action: "" };
+      return;
+    }
+    (bySess[c.session] = bySess[c.session] || []).push(c);
+  });
   for (const [sess, clips] of Object.entries(bySess)) {
     try {
       const d = await api("/api/shots?name=" + encodeURIComponent(sess));
@@ -736,6 +755,28 @@ async function gotoShot(i, play) {
   const s = shots[i];
   // playlist clips can live in DIFFERENT session videos: swap the src
   // (spinner shows via the existing loading UI) before seeking
+  if (s._slowmo) {
+    if (curSession !== "slowmo:" + s._slowmo) {
+      $("vwrap").classList.add("loading");
+      try {
+        const linkD = await api("/api/link?name="
+                                + encodeURIComponent("slowmo/" + s._slowmo));
+        curSession = "slowmo:" + s._slowmo;
+        const v1 = $("video");
+        v1.src = linkD.link;
+        await new Promise(res =>
+          v1.addEventListener("loadedmetadata", res, { once: true }));
+        s.end = $("video").duration || 20;
+      } catch (e) { /* fall through; play() below will surface it */ }
+      $("vwrap").classList.remove("loading");
+      if (cur !== i) return;
+    }
+    const v2 = $("video");
+    v2.currentTime = 0;
+    if (play) v2.play().catch(() => {});
+    buildLane(); updateInfo();
+    return;
+  }
   if (s._session && s._session !== curSession) {
     $("vwrap").classList.add("loading");
     try {
@@ -1417,6 +1458,26 @@ $("pl-save").onclick = () => {
   };
   box.appendChild(nb);
   box.style.display = "block";
+};
+$("rife-req").onclick = async () => {
+  const s2 = shots[cur];
+  if (!s2 || s2._slowmo) return;
+  $("rife-req").textContent = "✨ Requesting…";
+  try {
+    await api("/api/correct", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: s2._session || curSession,
+                             start: s2.start, end: s2.end, rife: true }),
+    });
+    $("rife-req").textContent = "✓ Requested — see the Slow-mo playlist soon";
+  } catch (e) {
+    $("rife-req").textContent = "✕ Request failed — try again";
+  }
+  setTimeout(() => {
+    $("rife-req").innerHTML =
+      '✨ Smooth slo-mo (renders ~1 min) <span class="chev">›</span>';
+  }, 2500);
 };
 // pinch-zoom belt-and-suspenders (iOS ignores user-scalable in odd cases)
 document.addEventListener("gesturestart", e => e.preventDefault());

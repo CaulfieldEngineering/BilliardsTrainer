@@ -47,6 +47,26 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         start = float(d["start"])
     except (KeyError, TypeError, ValueError):
         return True
+    if d.get("rife"):
+        # Smooth slow-mo request (Joe: "Rife looks great... it pushes to
+        # a slow mo playlist in a separate folder"): render 4x-interpolated
+        # clip into <recordings>/slowmo/ and append it to the Slow-mo
+        # playlist. Never while Joe is recording — the render owns the GPU
+        # for ~35s. Returning False keeps the request queued for retry.
+        import time as _time
+        now = _time.time()
+        if any(now - p.stat().st_mtime < 600
+               for p in recordings.glob("session-*.mp4")):
+            log.info("rife request deferred: recording activity")
+            return False
+        from .rife_render import add_to_slowmo_playlist, render_slowmo
+        end = float(d.get("end", start + 8.0))
+        out = render_slowmo(video, start, end)
+        if out is not None:
+            label = f"{name.replace('.mp4', '')} @{int(start)}s"
+            add_to_slowmo_playlist(recordings, out.name, label)
+            log.info("rife: %s ready and playlisted", out.name)
+        return True        # rendered or hopeless — archive the request
     if d.get("confirm"):
         import json as _json
         from ..vision.analysis_cache import sidecar_path as _sp
