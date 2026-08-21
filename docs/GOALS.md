@@ -1068,3 +1068,11 @@ Rounds continue with Joe's visual feedback as the gate.
   aim backfill running. NEXT: desktop overlay parity from the same
   summaries; CRON RENEWAL tomorrow (Aug 22!); playlist server sync;
   RIFE prototype; @819 contact attribution.
+- 2026-08-21 (loop, 12pm): DESKTOP OVERLAY PARITY shipped — Aim/Paths
+  Ghost toggles in the transport draw the same shots.json geometry as
+  the phone (packet gains media_t; controller emits the summary on
+  video open; VideoView paints tracer + faded trails in the content
+  rect; offscreen pin test). CRON RENEWED EARLY (40d395c3/37f7af18,
+  ~Aug 28). NEXT: app restart to pick this up (recording-guarded);
+  playlist server sync; RIFE prototype; @819 attribution; fresh
+  verdicts on new footage remain the generalization test.
