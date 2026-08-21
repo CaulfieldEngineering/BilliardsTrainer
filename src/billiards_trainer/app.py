@@ -123,6 +123,18 @@ def main() -> int:
     from .ui.main_window import MainWindow
 
     window = MainWindow(settings)
+    # Phone verdicts + smooth-slo-mo requests must apply while THE APP is
+    # what's running: the corrections watcher was wired only into the LAN
+    # companion server's own main, so with just the app open, requests sat
+    # until the hourly health-check backstop (found when a live rife
+    # request stalled). Daemon thread, 10s poll, recording-guarded inside.
+    try:
+        from pathlib import Path as _P
+
+        from .companion.corrections_watcher import start_watcher
+        start_watcher(_P(settings.recording.resolved_dir()))
+    except Exception:  # noqa: BLE001 - the watcher must never block launch
+        log.exception("corrections watcher failed to start")
     # Size/centre FIRST so "restore down" lands somewhere sane, then start
     # maximized (Joe's ask — the old post-show move computed against a rect Qt
     # hadn't settled yet and could park the title bar above the screen top).
