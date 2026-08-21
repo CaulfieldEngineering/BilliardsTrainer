@@ -220,8 +220,11 @@
          left:auto;max-width:340px;z-index:40;background:#151A21;
          border:1px solid #2A323D;
          border-radius:2px;padding:10px 12px">
-      <div style="font-size:12px;letter-spacing:.08em;color:#8A94A2;
-           margin-bottom:8px">DRAWING</div>
+      <div style="display:flex;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;letter-spacing:.08em;color:#8A94A2">DRAWING</span>
+        <button id="ov-close" style="margin-left:auto;min-width:40px;
+                padding:4px 10px">✕</button>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="d-line">＋ Line</button>
         <button id="d-angle">＋ Protractor</button>
@@ -1018,10 +1021,20 @@ const Draw = (() => {
     clear: () => { objs = []; sel = -1; save(); syncUI(); },
   };
 })();
-$("ovbtn").onclick = () => {
+$("ovbtn").onclick = ev => {
+  ev.stopPropagation();
   const m = $("ovmenu");
   m.style.display = m.style.display === "none" ? "block" : "none";
 };
+$("ov-close").onclick = () => { $("ovmenu").style.display = "none"; };
+// tapping anywhere outside the menu dismisses it too
+document.addEventListener("pointerdown", ev => {
+  const m = $("ovmenu");
+  if (m.style.display !== "none" && !m.contains(ev.target)
+      && ev.target !== $("ovbtn")) {
+    m.style.display = "none";
+  }
+}, true);
 $("d-line").onclick = () => { Draw.add("line"); $("ovmenu").style.display = "none"; };
 $("d-angle").onclick = () => { Draw.add("angle"); $("ovmenu").style.display = "none"; };
 $("d-show").onclick = () => Draw.toggleShow();
