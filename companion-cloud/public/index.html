@@ -357,8 +357,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 });
 
-async function api(path) {
-  const r = await fetch(path, { headers: { "x-key": KEY || "" } });
+async function api(path, opts) {
+  const o = opts || {};
+  o.headers = Object.assign({ "x-key": KEY || "" }, o.headers || {});
+  const r = await fetch(path, o);
   if (r.status === 401) {
     // say exactly which failure this is, so remote debugging isn't a guess
     $("keygate").textContent = KEY
@@ -406,12 +408,52 @@ function fmtDate(name, iso) {
 const PL = {
   all: () => { try { return JSON.parse(localStorage.getItem("playlists") || "[]"); }
                catch (e) { return []; } },
-  save: ls => localStorage.setItem("playlists", JSON.stringify(ls)),
+  save: ls => {
+    localStorage.setItem("playlists", JSON.stringify(ls));
+    localStorage.setItem("playlistsMod", String(Date.now()));
+    PL.push();
+  },
   create: name => {
     const ls = PL.all();
-    ls.push({ id: Date.now().toString(36), name, clips: [] });
+    ls.push({ id: Date.now().toString(36), name, mod: Date.now(), clips: [] });
     PL.save(ls);
     return ls[ls.length - 1];
+  },
+  // ---- server sync (Dropbox via /api/playlists): whole-doc last-write-
+  // wins — device-local playlists would die with the phone (Joe's
+  // curation is too valuable for that). Deletes propagate because the
+  // full list is what syncs.
+  _timer: null,
+  push: () => {
+    clearTimeout(PL._timer);
+    PL._timer = setTimeout(async () => {
+      try {
+        await api("/api/playlists", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mod: Number(localStorage.getItem("playlistsMod")) || Date.now(),
+            playlists: PL.all(),
+          }),
+        });
+      } catch (e) { /* offline: next save retries */ }
+    }, 1500);
+  },
+  pull: async () => {
+    try {
+      const doc = await api("/api/playlists");
+      const localMod = Number(localStorage.getItem("playlistsMod")) || 0;
+      if ((Number(doc.mod) || 0) > localMod) {
+        localStorage.setItem("playlists",
+                             JSON.stringify(doc.playlists || []));
+        localStorage.setItem("playlistsMod", String(doc.mod));
+        if (homeTab === "playlists"
+            && $("player").classList.contains("open") === false)
+          renderPlaylists();
+      } else if (localMod > (Number(doc.mod) || 0) && PL.all().length) {
+        PL.push();                 // local is newer: heal the server copy
+      }
+    } catch (e) { /* offline is fine */ }
   },
 };
 let homeTab = localStorage.getItem("homeTab") || "sessions";
@@ -467,9 +509,11 @@ function renderPlaylists() {
   });
 }
 
+let _plPulled = false;
 async function loadSessions() {
   const box = $("sessions");
   box.innerHTML = "<div class='empty'>Loading sessions…</div>";
+  if (!_plPulled) { _plPulled = true; PL.pull(); }
   if (homeTab === "playlists") { renderPlaylists(); return; }
   try {
     const resp = await api("/api/sessions");
@@ -1286,6 +1330,7 @@ $("pl-save").onclick = () => {
     if (!t.clips.some(c => c.session === sess
         && Math.abs(c.start - s.start) < 0.5))
       t.clips.push({ session: sess, start: s.start });
+    t.mod = Date.now();
     if (!ls.some(p => p.id === t.id)) ls.push(t);
     PL.save(ls);
     box.style.display = "none";
