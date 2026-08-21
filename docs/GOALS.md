@@ -1024,3 +1024,19 @@ Rounds continue with Joe's visual feedback as the gate.
   lands: hops audit + review scoreboard across the WHOLE library, spot
   outcome checks vs Joe's July-session notes. Loops while the batch
   runs: NO other heavy jobs (check the lock first); light work only.
+- 2026-08-20 (11pm, Joe-directed): CUE-AIM ANALYSIS TOOL begun — Joe
+  wants toggleable overlays on the phone showing where his cue points,
+  with desktop/iOS IDENTICAL by construction. Architecture: compute
+  once server-side, store in sidecar/export, both clients draw the same
+  geometry. vision/cue_aim.py shipped + frame-verified (dense-angle-
+  cluster Hough; the @99s ray points left of the 3 and his note says
+  "Three ball was missed" — the tool answers his exact question).
+  INTEGRATION QUEUE (next loops, in order): (1) pipeline samples aim
+  during address windows -> {"type":"aim"} sidecar records (re-derive
+  cheap); (2) export last-stable-aim per shot into shots.json (video-
+  normalized endpoints via the trails mapping); (3) phone: overlay
+  toggle chips in the player + canvas ray during pre-launch playback
+  (reuse the dormant trails canvas); (4) desktop playback overlay from
+  the SAME shots.json. @444s address had no lock at fixed probe times —
+  integration scans the whole address window and takes the last stable
+  lock (quality-gated), which also handles it.
