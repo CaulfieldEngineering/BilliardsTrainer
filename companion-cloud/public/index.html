@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.json">
@@ -12,7 +12,13 @@
   :root { --bg:#0B0F14; --panel:#12161D; --line:#1D2530; --text:#E6EDF3;
           --dim:#7D8590; --faint:#3E4A5A; --make:#3FB950; --scratch:#E3B341;
           --accent:#58A6FF; }
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent;
+      /* app, not a web page (Joe): no text selection, no long-press
+         callouts on the video, no double-tap zoom */
+      -webkit-user-select:none; user-select:none;
+      -webkit-touch-callout:none; }
+  body { touch-action:manipulation; }
+  input, textarea { -webkit-user-select:text; user-select:text; }
   body { background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,
          "Segoe UI", sans-serif; padding-bottom:env(safe-area-inset-bottom); }
   header { padding:calc(14px + env(safe-area-inset-top)) 16px 10px;
@@ -221,10 +227,14 @@
          border:1px solid #2A323D;
          border-radius:2px;padding:10px 12px">
       <div style="display:flex;align-items:center;margin-bottom:8px">
-        <span style="font-size:12px;letter-spacing:.08em;color:#8A94A2">DRAWING</span>
+        <span style="font-size:12px;letter-spacing:.08em;color:#8A94A2">PLAYLIST</span>
         <button id="ov-close" style="margin-left:auto;min-width:40px;
                 padding:4px 10px">✕</button>
       </div>
+      <button id="pl-save" style="width:100%">☆ Save clip to playlist</button>
+      <div id="pl-pick" style="display:none;margin-top:8px"></div>
+      <div style="font-size:12px;letter-spacing:.08em;color:#8A94A2;
+           margin:12px 0 8px">DRAWING</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="d-line">＋ Line</button>
         <button id="d-angle">＋ Protractor</button>
@@ -349,13 +359,82 @@ function fmtDate(name, iso) {
   return d.toLocaleString([], { month: "short", day: "numeric",
                                 hour: "numeric", minute: "2-digit" });
 }
+// ---- home tabs: Sessions | Playlists (Joe: "Playlists alongside
+// sessions... Save Clip from a session to a playlist")
+const PL = {
+  all: () => { try { return JSON.parse(localStorage.getItem("playlists") || "[]"); }
+               catch (e) { return []; } },
+  save: ls => localStorage.setItem("playlists", JSON.stringify(ls)),
+  create: name => {
+    const ls = PL.all();
+    ls.push({ id: Date.now().toString(36), name, clips: [] });
+    PL.save(ls);
+    return ls[ls.length - 1];
+  },
+};
+let homeTab = localStorage.getItem("homeTab") || "sessions";
+let sessCache = [];                       // last /api/sessions payload
+function tabBar(box) {
+  const bar = document.createElement("div");
+  bar.style.cssText = "display:flex;gap:8px;padding:10px 12px 2px";
+  [["sessions", "Sessions"], ["playlists", "Playlists"]].forEach(([k, label]) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.style.cssText = "flex:1;padding:8px 0" + (homeTab === k
+      ? ";border-color:#3B82F6;color:#EAF2FF" : ";color:#8A94A2");
+    b.onclick = () => {
+      homeTab = k;
+      localStorage.setItem("homeTab", k);
+      k === "sessions" ? loadSessions() : renderPlaylists();
+    };
+    bar.appendChild(b);
+  });
+  box.appendChild(bar);
+}
+function renderPlaylists() {
+  const box = $("sessions");
+  box.innerHTML = "";
+  tabBar(box);
+  const ls = PL.all();
+  if (!ls.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "No playlists yet — open a shot and use ☰ → Save clip.";
+    box.appendChild(e);
+  }
+  ls.forEach(pl => {
+    const el = document.createElement("div");
+    el.className = "sess";
+    const n = document.createElement("span");
+    n.textContent = pl.name;
+    const c = document.createElement("span");
+    c.className = "num";
+    c.textContent = pl.clips.length + (pl.clips.length === 1 ? " clip" : " clips");
+    const del = document.createElement("button");
+    del.textContent = "✕";
+    del.style.cssText = "min-width:36px;padding:4px 8px;margin-left:8px";
+    del.onclick = ev => {
+      ev.stopPropagation();
+      if (!confirm(`Delete playlist "${pl.name}"?`)) return;
+      PL.save(PL.all().filter(p => p.id !== pl.id));
+      renderPlaylists();
+    };
+    el.append(n, c, del);
+    el.onclick = () => openPlaylist(pl);
+    box.appendChild(el);
+  });
+}
+
 async function loadSessions() {
   const box = $("sessions");
   box.innerHTML = "<div class='empty'>Loading sessions…</div>";
+  if (homeTab === "playlists") { renderPlaylists(); return; }
   try {
     const resp = await api("/api/sessions");
+    sessCache = resp.sessions || [];
     box.innerHTML = "";
-    if (!resp.sessions.length) box.innerHTML = "<div class='empty'>No sessions.</div>";
+    tabBar(box);
+    if (!resp.sessions.length) box.innerHTML += "<div class='empty'>No sessions.</div>";
     else {
       const head = document.createElement("div");
       head.className = "sess head";
@@ -398,7 +477,43 @@ async function loadSessions() {
 let shots = [], cur = -1;
 const isAttempt = s => !s.action || s.action === "stroke" || s.action === "break";
 
+let playlistMode = null;          // {name} while a playlist is playing
+
+async function openPlaylist(pl) {
+  playlistMode = { name: pl.name };
+  $("sessions").style.display = "none";
+  document.querySelector("header").style.display = "none";
+  $("update").style.display = "none";
+  $("player").classList.add("open");
+  $("title").textContent = "☆ " + pl.name;
+  shots = []; cur = -1; curSession = "";
+  $("chips").innerHTML = "";
+  updateInfo();
+  // resolve each saved clip against its session's summary (grouped per
+  // session so each summary is fetched once), preserving playlist order
+  const bySess = {};
+  pl.clips.forEach(c => (bySess[c.session] = bySess[c.session] || []).push(c));
+  for (const [sess, clips] of Object.entries(bySess)) {
+    try {
+      const d = await api("/api/shots?name=" + encodeURIComponent(sess));
+      clips.forEach(c => {
+        const m = (d.shots || []).find(x =>
+          Math.abs(x.start - c.start) < 1.5
+          || (x.start - 1 <= c.start && c.start <= (x.end || x.start) + 1));
+        if (m) c._resolved = { ...m, _session: sess };
+      });
+    } catch (e) { /* session summary unreachable: clips stay unresolved */ }
+  }
+  shots = pl.clips.map(c => c._resolved).filter(Boolean);
+  buildChips();
+  buildLane();
+  updateInfo();
+  if (shots.length) gotoShot(0, true);
+  else $("shot-oc").textContent = "No playable clips in this playlist.";
+}
+
 async function openSession(s) {
+  playlistMode = null;
   curSession = s.name;
   $("sessions").style.display = "none";
   document.querySelector("header").style.display = "none";
@@ -443,10 +558,12 @@ async function openSession(s) {
   }
 }
 $("back").onclick = () => {
+  playlistMode = null;
   $("video").pause(); $("video").removeAttribute("src"); $("video").load();
   $("player").classList.remove("open");
   document.querySelector("header").style.display = "flex";
   $("sessions").style.display = "block";
+  loadSessions();                  // re-render the active tab
   checkUpdate();
 };
 
@@ -466,11 +583,27 @@ function buildChips() {
     c.appendChild(el);
   });
 }
-function gotoShot(i, play) {
+async function gotoShot(i, play) {
   if (i < 0 || i >= shots.length) return;
   cur = i;
+  const s = shots[i];
+  // playlist clips can live in DIFFERENT session videos: swap the src
+  // (spinner shows via the existing loading UI) before seeking
+  if (s._session && s._session !== curSession) {
+    $("vwrap").classList.add("loading");
+    try {
+      const linkD = await api("/api/link?name=" + encodeURIComponent(s._session));
+      curSession = s._session;
+      const v0 = $("video");
+      v0.src = linkD.link;
+      await new Promise(res =>
+        v0.addEventListener("loadedmetadata", res, { once: true }));
+    } catch (e) { /* link fetch failed; seek below still tries */ }
+    $("vwrap").classList.remove("loading");
+    if (cur !== i) return;        // user navigated on while loading
+  }
   const v = $("video");
-  v.currentTime = Math.max(0, shots[i].start - PRE_ROLL);
+  v.currentTime = Math.max(0, s.start - PRE_ROLL);
   if (play) v.play().catch(() => {});
   buildLane();
   updateInfo();
@@ -670,7 +803,12 @@ function drawTrails() {
       // down to the frame... watch the thing in its entirety"): never
       // seek — playback rolls straight through, the clip indicator and
       // lane just follow. Skipping is what the › button is for.
-      advanceSeamless(cur + 1);
+      {
+        const nx = shots[cur + 1];
+        if (nx && nx._session && nx._session !== curSession)
+          gotoShot(cur + 1, true);   // playlist crossing into another video
+        else advanceSeamless(cur + 1);
+      }
     }
     // last clip: keep rolling to the end of the video, no pause
   }
@@ -837,7 +975,14 @@ const FrameCache = (() => {
 const Draw = (() => {
   let objs = [], sel = -1, show = true, loadedKey = "";
   const cv = $("drawcv");
-  const key = () => `draw:${typeof curSession !== "undefined" ? curSession : ""}:${cur}`;
+  const key = () => {
+    // keyed by SESSION + SHOT START so drawings follow the clip itself —
+    // including when it plays inside a playlist
+    const s = (typeof shots !== "undefined" && shots[cur]) || null;
+    const sess = (s && s._session)
+      || (typeof curSession !== "undefined" ? curSession : "");
+    return `draw:${sess}:${s ? s.start : cur}`;
+  };
   const save = () => { try { localStorage.setItem(key(), JSON.stringify(objs)); } catch (e) {} };
   const load = () => {
     loadedKey = key();
@@ -1027,6 +1172,47 @@ $("ovbtn").onclick = ev => {
   m.style.display = m.style.display === "none" ? "block" : "none";
 };
 $("ov-close").onclick = () => { $("ovmenu").style.display = "none"; };
+// ---- save the current clip into a playlist (picker inline in the menu)
+$("pl-save").onclick = () => {
+  const box = $("pl-pick");
+  if (box.style.display !== "none") { box.style.display = "none"; return; }
+  box.innerHTML = "";
+  const choose = pl => {
+    const s = shots[cur];
+    if (!s) return;
+    const ls = PL.all();
+    const t = ls.find(p => p.id === pl.id) || pl;
+    const sess = s._session || curSession;
+    if (!t.clips.some(c => c.session === sess
+        && Math.abs(c.start - s.start) < 0.5))
+      t.clips.push({ session: sess, start: s.start });
+    if (!ls.some(p => p.id === t.id)) ls.push(t);
+    PL.save(ls);
+    box.style.display = "none";
+    $("pl-save").textContent = `✓ Saved to ${t.name}`;
+    setTimeout(() => { $("pl-save").textContent = "☆ Save clip to playlist"; },
+               1600);
+  };
+  PL.all().forEach(pl => {
+    const b = document.createElement("button");
+    b.textContent = `${pl.name} (${pl.clips.length})`;
+    b.style.cssText = "display:block;width:100%;margin-bottom:6px;text-align:left";
+    b.onclick = () => choose(pl);
+    box.appendChild(b);
+  });
+  const nb = document.createElement("button");
+  nb.textContent = "＋ New playlist…";
+  nb.style.cssText = "display:block;width:100%;text-align:left";
+  nb.onclick = () => {
+    const name = (prompt("Playlist name") || "").trim();
+    if (name) choose(PL.create(name));
+  };
+  box.appendChild(nb);
+  box.style.display = "block";
+};
+// pinch-zoom belt-and-suspenders (iOS ignores user-scalable in odd cases)
+document.addEventListener("gesturestart", e => e.preventDefault());
+$("video").addEventListener("contextmenu", e => e.preventDefault());
 // tapping anywhere outside the menu dismisses it too
 document.addEventListener("pointerdown", ev => {
   const m = $("ovmenu");
