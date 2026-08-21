@@ -1076,3 +1076,9 @@ Rounds continue with Joe's visual feedback as the gate.
   ~Aug 28). NEXT: app restart to pick this up (recording-guarded);
   playlist server sync; RIFE prototype; @819 attribution; fresh
   verdicts on new footage remain the generalization test.
+- 2026-08-21 (loop, 2pm): PLAYLIST SERVER SYNC shipped — /api/playlists
+  (GET/POST, validated, size-capped) stores the doc in Dropbox where
+  the PC also syncs it; phone pulls at startup, pushes debounced on
+  every change, whole-doc LWW so deletes propagate. Verified end-to-end
+  against the live deployment. NEXT: RIFE slow-mo prototype; @819
+  contact attribution; fresh verdicts on new footage.
