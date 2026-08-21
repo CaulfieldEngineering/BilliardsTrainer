@@ -607,8 +607,13 @@ function drawTrails() {
   else { const c = $("trails");
          c.getContext("2d").clearRect(0, 0, c.width, c.height); }
   if (win) {
-    const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
-    $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
+    // while the thumb owns the playhead, the video's lagging seek time
+    // must NOT fight it (Joe: "still sticky when I drag") — the drag
+    // handler positions the playhead; this loop yields until release
+    if (!window.scrubActive) {
+      const frac = (v.currentTime - win.t0) / (win.t1 - win.t0);
+      $("playhead").style.left = (100 * Math.min(1, Math.max(0, frac))) + "%";
+    }
     // in the dead time BETWEEN clips the lane owns no time: pulse the
     // playhead and count down to the next shot (Joe: "video is playing
     // but the playhead isn't moving — time isn't accounted for")
@@ -639,18 +644,23 @@ function drawTrails() {
 // seconds. Issue ONE seek at a time; when it lands, jump straight to
 // wherever the thumb is NOW (Joe: "more frame resolution... really
 // look closely at frame timing").
-let seekBusy = false, seekPending = null;
-function requestSeek(t) {
+let seekBusy = false, seekPending = null, seekFastMode = false;
+function requestSeek(t, fast) {
   const v = $("video");
   if (seekBusy) { seekPending = t; return; }
   seekBusy = true;
-  v.currentTime = t;
+  seekFastMode = !!fast;
+  // fastSeek (Safari) lands on the nearest keyframe in a fraction of a
+  // precise seek's time — right for live thumb-dragging; the release
+  // handler issues one precise seek for exact frame inspection
+  if (fast && v.fastSeek) v.fastSeek(t); else v.currentTime = t;
 }
 $("video").addEventListener("seeked", () => {
+  const v = $("video");
   if (seekPending != null) {
     const t = seekPending;
     seekPending = null;
-    $("video").currentTime = t;
+    if (seekFastMode && v.fastSeek) v.fastSeek(t); else v.currentTime = t;
   } else {
     seekBusy = false;
   }
@@ -658,16 +668,18 @@ $("video").addEventListener("seeked", () => {
 
 (() => {
   const lane = $("lane");
-  let scrubbing = false, wasPlaying = false;
+  let scrubbing = false, wasPlaying = false, lastT = null;
   const seekTo = ev => {
     if (!win) return;
     const r = lane.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
-    requestSeek(win.t0 + frac * (win.t1 - win.t0));
+    lastT = win.t0 + frac * (win.t1 - win.t0);
+    requestSeek(lastT, true);            // keyframe-fast while dragging
     $("playhead").style.left = (100 * frac) + "%";
   };
   lane.addEventListener("pointerdown", ev => {
     scrubbing = true;
+    window.scrubActive = true;           // rAF loop hands the playhead over
     wasPlaying = !$("video").paused;
     $("video").pause();          // decoder devotes itself to scrub frames
     lane.setPointerCapture(ev.pointerId);
@@ -677,6 +689,8 @@ $("video").addEventListener("seeked", () => {
   const end = () => {
     if (!scrubbing) return;
     scrubbing = false;
+    window.scrubActive = false;
+    if (lastT != null) requestSeek(lastT, false);  // one precise landing
     if (wasPlaying) $("video").play();
   };
   lane.addEventListener("pointerup", end);
