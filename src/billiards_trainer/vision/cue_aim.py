@@ -105,7 +105,7 @@ def detect_cue_aim(rect_bgr: np.ndarray, cue_xy: tuple, cue_r: float,
     # profile every few px, keep thin bright bands (the glove and the
     # ball fail the width test and drop out), and refit the line
     # through the band centres.
-    refined = _refine_centerline(mask, ang, ax, ay)
+    refined = _refine_centerline(mask, ang, ax, ay, ball_xy=(cx, cy))
     if refined is not None:
         ang, ax, ay = refined
     total = sum(length for length, _, _, _ in cand)
@@ -114,50 +114,85 @@ def detect_cue_aim(rect_bgr: np.ndarray, cue_xy: tuple, cue_r: float,
 
 
 def _refine_centerline(mask: np.ndarray, ang: float, ax: float, ay: float,
-                       span: float = 260.0, step: float = 7.0,
+                       step: float = 5.0,
+                       ball_xy: tuple | None = None,
                        ) -> tuple[float, float, float] | None:
     """Refit (angle, anchor) through the stick band's per-profile centres.
-    Returns None when too few clean profiles exist (keep the Hough fit)."""
+
+    Walks the ENTIRE visible shaft in both directions (Joe: "use more of
+    the cue"), stops after a run of invalid profiles, and iterates the
+    fit twice so the second walk samples along the improved axis. The
+    fit is TIP-WEIGHTED: the homography maps the table plane, and the
+    butt end rides much higher above it than the tip, so a straight
+    stick's image is subtly bent — samples far from the ball carry the
+    butt's parallax displacement, tilting an unweighted fit (visible at
+    zoom on the @99s frame). exp(-d/300) keeps the long lever for noise
+    while the tip section — lowest, nearest the ball, and where the eye
+    checks alignment — dominates the answer. Returns None when too few
+    clean profiles exist (keep the Hough fit)."""
     h, w = mask.shape[:2]
-    vx, vy = math.cos(ang), math.sin(ang)
-    nx, ny = -vy, vx
-    pts = []
-    s = -span
-    while s <= span:
-        sx, sy = ax + vx * s, ay + vy * s
-        offs, vals = [], []
-        d = -14.0
-        while d <= 14.0:
-            px, py = int(sx + nx * d), int(sy + ny * d)
-            if 0 <= px < w and 0 <= py < h and mask[py, px]:
-                offs.append(d)
-                vals.append(1.0)
-            d += 1.0
-        # a clean stick profile is a THIN contiguous band; hands, balls
-        # and rail wood are wide, gaps mean clutter
-        if 3 <= len(offs) <= 13 and (offs[-1] - offs[0]) <= 13.0:
-            c = sum(offs) / len(offs)
-            pts.append((sx + nx * c, sy + ny * c))
-        s += step
-    if len(pts) < 8:
-        return None
-    xs = np.array([p[0] for p in pts])
-    ys = np.array([p[1] for p in pts])
-    mx_, my_ = float(xs.mean()), float(ys.mean())
-    # total least squares via PCA; keep the aim's forward sign
-    u = np.stack([xs - mx_, ys - my_])
-    cov = u @ u.T
-    evals, evecs = np.linalg.eigh(cov)
-    dx, dy = float(evecs[0, 1]), float(evecs[1, 1])
-    new_ang = math.atan2(dy, dx)
-    d = (new_ang - ang) % (2 * math.pi)
-    if min(d, 2 * math.pi - d) > math.pi / 2:
-        new_ang += math.pi
-    # sanity: refinement must agree with the cluster within a few degrees
-    d = (new_ang - ang) % (2 * math.pi)
+
+    def _profiles(a: float, x0: float, y0: float) -> list:
+        vx, vy = math.cos(a), math.sin(a)
+        nx, ny = -vy, vx
+        pts = []
+        for sgn in (1.0, -1.0):
+            # tolerate long invalid runs: the BRIDGE GLOVE is ~20
+            # consecutive wide profiles and sits between the anchor and
+            # the tip — stopping at it starved the fit of exactly the
+            # tip samples the weighting exists for
+            misses = 0
+            s = step * sgn
+            while abs(s) <= 1200.0 and misses < 40:
+                sx, sy = x0 + vx * s, y0 + vy * s
+                offs = []
+                d = -14.0
+                while d <= 14.0:
+                    px, py = int(sx + nx * d), int(sy + ny * d)
+                    if 0 <= px < w and 0 <= py < h and mask[py, px]:
+                        offs.append(d)
+                    d += 1.0
+                # a clean stick profile is a THIN contiguous band; hands,
+                # balls and rail wood are wide, gaps mean clutter
+                if (3 <= len(offs) <= 13
+                        and (offs[-1] - offs[0]) <= 13.0):
+                    c = sum(offs) / len(offs)
+                    pts.append((sx + nx * c, sy + ny * c))
+                    misses = 0
+                else:
+                    misses += 1
+                s += step * sgn
+        return pts
+
+    cur_ang, cx_, cy_ = ang, ax, ay
+    for _ in range(2):
+        pts = _profiles(cur_ang, cx_, cy_)
+        if len(pts) < 10:
+            return None
+        xs = np.array([p[0] for p in pts])
+        ys = np.array([p[1] for p in pts])
+        if ball_xy is not None:
+            db = np.hypot(xs - ball_xy[0], ys - ball_xy[1])
+            wts = np.exp(-db / 300.0)
+        else:
+            wts = np.ones_like(xs)
+        wsum = float(wts.sum())
+        mx_ = float((wts * xs).sum() / wsum)
+        my_ = float((wts * ys).sum() / wsum)
+        u = np.stack([(xs - mx_) * np.sqrt(wts), (ys - my_) * np.sqrt(wts)])
+        evals, evecs = np.linalg.eigh(u @ u.T)
+        dx, dy = float(evecs[0, 1]), float(evecs[1, 1])
+        new_ang = math.atan2(dy, dx)
+        d = (new_ang - cur_ang) % (2 * math.pi)
+        if min(d, 2 * math.pi - d) > math.pi / 2:
+            new_ang += math.pi
+        cur_ang, cx_, cy_ = new_ang % (2 * math.pi), mx_, my_
+    # sanity: refinement must agree with the Hough cluster within a few
+    # degrees — a runaway fit (arm, rail) must not replace the stick
+    d = (cur_ang - ang) % (2 * math.pi)
     if min(d, 2 * math.pi - d) > math.radians(4.0):
         return None
-    return new_ang % (2 * math.pi), mx_, my_
+    return cur_ang, cx_, cy_
 
 
 def aim_ray_end(cx: float, cy: float, ang: float,
