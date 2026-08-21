@@ -1040,3 +1040,22 @@ Rounds continue with Joe's visual feedback as the gate.
   the SAME shots.json. @444s address had no lock at fixed probe times —
   integration scans the whole address window and takes the last stable
   lock (quality-gated), which also handles it.
+- 2026-08-21 (overnight + morning): LIBRARY REBUILD COMPLETE — 35/35
+  sessions re-analyzed under the current pipeline with Joe's verdicts
+  carried forward; health GREEN. Library hops 1.17/1k, but the
+  concentration is entirely EARLY-AUGUST footage (011928: 34, 192859:
+  24, 210621: 23 — pre-exposure-fix era); Aug 18-20 sessions run 0-2
+  hops (~0.3/1k), so the fleet number reflects old film grain, not the
+  tracker. Overnight Joe drove a PHONE SPRINT, all shipped: drawing
+  suite (lines + protractor with live degrees, per-object color/weight/
+  opacity in a floating pill, per-clip persistence), standard bottom-
+  sheet menu, frame-cache scrubbing (harvested frames draw from memory
+  — the iOS seek-latency floor made seek-based scrubbing unfixable),
+  frame-step buttons, PLAYLISTS (home tabs, save-clip picker, cross-
+  session playback), native-feel fixes, trails badge dedup + badges-
+  match-description guarantee, aim-line detection refined to the true
+  tip axis (butt parallax + glove-crossing) with target/ghost geometry
+  built then SHELVED by Joe's pivot: overlays = REAL measured things
+  only (aim line at address + actual ball paths). NEXT: cron renewal
+  (Aug 22!), aim/paths overlay integration behind the ☰ sheet, playlist
+  server sync, RIFE slow-mo prototype.
