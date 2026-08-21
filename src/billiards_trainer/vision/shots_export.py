@@ -102,7 +102,22 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
                              round(min(1.0, max(0.0, py)), 4)])
         if len(poly) >= 3:
             out.append({"n": e["n"], "p": poly})
-    return out
+    # ONE entry per BALL, not per track segment (Joe: two cue badges and
+    # two 7s on one shot — "always wrong to some extent"): identity churn
+    # splits a ball's path across track ids mid-flight; merge same-number
+    # segments in time order, and drop unnumbered fragments (they are the
+    # churn itself, not extra balls in play).
+    merged: dict = {}
+    for e in out:
+        if e["n"] < 0:
+            continue
+        m = merged.setdefault(e["n"], {"n": e["n"], "p": []})
+        m["p"].extend(e["p"])
+    result = []
+    for m in merged.values():
+        m["p"].sort(key=lambda q: q[0])
+        result.append(m)
+    return result
 
 
 def summary_path(video_path) -> Path:
