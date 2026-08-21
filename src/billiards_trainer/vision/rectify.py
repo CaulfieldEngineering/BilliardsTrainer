@@ -284,3 +284,18 @@ def estimate_camera_position(Hinv: np.ndarray,
     # always on the camera's side of the plane, so report height as |z|.
     C[2] = abs(C[2])
     return C
+
+
+def visual_from_plane(x: float, y: float, cam, r_ball: float
+                      ) -> tuple[float, float]:
+    """Invert the ball-height parallax correction for DISPLAY.
+
+    Stored track positions are the felt-CONTACT point (physics space);
+    imagery shows the ball's DISC, displaced radially away from the
+    camera by the ball's height. Any overlay drawn on video/rect frames
+    must map ball positions through this or the graphic sits visibly
+    off the ball (Joe's screenshot, first overlay render: cyan ring
+    low-left of the cue ball)."""
+    shrink = max(1e-6, 1.0 - float(r_ball) / float(cam[2]))
+    return (float(cam[0]) + (x - float(cam[0])) / shrink,
+            float(cam[1]) + (y - float(cam[1])) / shrink)
