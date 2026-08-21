@@ -1112,3 +1112,15 @@ Rounds continue with Joe's visual feedback as the gate.
   plan once approved: state machine + gesture layer first behind the
   current DOM, then layout swap, feature-parity checklist from the
   spec's §7 two-tap table. Meanwhile: @819 attribution next.
+- 2026-08-21 (loop, 10pm): @819 CONTACT ATTRIBUTION attempted and
+  HONESTLY DECLINED. Forensics confirmed Joe's note (the 3 moved first,
+  at t0-0.3, 34px nudge — the shot boundary lags the strike). Tried:
+  lower travel gate + soft-launch for nudges + wider path window.
+  Measured on both flagship sessions: 8 plausible text improvements BUT
+  one regression on a Joe-verified fact (@100 flipped to "contact on
+  the 3" where his note says the 7 was contacted) and @819 still not
+  fixed. Lesson recorded: MOTION ORDER cannot distinguish drift/rattle
+  from contact — proper fix is CUE-PATH INTERSECTION (which ball the
+  cue's actual trajectory reached first), a geometric test against the
+  cue trail. Reverted; texts restored; queued as the designed next
+  approach. UI v2 spec still awaiting Joe.
