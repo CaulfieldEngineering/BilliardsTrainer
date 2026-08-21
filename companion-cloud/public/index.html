@@ -97,6 +97,50 @@
              background:var(--panel); color:var(--dim);
              border:1px solid var(--line); border-radius:4px;
              font-size:14px; font-weight:600; }
+  /* ---- overlay bottom sheet (standard iOS pattern: scrim + slide-up
+     card with grabber; tool grid like Markup) ---- */
+  #ovscrim { display:none; position:fixed; inset:0; z-index:48;
+             background:rgba(0,0,0,.45); }
+  #ovmenu { display:none; position:fixed; left:0; right:0; bottom:0;
+            z-index:49; background:var(--panel);
+            border-top:1px solid var(--line);
+            border-radius:14px 14px 0 0;
+            padding:8px 16px calc(18px + env(safe-area-inset-bottom));
+            animation:ovup .22s ease; }
+  @keyframes ovup { from { transform:translateY(30%); opacity:.4; }
+                    to { transform:none; opacity:1; } }
+  #ovmenu .grab { width:36px; height:5px; border-radius:3px;
+                  background:var(--faint); margin:4px auto 14px; }
+  #ovmenu h3 { font-size:13px; font-weight:600; letter-spacing:.06em;
+               color:var(--dim); text-transform:uppercase; margin:14px 0 8px; }
+  #ovmenu .lrow { display:flex; align-items:center; width:100%;
+                  height:48px; padding:0 4px; background:none; border:none;
+                  border-bottom:1px solid var(--line); color:var(--text);
+                  font-size:16px; }
+  #ovmenu .lrow .chev { margin-left:auto; color:var(--faint); }
+  #ovmenu .tools { display:grid; grid-template-columns:repeat(4, 1fr);
+                   gap:10px; }
+  #ovmenu .tool { display:flex; flex-direction:column; align-items:center;
+                  gap:6px; padding:12px 0 10px; background:var(--bg);
+                  border:1px solid var(--line); border-radius:12px;
+                  color:var(--text); }
+  #ovmenu .tool .ic { font-size:22px; line-height:1; }
+  #ovmenu .tool .lb { font-size:11px; color:var(--dim); }
+  #pl-pick button { display:block; width:100%; height:44px; text-align:left;
+                    padding:0 10px; margin-top:6px; background:var(--bg);
+                    border:1px solid var(--line); border-radius:10px;
+                    color:var(--text); font-size:15px; }
+  /* ---- floating style pill (Markup-style) ---- */
+  #dtools { display:none; position:absolute; left:50%;
+            transform:translateX(-50%); bottom:96px; z-index:39;
+            background:rgba(18,22,29,.96); border:1px solid var(--line);
+            border-radius:24px; padding:8px 14px; align-items:center;
+            gap:12px; box-shadow:0 6px 24px rgba(0,0,0,.5);
+            max-width:calc(100% - 24px); }
+  #dtools .sw { width:24px; height:24px; border-radius:50%; padding:0;
+                border:2px solid transparent; }
+  #dtools .sw.on { border-color:#fff; }
+  #dtools input[type=range] { width:84px; }
   #sheet { display:none; }
   #sheet .row { display:flex; gap:6px; margin-bottom:8px; }
   #sheet button { flex:1; height:42px; background:var(--panel);
@@ -222,38 +266,34 @@
       <button id="correct">✎ Correct this clip</button>
       <div id="chips"></div>
     </div>
-    <div id="ovmenu" style="display:none;position:absolute;right:12px;top:54px;
-         left:auto;max-width:340px;z-index:40;background:#151A21;
-         border:1px solid #2A323D;
-         border-radius:2px;padding:10px 12px">
-      <div style="display:flex;align-items:center;margin-bottom:8px">
-        <span style="font-size:12px;letter-spacing:.08em;color:#8A94A2">PLAYLIST</span>
-        <button id="ov-close" style="margin-left:auto;min-width:40px;
-                padding:4px 10px">✕</button>
+    <div id="ovscrim"></div>
+    <div id="ovmenu">
+      <div class="grab"></div>
+      <button id="pl-save" class="lrow">☆ Save clip to playlist
+        <span class="chev">›</span></button>
+      <div id="pl-pick" style="display:none"></div>
+      <h3>Drawing tools</h3>
+      <div class="tools">
+        <button id="d-line" class="tool"><span class="ic">╱</span>
+          <span class="lb">Line</span></button>
+        <button id="d-angle" class="tool"><span class="ic">∠</span>
+          <span class="lb">Angle</span></button>
+        <button id="d-show" class="tool"><span class="ic">👁</span>
+          <span class="lb" id="d-show-lb">Shown</span></button>
+        <button id="d-clear" class="tool"><span class="ic">🗑</span>
+          <span class="lb">Clear</span></button>
       </div>
-      <button id="pl-save" style="width:100%">☆ Save clip to playlist</button>
-      <div id="pl-pick" style="display:none;margin-top:8px"></div>
-      <div style="font-size:12px;letter-spacing:.08em;color:#8A94A2;
-           margin:12px 0 8px">DRAWING</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="d-line">＋ Line</button>
-        <button id="d-angle">＋ Protractor</button>
-        <button id="d-show">👁 Shown</button>
-        <button id="d-del" disabled>Remove selected</button>
-        <button id="d-clear">Clear shot</button>
-      </div>
-      <div style="font-size:12px;color:#5A6472;margin-top:10px">
+      <button id="d-del" class="lrow" disabled style="display:none"></button>
+      <div style="font-size:12px;color:var(--faint);margin-top:14px">
         Aim line &amp; ball paths arrive here with the analysis overlays.
       </div>
     </div>
-    <div id="dtools" style="display:none;position:absolute;left:12px;right:12px;
-         bottom:90px;z-index:39;background:#151A21;border:1px solid #2A323D;
-         border-radius:2px;padding:8px 10px;align-items:center;gap:10px">
-      <span id="dt-colors" style="display:flex;gap:8px"></span>
-      <button id="dt-w" style="min-width:44px">──</button>
-      <input id="dt-a" type="range" min="15" max="100" value="55"
-             style="flex:1;min-width:60px">
-      <button id="dt-del" style="min-width:40px">🗑</button>
+    <div id="dtools">
+      <span id="dt-colors" style="display:flex;gap:10px"></span>
+      <button id="dt-w" style="min-width:40px;background:none;border:none;
+              color:var(--text)">──</button>
+      <input id="dt-a" type="range" min="15" max="100" value="55">
+      <button id="dt-del" style="min-width:36px;background:none;border:none">🗑</button>
     </div>
     <div id="sheet">
       <p id="sh-desc"></p>
@@ -1129,8 +1169,9 @@ const Draw = (() => {
   // per-object style strip (Joe: "a mini digital media suite")
   COLORS.forEach(c => {
     const d = document.createElement("button");
-    d.style.cssText = `width:26px;height:26px;border-radius:50%;padding:0;
-      border:2px solid #2A323D;background:${c}`;
+    d.className = "sw";
+    d.dataset.c = c;
+    d.style.background = c;
     d.onclick = () => {
       if (sel >= 0) { objs[sel].color = c; save(); syncUI(); }
     };
@@ -1149,14 +1190,16 @@ const Draw = (() => {
     if (sel >= 0) { objs.splice(sel, 1); sel = -1; save(); syncUI(); }
   };
   function syncUI() {
-    $("d-del").disabled = sel < 0;
-    $("d-show").textContent = show ? "👁 Shown" : "👁 Hidden";
+    $("d-show-lb").textContent = show ? "Shown" : "Hidden";
     const t = $("dtools");
     t.style.display = sel >= 0 ? "flex" : "none";
     if (sel >= 0) {
       const o = objs[sel];
       $("dt-w").textContent = WIDTH_GLYPH[o.w || 1.8] || "──";
       $("dt-a").value = Math.round((o.alpha != null ? o.alpha : 0.55) * 100);
+      const c = o.color || "#7DF29B";
+      [...$("dt-colors").children].forEach(b =>
+        b.classList.toggle("on", b.dataset.c === c));
     }
   }
   return {
@@ -1166,12 +1209,13 @@ const Draw = (() => {
     clear: () => { objs = []; sel = -1; save(); syncUI(); },
   };
 })();
-$("ovbtn").onclick = ev => {
-  ev.stopPropagation();
-  const m = $("ovmenu");
-  m.style.display = m.style.display === "none" ? "block" : "none";
-};
-$("ov-close").onclick = () => { $("ovmenu").style.display = "none"; };
+function ovOpen(open) {
+  $("ovmenu").style.display = open ? "block" : "none";
+  $("ovscrim").style.display = open ? "block" : "none";
+  if (!open) $("pl-pick").style.display = "none";
+}
+$("ovbtn").onclick = () => ovOpen($("ovmenu").style.display !== "block");
+$("ovscrim").onclick = () => ovOpen(false);
 // ---- save the current clip into a playlist (picker inline in the menu)
 $("pl-save").onclick = () => {
   const box = $("pl-pick");
@@ -1189,9 +1233,11 @@ $("pl-save").onclick = () => {
     if (!ls.some(p => p.id === t.id)) ls.push(t);
     PL.save(ls);
     box.style.display = "none";
-    $("pl-save").textContent = `✓ Saved to ${t.name}`;
-    setTimeout(() => { $("pl-save").textContent = "☆ Save clip to playlist"; },
-               1600);
+    $("pl-save").innerHTML = `✓ Saved to ${t.name}`;
+    setTimeout(() => {
+      $("pl-save").innerHTML =
+        '☆ Save clip to playlist <span class="chev">›</span>';
+    }, 1600);
   };
   PL.all().forEach(pl => {
     const b = document.createElement("button");
@@ -1213,16 +1259,8 @@ $("pl-save").onclick = () => {
 // pinch-zoom belt-and-suspenders (iOS ignores user-scalable in odd cases)
 document.addEventListener("gesturestart", e => e.preventDefault());
 $("video").addEventListener("contextmenu", e => e.preventDefault());
-// tapping anywhere outside the menu dismisses it too
-document.addEventListener("pointerdown", ev => {
-  const m = $("ovmenu");
-  if (m.style.display !== "none" && !m.contains(ev.target)
-      && ev.target !== $("ovbtn")) {
-    m.style.display = "none";
-  }
-}, true);
-$("d-line").onclick = () => { Draw.add("line"); $("ovmenu").style.display = "none"; };
-$("d-angle").onclick = () => { Draw.add("angle"); $("ovmenu").style.display = "none"; };
+$("d-line").onclick = () => { Draw.add("line"); ovOpen(false); };
+$("d-angle").onclick = () => { Draw.add("angle"); ovOpen(false); };
 $("d-show").onclick = () => Draw.toggleShow();
 $("d-del").onclick = () => Draw.removeSel();
 $("d-clear").onclick = () => Draw.clear();
