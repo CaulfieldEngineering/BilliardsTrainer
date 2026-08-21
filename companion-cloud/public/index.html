@@ -233,6 +233,15 @@
         Aim line &amp; ball paths arrive here with the analysis overlays.
       </div>
     </div>
+    <div id="dtools" style="display:none;position:absolute;left:12px;right:12px;
+         bottom:90px;z-index:39;background:#151A21;border:1px solid #2A323D;
+         border-radius:2px;padding:8px 10px;align-items:center;gap:10px">
+      <span id="dt-colors" style="display:flex;gap:8px"></span>
+      <button id="dt-w" style="min-width:44px">──</button>
+      <input id="dt-a" type="range" min="15" max="100" value="55"
+             style="flex:1;min-width:60px">
+      <button id="dt-del" style="min-width:40px">🗑</button>
+    </div>
     <div id="sheet">
       <p id="sh-desc"></p>
       <div class="row" id="sh-outcome">
@@ -856,12 +865,18 @@ const Draw = (() => {
     const dpr = window.devicePixelRatio || 1;
     objs.forEach((o, i) => {
       const P = o.pts.map(p => toPx(b, p));
+      const col = o.color || "#7DF29B";
+      const alpha = o.alpha != null ? o.alpha : 0.55;
+      const lw = (o.w || 1.8) * dpr;
       const tracer = (a, c) => {
         g.lineCap = "round";
-        g.strokeStyle = "rgba(10,25,12,.55)"; g.lineWidth = 4.5 * dpr;
+        g.globalAlpha = alpha * 0.5;
+        g.strokeStyle = "#0A190C"; g.lineWidth = lw + 2.6 * dpr;
         g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.stroke();
-        g.strokeStyle = i === sel ? "#FFD54A" : "#7DF29B"; g.lineWidth = 1.8 * dpr;
+        g.globalAlpha = alpha;
+        g.strokeStyle = col; g.lineWidth = lw;
         g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.stroke();
+        g.globalAlpha = 1;
       };
       if (o.type === "line") tracer(P[0], P[1]);
       else {                              // protractor: vertex + two rays
@@ -871,9 +886,11 @@ const Draw = (() => {
         let d = Math.abs(a2 - a1) * 180 / Math.PI;
         if (d > 180) d = 360 - d;
         const rr = 34 * dpr;
-        g.strokeStyle = i === sel ? "#FFD54A" : "#7DF29B"; g.lineWidth = 1.2 * dpr;
+        g.globalAlpha = alpha;
+        g.strokeStyle = col; g.lineWidth = 1.2 * dpr;
         g.beginPath(); g.arc(P[0][0], P[0][1], rr, Math.min(a1, a2), Math.max(a1, a2));
         g.stroke();
+        g.globalAlpha = 1;
         const mid = (a1 + a2) / 2, lx = P[0][0] + Math.cos(mid) * (rr + 16 * dpr),
               ly = P[0][1] + Math.sin(mid) * (rr + 16 * dpr);
         const label = d.toFixed(1) + "°";
@@ -951,15 +968,48 @@ const Draw = (() => {
   const endDrag = () => { if (drag) { drag = null; save(); } };
   cv.addEventListener("pointerup", endDrag);
   cv.addEventListener("pointercancel", endDrag);
+  const COLORS = ["#7DF29B", "#FFD54A", "#FF6B6B", "#6BD5FF", "#F2F6FA"];
+  const WIDTHS = [1.2, 1.8, 3.0];
+  const WIDTH_GLYPH = { 1.2: "─", 1.8: "──", 3.0: "━━" };
   function add(type) {
     const o = type === "line"
       ? { type: "line", pts: [[0.3, 0.45], [0.7, 0.45]] }
       : { type: "angle", pts: [[0.5, 0.5], [0.28, 0.36], [0.72, 0.36]] };
+    o.color = COLORS[0]; o.alpha = 0.55; o.w = 1.8;
     objs.push(o); sel = objs.length - 1; save(); syncUI();
   }
+  // per-object style strip (Joe: "a mini digital media suite")
+  COLORS.forEach(c => {
+    const d = document.createElement("button");
+    d.style.cssText = `width:26px;height:26px;border-radius:50%;padding:0;
+      border:2px solid #2A323D;background:${c}`;
+    d.onclick = () => {
+      if (sel >= 0) { objs[sel].color = c; save(); syncUI(); }
+    };
+    $("dt-colors").appendChild(d);
+  });
+  $("dt-w").onclick = () => {
+    if (sel < 0) return;
+    const o = objs[sel];
+    o.w = WIDTHS[(WIDTHS.indexOf(o.w || 1.8) + 1) % WIDTHS.length];
+    save(); syncUI();
+  };
+  $("dt-a").addEventListener("input", () => {
+    if (sel >= 0) { objs[sel].alpha = $("dt-a").value / 100; save(); }
+  });
+  $("dt-del").onclick = () => {
+    if (sel >= 0) { objs.splice(sel, 1); sel = -1; save(); syncUI(); }
+  };
   function syncUI() {
     $("d-del").disabled = sel < 0;
     $("d-show").textContent = show ? "👁 Shown" : "👁 Hidden";
+    const t = $("dtools");
+    t.style.display = sel >= 0 ? "flex" : "none";
+    if (sel >= 0) {
+      const o = objs[sel];
+      $("dt-w").textContent = WIDTH_GLYPH[o.w || 1.8] || "──";
+      $("dt-a").value = Math.round((o.alpha != null ? o.alpha : 0.55) * 100);
+    }
   }
   return {
     render, add,
