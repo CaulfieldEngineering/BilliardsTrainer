@@ -1093,3 +1093,14 @@ Rounds continue with Joe's visual feedback as the gate.
   every heavy job. Binary cached in the session scratchpad; wiring
   would vendor it under tools/. NEXT: Joe's verdict on the sample;
   @819 contact attribution; fresh verdicts on new footage.
+- 2026-08-21 (evening, Joe-directed): SMOOTH SLO-MO SHIPPED end-to-end —
+  ✨ request in the phone sheet -> corrections channel -> in-app watcher
+  renders (rife v4.6, half-res, ~30s, recording-deferred, idempotent)
+  into slowmo/ (invisible to the sessions list) -> auto-appends to the
+  PC-owned "Slow-mo" playlist in synced playlists.json (phone merges it
+  even when local is newer). Casual ½×/¼× untouched. Binary out-of-repo
+  (~/.billiards-tools, tools/fetch_rife.py). LIVE-VERIFIED TWICE incl.
+  a real find: the corrections watcher only ran inside the LAN server
+  main — with just the app open, requests waited for the hourly
+  backstop; the app now starts the watcher at launch. UI-redesign
+  research done (4 sources + spec) — present to Joe before rebuilding.
