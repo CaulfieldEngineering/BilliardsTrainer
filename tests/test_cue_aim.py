@@ -81,3 +81,30 @@ class TestAimRay:
         assert (round(ex), round(ey)) == (350, 1300)
         ex, ey = aim_ray_end(350, 650, math.pi, (0, 0, 700, 1300))
         assert (round(ex), round(ey)) == (0, 650)
+
+
+class TestInferTarget:
+    def test_straight_hit_ghost_two_radii_back(self):
+        from billiards_trainer.vision.cue_aim import infer_target
+        got = infer_target((100, 100), 0.0, [(5, 400, 100)], 15.0)
+        assert got is not None
+        num, (gx, gy), t = got
+        assert num == 5
+        assert abs(gx - 370) < 1e-6 and abs(gy - 100) < 1e-6
+
+    def test_first_ball_in_path_wins(self):
+        from billiards_trainer.vision.cue_aim import infer_target
+        got = infer_target((100, 100), 0.0,
+                           [(9, 600, 100), (5, 400, 110)], 15.0)
+        assert got[0] == 5
+
+    def test_offset_hit_and_clean_miss(self):
+        import math
+        from billiards_trainer.vision.cue_aim import infer_target
+        # centre passes 29px from the ball: still a (thin) hit at 2r=30
+        got = infer_target((100, 100), 0.0, [(3, 400, 129)], 15.0)
+        assert got is not None and got[0] == 3
+        # 31px: clean miss
+        assert infer_target((100, 100), 0.0, [(3, 400, 131)], 15.0) is None
+        # ball BEHIND the cue is never a target
+        assert infer_target((100, 100), 0.0, [(3, 50, 100)], 15.0) is None

@@ -212,3 +212,36 @@ def aim_ray_end(cx: float, cy: float, ang: float,
         ts.append((y0 - cy) / vy)
     t = min((t for t in ts if t > 0), default=0.0)
     return cx + vx * t, cy + vy * t
+
+
+def infer_target(cue_xy: tuple, ang: float, balls: list, ball_r: float,
+                 ) -> tuple[int, tuple[float, float], float] | None:
+    """First ball in the cue's collision path — Joe's target inference.
+
+    Capsule sweep: the cue ball's centre travels along ``ang`` from
+    ``cue_xy``; any ball whose centre lies within 2r of the path line
+    (and ahead of the cue) can be struck; the FIRST contact wins,
+    assuming no kick. ``balls`` is [(num, x, y)] in PLANE space (physics
+    uses contact points; render via visual_from_plane afterwards).
+    Returns (ball num, ghost-ball centre at contact, travel px) or None
+    when nothing is in the path (kick shot / safety).
+    """
+    vx, vy = math.cos(ang), math.sin(ang)
+    reach = 2.0 * float(ball_r)
+    best = None
+    for num, bx, by in balls:
+        rx, ry = bx - cue_xy[0], by - cue_xy[1]
+        t_par = rx * vx + ry * vy
+        if t_par <= 0:
+            continue                      # behind the cue ball
+        d_perp = abs(rx * vy - ry * vx)
+        if d_perp >= reach:
+            continue                      # path misses it
+        t_hit = t_par - math.sqrt(reach * reach - d_perp * d_perp)
+        if t_hit <= 0:
+            continue                      # already overlapping: ignore
+        if best is None or t_hit < best[2]:
+            best = (int(num),
+                    (cue_xy[0] + vx * t_hit, cue_xy[1] + vy * t_hit),
+                    float(t_hit))
+    return best
