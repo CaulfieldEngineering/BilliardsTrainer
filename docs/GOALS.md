@@ -1059,3 +1059,12 @@ Rounds continue with Joe's visual feedback as the gate.
   only (aim line at address + actual ball paths). NEXT: cron renewal
   (Aug 22!), aim/paths overlay integration behind the ☰ sheet, playlist
   server sync, RIFE slow-mo prototype.
+- 2026-08-21 (loop, 8am): AIM + PATHS OVERLAYS live on the phone —
+  ☰ sheet gains an OVERLAYS section with Aim line / Ball paths
+  toggles. The aim segment is computed at EXPORT (one address-frame
+  decode per stroke, q-gated, cached across re-exports; 30/44 lines on
+  005647, 11s cold / instant warm) and stored video-normalized in
+  shots.json; both surfaces draw the same stored geometry. Library
+  aim backfill running. NEXT: desktop overlay parity from the same
+  summaries; CRON RENEWAL tomorrow (Aug 22!); playlist server sync;
+  RIFE prototype; @819 contact attribution.
