@@ -37,6 +37,20 @@
   #keygate { padding:40px 24px; text-align:center; color:var(--dim);
              display:none; }
   #sessions { padding:8px 0; }
+  .acc { display:flex; align-items:center; gap:10px; padding:16px 16px 10px;
+         font-size:17px; font-weight:700; }
+  .acc .ch { color:var(--dim); transition:transform .15s;
+             display:inline-block; }
+  .acc.open .ch { transform:rotate(90deg); }
+  .acc .cnt { margin-left:auto; color:var(--faint); font-size:13px;
+              font-weight:600; }
+  .indent { padding-left:10px; }
+  .swipe { position:relative; overflow:hidden; touch-action:pan-y; }
+  .swipe .swdel { position:absolute; right:0; top:0; bottom:0; width:80px;
+                  background:#D64545; color:#fff; border:none;
+                  font-weight:700; font-size:14px; }
+  .swipe .sess { position:relative; background:var(--bg); }
+  .sess.new { color:var(--accent); font-weight:600; display:block; }
   .sess { display:grid; grid-template-columns: 1fr 64px 56px;
           gap:10px; padding:12px 16px; align-items:baseline;
           border-bottom:1px solid var(--line); }
@@ -447,81 +461,102 @@ const PL = {
         localStorage.setItem("playlists",
                              JSON.stringify(doc.playlists || []));
         localStorage.setItem("playlistsMod", String(doc.mod));
-        if (homeTab === "playlists"
-            && $("player").classList.contains("open") === false)
-          renderPlaylists();
+        if ($("player").classList.contains("open") === false)
+          renderHome();
       } else if (localMod > (Number(doc.mod) || 0) && PL.all().length) {
         PL.push();                 // local is newer: heal the server copy
       }
     } catch (e) { /* offline is fine */ }
   },
 };
-let homeTab = localStorage.getItem("homeTab") || "sessions";
 let sessCache = [];                       // last /api/sessions payload
-function tabBar(box) {
-  const bar = document.createElement("div");
-  bar.style.cssText = "display:flex;gap:8px;padding:10px 12px 2px";
-  [["sessions", "Sessions"], ["playlists", "Playlists"]].forEach(([k, label]) => {
-    const b = document.createElement("button");
-    b.textContent = label;
-    b.style.cssText = "flex:1;padding:8px 0" + (homeTab === k
-      ? ";border-color:#3B82F6;color:#EAF2FF" : ";color:#8A94A2");
-    b.onclick = () => {
-      homeTab = k;
-      localStorage.setItem("homeTab", k);
-      k === "sessions" ? loadSessions() : renderPlaylists();
-    };
-    bar.appendChild(b);
-  });
-  box.appendChild(bar);
+// ---- home screen: accordion sections (Joe: "sessions header, then a
+// playlists header, drop downs with indented content, entries slidable
+// to delete")
+const HOME = {
+  sess: localStorage.getItem("home_sess") !== "0",
+  pl: localStorage.getItem("home_pl") !== "0",
+};
+function _accHeader(box, key, title, count) {
+  const h = document.createElement("div");
+  h.className = "acc" + (HOME[key] ? " open" : "");
+  const ch = document.createElement("span");
+  ch.className = "ch"; ch.textContent = "\u203A";
+  const t = document.createElement("span");
+  t.textContent = title;
+  const c = document.createElement("span");
+  c.className = "cnt"; c.textContent = count === 0 ? "" : count;
+  h.append(ch, t, c);
+  h.onclick = () => {
+    HOME[key] = !HOME[key];
+    localStorage.setItem("home_" + key, HOME[key] ? "1" : "0");
+    renderHome();
+  };
+  box.appendChild(h);
 }
-function renderPlaylists() {
-  const box = $("sessions");
-  box.innerHTML = "";
-  tabBar(box);
-  const ls = PL.all();
-  if (!ls.length) {
-    const e = document.createElement("div");
-    e.className = "empty";
-    e.textContent = "No playlists yet — open a shot and use ☰ → Save clip.";
-    box.appendChild(e);
-  }
-  ls.forEach(pl => {
-    const el = document.createElement("div");
-    el.className = "sess";
-    const n = document.createElement("span");
-    n.textContent = pl.name;
-    const c = document.createElement("span");
-    c.className = "num";
-    c.textContent = pl.clips.length + (pl.clips.length === 1 ? " clip" : " clips");
-    const del = document.createElement("button");
-    del.textContent = "✕";
-    del.style.cssText = "min-width:36px;padding:4px 8px;margin-left:8px";
-    del.onclick = ev => {
-      ev.stopPropagation();
-      if (!confirm(`Delete playlist "${pl.name}"?`)) return;
-      PL.save(PL.all().filter(p => p.id !== pl.id));
-      renderPlaylists();
-    };
-    el.append(n, c, del);
-    el.onclick = () => openPlaylist(pl);
-    box.appendChild(el);
+const fmtDur = d => d == null ? "\u2013"
+  : d >= 3600 ? `${Math.floor(d / 3600)}h${String(Math.floor(d % 3600 / 60)).padStart(2, "0")}`
+  : d >= 60 ? `${Math.floor(d / 60)}m` : `${Math.floor(d)}s`;
+
+function _plRow(pl) {
+  const holder = document.createElement("div");
+  holder.className = "swipe";
+  const del = document.createElement("button");
+  del.className = "swdel";
+  del.textContent = "Delete";
+  del.onclick = () => {
+    PL.save(PL.all().filter(q => q.id !== pl.id));
+    renderHome();
+  };
+  const el = document.createElement("div");
+  el.className = "sess pl";
+  const n = document.createElement("span");
+  n.className = "d";
+  n.textContent = pl.name;
+  const c = document.createElement("span");
+  c.className = "num";
+  c.textContent = pl.clips.length + (pl.clips.length === 1 ? " clip" : " clips");
+  el.append(n, c);
+  // iOS-style swipe-to-delete: horizontal drag reveals the button;
+  // touch-action pan-y keeps vertical list scrolling native
+  let x0 = null, dx = 0, open = false, moved = false;
+  el.addEventListener("pointerdown", e => {
+    x0 = e.clientX; moved = false;
+    el.setPointerCapture(e.pointerId);
   });
+  el.addEventListener("pointermove", e => {
+    if (x0 == null) return;
+    const raw = e.clientX - x0 - (open ? 80 : 0);
+    if (Math.abs(e.clientX - x0) > 8) moved = true;
+    dx = Math.min(0, Math.max(-96, raw));
+    el.style.transform = `translateX(${dx}px)`;
+  });
+  const up = e => {
+    if (x0 == null) return;
+    open = dx < -40;
+    el.style.transition = "transform .16s ease";
+    el.style.transform = `translateX(${open ? -80 : 0}px)`;
+    setTimeout(() => { el.style.transition = ""; }, 180);
+    const tap = !moved && !open;
+    x0 = null; dx = open ? -80 : 0;
+    if (tap) openPlaylist(pl);
+  };
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+  holder.append(del, el);
+  return holder;
 }
 
-let _plPulled = false;
-async function loadSessions() {
+function renderHome() {
   const box = $("sessions");
-  box.innerHTML = "<div class='empty'>Loading sessions…</div>";
-  if (!_plPulled) { _plPulled = true; PL.pull(); }
-  if (homeTab === "playlists") { renderPlaylists(); return; }
-  try {
-    const resp = await api("/api/sessions");
-    sessCache = resp.sessions || [];
-    box.innerHTML = "";
-    tabBar(box);
-    if (!resp.sessions.length) box.innerHTML += "<div class='empty'>No sessions.</div>";
-    else {
+  box.innerHTML = "";
+  _accHeader(box, "sess", "Sessions", sessCache.length);
+  if (HOME.sess) {
+    const wrap = document.createElement("div");
+    wrap.className = "indent";
+    if (!sessCache.length) {
+      wrap.innerHTML = "<div class='empty'>Loading sessions\u2026</div>";
+    } else {
       const head = document.createElement("div");
       head.className = "sess head";
       ["DATE", "LENGTH", "SHOTS"].forEach((t, i) => {
@@ -530,32 +565,58 @@ async function loadSessions() {
         sp.textContent = t;
         head.appendChild(sp);
       });
-      box.appendChild(head);
+      wrap.appendChild(head);
+      sessCache.forEach(s2 => {
+        const el = document.createElement("div");
+        el.className = "sess" + (s2.analyzed ? "" : " stub");
+        // textContent only — a Dropbox filename is untrusted input and
+        // the fmtDate fallback returns it raw (security review).
+        const d = document.createElement("span");
+        d.className = "d";
+        d.textContent = fmtDate(s2.name, s2.modified);
+        const len = document.createElement("span");
+        len.className = "num" + (s2.dur_s == null ? " dim" : "");
+        len.textContent = fmtDur(s2.dur_s);
+        const sh = document.createElement("span");
+        sh.className = "num" + (s2.shots == null ? " dim" : "");
+        sh.textContent = s2.shots == null ? "\u2013" : s2.shots;
+        el.append(d, len, sh);
+        el.onclick = () => openSession(s2);
+        wrap.appendChild(el);
+      });
     }
-    const fmtDur = d => d == null ? "–"
-      : d >= 3600 ? `${Math.floor(d / 3600)}h${String(Math.floor(d % 3600 / 60)).padStart(2, "0")}`
-      : d >= 60 ? `${Math.floor(d / 60)}m` : `${Math.floor(d)}s`;
-    resp.sessions.forEach(s => {
-      const el = document.createElement("div");
-      el.className = "sess" + (s.analyzed ? "" : " stub");
-      // textContent only — a Dropbox filename is untrusted input and the
-      // fmtDate fallback returns it raw (security review: XSS sink).
-      const d = document.createElement("span");
-      d.className = "d";
-      d.textContent = fmtDate(s.name, s.modified);
-      const len = document.createElement("span");
-      len.className = "num" + (s.dur_s == null ? " dim" : "");
-      len.textContent = fmtDur(s.dur_s);
-      const sh = document.createElement("span");
-      sh.className = "num" + (s.shots == null ? " dim" : "");
-      sh.textContent = s.shots == null ? "–" : s.shots;
-      el.append(d, len, sh);
-      el.onclick = () => openSession(s);
-      box.appendChild(el);
-    });
+    box.appendChild(wrap);
+  }
+  const ls = PL.all();
+  _accHeader(box, "pl", "Playlists", ls.length);
+  if (HOME.pl) {
+    const wrap = document.createElement("div");
+    wrap.className = "indent";
+    const nw = document.createElement("div");
+    nw.className = "sess new";
+    nw.textContent = "\uFF0B New Playlist";
+    nw.onclick = () => {
+      const name = (prompt("Playlist name") || "").trim();
+      if (name) { PL.create(name); renderHome(); }
+    };
+    wrap.appendChild(nw);
+    ls.forEach(pl => wrap.appendChild(_plRow(pl)));
+    box.appendChild(wrap);
+  }
+}
+
+let _plPulled = false;
+async function loadSessions() {
+  if (!_plPulled) { _plPulled = true; PL.pull(); }
+  renderHome();
+  try {
+    const resp = await api("/api/sessions");
+    sessCache = resp.sessions || [];
+    renderHome();
   } catch (e) {
     if (String(e.message) !== "401")
-      box.innerHTML = `<div class='empty'>Couldn't reach Dropbox (${e.message})</div>`;
+      $("sessions").innerHTML =
+        `<div class='empty'>Couldn't reach Dropbox (${e.message})</div>`;
   }
 }
 
