@@ -99,9 +99,65 @@ def detect_cue_aim(rect_bgr: np.ndarray, cue_xy: tuple, cue_r: float,
     wsum = sum(length for length, _, _, _ in members)
     ax = sum(length * mx for length, _, mx, _ in members) / wsum
     ay = sum(length * my for length, _, _, my in members) / wsum
+    # SUB-PIXEL CENTERLINE (Joe: "aligned perfectly with the cue"): the
+    # Hough cluster averages EDGE segments, which sits a hair off when
+    # glare favours one edge. Walk the axis, take a perpendicular
+    # profile every few px, keep thin bright bands (the glove and the
+    # ball fail the width test and drop out), and refit the line
+    # through the band centres.
+    refined = _refine_centerline(mask, ang, ax, ay)
+    if refined is not None:
+        ang, ax, ay = refined
     total = sum(length for length, _, _, _ in cand)
     quality = min(1.0, best_w / max(1e-6, total)) * min(1.0, best_w / 400.0)
     return ang % (2 * math.pi), quality, (ax, ay)
+
+
+def _refine_centerline(mask: np.ndarray, ang: float, ax: float, ay: float,
+                       span: float = 260.0, step: float = 7.0,
+                       ) -> tuple[float, float, float] | None:
+    """Refit (angle, anchor) through the stick band's per-profile centres.
+    Returns None when too few clean profiles exist (keep the Hough fit)."""
+    h, w = mask.shape[:2]
+    vx, vy = math.cos(ang), math.sin(ang)
+    nx, ny = -vy, vx
+    pts = []
+    s = -span
+    while s <= span:
+        sx, sy = ax + vx * s, ay + vy * s
+        offs, vals = [], []
+        d = -14.0
+        while d <= 14.0:
+            px, py = int(sx + nx * d), int(sy + ny * d)
+            if 0 <= px < w and 0 <= py < h and mask[py, px]:
+                offs.append(d)
+                vals.append(1.0)
+            d += 1.0
+        # a clean stick profile is a THIN contiguous band; hands, balls
+        # and rail wood are wide, gaps mean clutter
+        if 3 <= len(offs) <= 13 and (offs[-1] - offs[0]) <= 13.0:
+            c = sum(offs) / len(offs)
+            pts.append((sx + nx * c, sy + ny * c))
+        s += step
+    if len(pts) < 8:
+        return None
+    xs = np.array([p[0] for p in pts])
+    ys = np.array([p[1] for p in pts])
+    mx_, my_ = float(xs.mean()), float(ys.mean())
+    # total least squares via PCA; keep the aim's forward sign
+    u = np.stack([xs - mx_, ys - my_])
+    cov = u @ u.T
+    evals, evecs = np.linalg.eigh(cov)
+    dx, dy = float(evecs[0, 1]), float(evecs[1, 1])
+    new_ang = math.atan2(dy, dx)
+    d = (new_ang - ang) % (2 * math.pi)
+    if min(d, 2 * math.pi - d) > math.pi / 2:
+        new_ang += math.pi
+    # sanity: refinement must agree with the cluster within a few degrees
+    d = (new_ang - ang) % (2 * math.pi)
+    if min(d, 2 * math.pi - d) > math.radians(4.0):
+        return None
+    return new_ang % (2 * math.pi), mx_, my_
 
 
 def aim_ray_end(cx: float, cy: float, ang: float,
