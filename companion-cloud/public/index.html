@@ -18,6 +18,10 @@
       -webkit-user-select:none; user-select:none;
       -webkit-touch-callout:none; }
   body { touch-action:manipulation; }
+  /* the video area owns ALL its gestures: without this, iOS treats
+     two-finger and drag input over the <video> as PAGE gestures — pinch-
+     out got stolen and pans scrolled the page (Joe) */
+  #vwrap, #vwrap video, #vwrap canvas { touch-action:none; }
   input, textarea { -webkit-user-select:text; user-select:text; }
   body { background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,
          "Segoe UI", sans-serif; padding-bottom:env(safe-area-inset-bottom); }
