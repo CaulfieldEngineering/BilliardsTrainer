@@ -1212,3 +1212,29 @@ Rounds continue with Joe's visual feedback as the gate.
   analysis/forensic.py (per-shot geometry card + required-vs-actual
   overlays — Joe's Yahoo-Pool instinct), then Step 3 cue-tip tracking
   which REPLACES the planned full-shaft aim work.
+- 2026-08-22 (overnight, Joe asleep): worked his stated priority list.
+  (1) MISS LABELS + "WHY THIS MISS" OVERLAY shipped — the overlay draws
+  the figure the label is made of (cue approach dashed, line to the
+  pocket, line the ball actually took, legend) from geometry stored
+  with the tag, so "left cut / missed left / overcut" is shown, not
+  asserted; identical on both surfaces by construction. (2) GLOBAL 180
+  ROTATION (container rotates so video + overlays turn as one; pointer
+  and pan inverted where consumed). (3) LIBRARY BACKFILL: 35 sessions
+  re-exported with tags. Pattern table today: 47 high-confidence misses
+  (122 abstained, 42 excluded by a new CONFIDENCE gate — a 14in "miss"
+  means the inferred pocket was wrong, a sub-inch one means the ball
+  went in). No bias stands out yet: left cuts 50/50, right cuts 55/45.
+  (4) TOP-DOWN SYSTEM REVIEW (Joe's reiteration): tools/system_review.py
+  runs L1 architecture (block diagram from real imports, layer contract,
+  cycles) -> L2 data spine -> L3 features -> L4 code, and the watchdog
+  now treats an L1 finding as outranking everything below. It found and
+  I FIXED companion(L3) importing ui(L4) (session_summaries moved to
+  vision/); it still reports events<->vision and detector_strategies<->
+  vision cycles, whose fix is a core/ package for the shared vocabulary
+  (Track/BallClass/TableModel) — deliberately deferred, not hidden.
+  STILL OPEN: cue-ball tracking loses the ball ~40% of flight (fresh
+  re-analysis reproduced it, so it is NOT stale code; the detector
+  finds the ball 45/45 frames in isolation, so the fault is in
+  association during full-history runs) — this is the next chunk and it
+  gates aim/miss coverage. Also open: aim lines on 66% of stroke shots;
+  IG-style UI phase 2; audio-transient segmentation.
