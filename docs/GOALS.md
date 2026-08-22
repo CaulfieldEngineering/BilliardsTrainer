@@ -1332,3 +1332,38 @@ Rounds continue with Joe's visual feedback as the gate.
   direction and speed). Note the first gate I wrote excluded the only case
   that matters: I required move_streak>=2, but a struck ball was at REST one
   frame earlier. Gate on "a confirmed track's detection just vanished".
+
+- 2026-08-22 (session) — Hygiene first per the rule: lint 12 -> 10 (both
+  regressions were mine from the overlay work), and the overlay video-box
+  math deduplicated into one videoBox() owner. Then the main chunk, which
+  started as "stop the ball swap" and turned into something larger.
+  _project_raw_to_rect rebuilds every Detection to move it into rect space
+  and did not copy measured_bgr. The tracker only consumes rect-space
+  detections, and that field is the ONLY feed for colour_hist — so
+  colour_hist has always been empty in production (measured: 0 of 6
+  detections carried a colour through the strike). Three tested,
+  review-hardened mechanisms have therefore never executed on real
+  footage: _colour_consensus (always hit its len<8 fallback, which returns
+  frac 0.0 exactly so adoption cannot fire), COLOUR ADOPTION (needs
+  len>=25 — unreachable), and the +COLOUR_MAX term in arbitration. Fixed
+  by carrying the field, plus sampling a glare-trimmed crop median on
+  every detection rather than only on the rare number-correction path.
+  On top of that, a settled track now refuses a detection whose measured
+  colour is drastically unlike its own — because a settled track gets a
+  ~99px strike gate and the class veto exempts healthy tracks, so the
+  resting 4 took the arriving white cue 28px away while the cue's own
+  track sat 287px out of gate. Distance cannot separate touching balls.
+  Measured: the 4's own detections score 1-14, the cue scores 108,820
+  against a 22,500 bar. A/B on 005048@233 — veto OFF the 4's track ends
+  at (239,707) ON THE CUE BALL; veto ON it stays at (293,973) as the 4.
+  The swap is gone. HONEST LIMIT: the shot is not recovered. The 4's track
+  now sits frozen at address still holding number 4, so the real 4 (found
+  correctly by id8 at (200,1272)) holds the number for one sample before
+  the ghost takes it back. A confidently wrong path became an honest
+  abstention — right direction, but a stalemate.
+  NEXT: (1) a settled track whose spot is demonstrably empty must RELEASE
+  its number instead of holding it hostage — that is what turns this
+  stalemate into a recovered shot; (2) validate colour adoption at library
+  scale (it is reachable for the first time) via a re-analysis scored on
+  id_hops and duplicate-identity; (3) blur recovery with a median
+  background and ballistic validation.
