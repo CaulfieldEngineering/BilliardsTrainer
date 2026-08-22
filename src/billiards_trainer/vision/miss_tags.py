@@ -160,6 +160,18 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
         "miss_in": round(miss_px / space.px_per_in, 2),
         "pocket_inferred": True,
     }
+    # GEOMETRY THE LABEL IS MADE OF (Joe: "an optional visual overlay to
+    # understand where your 'shot left, misses left' definition is coming
+    # from"). Rect-space points; the exporter maps them to video coords so
+    # both surfaces draw the identical figure.
+    tags["geom"] = {
+        "cue": [round(ax, 1), round(ay, 1)],          # cue ball at address
+        "obj": [round(ox, 1), round(oy, 1)],          # object ball at contact
+        "pocket": [round(px, 1), round(py, 1)],       # the pocket it was on
+        # where the object ball ACTUALLY went (extended to the pocket's range)
+        "went": [round(ox + vx * math.hypot(px - ox, py - oy), 1),
+                 round(oy + vy * math.hypot(px - ox, py - oy), 1)],
+    }
     if not straight:
         tags["fullness"] = "overcut" if over_deg > 0 else "undercut"
         tags["error_deg"] = round(over_deg, 1)

@@ -313,11 +313,16 @@
           <span class="lb">Clear</span></button>
       </div>
       <button id="d-del" class="lrow" disabled style="display:none"></button>
+      <h3>View</h3>
+      <button id="ov-rot" class="lrow">Rotate 180°
+        <span class="chev" id="ov-rot-st">Off</span></button>
       <h3>Overlays</h3>
       <button id="ov-aim" class="lrow">Aim line
         <span class="chev" id="ov-aim-st">Off</span></button>
       <button id="ov-paths" class="lrow">Ball paths
         <span class="chev" id="ov-paths-st">Off</span></button>
+      <button id="ov-why" class="lrow">Why this miss
+        <span class="chev" id="ov-why-st">Off</span></button>
     </div>
     <div id="dtools">
       <div class="dtrow">
@@ -964,9 +969,26 @@ const TRAIL_TAIL_S = 4.0;
 const OV = {
   aim: localStorage.getItem("ov_aim") === "1",
   paths: localStorage.getItem("ov_paths") === "1",
+  why: localStorage.getItem("ov_why") === "1",
+};
+// GLOBAL 180° rotation (Joe: "always keep in portrait, but rotating the
+// video 180 so I can stay upright"). Rotating the CONTAINER turns the
+// video and every overlay canvas as one, so nothing can drift out of
+// register; pointer coords are inverted where they are consumed.
+let ROT = localStorage.getItem("rot180") === "1";
+function applyRot() {
+  $("vwrap").style.transform = ROT ? "rotate(180deg)" : "";
+  $("ov-rot-st").textContent = ROT ? "On" : "Off";
+  $("ov-rot-st").style.color = ROT ? "var(--make)" : "var(--faint)";
+}
+$("ov-rot").onclick = () => {
+  ROT = !ROT;
+  localStorage.setItem("rot180", ROT ? "1" : "");
+  applyRot();
 };
 function ovSync() {
-  [["ov-aim-st", OV.aim], ["ov-paths-st", OV.paths]].forEach(([id, on]) => {
+  [["ov-aim-st", OV.aim], ["ov-paths-st", OV.paths],
+   ["ov-why-st", OV.why]].forEach(([id, on]) => {
     $(id).textContent = on ? "On" : "Off";
     $(id).style.color = on ? "var(--make)" : "var(--faint)";
   });
@@ -975,12 +997,79 @@ $("ov-aim").onclick = () => {
   OV.aim = !OV.aim;
   localStorage.setItem("ov_aim", OV.aim ? "1" : "");
   ovSync();
+applyRot();
 };
 $("ov-paths").onclick = () => {
   OV.paths = !OV.paths;
   localStorage.setItem("ov_paths", OV.paths ? "1" : "");
   ovSync();
 };
+$("ov-why").onclick = () => {
+  OV.why = !OV.why;
+  localStorage.setItem("ov_why", OV.why ? "1" : "");
+  ovSync();
+};
+
+// ---- WHY THIS MISS (Joe): draw the figure the LABEL is made of, so
+// "left cut / missed left / overcut" is self-evident rather than
+// asserted. Three lines from the object ball: where it SHOULD have gone
+// (to the pocket), where it DID go, and the cue's approach that defines
+// left vs right. All from stored geometry — identical on both surfaces.
+function drawWhy() {
+  const cv = $("trails"), v = $("video");
+  const s = shots[cur];
+  if (!s || !s.tags || !s.tags.geom || !v.videoWidth) return;
+  const g = s.tags.geom;
+  const box = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(box.width * dpr)
+      || cv.height !== Math.round(box.height * dpr)) {
+    cv.width = Math.round(box.width * dpr);
+    cv.height = Math.round(box.height * dpr);
+  }
+  const ctx = cv.getContext("2d");
+  const sc = Math.min(box.width / v.videoWidth, box.height / v.videoHeight);
+  const cw = v.videoWidth * sc, ch = v.videoHeight * sc;
+  const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
+  const P = p2 => [(ox + p2[0] * cw) * dpr, (oy + p2[1] * ch) * dpr];
+  const line = (a, b, col, w, dash) => {
+    ctx.save();
+    ctx.setLineDash(dash || []);
+    ctx.lineCap = "round";
+    ctx.globalAlpha = 0.35; ctx.strokeStyle = "#08140A";
+    ctx.lineWidth = (w + 2.5) * dpr;
+    ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke();
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = w * dpr;
+    ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke();
+    ctx.restore();
+  };
+  const dot = (a, col, r) => {
+    ctx.save(); ctx.globalAlpha = 0.95; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(...P(a), r * dpr, 0, 7); ctx.fill(); ctx.restore();
+  };
+  line(g.cue, g.obj, "#8AA0FF", 1.6, [6, 5]);      // the approach
+  line(g.obj, g.pocket, "#7DF29B", 1.8);           // should have gone
+  line(g.obj, g.went, "#E5484D", 1.8);             // actually went
+  dot(g.obj, "#FFFFFF", 3.5);
+  dot(g.pocket, "#7DF29B", 4.5);
+  // legend, anchored bottom-left of the frame
+  ctx.save();
+  ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
+  ctx.textBaseline = "middle";
+  const rows = [["#7DF29B", "to the pocket"], ["#E5484D", "where it went"],
+                ["#8AA0FF", "cue approach"]];
+  let ly = (oy + ch) * dpr - 16 * dpr * rows.length - 8 * dpr;
+  rows.forEach(([col, txt]) => {
+    ctx.fillStyle = "rgba(13,17,23,.78)";
+    ctx.fillRect((ox * dpr) + 6 * dpr, ly - 8 * dpr, 116 * dpr, 15 * dpr);
+    ctx.fillStyle = col;
+    ctx.fillRect((ox * dpr) + 10 * dpr, ly - 1.5 * dpr, 14 * dpr, 3 * dpr);
+    ctx.fillStyle = "#E6EDF3";
+    ctx.fillText(txt, (ox * dpr) + 30 * dpr, ly);
+    ly += 16 * dpr;
+  });
+  ctx.restore();
+}
 ovSync();
 
 function drawAim() {
@@ -1062,6 +1151,7 @@ function drawTrails() {
   else { const c = $("trails");
          c.getContext("2d").clearRect(0, 0, c.width, c.height); }
   if (OV.aim) drawAim();
+  if (OV.why) drawWhy();
   Draw.render();
   if (win) {
     // while the thumb owns the playhead, the video's lagging seek time
@@ -1427,10 +1517,15 @@ const Draw = (() => {
     const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
     return Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy));
   };
+  const localXY = (ev, r, dpr) => {
+    let lx = ev.clientX - r.left, ly = ev.clientY - r.top;
+    if (ROT) { lx = r.width - lx; ly = r.height - ly; }
+    return [lx * dpr, ly * dpr];
+  };
   cv.addEventListener("pointerdown", ev => {
     const dpr = window.devicePixelRatio || 1;
     const r = cv.getBoundingClientRect();
-    const x = (ev.clientX - r.left) * dpr, y = (ev.clientY - r.top) * dpr;
+    const [x, y] = localXY(ev, r, dpr);
     const b = box();
     const HR = 22 * dpr;
     // selected object's handles win first
@@ -1468,13 +1563,13 @@ const Draw = (() => {
       const dx = ev.clientX - (drag.sx == null ? ev.clientX : drag.sx);
       const dy = ev.clientY - (drag.sy == null ? ev.clientY : drag.sy);
       if (Math.hypot(dx, dy) > 4) drag.moved = true;
-      if (drag.sx != null) Zoom.pan(dx, dy);
+      if (drag.sx != null) Zoom.pan(ROT ? -dx : dx, ROT ? -dy : dy);
       drag.sx = ev.clientX; drag.sy = ev.clientY;
       return;
     }
     const dpr = window.devicePixelRatio || 1;
     const r = cv.getBoundingClientRect();
-    const x = (ev.clientX - r.left) * dpr, y = (ev.clientY - r.top) * dpr;
+    const [x, y] = localXY(ev, r, dpr);
     const b = box(), o = objs[drag.obj];
     if (drag.pt >= 0) {
       o.pts[drag.pt] = toN(b, x, y);
@@ -1826,7 +1921,8 @@ function pinchUp(e) {
     if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) {
       moved = true; cancelHold();
       if (Zoom.scale > 1 && !Pinch.active) {
-        Zoom.pan(e.clientX - panX, e.clientY - panY);
+        Zoom.pan(ROT ? panX - e.clientX : e.clientX - panX,
+                 ROT ? panY - e.clientY : e.clientY - panY);
       }
     }
     panX = e.clientX; panY = e.clientY;
