@@ -132,7 +132,7 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
     import cv2
     import numpy as np
 
-    from .cue_aim import aim_ray_end, detect_cue_aim
+    from .cue_aim import AIM_VERSION, aim_ray_end, detect_cue_aim
     t0 = float(s.get("start", 0.0))
     hinv = np.asarray(tf["hinv"], dtype=float)
     w, h = float(tf["w"]), float(tf["h"])
@@ -157,7 +157,8 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
             v = hinv @ np.array([x, y, 1.0])
             seg.append([round(min(1.2, max(-0.2, v[0] / v[2] / w)), 4),
                         round(min(1.2, max(-0.2, v[1] / v[2] / h)), 4)])
-        return {"p": seg, "q": round(float(q), 2), "t": round(tp, 2)}
+        return {"p": seg, "q": round(float(q), 2), "t": round(tp, 2),
+                "v": AIM_VERSION}
     return None
 
 
@@ -263,8 +264,9 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             # re-decode the whole session); strokes and breaks only.
             try:
                 if entry["action"] in ("stroke", "break"):
+                    from .cue_aim import AIM_VERSION
                     cached = old_aims.get(entry["start"])
-                    if cached:
+                    if cached and cached.get("v") == AIM_VERSION:
                         entry["aim"] = cached
                     else:
                         if aim_cap is None:

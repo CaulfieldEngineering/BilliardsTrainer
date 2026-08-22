@@ -18,6 +18,15 @@ Aim direction points AWAY from the stick's mass (tip through ball).
 import math
 
 import cv2
+
+#: Bump when the aim GEOMETRY changes. Stored aim records carry this, and
+#: the exporter recomputes any record stamped with an older one -- without
+#: it, the 8.8px -> 4.7px full-shaft fix would have sat in the code while
+#: every session kept serving the cached tip-weighted line.
+#:   1 = tip-weighted mean (exp(-db/300))
+#:   2 = full-shaft robust total-least-squares (Joe: "use as much of the
+#:       visible cue as possible")
+AIM_VERSION = 2
 import numpy as np
 
 #: minimum Hough segment length (rect px) — arms produce short curly
