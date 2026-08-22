@@ -159,7 +159,7 @@ class TestStraightRollValidation:
         obj = _still(266, 500, 0.0, 1.4) + reappear_pts
         vid = _session(tmp_path, cue, 3, obj, name)
         side = tmp_path / (name + ".analysis.jsonl")
-        rows = [_json.loads(l) for l in side.read_text().splitlines()]
+        rows = [_json.loads(ln) for ln in side.read_text().splitlines()]
         for r in rows:
             if r.get("type") == "f" and 1.45 < r["t"] < 1.85:
                 r["tracks"] = [tk for tk in r["tracks"] if tk[4] != 3]
