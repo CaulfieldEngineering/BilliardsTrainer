@@ -96,11 +96,32 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     if target is None:
         return None                       # nothing was struck
     contact_t = tpath[tidx][0]
-    ox, oy = tpath[tidx][1], tpath[tidx][2]
+    # CONTACT IS WHERE THE BALL WAS SITTING, not where it was first seen
+    # moving. _first_motion returns the first sample DISPLACED from the
+    # start, and on a hard shot that sample is already far downrange: on
+    # 005048@233 the 4 had travelled 280px by the time it was first caught
+    # moving, which put "contact" almost at the pocket and inverted
+    # everything measured from it. The sample before is the ball at rest.
+    cidx = max(0, tidx - 1)
+    ox, oy = tpath[cidx][1], tpath[cidx][2]
     # --- object departure: the line of centres at impact (physics), and
-    # the one direction this footage measures reliably
-    seg = tpath[tidx:tidx + 6]
-    vx, vy = _unit(seg[-1][1] - ox, seg[-1][2] - oy)
+    # the one direction this footage measures reliably.
+    # Measured to where the ball GOT TO before it came back, not over a
+    # fixed sample window. A fixed window was fine while balls were only
+    # ever tracked slowly; now that fast ones are recovered it runs
+    # straight into the rebound off the rail and reports the ball leaving
+    # UP the table (measured on @233: v = (-0.118,-0.993), pointing back
+    # the way it came). The outbound extremum is the honest departure.
+    far, fx, fy = -1.0, ox, oy
+    seg = []
+    for q in tpath[tidx:]:
+        d = math.hypot(q[1] - ox, q[2] - oy)
+        if d < far - 0.5 * space.ball_r_px:
+            break                          # it turned back: rail or pocket
+        seg.append(q)
+        if d > far:
+            far, fx, fy = d, q[1], q[2]
+    vx, vy = _unit(fx - ox, fy - oy)
     if (vx, vy) == (0.0, 0.0):
         return None
     # PATH CONTINUITY (005048 @233, Joe: "this one should be a pretty
@@ -112,8 +133,12 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # library-wide, 62% of tags carried a hole or a mid-flight track
     # switch. Those keep their numbers but are excluded from the pattern
     # counts -- a guessed side is worse than no side.
+    # the biggest hole in the OUTBOUND leg — the stretch the direction is
+    # actually measured from. A gap here means the line is a chord across
+    # missing frames rather than the ball's real path.
     departure_gap = max(
-        (seg[i + 1][0] - seg[i][0] for i in range(len(seg) - 1)), default=0.0)
+        [seg[i + 1][0] - seg[i][0] for i in range(len(seg) - 1)]
+        + [tpath[tidx][0] - tpath[cidx][0]], default=0.0)
     # --- cue direction WITHOUT tracking the cue in flight. Measured on
     # real footage: the tracker loses a struck cue ball for seconds (at
     # 005048@233 it reported "cue moving" 2.4s AFTER contact), so a
