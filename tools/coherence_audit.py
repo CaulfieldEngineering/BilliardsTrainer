@@ -27,7 +27,6 @@ desktop. Those are measurable, so this measures them.
 import argparse
 import json
 import re
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
