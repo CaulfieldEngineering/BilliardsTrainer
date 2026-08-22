@@ -1479,3 +1479,29 @@ Rounds continue with Joe's visual feedback as the gate.
   and arbitration concern out; (3) Joe changes camera settings in a few
   days (docs/CAMERA_SETTINGS.md) — measure smear and detection rate on the
   first session he shoots at 1/250.
+
+- 2026-08-22 (session 5) — Joe: shot lines "not there yet or still flipped"
+  on other shots, and asked whether they are always available or on demand.
+  Answer: always — computed once at analysis time and stored per shot, so
+  both surfaces draw identical geometry and nothing is computed on open.
+  But "always" means as of the last processing pass, and the fixes split
+  across two very different costs: the TAGGER fixes (contact point,
+  departure extremum) land with a RE-EXPORT, ~3 minutes for the library;
+  the BLUR RECOVERY needs full re-analysis, ~348 minutes of video.
+  Ran the cheap half. 35 sessions re-exported in 194s. 12 of ~90 miss tags
+  CHANGED SIDE, 12 newly tagged, 13 no longer tagged, and drawn
+  object-ball lines went 305 -> 286 of 701 strokes. HONEST LIMIT: I can
+  verify exactly one of those twelve (@233, which is now right and was
+  wrong before). The other eleven are unverified — the fixes are
+  principled and the one checkable case proves the old behaviour was
+  wrong, but "12 flipped" is not the same as "12 corrected". Four of the
+  twelve are high-confidence and therefore the best candidates for Joe to
+  spot-check; his verdict on two or three of them is worth more than any
+  amount of further reasoning here.
+  Coverage dropped slightly (305 -> 286 lines). Likely honest abstention:
+  a more accurate departure direction can now fail the "within 45 deg of
+  some pocket" test that a wrong one passed. Not yet confirmed.
+  NEXT: (1) the full library re-analysis, which is the expensive half and
+  the only thing that fixes shots where the ball was never tracked; it is
+  also the overdue library-scale validation of colour adoption; (2) find
+  out why 19 shots lost their drawn line; (3) tracking.py 1035 lines.
