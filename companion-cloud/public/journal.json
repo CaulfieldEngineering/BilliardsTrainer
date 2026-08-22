@@ -1,0 +1,77 @@
+{
+ "entries": [
+  {
+   "id": 6,
+   "date": "2026-08-23",
+   "build": "20260822-180251",
+   "title": "The full story of your 4-ball shot",
+   "summary": "Why one seven-second shot took a week to read correctly \u2014 and what it fixed for every other shot.",
+   "body": [
+    "When you flagged the shot at 3:52 ('this should be a pretty clear miss left'), the app said the opposite. Getting it right ended up fixing four separate problems, and each one is now better for every clip in your library.",
+    "First: the camera. When you hit a ball hard, the shutter is open long enough that the ball smears into a faint streak \u2014 and the ball-detector, trained on crisp round balls, sees nothing at all. For about half a second after contact, your 4-ball simply didn't exist to the software.",
+    "Second: mistaken identity. While the 4-ball was invisible, the cue ball rolled up and stopped where the 4 used to be. The software saw a ball sitting right where it expected the 4 \u2014 and assumed it WAS the 4. So the '4' it tracked afterwards was actually the cue ball, and the miss got called on the wrong side. The fix: a resting ball now refuses to become a different-coloured ball. White can't become purple.",
+    "Third: the ghost. Even after that fix, the old '4' label stayed stuck at the spot the ball had left, so the real 4 \u2014 found again near the pocket \u2014 couldn't get its name back. Now a label lets go when its spot is visibly empty, and the real ball reclaims it.",
+    "Fourth: the verdict itself. Even with the ball tracked, the app judged the miss from the blurriest instant of the shot. Now it checks something simpler: every glimpse it DID get of the ball lies on one straight line \u2014 and a rolling ball can't leave its line and sneak back. So the gap hides nothing, and the verdict is trusted: missed left, 1.3 inches."
+   ]
+  },
+  {
+   "id": 5,
+   "date": "2026-08-23",
+   "build": "20260822-180251",
+   "title": "What the pros do, and what we're borrowing",
+   "summary": "We compared our approach against published pool-tracking systems. Three lessons, one plan.",
+   "body": [
+    "You asked whether fast-ball tracking is a solved problem \u2014 it mostly is, and not with expensive cameras. Systems like POOL-AID and PoolLiveAid ran on ordinary webcams a decade ago.",
+    "Their trick #1: don't look FOR balls, look for anything that isn't table. A smeared ball doesn't look like a ball, but it never looks like blue felt either. We had this backwards \u2014 our smart detector finds balls brilliantly when they're sharp and goes blind when they move. Their approach never goes blind.",
+    "Their trick #2: carry uncertainty. When a system loses sight of a ball, it should get less sure about where it is \u2014 and search wider \u2014 automatically. We'd hand-built a dozen special rules that each approximate a piece of that.",
+    "Their trick #3: fit physics to the whole shot. A ball rolls straight, slows smoothly, and bounces off rails at known angles. Fit that model to every glimpse you got, and it fills the gaps \u2014 with an honest error bar. That's the plan now, in that order, each step measured before it replaces anything."
+   ]
+  },
+  {
+   "id": 4,
+   "date": "2026-08-22",
+   "build": "20260822-161753",
+   "title": "Why the app sometimes says \u201ccan't tell\u201d",
+   "summary": "A guessed answer is worse than no answer \u2014 the design principle behind the honest verdicts.",
+   "body": [
+    "Early on, the app labelled every miss with a side, even when its data was garbage. That's how your miss-left got called miss-right: it measured a direction across a half-second hole and confidently reported nonsense.",
+    "The standing rule now: the app only states what it actually measured. When the ball was lost at the decisive moment, the verdict says 'can't tell which side \u2014 ball lost after contact' instead of guessing. When it IS sure, that confidence means something.",
+    "This matters for the stats. Your miss patterns are only useful if every counted miss is real \u2014 one wrong-side label pollutes the pattern more than ten honest abstentions. Trusted verdicts went from 30 to 33 this week, and each 'can't tell' is a known repair target, not a mystery."
+   ]
+  },
+  {
+   "id": 3,
+   "date": "2026-08-22",
+   "build": "20260822-161753",
+   "title": "Recovering balls the camera can't see",
+   "summary": "How trails now follow hard-hit balls through the motion blur.",
+   "body": [
+    "A hard-hit ball crosses four of its own widths between frames and smears into a translucent streak. The detector sees nothing \u2014 but the pixels still hold the ball.",
+    "The recovery: remember what the empty table looks like (the average of the last second and a half), subtract it, and whatever remains that's ball-sized and matches the missing ball's own colour better than any other ball's \u2014 that's your ball. It's how your trails now follow the ball all the way to the rail.",
+    "One honest limit: a smeared ball's measured position is the middle of the streak, not the ball. Good enough to draw a trail; not good enough to judge a miss by. So recovery feeds the drawings, and verdicts wait for the physics fit."
+   ]
+  },
+  {
+   "id": 2,
+   "date": "2026-08-22",
+   "build": "20260822-152540",
+   "title": "The overlay, rebuilt around one idea",
+   "summary": "The red line is exactly where your ball went. Everything else got out of the way.",
+   "body": [
+    "After a few rounds of your feedback the overlay settled on one principle: draw measurements, not conclusions. The red line is the ball's entire recorded path \u2014 rail bounce and all \u2014 not a simplified arrow.",
+    "Nothing is written on top of the video anymore; the verdict lives in the bar below. The legend drags anywhere and remembers its spot. And a new rule for future changes: overlays get rendered against real footage before they ship, because two of the earlier misses would have been caught by simply looking."
+   ]
+  },
+  {
+   "id": 1,
+   "date": "2026-08-22",
+   "build": "20260822-065616",
+   "title": "Sharper shots for free (when you have a minute)",
+   "summary": "One camera dial change would make every future recording dramatically easier to analyse.",
+   "body": [
+    "Most of this week's problems trace to motion blur, and most of that traces to shutter speed. Your camera is exposing each frame for about 1/75th of a second; at 1/250th, a hard-hit ball stays a crisp dot instead of a streak.",
+    "The full plain-language walkthrough is saved as CAMERA_SETTINGS.md in the project \u2014 which dial, which direction, what it costs (a bit of grain, which the software barely notices). No new lighting needed. Whenever you get a minute at the table, it's the single highest-value tweak available."
+   ]
+  }
+ ]
+}

@@ -114,6 +114,14 @@ can SEE or that changes what his data means:
   belong in the file.
 - deploy (the file ships with the app).
 Sessions that change nothing Joe-visible add nothing — the dot must mean
-something. Separately: when the accuracy chain completes (trajectory fit
+something.
+ALSO (Joe 2026-08-23): companion-cloud/public/journal.json is the DESIGN
+JOURNAL — one entry per push that changes behaviour, the thorough
+companion to What's New's one-liner. Structure: title, one-sentence
+summary, body = short paragraphs telling the story (what changed, why it
+was wrong before, how the fix works) in language a layman grasps —
+analogies over internals, no module names, no jargon. What's New says
+WHAT; the journal explains. Same discipline: if a push changes nothing he
+can perceive, no entry. Separately: when the accuracy chain completes (trajectory fit
 validated + library relabelled), notify Joe proactively — he asked to be
 told when it's all fixed.
