@@ -112,3 +112,15 @@ Modal bottom sheet, full-width rows (R3: menus become bottom sheets on compact s
 ## 7. ≤2-tap audit (from WATCH, worst case)
 
 play/pause 1 · replay stroke 1 (double-tap) · prev/next shot 1 (flick) · verdict sheet 1 · outcome correction 2 · confirm reviewed 2 · frame-step 2 (tap-pause, tap-step) · speed change 2 · loop 2 (long-press chip, tap) · jump to any shot 2 (pause, chip) · draw (last tool) 2 (pen auto-arms) · show/hide / clear drawings 2 · style pill 1 (tap object) · playlist / overlay toggles / correct clip / remove / export 2 (More or badge, then row). Temporary slow-mo, scrub-anywhere, zoom: 0 taps (gestures) with the chip/lanes as visible fallbacks — no gesture-only capability exists (NN/g, R2).
+
+## Amendments (Joe, 2026-08-21 night)
+
+1. **Latched slow-mo is sacred.** The speed chip (1x -> 1/2 -> 1/4 ->
+   1/8, latching) stays visible in WATCH too — small, translucent, near
+   the hairline. Hold-for-1/4x is an addition for momentary peeks, never
+   the replacement.
+2. **Stats overlay ON the video, Instagram-style.** Shot facts (outcome,
+   ball badges, one-line description) render as translucent overlays on
+   the footage — caption-block bottom-left, action stack right edge
+   (pen, and the per-clip actions) — instead of strips below the video.
+   The Inspect precision cluster still rises from the bottom on pause.
