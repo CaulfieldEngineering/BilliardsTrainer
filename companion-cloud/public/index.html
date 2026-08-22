@@ -1145,71 +1145,17 @@ function videoBox(cv, v) {
   return { box, dpr, P: q => [(ox + q[0] * cw) * dpr, (oy + q[1] * ch) * dpr] };
 }
 
-//: The target ball's recorded tail, trimmed at its closest approach to the
-//: pocket — the part of the path where the miss actually happens. Anything
-//: after that is the rebound and only muddies the picture.
+//: The target ball's recorded path. The WHOLE of it. Joe: "I just want a
+//: line showing where the object ball actually goes and that is not being
+//: done." It was not: this used to trim at the closest approach to the
+//: pocket, which discards the rebound and leaves three points running
+//: straight at the pocket — indistinguishable from the pocket line, and
+//: exactly what he kept seeing. No trimming, no inference, no cleverness.
 function objectTail(s, g) {
   const num = s.tags && s.tags.target;
   if (num == null || !s.trails) return [];
-  const tr = s.trails.find(e => e.n === num && e.p && e.p.length > 2);
-  if (!tr) return [];
-  const [px, py] = g.pocket;
-  let best = 1e9, bi = 0;
-  tr.p.forEach((q, i) => {
-    const d = (q[1] - px) ** 2 + (q[2] - py) ** 2;
-    if (d < best) { best = d; bi = i; }
-  });
-  const out = tr.p.slice(0, bi + 1).map(q => [q[1], q[2]]);
-  return out.length > 1 ? out : [];
-}
-
-//: SAY WHICH WAY IT MISSED. Joe: "you don't identify what direction the
-//: miss is." A 1.3in miss on a 44in table is under 3% of the frame — the
-//: red line and the green line land on top of each other, so no amount of
-//: line drawing can show it. State it instead: a short arrow off the
-//: pocket in the direction the ball actually passed, with the distance.
-function drawMissCallout(ctx, P, dpr, s, g, tail) {
-  const t = s.tags;
-  if (!t || !t.miss_side) return;
-  const end = tail.length > 1 ? tail[tail.length - 1] : g.went;
-  if (!end) return;
-  const a = P(g.pocket), b = P(end);
-  let dx = b[0] - a[0], dy = b[1] - a[1];
-  const n = Math.hypot(dx, dy) || 1;
-  // exaggerate to a legible length; the TRUE size is in the text
-  const L = 34 * dpr;
-  dx = (dx / n) * L; dy = (dy / n) * L;
-  const sure = (t.confidence || "high") === "high";
-  const col = sure ? "#E5484D" : "#8A93A0";
-  ctx.save();
-  ctx.globalAlpha = 0.95;
-  ctx.strokeStyle = col;
-  ctx.lineWidth = 1.6 * dpr;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(a[0], a[1]);
-  ctx.lineTo(a[0] + dx, a[1] + dy);
-  ctx.stroke();
-  const ah = 5 * dpr, ang = Math.atan2(dy, dx);
-  ctx.beginPath();
-  ctx.moveTo(a[0] + dx, a[1] + dy);
-  ctx.lineTo(a[0] + dx - ah * Math.cos(ang - 0.5), a[1] + dy - ah * Math.sin(ang - 0.5));
-  ctx.lineTo(a[0] + dx - ah * Math.cos(ang + 0.5), a[1] + dy - ah * Math.sin(ang + 0.5));
-  ctx.closePath();
-  ctx.fillStyle = col;
-  ctx.fill();
-  const label = `missed ${t.miss_side}` + (t.miss_in ? `  ${t.miss_in}"` : "")
-    + (sure ? "" : "  (unsure)");
-  ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
-  const w = ctx.measureText(label).width + 12 * dpr;
-  let lx = a[0] + dx + 8 * dpr, ly = a[1] + dy;
-  if (lx + w > ctx.canvas.width) lx = a[0] + dx - w - 8 * dpr;
-  ctx.fillStyle = "rgba(13,17,23,.82)";
-  ctx.fillRect(lx - 6 * dpr, ly - 9 * dpr, w, 18 * dpr);
-  ctx.fillStyle = col;
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, lx, ly);
-  ctx.restore();
+  const tr = s.trails.find(e => e.n === num && e.p && e.p.length > 1);
+  return tr ? tr.p.map(q => [q[1], q[2]]) : [];
 }
 
 function drawWhy() {
@@ -1250,7 +1196,6 @@ function drawWhy() {
   }
   dot(g.obj, "#FFFFFF", 2.6);
   dot(g.pocket, "#7DF29B", 3.4);
-  drawMissCallout(ctx, P, dpr, s, g, tail);
   showLegend([...(OV.aim ? [["#F0B429", "where the cue pointed"]] : []),
               ["#7DF29B", "line to the pocket"],
               ["#E5484D", "line it took"],
@@ -1291,13 +1236,23 @@ const Legend = (() => {
   let pos = null;
   try { pos = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { pos = null; }
   const el = () => $("legend");
+  //: where the PICTURE sits inside the player — the video is letterboxed,
+  //: so clamping to the wrap let the legend drift into the black bars
+  //: beside the table (visible on 005048@96)
+  function picture() {
+    const r = $("vwrap").getBoundingClientRect(), v = $("video");
+    if (!v.videoWidth) return { x: 0, y: 0, w: r.width, h: r.height, r };
+    const sc = Math.min(r.width / v.videoWidth, r.height / v.videoHeight);
+    const w = v.videoWidth * sc, h = v.videoHeight * sc;
+    return { x: (r.width - w) / 2, y: (r.height - h) / 2, w, h, r };
+  }
   function place() {
-    const g = el(), wrap = $("vwrap");
+    const g = el();
     if (!pos || g.style.display === "none") return;
-    const r = wrap.getBoundingClientRect();
+    const b = picture();
     const w = g.offsetWidth || 120, h = g.offsetHeight || 60;
-    const x = Math.min(Math.max(0, pos.fx * r.width), Math.max(0, r.width - w));
-    const y = Math.min(Math.max(0, pos.fy * r.height), Math.max(0, r.height - h));
+    const x = Math.min(Math.max(b.x, b.x + pos.fx * b.w), b.x + Math.max(0, b.w - w));
+    const y = Math.min(Math.max(b.y, b.y + pos.fy * b.h), b.y + Math.max(0, b.h - h));
     g.style.left = `${x}px`;
     g.style.top = `${y}px`;
     g.style.bottom = "auto";
@@ -1314,16 +1269,16 @@ const Legend = (() => {
   }
   function move(e) {
     if (!grab) return;
-    const g = el();
+    const g = el(), b = picture();
     const w = g.offsetWidth, h = g.offsetHeight;
-    const x = Math.min(Math.max(0, e.clientX - grab.r.left - grab.dx),
-                       Math.max(0, grab.r.width - w));
-    const y = Math.min(Math.max(0, e.clientY - grab.r.top - grab.dy),
-                       Math.max(0, grab.r.height - h));
+    const x = Math.min(Math.max(b.x, e.clientX - grab.r.left - grab.dx),
+                       b.x + Math.max(0, b.w - w));
+    const y = Math.min(Math.max(b.y, e.clientY - grab.r.top - grab.dy),
+                       b.y + Math.max(0, b.h - h));
     g.style.left = `${x}px`;
     g.style.top = `${y}px`;
     g.style.bottom = "auto";
-    pos = { fx: x / grab.r.width, fy: y / grab.r.height };
+    pos = { fx: (x - b.x) / b.w, fy: (y - b.y) / b.h };
     e.preventDefault();
     e.stopPropagation();
   }
