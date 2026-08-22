@@ -145,7 +145,8 @@ def main() -> int:
     ap.add_argument("--level", type=int, default=0)
     args = ap.parse_args()
     res = {}
-    want = (lambda n: args.level in (0, n))
+    def want(n):
+        return args.level in (0, n)
     if want(1):
         res["L1_architecture"] = level1()
     if want(2):

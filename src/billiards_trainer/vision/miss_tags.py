@@ -160,11 +160,11 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     miss_in_val = (abs(side_sign) / max(1e-9, math.hypot(vx, vy))
                    / space.px_per_in)
     if miss_in_val > 8.0:
-        conf = "low: pocket inference doubtful (missed by %.0fin)" % miss_in_val
+        conf = f"low: pocket inference doubtful (missed by {miss_in_val:.0f}in)"
     elif miss_in_val < 0.8:
         conf = "low: ball was at the pocket mouth (rattle or mislabelled)"
     elif best_off > 25.0:
-        conf = "low: object path %.0f deg off any pocket line" % best_off
+        conf = f"low: object path {best_off:.0f} deg off any pocket line"
     else:
         conf = "high"
     tags = {

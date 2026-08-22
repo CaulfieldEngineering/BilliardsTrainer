@@ -158,6 +158,15 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
     return None
 
 
+def _rect_to_video(pt, tf: dict) -> list:
+    """Rect-space point -> normalized video coords (the overlay frame)."""
+    import numpy as np
+    hinv = np.asarray(tf["hinv"], dtype=float)
+    v = hinv @ np.array([pt[0], pt[1], 1.0])
+    return [round(v[0] / v[2] / float(tf["w"]), 4),
+            round(v[1] / v[2] / float(tf["h"]), 4)]
+
+
 def summary_path(video_path) -> Path:
     return Path(str(video_path) + SUMMARY_SUFFIX)
 
@@ -276,15 +285,8 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                     # coords so phone and desktop draw the same figure
                     g = tg.get("geom")
                     if g and tf is not None:
-                        import numpy as _np
-                        _hinv = _np.asarray(tf["hinv"], dtype=float)
-                        _w, _h = float(tf["w"]), float(tf["h"])
-
-                        def _vid(pt):
-                            v = _hinv @ _np.array([pt[0], pt[1], 1.0])
-                            return [round(v[0] / v[2] / _w, 4),
-                                    round(v[1] / v[2] / _h, 4)]
-                        tg["geom"] = {k: _vid(v) for k, v in g.items()}
+                        tg["geom"] = {k: _rect_to_video(v, tf)
+                                      for k, v in g.items()}
                     entry["tags"] = tg
             except Exception:  # noqa: BLE001 - tagging is enrichment
                 pass
