@@ -298,6 +298,35 @@ def _check_identity_hops() -> tuple[str, str]:
     return GREEN, f"identity hops {rate:.2f}/1k (3 newest sessions)"
 
 
+def _check_coherence() -> tuple:
+    """System coherence (Joe: "not necessarily contextual relationship or
+    coherence between the features of system"). Different failure from
+    messy code: one idea implemented in four places, a data field no
+    surface reads, a capability that exists on one surface only. AMBER,
+    never RED."""
+    import subprocess
+    try:
+        r = subprocess.run([sys.executable, "tools/coherence_audit.py",
+                            "--json"], cwd=ROOT, capture_output=True,
+                           text=True, timeout=300)
+        d = json.loads(r.stdout or "{}")
+    except (subprocess.SubprocessError, ValueError, OSError) as exc:
+        return "AMBER", f"coherence audit failed: {exc}"
+    gaps = d.get("parity", {})
+    scattered = d.get("concepts", {})
+    ghost = d.get("contract", {}).get("read_never_written", [])
+    bits = []
+    if gaps:
+        bits.append(f"{len(gaps)} surface-parity gaps ({', '.join(list(gaps)[:3])})")
+    if ghost:
+        bits.append(f"fields read but never written: {', '.join(ghost[:3])}")
+    if scattered:
+        bits.append(f"{len(scattered)} scattered concepts")
+    if not bits:
+        return "GREEN", "concepts owned, contract tight, surfaces agree"
+    return "AMBER", "; ".join(bits)
+
+
 CHECKS = {
     "app": _check_app_running,
     "app_log": _check_app_log,
@@ -311,6 +340,7 @@ CHECKS = {
     "corrections": _check_corrections,
     "id_hops": _check_identity_hops,
     "hygiene": _check_hygiene,
+    "coherence": _check_coherence,
     "disk": _check_disk,
 }
 
