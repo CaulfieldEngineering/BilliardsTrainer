@@ -48,6 +48,44 @@ class Pocket:
         return (self.x, self.y)
 
 
+#: Prose forms for descriptions — the identifiers above are DB keys and
+#: must stay stable, but "into the left-side pocket" reads badly, so the
+#: sentence layer gets its own words from the SAME single vocabulary.
+POCKET_LABEL = {
+    POCKET_TL: "top-left", POCKET_TR: "top-right",
+    POCKET_BR: "bottom-right", POCKET_BL: "bottom-left",
+    POCKET_LEFT: "left-middle", POCKET_RIGHT: "right-middle",
+}
+
+
+def pockets_for_rect(x0: float, y0: float, x1: float, y1: float) -> list:
+    """The six pockets of a playing rectangle — THE definition.
+
+    Three modules had each grown their own copy (tablespace, describe,
+    outcomes), and they had even drifted apart on naming: two called the
+    side pockets "left-middle" while the DB keys said "left-side". One
+    definition, one vocabulary. Side pockets sit at the midpoints of the
+    LONG rails, which is why the orientation test is here and not in
+    each caller."""
+    portrait = (y1 - y0) >= (x1 - x0)
+    mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    out = [Pocket(POCKET_TL, x0, y0), Pocket(POCKET_TR, x1, y0),
+           Pocket(POCKET_BL, x0, y1), Pocket(POCKET_BR, x1, y1)]
+    if portrait:
+        out += [Pocket(POCKET_LEFT, x0, my, True),
+                Pocket(POCKET_RIGHT, x1, my, True)]
+    else:
+        out += [Pocket(POCKET_LEFT, mx, y0, True),
+                Pocket(POCKET_RIGHT, mx, y1, True)]
+    return out
+
+
+def nearest_pocket_in_rect(x: float, y: float, rect: tuple):
+    """Closest pocket of ``rect`` = (x0, y0, x1, y1) to a point."""
+    return min(pockets_for_rect(*rect),
+               key=lambda p: (p.x - x) ** 2 + (p.y - y) ** 2)
+
+
 @dataclass
 class TableModel:
     """Playing-surface rectangle + pockets in rectified pixels.

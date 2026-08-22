@@ -35,10 +35,12 @@ def test_size_inferred_from_measured_bed():
 
 def test_pockets_portrait_have_side_pockets_on_long_rails():
     ts = from_calibration(_Table(100, 200, 400, 800), 12.0)   # portrait
+    # names come from core.geometry — the ONE vocabulary (these are the
+    # DB keys; "left-middle" is the prose form used only in sentences)
     names = {n for n, _x, _y in ts.pockets()}
     assert names == {"top-left", "top-right", "bottom-left", "bottom-right",
-                     "left-middle", "right-middle"}
-    mid = next((x, y) for n, x, y in ts.pockets() if n == "left-middle")
+                     "left-side", "right-side"}
+    mid = next((x, y) for n, x, y in ts.pockets() if n == "left-side")
     assert mid == (100, 500)
 
 

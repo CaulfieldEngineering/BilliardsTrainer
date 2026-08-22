@@ -107,11 +107,9 @@ def _pockets(reader: SidecarReader) -> tuple:
         return reader._pockets_cache
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
     ball_r = sorted(rs)[len(rs) // 2]
-    pts = [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]
-    if (y1 - y0) > (x1 - x0):      # side pockets on the LONG rails
-        pts += [(x0, (y0 + y1) / 2), (x1, (y0 + y1) / 2)]
-    else:
-        pts += [((x0 + x1) / 2, y0), ((x0 + x1) / 2, y1)]
+    # pocket geometry is core's, not a third private copy
+    from ..core.geometry import pockets_for_rect
+    pts = [(p.x, p.y) for p in pockets_for_rect(x0, y0, x1, y1)]
     reader._pockets_cache = (pts, 4.5 * ball_r, ball_r)
     return reader._pockets_cache
 

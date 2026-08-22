@@ -37,30 +37,41 @@ PHONE = ROOT / "companion-cloud" / "public" / "index.html"
 #: else that implements it is drift, not necessarily a bug — the audit
 #: reports, a human decides.
 CONCEPTS = {
+    # Signals must match a DEFINITION, not a use. The first version
+    # matched any mention, so every legitimate caller looked like a
+    # duplicate implementation (shots_export calling detect_cue_aim,
+    # the watcher writing src="review") and the real duplication —
+    # three private copies of pocket geometry — was buried in noise.
     "pocket geometry": {
-        "owner": "vision/tablespace.py",
-        "signals": [r"top-left", r"bottom-right", r"left-middle",
-                    r"pocket_name", r"pockets\("],
+        "owner": "core/geometry.py",
+        "signals": [r'"top-left":', r'\("top-left"',
+                    r"def pockets_for_rect", r"def bed_and_pockets",
+                    r'POCKET_TL\s*='],
     },
     "true-inch scale": {
         "owner": "vision/tablespace.py",
-        "signals": [r"px_per_in", r"BALL_DIAM"],
+        "signals": [r"px_per_in\s*=\s*\(", r"BALL_DIAM_IN\s*=",
+                    r"def .*px_per_in"],
+    },
+    "ball size in pixels": {
+        "owner": "core/geometry.py",
+        "signals": [r"def expected_ball_radius_px", r"_TABLE_WIDTH_IN\s*="],
     },
     "shot geometry (cut/aim angles)": {
         "owner": "vision/miss_tags.py",
-        "signals": [r"signed_angle", r"atan2\([^)]*cross", r"cut_deg"],
+        "signals": [r"def _signed_angle", r"def _cross"],
     },
     "verdict ranking (review vs derived)": {
         "owner": "vision/analysis_cache.py",
-        "signals": [r'src.*==.*"review"', r'src="review"', r"_reviewed"],
+        "signals": [r'csrc\s*==\s*"derived"', r'asrc\s*==\s*"derived"'],
     },
     "shot-to-record matching": {
         "owner": "vision/analysis_cache.py",
-        "signals": [r"_shot_for", r"abs\(float\(s\.get\(.start.*\) - "],
+        "signals": [r"def _shot_for"],
     },
     "cue-stick detection": {
         "owner": "vision/cue_aim.py",
-        "signals": [r"detect_cue_aim", r"HoughLinesP"],
+        "signals": [r"def detect_cue_aim", r"HoughLinesP\("],
     },
 }
 

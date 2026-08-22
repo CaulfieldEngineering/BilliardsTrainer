@@ -55,16 +55,14 @@ class TableSpace:
         return (((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5) / self.px_per_in
 
     def pockets(self) -> list:
-        """(name, x, y) pocket centres in rect pixels — four corners plus
-        the two long-rail midpoints, named from the overhead view."""
-        mx, my = (self.x0 + self.x1) / 2.0, (self.y0 + self.y1) / 2.0
-        if (self.y1 - self.y0) >= (self.x1 - self.x0):   # portrait
-            side = [("left-middle", self.x0, my), ("right-middle", self.x1, my)]
-        else:
-            side = [("top-middle", mx, self.y0), ("bottom-middle", mx, self.y1)]
-        return [("top-left", self.x0, self.y0), ("top-right", self.x1, self.y0),
-                ("bottom-left", self.x0, self.y1),
-                ("bottom-right", self.x1, self.y1)] + side
+        """(name, x, y) pocket centres in rect pixels.
+
+        Delegates to core.geometry, which OWNS pocket geometry — this
+        used to be a private copy, and it had drifted to its own names
+        ("left-middle" vs the DB's "left-side")."""
+        from ..core.geometry import pockets_for_rect
+        return [(p.name, p.x, p.y)
+                for p in pockets_for_rect(self.x0, self.y0, self.x1, self.y1)]
 
 
 def from_calibration(table, ball_r_px: float, n_samples: int = 0

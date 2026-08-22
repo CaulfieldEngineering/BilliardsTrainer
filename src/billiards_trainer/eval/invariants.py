@@ -403,7 +403,10 @@ def bed_and_pockets(width: float, height: float
     In rectified space the bed *is* the image, so the pockets are the four
     corners plus the two side midpoints.
     """
+    from ..core.geometry import pockets_for_rect
     bed = (0.0, 0.0, width, height)
-    pockets = [(0.0, 0.0), (width, 0.0), (0.0, height), (width, height),
-               (0.0, height / 2.0), (width, height / 2.0)]
+    # core OWNS pocket geometry; this was a fourth private copy, and it
+    # hardcoded the side pockets onto the vertical edges — correct only
+    # for a portrait rect, silently wrong for a landscape one.
+    pockets = [(p.x, p.y) for p in pockets_for_rect(0.0, 0.0, width, height)]
     return bed, pockets

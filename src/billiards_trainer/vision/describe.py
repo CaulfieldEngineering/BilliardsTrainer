@@ -39,16 +39,14 @@ def _bed_envelope(reader: SidecarReader) -> tuple:
 
 
 def _pocket_name(x: float, y: float, env: tuple) -> str:
-    """Nearest pocket, named from the overhead view (portrait table:
-    y grows downward, long axis vertical)."""
-    x0, y0, x1, y1 = env
-    pockets = {
-        "top-left": (x0, y0), "top-right": (x1, y0),
-        "bottom-left": (x0, y1), "bottom-right": (x1, y1),
-        "left-middle": (x0, (y0 + y1) / 2), "right-middle": (x1, (y0 + y1) / 2),
-    }
-    return min(pockets, key=lambda k: (pockets[k][0] - x) ** 2
-                                      + (pockets[k][1] - y) ** 2)
+    """Nearest pocket, in PROSE form for a sentence.
+
+    Geometry comes from core (the owner); this layer only chooses the
+    words — "into the left-middle pocket" reads better than the DB key
+    "left-side", and both now come from the same vocabulary."""
+    from ..core.geometry import POCKET_LABEL, nearest_pocket_in_rect
+    p = nearest_pocket_in_rect(x, y, env)
+    return POCKET_LABEL.get(p.name, p.name)
 
 
 def _paths(reader: SidecarReader, t0: float, t1: float) -> dict:

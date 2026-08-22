@@ -124,7 +124,7 @@ class TestConventions:
         vid = _session(tmp_path, cue, 3, obj, "st.mp4")
         r = SidecarReader(vid)
         tags = tag_shot(r, r.shots[0], SPACE)
-        assert tags["pocket"] == "left-middle"
+        assert tags["pocket"] == "left-side"
         assert tags["cut"] == "straight"
         assert "fullness" not in tags
         assert label(tags).startswith("Straight-in, missed ")
