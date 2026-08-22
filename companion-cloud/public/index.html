@@ -254,6 +254,10 @@
   <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex;">
     <video id="video" playsinline preload="metadata"></video>
     <div id="paused-glyph">▶</div>
+    <div id="holdpill" style="display:none;position:absolute;top:12px;
+         left:50%;transform:translateX(-50%);background:rgba(13,17,23,.85);
+         color:#EAF2F3;border:1px solid #2A323D;border-radius:14px;
+         padding:4px 12px;font-size:13px;font-weight:700;z-index:20">¼×</div>
     <div id="spinner"><div></div></div>
     <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
     <canvas id="trails"></canvas>
@@ -311,6 +315,8 @@
       <button id="dt-w" style="min-width:40px;background:none;border:none;
               color:var(--text)">──</button>
       <input id="dt-a" type="range" min="15" max="100" value="55">
+      <input id="dt-len" type="range" min="5" max="160" value="40"
+             title="line length" style="display:none">
       <button id="dt-del" style="min-width:36px;background:none;border:none">🗑</button>
     </div>
     <div id="sheet">
@@ -1388,6 +1394,23 @@ const Draw = (() => {
   $("dt-a").addEventListener("input", () => {
     if (sel >= 0) { objs[sel].alpha = $("dt-a").value / 100; save(); }
   });
+  // LENGTH slider (Joe: "one point is anchored and then I can slide the
+  // length of the other end" — thumb off the view). Line objects only:
+  // pts[0] anchors; the slider extends pts[1] along the current angle.
+  // Aspect-corrected so length is true on screen, not skewed by the
+  // portrait normalization.
+  const AR = 936 / 1640;               // video w/h (fixed overhead rig)
+  $("dt-len").addEventListener("input", () => {
+    if (sel < 0 || objs[sel].type !== "line") return;
+    const o = objs[sel];
+    const ux = (o.pts[1][0] - o.pts[0][0]) * AR;
+    const uy = o.pts[1][1] - o.pts[0][1];
+    const L = Math.hypot(ux, uy) || 1e-6;
+    const want = $("dt-len").value / 100;
+    o.pts[1] = [o.pts[0][0] + (ux / L) * want / AR,
+                o.pts[0][1] + (uy / L) * want];
+    save();
+  });
   $("dt-del").onclick = () => {
     if (sel >= 0) { objs.splice(sel, 1); sel = -1; save(); syncUI(); }
   };
@@ -1402,6 +1425,14 @@ const Draw = (() => {
       const c = o.color || "#7DF29B";
       [...$("dt-colors").children].forEach(b =>
         b.classList.toggle("on", b.dataset.c === c));
+      const isLine = o.type === "line";
+      $("dt-len").style.display = isLine ? "" : "none";
+      if (isLine) {
+        const AR = 936 / 1640;
+        const L = Math.hypot((o.pts[1][0] - o.pts[0][0]) * AR,
+                             o.pts[1][1] - o.pts[0][1]);
+        $("dt-len").value = Math.max(5, Math.min(160, Math.round(L * 100)));
+      }
     }
   }
   return {
@@ -1560,7 +1591,77 @@ function togglePlay() {
   const v = $("video");
   if (v.paused) v.play(); else v.pause();
 }
-$("video").addEventListener("click", togglePlay);
+// ---- P1 GESTURE LAYER (clip-UI v2, Joe-approved): hold = momentary
+// 1/4x peek (latched speed chip untouched — sacred), double-tap sides =
+// +/-1s replay hop, horizontal flick = prev/next shot. Tap stays
+// play/pause (fires after the double-tap window).
+(() => {
+  const v = $("video");
+  let t0 = 0, x0 = 0, y0 = 0, moved = false, down = false;
+  let holdTimer = null, holding = false, savedRate = 1;
+  let lastTap = 0, tapTimer = null;
+  const cancelHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+  v.addEventListener("pointerdown", e => {
+    if (window.scrubActive) return;
+    down = true; moved = false;
+    t0 = Date.now(); x0 = e.clientX; y0 = e.clientY;
+    holdTimer = setTimeout(() => {
+      if (!down || moved) return;
+      holding = true;
+      savedRate = v.playbackRate;
+      v.playbackRate = 0.25;
+      if (v.paused) v.play().catch(() => {});
+      $("holdpill").style.display = "block";
+    }, 380);
+  });
+  v.addEventListener("pointermove", e => {
+    if (!down) return;
+    if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) {
+      moved = true; cancelHold();
+    }
+  });
+  const finish = e => {
+    if (!down) return;
+    down = false; cancelHold();
+    if (holding) {
+      holding = false;
+      v.playbackRate = savedRate;
+      $("holdpill").style.display = "none";
+      return;
+    }
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    const dur = Date.now() - t0;
+    if (moved && Math.abs(dx) > 64 && Math.abs(dx) > 2 * Math.abs(dy)
+        && dur < 650) {                       // horizontal flick = shot nav
+      if (dx < 0) gotoShot(Math.min(shots.length - 1, cur + 1), true);
+      else gotoShot(Math.max(0, cur - 1), true);
+      return;
+    }
+    if (moved) return;
+    const now = Date.now();
+    const r = v.getBoundingClientRect();
+    const frac = (e.clientX - r.left) / Math.max(1, r.width);
+    if (now - lastTap < 300) {                // double-tap: 1s hop
+      clearTimeout(tapTimer); tapTimer = null; lastTap = 0;
+      const lo = win ? win.t0 : 0, hi = win ? win.t1 : (v.duration || 1e9);
+      if (frac < 0.33) requestSeek(Math.max(lo, v.currentTime - 1), false);
+      else if (frac > 0.67) requestSeek(Math.min(hi, v.currentTime + 1), false);
+      else togglePlay();                      // centre double-tap = just toggle
+      return;
+    }
+    lastTap = now;
+    tapTimer = setTimeout(() => { tapTimer = null; togglePlay(); }, 300);
+  };
+  v.addEventListener("pointerup", finish);
+  v.addEventListener("pointercancel", () => {
+    down = false; cancelHold();
+    if (holding) {
+      holding = false;
+      v.playbackRate = savedRate;
+      $("holdpill").style.display = "none";
+    }
+  });
+})();
 $("play").onclick = togglePlay;
 $("video").addEventListener("pause", () => {
   $("vwrap").classList.add("paused");
