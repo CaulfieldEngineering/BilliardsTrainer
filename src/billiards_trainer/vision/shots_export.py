@@ -71,15 +71,21 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     hinv = np.asarray(tf["hinv"], dtype=float)
     w, h = float(tf["w"]), float(tf["h"])
     t0, t1 = float(s["start"]), float(s["end"])
+    # Attribute every sample to the number the track held AT THAT MOMENT.
+    # Stamping a track's FINAL number over its whole path was drawing
+    # 005048 @233's object ball as the cue (Joe: "the line the object ball
+    # took is drastically wrong"): when Joe struck the 4, the arriving cue
+    # ball stole that track at the contact point, so the track finished the
+    # shot riding the cue and the exporter relabelled its entire history --
+    # including the stretch where it really was sitting on the 4.
     paths: dict = {}
     t = max(0.0, t0 - 1.0)
     while t <= t1 + 1e-9:
         for tr in reader.tracks_at(t):
-            if not tr.active:
+            if not tr.active or tr.number < 0:
                 continue
-            e = paths.setdefault(tr.id, {"n": tr.number, "pts": []})
-            if tr.number >= 0:
-                e["n"] = tr.number
+            e = paths.setdefault((tr.id, tr.number),
+                                 {"n": tr.number, "pts": []})
             e["pts"].append((t, tr.x, tr.y, tr.radius))
         t += 0.15
     out = []
@@ -105,12 +111,9 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     # ONE entry per BALL, not per track segment (Joe: two cue badges and
     # two 7s on one shot — "always wrong to some extent"): identity churn
     # splits a ball's path across track ids mid-flight; merge same-number
-    # segments in time order, and drop unnumbered fragments (they are the
-    # churn itself, not extra balls in play).
+    # segments in time order.
     merged: dict = {}
     for e in out:
-        if e["n"] < 0:
-            continue
         m = merged.setdefault(e["n"], {"n": e["n"], "p": []})
         m["p"].extend(e["p"])
     result = []

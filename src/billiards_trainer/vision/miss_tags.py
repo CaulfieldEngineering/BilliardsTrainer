@@ -103,6 +103,17 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     vx, vy = _unit(seg[-1][1] - ox, seg[-1][2] - oy)
     if (vx, vy) == (0.0, 0.0):
         return None
+    # PATH CONTINUITY (005048 @233, Joe: "this one should be a pretty
+    # clear miss left" against a tag that said right). That label was
+    # measured across a 0.9s HOLE in the object ball's track: the strike
+    # blurs the ball, the tracker drops it, and a fresh track picks it up
+    # near the pocket. Departure direction is then a chord across the
+    # hole, not the ball's real line, and left/right can invert. Measured
+    # library-wide, 62% of tags carried a hole or a mid-flight track
+    # switch. Those keep their numbers but are excluded from the pattern
+    # counts -- a guessed side is worse than no side.
+    departure_gap = max(
+        (seg[i + 1][0] - seg[i][0] for i in range(len(seg) - 1)), default=0.0)
     # --- cue direction WITHOUT tracking the cue in flight. Measured on
     # real footage: the tracker loses a struck cue ball for seconds (at
     # 005048@233 it reported "cue moving" 2.4s AFTER contact), so a
@@ -159,7 +170,10 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # the pattern counts rather than quietly skewing them.
     miss_in_val = (abs(side_sign) / max(1e-9, math.hypot(vx, vy))
                    / space.px_per_in)
-    if miss_in_val > 8.0:
+    if departure_gap > 3.0 * _STEP:
+        conf = (f"low: object ball untracked for {departure_gap:.1f}s right "
+                f"after contact -- its departure line is a guess")
+    elif miss_in_val > 8.0:
         conf = f"low: pocket inference doubtful (missed by {miss_in_val:.0f}in)"
     elif miss_in_val < 0.8:
         conf = "low: ball was at the pocket mouth (rattle or mislabelled)"

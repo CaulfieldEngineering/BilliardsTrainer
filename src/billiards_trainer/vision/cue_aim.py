@@ -119,17 +119,17 @@ def _refine_centerline(mask: np.ndarray, ang: float, ax: float, ay: float,
                        ) -> tuple[float, float, float] | None:
     """Refit (angle, anchor) through the stick band's per-profile centres.
 
-    Walks the ENTIRE visible shaft in both directions (Joe: "use more of
-    the cue"), stops after a run of invalid profiles, and iterates the
-    fit twice so the second walk samples along the improved axis. The
-    fit is TIP-WEIGHTED: the homography maps the table plane, and the
-    butt end rides much higher above it than the tip, so a straight
-    stick's image is subtly bent — samples far from the ball carry the
-    butt's parallax displacement, tilting an unweighted fit (visible at
-    zoom on the @99s frame). exp(-d/300) keeps the long lever for noise
-    while the tip section — lowest, nearest the ball, and where the eye
-    checks alignment — dominates the answer. Returns None when too few
-    clean profiles exist (keep the Hough fit)."""
+    Uses the ENTIRE visible shaft (Joe, twice: "use as much of the
+    visible cue as possible"). An earlier version weighted samples
+    toward the tip on the theory that the raised butt bends the stick's
+    image — that reasoning was WRONG: a straight 3D line projects to a
+    straight line under a homography, so the shaft's rect-space image is
+    straight and every sample is equally valid. What actually corrupted
+    the long fit was the forearm and glove sneaking into the band, so
+    the answer is OUTLIER REJECTION, not a short lever: fit all clean
+    profiles by total least squares, drop the samples furthest from that
+    line, refit. Longer lever + robust fit beats a tip-only fit on both
+    counts. Returns None when too few clean profiles exist."""
     h, w = mask.shape[:2]
 
     def _profiles(a: float, x0: float, y0: float) -> list:
@@ -171,17 +171,27 @@ def _refine_centerline(mask: np.ndarray, ang: float, ax: float, ay: float,
             return None
         xs = np.array([p[0] for p in pts])
         ys = np.array([p[1] for p in pts])
-        if ball_xy is not None:
-            db = np.hypot(xs - ball_xy[0], ys - ball_xy[1])
-            wts = np.exp(-db / 300.0)
-        else:
-            wts = np.ones_like(xs)
-        wsum = float(wts.sum())
-        mx_ = float((wts * xs).sum() / wsum)
-        my_ = float((wts * ys).sum() / wsum)
-        u = np.stack([(xs - mx_) * np.sqrt(wts), (ys - my_) * np.sqrt(wts)])
-        evals, evecs = np.linalg.eigh(u @ u.T)
-        dx, dy = float(evecs[0, 1]), float(evecs[1, 1])
+        # ROBUST total-least-squares over the WHOLE shaft: fit, measure
+        # each sample's perpendicular distance, drop the worst tail
+        # (arm/glove), refit. Two passes settle it.
+        keep = np.ones(len(xs), dtype=bool)
+        mx_ = my_ = 0.0
+        dx = dy = 0.0
+        for _pass in range(3):
+            kx, ky = xs[keep], ys[keep]
+            if len(kx) < 8:
+                keep = np.ones(len(xs), dtype=bool)
+                kx, ky = xs, ys
+            mx_, my_ = float(kx.mean()), float(ky.mean())
+            u = np.stack([kx - mx_, ky - my_])
+            evals, evecs = np.linalg.eigh(u @ u.T)
+            dx, dy = float(evecs[0, 1]), float(evecs[1, 1])
+            perp = np.abs(-dy * (xs - mx_) + dx * (ys - my_))
+            med = float(np.median(perp[keep])) if keep.any() else 0.0
+            cut = max(1.5, 3.0 * max(med, 0.35))
+            nk = perp <= cut
+            if nk.sum() >= 8:
+                keep = nk
         new_ang = math.atan2(dy, dx)
         d = (new_ang - cur_ang) % (2 * math.pi)
         if min(d, 2 * math.pi - d) > math.pi / 2:

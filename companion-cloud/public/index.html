@@ -93,6 +93,16 @@
   #vwrap.loading #paused-glyph { display:none; }
   #trails { position:absolute; inset:0; width:100%; height:100%;
             pointer-events:none; }
+  /* Legend is HUD, not overlay: it lives outside #vrot so it stays
+     upright and bottom-left no matter how the video is rotated. */
+  #legend { position:absolute; left:10px; bottom:10px; display:none;
+            flex-direction:column; gap:3px; pointer-events:none; z-index:19;
+            font-size:11px; line-height:1.35; }
+  #legend div { display:flex; align-items:center; gap:7px; color:#E6EDF3;
+                background:rgba(13,17,23,.78); border-radius:5px;
+                padding:2px 7px; width:max-content; }
+  #legend i { display:block; width:14px; height:3px; border-radius:2px;
+              flex:0 0 auto; }
   #spinner div { width:36px; height:36px; border-radius:50%;
                  border:3px solid var(--line);
                  border-top-color:var(--accent);
@@ -262,8 +272,16 @@
             style="flex:0 0 auto;min-width:46px;margin-left:8px">☰</button>
   </div>
   <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex; overflow:hidden;">
+    <!-- ONLY this layer rotates (Joe: "keep your legend upright when I
+         rotate the video", "play button seems to flip"). The video and
+         the canvases that share its coordinate space live inside; every
+         piece of HUD chrome stays outside and upright. -->
+    <div id="vrot" style="position:absolute; inset:0; display:flex;">
     <video id="video" playsinline preload="metadata"></video>
-    <div id="paused-glyph">▶</div>
+    <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
+    <canvas id="trails"></canvas>
+    <canvas id="drawcv" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none"></canvas>
+    </div><!-- /vrot -->
     <button id="zoomreset" style="display:none;position:absolute;top:12px;
          right:12px;z-index:21;background:rgba(13,17,23,.85);color:#EAF2F3;
          border:1px solid #2A323D;border-radius:14px;padding:4px 12px;
@@ -273,9 +291,8 @@
          color:#EAF2F3;border:1px solid #2A323D;border-radius:14px;
          padding:4px 12px;font-size:13px;font-weight:700;z-index:20">¼×</div>
     <div id="spinner"><div></div></div>
-    <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
-    <canvas id="trails"></canvas>
-    <canvas id="drawcv" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none"></canvas>
+    <div id="paused-glyph">▶</div>
+    <div id="legend"></div>
   </div>
   <div id="shotbar">
     <div id="shotinfo">
@@ -977,7 +994,7 @@ const OV = {
 // register; pointer coords are inverted where they are consumed.
 let ROT = localStorage.getItem("rot180") === "1";
 function applyRot() {
-  $("vwrap").style.transform = ROT ? "rotate(180deg)" : "";
+  $("vrot").style.transform = ROT ? "rotate(180deg)" : "";
   $("ov-rot-st").textContent = ROT ? "On" : "Off";
   $("ov-rot-st").style.color = ROT ? "var(--make)" : "var(--faint)";
 }
@@ -1019,7 +1036,7 @@ function drawWhy() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   const g = s && (s.lines || (s.tags && s.tags.geom));
-  if (!g || !v.videoWidth) return;
+  if (!g || !v.videoWidth) { hideLegend(); return; }
   const box = cv.parentElement.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   if (cv.width !== Math.round(box.width * dpr)
@@ -1052,25 +1069,31 @@ function drawWhy() {
   line(g.obj, g.went, "#E5484D", 1.8);             // actually went
   dot(g.obj, "#FFFFFF", 3.5);
   dot(g.pocket, "#7DF29B", 4.5);
-  // legend, anchored bottom-left of the frame
-  ctx.save();
-  ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
-  ctx.textBaseline = "middle";
-  const rows = [["#7DF29B", "line to the pocket"],
-                ["#E5484D", "line it took"],
-                ["#8AA0FF", "cue line"]];
-  let ly = (oy + ch) * dpr - 16 * dpr * rows.length - 8 * dpr;
-  rows.forEach(([col, txt]) => {
-    ctx.fillStyle = "rgba(13,17,23,.78)";
-    ctx.fillRect((ox * dpr) + 6 * dpr, ly - 8 * dpr, 116 * dpr, 15 * dpr);
-    ctx.fillStyle = col;
-    ctx.fillRect((ox * dpr) + 10 * dpr, ly - 1.5 * dpr, 14 * dpr, 3 * dpr);
-    ctx.fillStyle = "#E6EDF3";
-    ctx.fillText(txt, (ox * dpr) + 30 * dpr, ly);
-    ly += 16 * dpr;
-  });
-  ctx.restore();
+  showLegend([["#7DF29B", "line to the pocket"],
+              ["#E5484D", "line it took"],
+              ["#8AA0FF", "cue line"]]);
 }
+
+// The legend is DOM, deliberately: painted into the canvas it inherited
+// the 180° flip and read upside down.
+function showLegend(rows) {
+  const el = $("legend");
+  const key = rows.map(r => r.join("")).join("|");
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    el.innerHTML = "";
+    rows.forEach(([col, txt]) => {
+      const d = document.createElement("div");
+      const i = document.createElement("i");
+      i.style.background = col;
+      d.appendChild(i);
+      d.appendChild(document.createTextNode(txt));
+      el.appendChild(d);
+    });
+  }
+  el.style.display = "flex";
+}
+function hideLegend() { $("legend").style.display = "none"; }
 ovSync();
 
 function drawAim() {
@@ -1172,7 +1195,7 @@ function drawTrails() {
   else { const c = $("trails");
          c.getContext("2d").clearRect(0, 0, c.width, c.height); }
   if (OV.aim) drawAim();
-  if (OV.why) drawWhy();
+  if (OV.why) drawWhy(); else hideLegend();
   Draw.render();
   if (win) {
     // while the thumb owns the playhead, the video's lagging seek time
