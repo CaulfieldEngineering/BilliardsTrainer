@@ -196,6 +196,28 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # understand where your 'shot left, misses left' definition is coming
     # from"). Rect-space points; the exporter maps them to video coords so
     # both surfaces draw the identical figure.
+    # THE OBJECT BALL'S ACTUAL OUTBOUND PATH, cleaned. Joe: "the 4 ball is
+    # still being projected to the wrong path" and "I don't care what
+    # happens to the cue ball once it hits its object ball". The raw track
+    # for the target carries two things that are not the object ball
+    # travelling to the pocket: a leading stub from before/at contact that
+    # actually belongs to the CUE ball (the arriving cue steals the resting
+    # track -- see the strike-time swap), and the return leg after the ball
+    # rattles out. Both read as "the line went somewhere the ball didn't".
+    # Keep only samples that make forward progress toward the pocket.
+    outbound = []
+    denom = math.hypot(px - ox, py - oy) or 1.0
+    prog = -1e9
+    for (_t, qx, qy) in tpath[tidx:]:
+        d = ((qx - ox) * (px - ox) + (qy - oy) * (py - oy)) / denom
+        if d < -0.5 * space.ball_r_px:
+            continue                      # behind contact: not this ball
+        if d < prog - 0.5 * space.ball_r_px:
+            break                         # stopped advancing: rattle/return
+        prog = max(prog, d)
+        outbound.append([round(qx, 1), round(qy, 1)])
+    if len(outbound) >= 2:
+        tags["path"] = outbound
     tags["geom"] = {
         "cue": [round(ax, 1), round(ay, 1)],          # cue ball at address
         "obj": [round(ox, 1), round(oy, 1)],          # object ball at contact

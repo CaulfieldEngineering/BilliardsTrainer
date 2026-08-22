@@ -190,6 +190,9 @@ class VideoView(QWidget):
         trails = getattr(self, "_trails", None)
         if not isinstance(tags, dict) or not trails:
             return []
+        g = tags.get("lines") or tags.get("geom") or {}
+        if g.get("path") and len(g["path"]) > 1:
+            return [(q[0], q[1]) for q in g["path"]]
         num = tags.get("target")
         if num is None:
             return []

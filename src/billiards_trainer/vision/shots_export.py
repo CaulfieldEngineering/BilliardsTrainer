@@ -152,6 +152,15 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
             continue
         ang, q, (ax, ay) = got
         ex, ey = aim_ray_end(ax, ay, ang, (30.0, 30.0, 670.0, 1270.0))
+        # STOP AT THE BALL IT WOULD HIT (Joe: "stop the line at the object
+        # ball ... I don't care about what happens to the cue ball once it
+        # hits its object ball"). Running the ray on to the rail drew a
+        # long line straight THROUGH the object ball, which read as a
+        # prediction about the cue ball's onward travel -- something this
+        # overlay is not claiming and cannot know.
+        hit = _first_ball_on_ray(reader, tp, (ax, ay), (ex, ey), cue.radius)
+        if hit is not None:
+            ex, ey = hit
         seg = []
         for (x, y) in ((ax, ay), (ex, ey)):
             v = hinv @ np.array([x, y, 1.0])
@@ -160,6 +169,39 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
         return {"p": seg, "q": round(float(q), 2), "t": round(tp, 2),
                 "v": AIM_VERSION}
     return None
+
+
+def _first_ball_on_ray(reader, t, a, b, r_cue):
+    """Where a cue ball rolling a->b would first touch another ball:
+    the CONTACT point (one ball-diameter short of that ball's centre),
+    or None if the path is clear. Uses the cue ball's own width, so a
+    ball the cue would just squeeze past does not stop the line."""
+    import math
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    seg = math.hypot(dx, dy)
+    if seg < 1e-6:
+        return None
+    ux, uy = dx / seg, dy / seg
+    best = None
+    for tr in reader.tracks_at(t):
+        if not tr.active or tr.number == 0:
+            continue
+        along = (tr.x - ax) * ux + (tr.y - ay) * uy
+        if along <= 0.0 or along > seg:
+            continue
+        perp = abs(-(tr.y - ay) * ux + (tr.x - ax) * uy)
+        reach = r_cue + tr.radius
+        if perp > reach:
+            continue                       # the cue would miss this ball
+        # roll back to the centres-touching position
+        back = math.sqrt(max(0.0, reach * reach - perp * perp))
+        d = along - back
+        if d > 0 and (best is None or d < best):
+            best = d
+    if best is None:
+        return None
+    return (ax + ux * best, ay + uy * best)
 
 
 def _rect_to_video(pt, tf: dict) -> list:
@@ -297,6 +339,13 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                         tg["geom"] = {k: _rect_to_video(v, tf)
                                       for k, v in g.items()}
                         entry["lines"] = tg["geom"]
+                        # the MEASURED outbound path of the object ball,
+                        # in the same normalized frame as the rest of the
+                        # figure, so both surfaces draw the measurement
+                        if tg.get("path"):
+                            entry["lines"]["path"] = [
+                                _rect_to_video(q, tf) for q in tg["path"]]
+                            tg["path"] = entry["lines"]["path"]
                     if entry["outcome"] == "miss":
                         entry["tags"] = tg
             except Exception:  # noqa: BLE001 - tagging is enrichment

@@ -26,7 +26,8 @@ import cv2
 #:   1 = tip-weighted mean (exp(-db/300))
 #:   2 = full-shaft robust total-least-squares (Joe: "use as much of the
 #:       visible cue as possible")
-AIM_VERSION = 2
+#:   3 = ray stops at the first ball it would hit, instead of the rail
+AIM_VERSION = 3
 import numpy as np
 
 #: minimum Hough segment length (rect px) — arms produce short curly

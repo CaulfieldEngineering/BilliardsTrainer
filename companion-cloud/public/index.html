@@ -1048,57 +1048,114 @@ $("ov-why").onclick = () => {
 // asserted. Three lines from the object ball: where it SHOULD have gone
 // (to the pocket), where it DID go, and the cue's approach that defines
 // left vs right. All from stored geometry — identical on both surfaces.
+// ---- one renderer for every analysis overlay --------------------------
+// Joe: "cleaner, finer, smoother graphics... right now they're fat ugly
+// pixelated things". Three causes, all fixed here:
+//   * each segment used to be stroked SEPARATELY with its own dark halo,
+//     so every vertex got double-blended into a bead;
+//   * the halo (4.6px) outweighed the core (2.0px), reading as a muddy
+//     grey band rather than a line;
+//   * a 0.15s-sampled path was drawn as a raw polygon, corners and all.
+// Now: one Path2D per line, smoothed through its midpoints, stroked as a
+// soft same-hue bloom under a thin crisp core.
+
+//: build a smooth Path2D through points (quadratic via midpoints)
+function smoothPath(pts) {
+  const path = new Path2D();
+  if (!pts.length) return path;
+  path.moveTo(pts[0][0], pts[0][1]);
+  if (pts.length === 2) { path.lineTo(pts[1][0], pts[1][1]); return path; }
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+    const my = (pts[i][1] + pts[i + 1][1]) / 2;
+    path.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+  }
+  const n = pts.length - 1;
+  path.quadraticCurveTo(pts[n - 1][0], pts[n - 1][1], pts[n][0], pts[n][1]);
+  return path;
+}
+
+//: a line reads over blue felt AND over a white ball, so: a whisper of
+//: dark to separate it from the background, a bloom in its own hue for
+//: presence, then a thin opaque core that carries the actual geometry
+function strokeLine(ctx, path, col, w, dpr, opts) {
+  const o = opts || {};
+  ctx.save();
+  ctx.lineJoin = ctx.lineCap = "round";
+  if (o.dash) ctx.setLineDash(o.dash.map(d => d * dpr));
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = "#05090C";
+  ctx.lineWidth = (w + 1.6) * dpr;
+  ctx.stroke(path);
+  ctx.globalAlpha = 0.16;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = (w + 3.2) * dpr;
+  ctx.stroke(path);
+  ctx.globalAlpha = o.alpha == null ? 0.95 : o.alpha;
+  ctx.strokeStyle = o.grad || col;
+  ctx.lineWidth = w * dpr;
+  ctx.stroke(path);
+  ctx.restore();
+}
+
+//: a marker that does not look like a blob: filled core, hairline ring
+function markDot(ctx, x, y, col, r, dpr) {
+  ctx.save();
+  ctx.globalAlpha = 0.30;
+  ctx.fillStyle = "#05090C";
+  ctx.beginPath(); ctx.arc(x, y, (r + 1.4) * dpr, 0, 7); ctx.fill();
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(x, y, r * dpr, 0, 7); ctx.fill();
+  ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = "rgba(255,255,255,.65)";
+  ctx.lineWidth = 0.8 * dpr;
+  ctx.beginPath(); ctx.arc(x, y, r * dpr, 0, 7); ctx.stroke();
+  ctx.restore();
+}
+
+//: HiDPI backing store, sized once per frame in ONE place
+function fitCanvas(cv, box) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(box.width * dpr), h = Math.round(box.height * dpr);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return dpr;
+}
+
 function drawWhy() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   const g = s && (s.lines || (s.tags && s.tags.geom));
   if (!g || !v.videoWidth) { hideLegend(); return; }
   const box = cv.parentElement.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  if (cv.width !== Math.round(box.width * dpr)
-      || cv.height !== Math.round(box.height * dpr)) {
-    cv.width = Math.round(box.width * dpr);
-    cv.height = Math.round(box.height * dpr);
-  }
+  const dpr = fitCanvas(cv, box);
   const ctx = cv.getContext("2d");
   const sc = Math.min(box.width / v.videoWidth, box.height / v.videoHeight);
   const cw = v.videoWidth * sc, ch = v.videoHeight * sc;
   const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
   const P = p2 => [(ox + p2[0] * cw) * dpr, (oy + p2[1] * ch) * dpr];
-  const line = (a, b, col, w, dash) => {
-    ctx.save();
-    ctx.setLineDash(dash || []);
-    ctx.lineCap = "round";
-    ctx.globalAlpha = 0.35; ctx.strokeStyle = "#08140A";
-    ctx.lineWidth = (w + 2.5) * dpr;
-    ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke();
-    ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = w * dpr;
-    ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke();
-    ctx.restore();
-  };
-  const dot = (a, col, r) => {
-    ctx.save(); ctx.globalAlpha = 0.95; ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(...P(a), r * dpr, 0, 7); ctx.fill(); ctx.restore();
-  };
-  line(g.cue, g.obj, "#8AA0FF", 1.6, [6, 5]);      // the approach
-  line(g.obj, g.pocket, "#7DF29B", 1.8);           // should have gone
+  const line = (a, b, col, w, dash) =>
+    strokeLine(ctx, smoothPath([P(a), P(b)]), col, w, dpr, { dash: dash });
+  const dot = (a, col, r) => { const q = P(a); markDot(ctx, q[0], q[1], col, r, dpr); };
+  line(g.cue, g.obj, "#8AA0FF", 1.1, [5, 6]);      // the approach
+  line(g.obj, g.pocket, "#7DF29B", 1.3);           // should have gone
   // WHERE IT ACTUALLY WENT. Joe: "look at the purple 4 ball here, it's
   // not travelling on your red line at all" -- because this used to be a
   // straight ray re-derived from six samples of departure direction, and
   // on that shot those samples straddled a half-second hole in the ball's
   // track. We already MEASURED the path; draw the measurement. The ray is
   // kept only as a fallback for shots that have no trail.
-  const targ = s.tags && s.tags.target;
-  const tr = (s.trails || []).find(e => e.n === targ && e.p && e.p.length > 2);
-  if (tr) {
-    const path = tr.p.map(q => [q[1], q[2]]);
-    for (let i = 1; i < path.length; i++)
-      line(path[i - 1], path[i], "#E5484D", 1.8);
+  // g.path is the CLEANED outbound leg: from contact until the ball stops
+  // advancing on the pocket. It excludes the stub the arriving cue ball
+  // steals at contact, and the rebound after it hits the rail -- both of
+  // which made the line wander somewhere the object ball never went.
+  if (g.path && g.path.length > 1) {
+    strokeLine(ctx, smoothPath(g.path.map(P)), "#E5484D", 1.3, dpr);
   } else {
-    line(g.obj, g.went, "#E5484D", 1.8);
+    line(g.obj, g.went, "#E5484D", 1.3);
   }
-  dot(g.obj, "#FFFFFF", 3.5);
-  dot(g.pocket, "#7DF29B", 4.5);
+  dot(g.obj, "#FFFFFF", 2.6);
+  dot(g.pocket, "#7DF29B", 3.4);
   showLegend([["#7DF29B", "line to the pocket"],
               ["#E5484D", "line it took"],
               ["#8AA0FF", "cue line"]]);
@@ -1131,39 +1188,22 @@ function drawAim() {
   const s = shots[cur];
   if (!s || !s.aim || !v.videoWidth) return;
   const box = cv.parentElement.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  if (cv.width !== Math.round(box.width * dpr)
-      || cv.height !== Math.round(box.height * dpr)) {
-    cv.width = Math.round(box.width * dpr);
-    cv.height = Math.round(box.height * dpr);
-  }
+  const dpr = fitCanvas(cv, box);
   const ctx = cv.getContext("2d");
   const scale = Math.min(box.width / v.videoWidth,
                          box.height / v.videoHeight);
   const cw = v.videoWidth * scale, ch = v.videoHeight * scale;
   const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
   const [a, b] = s.aim.p;
-  const X = p => (ox + p[0] * cw) * dpr, Y = p => (oy + p[1] * ch) * dpr;
-  ctx.lineCap = "round";
-  ctx.globalAlpha = 0.4;
-  ctx.strokeStyle = "#0A190C"; ctx.lineWidth = 4 * dpr;
-  ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke();
-  ctx.globalAlpha = 0.8;
-  ctx.strokeStyle = "#7DF29B"; ctx.lineWidth = 1.6 * dpr;
-  ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke();
-  ctx.globalAlpha = 1;
+  const Q = q => [(ox + q[0] * cw) * dpr, (oy + q[1] * ch) * dpr];
+  strokeLine(ctx, smoothPath([Q(a), Q(b)]), "#7DF29B", 1.2, dpr);
 }
 
 function drawTrails() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   const box = cv.parentElement.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  if (cv.width !== Math.round(box.width * dpr)
-      || cv.height !== Math.round(box.height * dpr)) {
-    cv.width = Math.round(box.width * dpr);
-    cv.height = Math.round(box.height * dpr);
-  }
+  const dpr = fitCanvas(cv, box);
   const ctx = cv.getContext("2d");
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (!s || !s.trails || !v.videoWidth) return;
@@ -1172,42 +1212,27 @@ function drawTrails() {
   const cw = v.videoWidth * scale, ch = v.videoHeight * scale;
   const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
   const t = v.currentTime;
-  const X = p => (ox + p[1] * cw) * dpr, Y = p => (oy + p[2] * ch) * dpr;
-  ctx.lineJoin = ctx.lineCap = "round";
+  const Q = q => [(ox + q[1] * cw) * dpr, (oy + q[2] * ch) * dpr];
   s.trails.forEach(tr => {
     // WHOLE SHOT, not a 4s tail (Joe: "should persist through the
     // entire duration of the shot") — the path is the record of what
     // happened, and it disappearing mid-review defeated the point.
-    const pts = tr.p.filter(p => p[0] <= t);
+    const pts = tr.p.filter(p => p[0] <= t).map(Q);
     if (pts.length < 2) return;
     const col = BALL_COL[tr.n] || "#9AA4B2";
-    // dark halo under a coloured core: legible over felt AND over the
-    // white cue ball, which a bare stroke was not
-    ctx.globalAlpha = 0.30;
-    ctx.strokeStyle = "#05090C";
-    ctx.lineWidth = 4.6 * dpr;
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))));
-    ctx.stroke();
-    // the core fades from faint at the start to solid at the ball, so
-    // direction reads at a glance without hiding the earlier path
-    for (let i = 1; i < pts.length; i++) {
-      ctx.globalAlpha = 0.25 + 0.65 * (i / (pts.length - 1));
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 2.0 * dpr;
-      ctx.beginPath();
-      ctx.moveTo(X(pts[i - 1]), Y(pts[i - 1]));
-      ctx.lineTo(X(pts[i]), Y(pts[i]));
-      ctx.stroke();
+    // The fade from faint-at-the-start to solid-at-the-ball used to be a
+    // separate stroke PER SEGMENT, which beaded at every vertex. A single
+    // gradient along the path gives the same read, smoothly.
+    const a = pts[0], b = pts[pts.length - 1];
+    let grad = col;
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 1) {
+      grad = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+      grad.addColorStop(0, col + "38");
+      grad.addColorStop(0.55, col + "9E");
+      grad.addColorStop(1, col + "FF");
     }
-    // where the ball is right now
-    const last = pts[pts.length - 1];
-    ctx.globalAlpha = 0.95;
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(X(last), Y(last), 3.2 * dpr, 0, 7); ctx.fill();
-    ctx.globalAlpha = 0.55;
-    ctx.strokeStyle = "#05090C"; ctx.lineWidth = 1.2 * dpr;
-    ctx.beginPath(); ctx.arc(X(last), Y(last), 3.2 * dpr, 0, 7); ctx.stroke();
+    strokeLine(ctx, smoothPath(pts), col, 1.5, dpr, { grad: grad, alpha: 1 });
+    markDot(ctx, b[0], b[1], col, 2.6, dpr);   // where the ball is now
   });
   ctx.globalAlpha = 1;
 }
