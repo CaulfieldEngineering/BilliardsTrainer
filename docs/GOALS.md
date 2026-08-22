@@ -1124,3 +1124,13 @@ Rounds continue with Joe's visual feedback as the gate.
   cue's actual trajectory reached first), a geometric test against the
   cue trail. Reverted; texts restored; queued as the designed next
   approach. UI v2 spec still awaiting Joe.
+- 2026-08-21 (10:30pm): JOE APPROVED CLIP-UI V2 ("Let's try it") — the
+  rebuild per docs/design/CLIP_UI_V2.md is now the TOP UI priority.
+  Implementation phases (one per loop, each deployed + verifiable):
+  P1 state machine + gesture layer (tap/hold/double-tap/flick/pinch)
+  behind the CURRENT layout; P2 Watch/Inspect chrome swap (hairline vs
+  bottom precision cluster w/ session strip + coarse lane + frame wheel
+  + 4-button transport); P3 verdict-on-badge sheet + auto-advance;
+  P4 pen-modal annotate rail; P5 polish + two-tap parity audit from the
+  spec's table. Keep every capability reachable; deploy per phase so
+  Joe can veto early.
