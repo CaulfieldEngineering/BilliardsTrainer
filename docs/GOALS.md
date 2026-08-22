@@ -1440,3 +1440,42 @@ Rounds continue with Joe's visual feedback as the gate.
   the overdue library-scale validation of colour adoption; (3) tracking.py
   and pipeline.py are both well over the size bar — split the identity /
   arbitration concern out.
+
+- 2026-08-22 (session 4) — JOE'S SHOT IS NOW CORRECT END TO END. Health
+  first: blur recovery extracted from pipeline.py (1451 -> 1268) into
+  vision/blur_recovery.py with four direct tests — and the extraction paid
+  for itself in minutes. The third test caught a defect real-footage
+  testing had never surfaced: a departed ball registers as motion TWICE,
+  once where it went and once at the vacancy it left, and that vacancy
+  sits exactly under the parked track, so recovery could pin a track to
+  its own absence (almost certainly what re-anchored the ghost at 233.77
+  yesterday). Two physical guards: at the ball the CURRENT pixels look
+  like the ball, at the hole the BACKGROUND does; and a ball is not
+  felt-coloured, while the window's background median IS the felt. Real
+  footage unchanged at 186px, so they cost nothing.
+  Then re-analysed 005048 through the production path. Recovery works
+  live: ball 4 now travels (174,804) -> (119,1078) -> (91,1181) where it
+  used to never leave the address spot. But the tag STILL abstained, from
+  a bug in miss_tags that only appears once fast balls are tracked at all:
+  _first_motion returns the first DISPLACED sample, which on a hard shot
+  is already 280px downrange, so "contact" was placed almost at the pocket
+  and every angle from it was nonsense; and departure direction was
+  measured over a fixed 6-sample window that ran past the rail into the
+  rebound, reporting the ball leaving UP the table. Contact is now the
+  sample before (the ball at rest) and departure is measured to the
+  outbound EXTREMUM — where it got to before turning back. The overlay
+  path starts from contact too.
+  RESULT: "straight cut, missed LEFT by 1.28in, ball 4 -> bottom-left".
+  Ground truth, measured from raw video independently of the pipeline:
+  short rail first, missed LEFT. CORRECT. Still gated low-confidence
+  because the ball really is undetected for 0.4s after contact — the label
+  is right AND still says it is not fully trusted, which is honest. The
+  gate is not something to retune on one shot.
+  NEXT: (1) re-analyse the LIBRARY and re-score all miss tags — this is
+  also the overdue library-scale validation of colour adoption; the 0.3s
+  continuity gate may now be over-conservative given departure is measured
+  to the extremum rather than across a chord, but that is a call to make
+  on 89 tags, not one; (2) tracking.py is 1035 lines — split the identity
+  and arbitration concern out; (3) Joe changes camera settings in a few
+  days (docs/CAMERA_SETTINGS.md) — measure smear and detection rate on the
+  first session he shoots at 1/250.
