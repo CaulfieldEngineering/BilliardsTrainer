@@ -22,7 +22,7 @@ def companion(tmp_path, monkeypatch):
         '{"type":"correction","start":5.0,"outcome":"make"}\n')
     monkeypatch.setattr(srv, "_recordings_dir", lambda: tmp_path)
     # summaries touch cv2 on a fake mp4; stub them out for the API shape test
-    import billiards_trainer.ui.session_summaries as ss
+    import billiards_trainer.vision.session_summaries as ss
     monkeypatch.setattr(ss, "summarize",
                         lambda p, c: {"dur_s": 60.0, "shots": 2})
     httpd = srv.serve(0)

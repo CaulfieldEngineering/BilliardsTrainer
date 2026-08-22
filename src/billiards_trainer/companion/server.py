@@ -91,7 +91,7 @@ def read_shots(video: Path) -> list[dict]:
 
 
 def list_sessions() -> list[dict]:
-    from billiards_trainer.ui import session_summaries as ss
+    from billiards_trainer.vision import session_summaries as ss
     d = _recordings_dir()
     cache = ss.load_cache()
     out = []

@@ -124,7 +124,7 @@ class TestActionAwareSurfaces:
     def test_summary_counts_attempts_only(self, tmp_path):
         import json
 
-        from billiards_trainer.ui.session_summaries import _sidecar_shot_count
+        from billiards_trainer.vision.session_summaries import _sidecar_shot_count
         vid = tmp_path / "s.mp4"
         vid.write_bytes(b"0")
         with open(str(vid) + ".analysis.jsonl", "w", encoding="utf-8") as f:

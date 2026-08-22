@@ -306,12 +306,20 @@ def _check_coherence() -> tuple:
     never RED."""
     import subprocess
     try:
-        r = subprocess.run([sys.executable, "tools/coherence_audit.py",
+        r = subprocess.run([sys.executable, "tools/system_review.py",
                             "--json"], cwd=ROOT, capture_output=True,
-                           text=True, timeout=300)
-        d = json.loads(r.stdout or "{}")
+                           text=True, timeout=900)
+        full = json.loads(r.stdout or "{}")
+        d = full.get("L3_features", {})
+        arch = full.get("L1_architecture", {})
     except (subprocess.SubprocessError, ValueError, OSError) as exc:
-        return "AMBER", f"coherence audit failed: {exc}"
+        return "AMBER", f"system review failed: {exc}"
+    # TOP-DOWN (Joe): an architecture finding outranks everything below
+    # it — no amount of tidy syntax saves a subsystem reaching upward.
+    if arch.get("violations"):
+        return "AMBER", ("L1 layering: " + "; ".join(arch["violations"][:2]))
+    if arch.get("cycles"):
+        return "AMBER", f"L1 cycles: {', '.join(arch['cycles'][:3])}"
     gaps = d.get("parity", {})
     scattered = d.get("concepts", {})
     ghost = d.get("contract", {}).get("read_never_written", [])

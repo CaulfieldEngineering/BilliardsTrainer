@@ -1,7 +1,7 @@
 """Sidebar session summaries: duration + shots, cached, stub detection."""
 
 
-from billiards_trainer.ui import session_summaries as ss
+from billiards_trainer.vision import session_summaries as ss
 
 
 def _tiny_video(tmp_path, seconds=3):

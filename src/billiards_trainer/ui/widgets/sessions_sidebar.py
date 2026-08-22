@@ -171,7 +171,7 @@ class SessionsSidebar(QFrame):
         self._sum_bridge.ready.connect(self._apply_summary)
 
         def work(bridge=self._sum_bridge, targets=list(paths)):
-            from .. import session_summaries as ss
+            from ...vision import session_summaries as ss
             cache = ss.load_cache()
             dirty = False
             for sp in targets:
@@ -199,7 +199,7 @@ class SessionsSidebar(QFrame):
     def _apply_summary(self, path: str, summary: dict) -> None:
         from PySide6.QtGui import QColor
 
-        from .. import session_summaries as ss
+        from ...vision import session_summaries as ss
         for i in range(self._list.topLevelItemCount()):
             it = self._list.topLevelItem(i)
             if it.data(0, Qt.UserRole) != path:
