@@ -1190,3 +1190,12 @@ Rounds continue with Joe's visual feedback as the gate.
   by-frame "Analyze Aim Line" on any paused frame. Same detector,
   same accuracy pass benefits both; the sheet offers the toggle and
   the button side by side.
+- 2026-08-22 (Joe, standing rule): MISS DIAGNOSIS MUST NOT
+  OVERSIMPLIFY. Every root-cause claim names the competing physical
+  explanations (aim error, unintentional english + squirt, cut-induced
+  and english-induced throw, swerve from cue elevation, contact-point
+  error, speed) and why they were excluded; magnitudes must be
+  physically plausible; the honest answer "can't tell from this data"
+  outranks a confident guess (no tip-contact-point, no spin measure,
+  30fps blur). The running forensics get an ADVERSARIAL PHYSICS CHECK
+  before any of it reaches Joe or ships as analytics.
