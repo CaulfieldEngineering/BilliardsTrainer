@@ -322,6 +322,19 @@
       <div id="chips"></div>
     </div>
     <div id="ovscrim"></div>
+    <div id="newssheet" style="display:none;position:fixed;inset:0;z-index:60;
+         background:rgba(4,8,12,.72)">
+      <div style="position:absolute;left:12px;right:12px;top:8%;bottom:8%;
+           background:var(--panel,#12161C);border:1px solid #2A323D;
+           border-radius:16px;padding:18px 16px 12px;display:flex;
+           flex-direction:column">
+        <div style="display:flex;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:17px">What’s New</h3>
+          <button id="news-close" style="margin-left:auto;min-width:44px">✕</button>
+        </div>
+        <div id="news-list" style="overflow-y:auto;flex:1"></div>
+      </div>
+    </div>
     <div id="ovmenu">
       <div class="grab"></div>
       <h3>Drawing tools</h3>
@@ -339,6 +352,8 @@
       <h3>View</h3>
       <button id="ov-rot" class="lrow">Rotate 180°
         <span class="chev" id="ov-rot-st">Off</span></button>
+      <button id="ov-news" class="lrow">What’s New
+        <span class="chev" id="ov-news-dot" style="color:var(--accent)"></span></button>
       <h3>Overlays</h3>
       <button id="ov-aim" class="lrow">Aim line
         <span class="chev" id="ov-aim-st">Off</span></button>
@@ -1026,6 +1041,43 @@ function applyRot() {
   $("ov-rot-st").textContent = ROT ? "On" : "Off";
   $("ov-rot-st").style.color = ROT ? "var(--make)" : "var(--faint)";
 }
+// ---- What's New (Joe: "I just come back to a wall of text I don't
+// understand" — the loop's summaries are written for the loop; this is
+// the channel written for HIM, in plain language, updated every session
+// that changes something he can see) --------------------------------
+const News = (() => {
+  let entries = [];
+  const seen = () => parseInt(localStorage.getItem("news_seen") || "0", 10);
+  function render() {
+    const box = $("news-list");
+    box.innerHTML = "";
+    entries.forEach(e => {
+      const d = document.createElement("div");
+      d.style.cssText = "padding:10px 2px;border-bottom:1px solid #232B36";
+      d.innerHTML = `<div style="font-weight:700;margin-bottom:3px">${e.title}
+        <span style="color:var(--faint);font-weight:400;font-size:12px;margin-left:6px">${e.date}</span></div>
+        <div style="color:#C7D0DA;font-size:14px;line-height:1.45">${e.body}</div>`;
+      box.appendChild(d);
+    });
+  }
+  fetch("whatsnew.json").then(r => r.json()).then(j => {
+    entries = j.entries || [];
+    const latest = entries.length ? entries[0].id : 0;
+    $("ov-news-dot").textContent = latest > seen() ? "● new" : "";
+  }).catch(() => {});
+  $("ov-news").onclick = () => {
+    render();
+    $("newssheet").style.display = "block";
+    if (entries.length) localStorage.setItem("news_seen", String(entries[0].id));
+    $("ov-news-dot").textContent = "";
+  };
+  $("news-close").onclick = () => { $("newssheet").style.display = "none"; };
+  $("newssheet").onclick = e => {
+    if (e.target === $("newssheet")) $("newssheet").style.display = "none";
+  };
+  return {};
+})();
+
 $("ov-rot").onclick = () => {
   ROT = !ROT;
   localStorage.setItem("rot180", ROT ? "1" : "");

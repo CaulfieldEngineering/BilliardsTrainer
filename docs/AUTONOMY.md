@@ -101,3 +101,19 @@ session did. Refreshed at the END of each successful work session.
   (heartbeat, GOALS, push all done) but omitted the lock delete; detected
   by heartbeat-newer-than-lock at the next session start. Cleared. The
   close-out checklist exists for exactly this; follow it in order.
+
+## What's New (Joe-facing changelog — standing requirement 2026-08-23)
+Joe: "I just come back to a wall of text I don't understand each time."
+GOALS.md and heartbeats are written for the loop; the channel written for
+JOE is companion-cloud/public/whatsnew.json, shown in the phone app's
+menu with an unread dot. At every session close that changed anything he
+can SEE or that changes what his data means:
+- prepend an entry: id (increment), date, plain-language title + body —
+  what changed FOR HIM, never how. No tracker internals, no module names,
+  no metrics he didn't ask for. If it can't be said plainly, it does not
+  belong in the file.
+- deploy (the file ships with the app).
+Sessions that change nothing Joe-visible add nothing — the dot must mean
+something. Separately: when the accuracy chain completes (trajectory fit
+validated + library relabelled), notify Joe proactively — he asked to be
+told when it's all fixed.

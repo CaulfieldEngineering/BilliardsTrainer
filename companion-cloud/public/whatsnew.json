@@ -1,0 +1,46 @@
+{
+  "entries": [
+    {
+      "id": 7,
+      "date": "2026-08-23",
+      "title": "Your disputed shot now reads correctly",
+      "body": "The shot you flagged (the 4-ball at 3:52) now shows 'missed left, 1.3 inches' with full confidence — matching what you saw on the table. The same check was applied to every clip: a few more misses earned a trusted verdict, and the ones still marked unsure are genuinely unsure, not broken."
+    },
+    {
+      "id": 6,
+      "date": "2026-08-23",
+      "title": "A first pattern in your misses",
+      "body": "Among the misses the app is confident about, you miss RIGHT about 3 times as often as left (25 vs 8). Small sample so far — treat it as a hint, not a diagnosis. It will sharpen as more shots get trusted verdicts."
+    },
+    {
+      "id": 5,
+      "date": "2026-08-22",
+      "title": "The red line is now the real path",
+      "body": "The 'line it took' overlay now draws the ball's entire recorded path — including rail bounces — instead of an approximation. Nothing is written on top of the video anymore; the verdict lives in the bar below the player."
+    },
+    {
+      "id": 4,
+      "date": "2026-08-22",
+      "title": "Drag the legend out of the way",
+      "body": "The overlay legend can now be dragged anywhere on the video, and it remembers where you put it — even when you rotate."
+    },
+    {
+      "id": 3,
+      "date": "2026-08-22",
+      "title": "Fast shots keep their trails",
+      "body": "Hard-hit balls used to vanish from the trails mid-flight. The app now recovers them through the motion blur, so the trail follows the ball to the rail and back."
+    },
+    {
+      "id": 2,
+      "date": "2026-08-22",
+      "title": "Rotation stays put",
+      "body": "Rotating the video no longer flips the legend or play button, and toggling overlays no longer un-rotates the video."
+    },
+    {
+      "id": 1,
+      "date": "2026-08-22",
+      "title": "Honest verdicts",
+      "body": "When the app can't actually see which side a miss went, it now says 'can't tell' instead of guessing. Fewer wrong labels; the trusted ones mean something."
+    }
+  ]
+}
