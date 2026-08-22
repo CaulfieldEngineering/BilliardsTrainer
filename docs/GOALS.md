@@ -1571,3 +1571,21 @@ Rounds continue with Joe's visual feedback as the gate.
   reflections) is what unlocks those. First real pattern visible in the
   trusted set: Joe misses RIGHT 25:8 over left. Worth surfacing once the
   fit lands and the sample grows.
+
+- 2026-08-23 (session 7) — Hygiene lint cleared (E741 in a fixture), then
+  TRAJECTORY FIT V1 landed as a standalone module with validation ahead
+  of wiring. One-or-two TLS legs over all observations; the true corner
+  is the LEG INTERSECTION (the breakpoint sample sat beside the wrong
+  cushion on @233); the rail is named by the dominant flipped velocity
+  component, confirmed by the corner's position. Results: @233 rail AND
+  side correct from pure geometry (residual 7.2px); label set 8 agree /
+  3 honest no-fits / 1 disagreement on a HIGH-confidence tag
+  (20260802-002402@223 — review candidate, do not steamroll). 5 unit
+  tests. NOT wired into the tagger yet — separate revertable step after
+  the disagreement is understood. No What's New entry: nothing
+  Joe-visible changed yet; the entry comes when verdicts actually flow
+  from the fit.
+  NEXT: (1) understand the @223 disagreement (fit says left, tagger
+  high-confidence right); (2) wire the fit as the tagger's geometry
+  source behind a comparison flag, measure library-wide deltas; (3) flag
+  blur-recovered detections; (4) audio contact anchor.
