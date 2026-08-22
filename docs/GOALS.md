@@ -1238,3 +1238,20 @@ Rounds continue with Joe's visual feedback as the gate.
   association during full-history runs) — this is the next chunk and it
   gates aim/miss coverage. Also open: aim lines on 66% of stroke shots;
   IG-style UI phase 2; audio-transient segmentation.
+- 2026-08-22 (loop, 5am): ARCHITECTURE FIXED, PARITY CLOSED. The
+  watchdog's AMBER was an L1 finding, and per Joe's top-down rule that
+  outranks features — so this session fixed it instead of building.
+  Root cause was ownership: Track/BallClass/TableModel/ball-colour/
+  rectify are the vocabulary EVERY subsystem speaks but lived inside
+  vision/, so events and detector_strategies had to import vision while
+  vision imported them back. New L0 core/ package (all four modules were
+  leaves), 55 files repointed: 0 layering violations, 0 cycles, block
+  diagram reads cleanly downward. Then the AMBER moved down to L3 and
+  that got closed too: 2 of 4 reported parity gaps were audit bugs
+  (desktop frame stepping exists; the contract check misread session
+  fields), parity is now judged against DECLARED INTENT, and the one
+  real gap — the "why this miss" figure — is drawn on the desktop from
+  the same stored geometry, pinned by a render test. Parity gaps 4 -> 0.
+  REMAINING AMBER: concept scatter (pocket geometry in 7 modules, scale
+  in 3) — next chunk. STILL OPEN and gating analytics coverage: the
+  cue-ball association bug (~40% of flight untracked).
