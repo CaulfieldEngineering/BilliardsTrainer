@@ -1415,6 +1415,31 @@ function ovOpen(open) {
   $("ovmenu").style.display = open ? "block" : "none";
   $("ovscrim").style.display = open ? "block" : "none";
   if (!open) $("pl-pick").style.display = "none";
+  if (open) {
+    syncRifeBtn();
+    PL.pull().then(syncRifeBtn);   // catch renders that finished since
+  }
+}
+// The slo-mo button is STATE-AWARE (Joe): if this shot's render already
+// exists in the Slow-mo playlist, the button VIEWS it instead of
+// re-requesting.
+function rifeNameFor(s2) {
+  const sess = (s2._session || curSession || "").replace(/\.mp4$/, "");
+  return `slowmo-${sess}-${Math.round(s2.start)}.mp4`;
+}
+function findSlowmo(s2) {
+  if (!s2 || s2._slowmo) return null;
+  const want = rifeNameFor(s2);
+  const pl = PL.all().find(q => q.name === "Slow-mo");
+  if (!pl) return null;
+  const idx = pl.clips.findIndex(c => c.slowmo === want);
+  return idx >= 0 ? { pl, idx } : null;
+}
+function syncRifeBtn() {
+  const hit = findSlowmo(shots[cur]);
+  $("rife-req").innerHTML = hit
+    ? '▶ View smooth slo-mo <span class="chev">›</span>'
+    : '✨ Smooth slo-mo (renders ~1 min) <span class="chev">›</span>';
 }
 $("ovbtn").onclick = () => ovOpen($("ovmenu").style.display !== "block");
 $("ovscrim").onclick = () => ovOpen(false);
@@ -1462,6 +1487,13 @@ $("pl-save").onclick = () => {
 $("rife-req").onclick = async () => {
   const s2 = shots[cur];
   if (!s2 || s2._slowmo) return;
+  const hit = findSlowmo(s2);
+  if (hit) {                        // already rendered: jump to the clip
+    ovOpen(false);
+    await openPlaylist(hit.pl);
+    if (hit.idx > 0) gotoShot(hit.idx, true);
+    return;
+  }
   $("rife-req").textContent = "✨ Requesting…";
   try {
     await api("/api/correct", {
