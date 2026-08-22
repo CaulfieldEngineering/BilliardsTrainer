@@ -1268,3 +1268,31 @@ Rounds continue with Joe's visual feedback as the gate.
   legitimate callers. Scattered concepts 4 -> 0, parity 0, contract
   clean. NEXT: the cue-ball association bug (~40% of flight untracked),
   which gates miss-tag and aim coverage.
+
+- 2026-08-22 — FOUND the cue-ball association bug, and it is worse than
+  "the tracker loses the cue ball". Frame-by-frame on 005048@233: when Joe
+  strikes, the cue's own track FREEZES at the address spot (a resting
+  track predicts zero velocity, so a hard-struck ball is already outside
+  the association gate on frame one), and then the arriving cue ball
+  STEALS the object ball's track at the contact point. Track 10 starts on
+  the purple 4, walks off onto the cue ball, and finishes the shot riding
+  it. That single swap explains both of Joe's reports: the "drastically
+  wrong" object-ball line, and a miss tagged "right" that he calls a clear
+  miss left. Evidence: scratchpad/swap.png (5-panel contact sheet).
+  Shipped two honest fixes rather than a guess: the exporter now labels
+  each trail sample with the number held AT THAT MOMENT (it had been
+  retro-stamping a track's final number over its whole history), and
+  miss_tags flags any tag whose object ball went untracked right after
+  contact — 62% of the library's 89 tags carry that defect, so the miss
+  statistics now say they are unreliable instead of asserting a side.
+  Also committed the full-shaft aim fit (offset 8.8px -> 4.7px) that Joe
+  asked for, and moved the phone's legend/play glyph/zoom pill outside the
+  rotating layer so 180-degree rotation no longer flips the HUD.
+  REVERTED, honestly: _migrate_departed_numbers and flight-linking from
+  the previous loop — a full re-analysis measured ZERO change (median
+  flight coverage 73%, 17/36 shots >=80%, 10 at 0%, identical to
+  baseline), and the swap evidence refutes the premise both rested on.
+  NEXT: fix the association itself — the first frame of motion needs a
+  wider gate, and a resting track must not accept a match onto a ball
+  arriving at it (appearance/colour would separate a purple 4 from a
+  white cue instantly). Needs library-wide measurement before it ships.
