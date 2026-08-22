@@ -152,9 +152,15 @@
   #dtools { display:none; position:absolute; left:50%;
             transform:translateX(-50%); bottom:96px; z-index:39;
             background:rgba(18,22,29,.96); border:1px solid var(--line);
-            border-radius:24px; padding:8px 14px; align-items:center;
-            gap:12px; box-shadow:0 6px 24px rgba(0,0,0,.5);
-            max-width:calc(100% - 24px); }
+            border-radius:18px; padding:10px 14px;
+            flex-direction:column; gap:10px;
+            box-shadow:0 6px 24px rgba(0,0,0,.5);
+            width:min(360px, calc(100% - 24px)); }
+  #dtools .dtrow { display:flex; align-items:center; gap:12px;
+                   justify-content:center; width:100%; }
+  #dtools .dtrow label { font-size:13px; color:var(--dim); width:18px;
+                         text-align:center; }
+  #dtools input[type=range] { flex:1; min-width:0; }
   #dtools .sw { width:24px; height:24px; border-radius:50%; padding:0;
                 border:2px solid transparent; }
   #dtools .sw.on { border-color:#fff; }
@@ -319,13 +325,22 @@
         <span class="chev" id="ov-paths-st">Off</span></button>
     </div>
     <div id="dtools">
-      <span id="dt-colors" style="display:flex;gap:10px"></span>
-      <button id="dt-w" style="min-width:40px;background:none;border:none;
-              color:var(--text)">──</button>
-      <input id="dt-a" type="range" min="15" max="100" value="55">
-      <input id="dt-len" type="range" min="5" max="160" value="40"
-             title="line length" style="display:none">
-      <button id="dt-del" style="min-width:36px;background:none;border:none">🗑</button>
+      <div class="dtrow">
+        <span id="dt-colors" style="display:flex;gap:10px"></span>
+        <button id="dt-w" style="min-width:40px;background:none;border:none;
+                color:var(--text)">──</button>
+        <button id="dt-del" style="min-width:36px;background:none;
+                border:none">🗑</button>
+      </div>
+      <div class="dtrow">
+        <label>◐</label>
+        <input id="dt-a" type="range" min="15" max="100" value="55">
+      </div>
+      <div class="dtrow" id="dt-lenrow" style="display:none">
+        <label>↔</label>
+        <input id="dt-len" type="range" min="5" max="160" value="40"
+               title="line length">
+      </div>
     </div>
     <div id="sheet">
       <p id="sh-desc"></p>
@@ -1518,7 +1533,7 @@ const Draw = (() => {
       [...$("dt-colors").children].forEach(b =>
         b.classList.toggle("on", b.dataset.c === c));
       const isLine = o.type === "line";
-      $("dt-len").style.display = isLine ? "" : "none";
+      $("dt-lenrow").style.display = isLine ? "flex" : "none";
       if (isLine) {
         const AR = 936 / 1640;
         const L = Math.hypot((o.pts[1][0] - o.pts[0][0]) * AR,
