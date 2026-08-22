@@ -96,9 +96,14 @@
   /* Legend is HUD, not overlay: it lives outside #vrot so it stays
      upright and bottom-left no matter how the video is rotated. */
   #vwrap.rot #vrot { transform: rotate(180deg); }
-  #legend { position:absolute; left:10px; bottom:10px; display:none;
-            flex-direction:column; gap:3px; pointer-events:none; z-index:19;
-            font-size:11px; line-height:1.35; }
+  /* draggable (Joe: "it's blocking my view of the shot"). It takes
+     pointer events so it can be grabbed; it is small and the whole point
+     is that you can move it off whatever it covers. */
+  #legend { position:absolute; left:10px; top:auto; bottom:10px;
+            display:none; flex-direction:column; gap:3px; z-index:19;
+            font-size:11px; line-height:1.35; cursor:grab;
+            touch-action:none; user-select:none; -webkit-user-select:none; }
+  #legend.dragging { cursor:grabbing; opacity:.75; }
   #legend div { display:flex; align-items:center; gap:7px; color:#E6EDF3;
                 background:rgba(13,17,23,.78); border-radius:5px;
                 padding:2px 7px; width:max-content; }
@@ -1193,8 +1198,76 @@ function showLegend(rows) {
     });
   }
   el.style.display = "flex";
+  Legend.place();
 }
 function hideLegend() { $("legend").style.display = "none"; }
+
+// ---- draggable legend -------------------------------------------------
+// Joe: "can we set up to allow dragging the legend to move it out of the
+// way? It's blocking my view of the shot." Stored as a FRACTION of the
+// video box, not pixels, so it survives rotation, resize and a phone turned
+// on its side — and it is clamped back inside on every placement, so a
+// position saved on a big window can never strand it off-screen on a small
+// one.
+const Legend = (() => {
+  const KEY = "legend_pos";
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { pos = null; }
+  const el = () => $("legend");
+  function place() {
+    const g = el(), wrap = $("vwrap");
+    if (!pos || g.style.display === "none") return;
+    const r = wrap.getBoundingClientRect();
+    const w = g.offsetWidth || 120, h = g.offsetHeight || 60;
+    const x = Math.min(Math.max(0, pos.fx * r.width), Math.max(0, r.width - w));
+    const y = Math.min(Math.max(0, pos.fy * r.height), Math.max(0, r.height - h));
+    g.style.left = `${x}px`;
+    g.style.top = `${y}px`;
+    g.style.bottom = "auto";
+  }
+  let grab = null;
+  function down(e) {
+    const g = el(), r = $("vwrap").getBoundingClientRect();
+    const b = g.getBoundingClientRect();
+    grab = { dx: e.clientX - b.left, dy: e.clientY - b.top, r };
+    g.classList.add("dragging");
+    g.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  function move(e) {
+    if (!grab) return;
+    const g = el();
+    const w = g.offsetWidth, h = g.offsetHeight;
+    const x = Math.min(Math.max(0, e.clientX - grab.r.left - grab.dx),
+                       Math.max(0, grab.r.width - w));
+    const y = Math.min(Math.max(0, e.clientY - grab.r.top - grab.dy),
+                       Math.max(0, grab.r.height - h));
+    g.style.left = `${x}px`;
+    g.style.top = `${y}px`;
+    g.style.bottom = "auto";
+    pos = { fx: x / grab.r.width, fy: y / grab.r.height };
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  function up(e) {
+    if (!grab) return;
+    grab = null;
+    el().classList.remove("dragging");
+    try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch (err) { /* private mode */ }
+    e.stopPropagation();
+  }
+  // attach NOW — this script runs after the document is parsed, so a
+  // DOMContentLoaded listener would never fire and the drag would look
+  // implemented while doing nothing
+  const g0 = el();
+  g0.addEventListener("pointerdown", down);
+  g0.addEventListener("pointermove", move);
+  g0.addEventListener("pointerup", up);
+  g0.addEventListener("pointercancel", up);
+  addEventListener("resize", place);
+  return { place };
+})();
 ovSync();
 
 function drawAim() {
