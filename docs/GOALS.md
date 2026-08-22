@@ -1162,3 +1162,14 @@ Rounds continue with Joe's visual feedback as the gate.
   (tracer style, parallax-inverted). Keep the stored per-shot aim as
   the instant default where it exists; the button refines/overrides at
   any paused moment. Build next loop.
+- 2026-08-22 (1am, Joe): AIM DETECTION ACCURACY PASS 2 requested —
+  "still slightly off the cue stick path." Attack plan: (1) SUB-PIXEL
+  EDGES — the refit centres binary-mask bands (1px quantized); instead
+  localize BOTH stick edges on the raw image with sub-pixel gradient
+  interpolation and average the two edge lines (kills the lit-side/
+  shadow-side asymmetry that biases a mask centroid toward the bright
+  edge); (2) fit both edges separately over the tip section, average;
+  (3) metric, not vibes: mean perpendicular deviation sampled along the
+  visible shaft, measured before/after on >=4 address frames, plus 3x
+  zoom renders for Joe. Ship only if the metric improves and the zooms
+  look glued. Pairs with the Aim Line v2 on-demand build.
