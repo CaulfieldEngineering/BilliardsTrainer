@@ -151,6 +151,21 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     vx, vy = _unit(fx - ox, fy - oy)
     if (vx, vy) == (0.0, 0.0):
         return _no("object ball never displaced")
+    # STRAIGHT-ROLL VALIDATION (Joe, on the shot still reading "can't
+    # tell": the data knew the side; only the post-strike hole gated it).
+    # A rolling ball travels in a straight line, so if EVERY observed
+    # outbound point lies on one line from the resting spot, nothing
+    # happened inside the gap — a ball cannot leave the line and return to
+    # it. The gate below should fire only when the observations BEND,
+    # which is what a rail contact hidden inside the hole would produce.
+    # Measured on 005048@233: residuals 4.7px and 0.0px on a 14.3px ball.
+    # This is the trajectory-fit idea in miniature: judged on ALL
+    # observations with a physical threshold, not two adjacent samples.
+    obs = [q for q in seg
+           if math.hypot(q[1] - ox, q[2] - oy) > 0.5 * space.ball_r_px]
+    line_ok = len(obs) >= 2 and all(
+        abs(vx * (q[2] - oy) - vy * (q[1] - ox)) <= 0.75 * space.ball_r_px
+        for q in obs)
     # PATH CONTINUITY (005048 @233, Joe: "this one should be a pretty
     # clear miss left" against a tag that said right). That label was
     # measured across a 0.9s HOLE in the object ball's track: the strike
@@ -222,7 +237,7 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # the pattern counts rather than quietly skewing them.
     miss_in_val = (abs(side_sign) / max(1e-9, math.hypot(vx, vy))
                    / space.px_per_in)
-    if departure_gap > 3.0 * _STEP:
+    if departure_gap > 3.0 * _STEP and not line_ok:
         conf = (f"low: object ball untracked for {departure_gap:.1f}s right "
                 f"after contact -- its departure line is a guess")
     elif miss_in_val > 8.0:

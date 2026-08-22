@@ -135,3 +135,58 @@ class TestConventions:
         vid = _session(tmp_path, cue, 3, obj, "none.mp4")
         r = SidecarReader(vid)
         assert tag_shot(r, r.shots[0], SPACE) is None
+
+
+class TestStraightRollValidation:
+    """A hole in the track right after contact does not make the side a
+    guess IF every observed outbound point lies on one straight line from
+    the resting spot -- a rolling ball cannot leave its line and return to
+    it. The gate fires only when the observations BEND (a rail contact
+    hidden inside the hole). Joe's @233: the data knew the side; only the
+    gap was gating it."""
+
+    def _gap_session(self, tmp_path, reappear_pts, name):
+        """Cue strikes at ~1.4s; the object ball VANISHES for 0.5s (blur),
+        then reappears following reappear_pts. The ball's records are
+        REMOVED during the hole — a numbered ball present on both sides of
+        a gap gets interpolated by the reader, which is not what a real
+        loss looks like (no track holds the number at all)."""
+        import json as _json
+        # the cue keeps records through the hole so f-records EXIST there
+        # (as in production, where frames continue but the ball is absent)
+        cue = (_still(266, 800, 0.0, 0.9) + _run(266, 800, 266, 530, 1.0, 1.4)
+               + _still(266, 530, 1.5, 2.1))
+        obj = _still(266, 500, 0.0, 1.4) + reappear_pts
+        vid = _session(tmp_path, cue, 3, obj, name)
+        side = tmp_path / (name + ".analysis.jsonl")
+        rows = [_json.loads(l) for l in side.read_text().splitlines()]
+        for r in rows:
+            if r.get("type") == "f" and 1.45 < r["t"] < 1.85:
+                r["tracks"] = [tk for tk in r["tracks"] if tk[4] != 3]
+        side.write_text(
+            "\n".join(_json.dumps(r) for r in rows) + "\n")
+        return vid
+
+    def test_collinear_reappearance_is_trusted(self, tmp_path):
+        # gap 1.4 -> 1.9, then two points ON the line from (266,500)
+        # toward (206,200): one straight roll
+        vid = self._gap_session(
+            tmp_path, [(1.9, 218, 260), (2.0, 210, 220), (2.1, 206, 200)],
+            "collinear.mp4")
+        tags = tag_shot(SidecarReader(vid), {"start": 1.0, "end": 3.0,
+                                             "outcome": "miss"}, SPACE)
+        assert tags is not None
+        assert "untracked" not in tags["confidence"], \
+            "a validated straight roll was still disclaimed"
+
+    def test_bent_reappearance_stays_gated(self, tmp_path):
+        # the ball reappears OFF the line it left on and moving on a
+        # different heading -- the hole could hide a cushion
+        vid = self._gap_session(
+            tmp_path, [(1.9, 150, 320), (2.0, 175, 290), (2.1, 200, 260)],
+            "bent.mp4")
+        tags = tag_shot(SidecarReader(vid), {"start": 1.0, "end": 3.0,
+                                             "outcome": "miss"}, SPACE)
+        if tags is not None:
+            assert "untracked" in tags["confidence"], \
+                "a bent path across a hole was presented as measured"
