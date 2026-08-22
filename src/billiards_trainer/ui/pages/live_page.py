@@ -387,7 +387,7 @@ class LivePage(QWidget):
         # Analysis overlays (Joe): SAME stored geometry the phone draws.
         self._aim_btn = QPushButton("Aim")
         self._paths_btn = QPushButton("Paths")
-        self._why_btn = QPushButton("Why")
+        self._why_btn = QPushButton("Lines")
         for b, attr in ((self._aim_btn, "overlay_aim"),
                         (self._paths_btn, "overlay_paths"),
                         (self._why_btn, "overlay_why")):
@@ -1094,7 +1094,12 @@ class LivePage(QWidget):
             return
         aim = (shot.get("aim") or {}).get("p") if want_aim else None
         trails = shot.get("trails") if want_paths else None
-        tags = shot.get("tags") if getattr(ui, "overlay_why", False) else None
+        tags = None
+        if getattr(ui, "overlay_why", False):
+            tags = dict(shot.get("tags") or {})
+            if shot.get("lines"):
+                tags["lines"] = shot["lines"]
+            tags = tags or None
         self._persp.set_analysis(aim, trails, t, tags)
 
     def _ingest_label_frame(self, packet) -> None:

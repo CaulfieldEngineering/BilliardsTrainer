@@ -88,15 +88,30 @@ class VideoView(QWidget):
         if trails and t >= 0:
             p.setBrush(Qt.NoBrush)
             for tr in trails:
-                pts = [q for q in tr.get("p", [])
-                       if t - self._TRAIL_TAIL_S <= q[0] <= t]
-                col = QColor(self._BALL_COL.get(tr.get("n", -1), "#9AA4B2"))
+                # WHOLE SHOT (Joe) — a 4s tail erased the path mid-review
+                pts = [q for q in tr.get("p", []) if q[0] <= t]
+                if len(pts) < 2:
+                    continue
+                base = QColor(self._BALL_COL.get(tr.get("n", -1), "#9AA4B2"))
+                halo = QColor("#05090C")
+                halo.setAlphaF(0.30)
+                p.setPen(QPen(halo, 4.6, Qt.SolidLine, Qt.RoundCap,
+                              Qt.RoundJoin))
                 for i in range(1, len(pts)):
-                    age = (t - pts[i][0]) / self._TRAIL_TAIL_S
-                    col.setAlphaF(max(0.0, 0.85 * (1.0 - age)))
-                    p.setPen(QPen(col, 3))
                     p.drawLine(QPointF(X(pts[i - 1]), Y(pts[i - 1])),
                                QPointF(X(pts[i]), Y(pts[i])))
+                for i in range(1, len(pts)):
+                    col = QColor(base)
+                    col.setAlphaF(0.25 + 0.65 * (i / max(1, len(pts) - 1)))
+                    p.setPen(QPen(col, 2.0, Qt.SolidLine, Qt.RoundCap,
+                                  Qt.RoundJoin))
+                    p.drawLine(QPointF(X(pts[i - 1]), Y(pts[i - 1])),
+                               QPointF(X(pts[i]), Y(pts[i])))
+                last = pts[-1]
+                p.setBrush(base)
+                p.setPen(Qt.NoPen)
+                p.drawEllipse(QPointF(X(last), Y(last)), 3.2, 3.2)
+                p.setBrush(Qt.NoBrush)
         self._draw_why_miss(p, r)
         if aim:
             a = (0.0, aim[0][0], aim[0][1])
@@ -116,7 +131,10 @@ class VideoView(QWidget):
         the line to the pocket the ball was on, and the line it actually
         took, plus the label. Parity is the contract."""
         tags = getattr(self, "_tags", None)
-        g = (tags or {}).get("geom") if isinstance(tags, dict) else None
+        # shot lines exist for EVERY stroke now; the labels only for misses
+        g = None
+        if isinstance(tags, dict):
+            g = tags.get("lines") or tags.get("geom")
         if not (g and all(k in g for k in ("cue", "obj", "pocket", "went"))):
             return
 

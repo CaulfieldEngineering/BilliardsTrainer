@@ -321,7 +321,7 @@
         <span class="chev" id="ov-aim-st">Off</span></button>
       <button id="ov-paths" class="lrow">Ball paths
         <span class="chev" id="ov-paths-st">Off</span></button>
-      <button id="ov-why" class="lrow">Why this miss
+      <button id="ov-why" class="lrow">Shot lines
         <span class="chev" id="ov-why-st">Off</span></button>
     </div>
     <div id="dtools">
@@ -1018,8 +1018,8 @@ $("ov-why").onclick = () => {
 function drawWhy() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
-  if (!s || !s.tags || !s.tags.geom || !v.videoWidth) return;
-  const g = s.tags.geom;
+  const g = s && (s.lines || (s.tags && s.tags.geom));
+  if (!g || !v.videoWidth) return;
   const box = cv.parentElement.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   if (cv.width !== Math.round(box.width * dpr)
@@ -1056,8 +1056,9 @@ function drawWhy() {
   ctx.save();
   ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
   ctx.textBaseline = "middle";
-  const rows = [["#7DF29B", "to the pocket"], ["#E5484D", "where it went"],
-                ["#8AA0FF", "cue approach"]];
+  const rows = [["#7DF29B", "line to the pocket"],
+                ["#E5484D", "line it took"],
+                ["#8AA0FF", "cue line"]];
   let ly = (oy + ch) * dpr - 16 * dpr * rows.length - 8 * dpr;
   rows.forEach(([col, txt]) => {
     ctx.fillStyle = "rgba(13,17,23,.78)";
@@ -1118,26 +1119,46 @@ function drawTrails() {
   const cw = v.videoWidth * scale, ch = v.videoHeight * scale;
   const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
   const t = v.currentTime;
-  ctx.lineWidth = 3 * dpr;
+  const X = p => (ox + p[1] * cw) * dpr, Y = p => (oy + p[2] * ch) * dpr;
   ctx.lineJoin = ctx.lineCap = "round";
   s.trails.forEach(tr => {
-    const pts = tr.p.filter(p => p[0] <= t && p[0] >= t - TRAIL_TAIL_S);
+    // WHOLE SHOT, not a 4s tail (Joe: "should persist through the
+    // entire duration of the shot") — the path is the record of what
+    // happened, and it disappearing mid-review defeated the point.
+    const pts = tr.p.filter(p => p[0] <= t);
     if (pts.length < 2) return;
     const col = BALL_COL[tr.n] || "#9AA4B2";
+    // dark halo under a coloured core: legible over felt AND over the
+    // white cue ball, which a bare stroke was not
+    ctx.globalAlpha = 0.30;
+    ctx.strokeStyle = "#05090C";
+    ctx.lineWidth = 4.6 * dpr;
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p))));
+    ctx.stroke();
+    // the core fades from faint at the start to solid at the ball, so
+    // direction reads at a glance without hiding the earlier path
     for (let i = 1; i < pts.length; i++) {
-      const age = (t - pts[i][0]) / TRAIL_TAIL_S;
+      ctx.globalAlpha = 0.25 + 0.65 * (i / (pts.length - 1));
       ctx.strokeStyle = col;
-      ctx.globalAlpha = 0.85 * (1 - age);
+      ctx.lineWidth = 2.0 * dpr;
       ctx.beginPath();
-      ctx.moveTo((ox + pts[i - 1][1] * cw) * dpr,
-                 (oy + pts[i - 1][2] * ch) * dpr);
-      ctx.lineTo((ox + pts[i][1] * cw) * dpr,
-                 (oy + pts[i][2] * ch) * dpr);
+      ctx.moveTo(X(pts[i - 1]), Y(pts[i - 1]));
+      ctx.lineTo(X(pts[i]), Y(pts[i]));
       ctx.stroke();
     }
+    // where the ball is right now
+    const last = pts[pts.length - 1];
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(X(last), Y(last), 3.2 * dpr, 0, 7); ctx.fill();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = "#05090C"; ctx.lineWidth = 1.2 * dpr;
+    ctx.beginPath(); ctx.arc(X(last), Y(last), 3.2 * dpr, 0, 7); ctx.stroke();
   });
   ctx.globalAlpha = 1;
 }
+
 
 // A render loop, not timeupdate: iOS fires timeupdate ~4x/s and the
 // playhead visibly stepped (Joe). rAF moves it every frame.

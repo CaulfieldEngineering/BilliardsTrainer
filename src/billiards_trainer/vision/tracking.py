@@ -490,8 +490,83 @@ class BallTracker:
                 ledger[d["n"]] = (self._frame_n, t.x, t.y)
                 self._num_last = ledger
                 self._flyer_deaths = [x for x in deaths if x is not d]
+            elif len(free_deaths) == 1 and not orphans:
+                # FLIGHT-LINKING. Rest-linking waits for the ball to
+                # SETTLE before handing its number over, so a struck ball
+                # is anonymous for its entire flight — measured on
+                # 005647: the cue ball had NO numbered track during
+                # flight on 10 of 36 shots (median coverage 73%), which
+                # is why miss tags abstained and aim lines went missing.
+                # The ball is tracked the whole time; only its name is
+                # late. Hand the number over mid-flight when the geometry
+                # leaves no doubt: one free death, one confirmed
+                # anonymous newcomer, and it is where that ball could
+                # actually have travelled since.
+                d = free_deaths[0]
+                df = max(1, self._frame_n - d["frame"])
+                # RECENT deaths only. Reach grows with age, so an old
+                # death eventually "reaches" the whole table and would
+                # adopt any passing stranger — mid-flight recovery
+                # happens within a few frames of the loss or not at all.
+                reach = df * 0.35 * self._short_side
+                cands = [] if df > 12 else [
+                    t for t in self._tracks
+                    if t.confirmed and not t.settled
+                    and t.committed_number < 0
+                    and self._frame_n - getattr(t, "born_frame", 0) <= 20
+                    and math.hypot(t.x - d["x"], t.y - d["y"]) <= reach]
+                if len(cands) == 1:
+                    t = cands[0]
+                    t.committed_number = d["n"]
+                    ledger = getattr(self, "_num_last", {})
+                    ledger[d["n"]] = (self._frame_n, t.x, t.y)
+                    self._num_last = ledger
+                    self._flyer_deaths = [x for x in deaths if x is not d]
+        self._migrate_departed_numbers()
         self._arbitrate_numbers()
         return self._public()
+
+    def _migrate_departed_numbers(self) -> None:
+        """The struck ball keeps its NAME, not the ghost it left behind.
+
+        Measured at 005647@386 (and 9 other shots in that session): when
+        a ball is struck, its numbered track frequently does not die at
+        all — it coasts frozen at the address spot on the occlusion
+        budget while a FRESH anonymous track carries the real ball across
+        the table. The number sits on the motionless ghost for the whole
+        flight, so analytics saw no cue ball exactly when it mattered
+        (0% coverage during flight on 10 of 36 shots).
+
+        Rest- and flight-linking cannot help, because nothing died. The
+        rule that applies: a number held by a COASTING, motionless track
+        migrates to the single confirmed anonymous track that was BORN
+        AT THAT SPOT and is demonstrably moving — i.e. the ball itself,
+        departing. Every clause is load-bearing: one candidate only (a
+        break scatters several), born at the spot (not any passing
+        stranger), and actually in motion (a resting neighbour keeps its
+        own identity)."""
+        near = 6.0 * max(6.0, self._ball_r)
+        for t in self._tracks:
+            if t.committed_number < 0 or t.misses < 3:
+                continue
+            cands = []
+            for o in self._tracks:
+                if o is t or not o.confirmed or o.committed_number >= 0:
+                    continue
+                if o.misses != 0 or not o.moving() or not o.pos_hist:
+                    continue
+                if self._frame_n - getattr(o, "born_frame", 0) > 25:
+                    continue
+                bx, by = o.pos_hist[0]
+                if math.hypot(bx - t.x, by - t.y) <= near:
+                    cands.append(o)
+            if len(cands) == 1:
+                o = cands[0]
+                o.committed_number = t.committed_number
+                t.committed_number = -1
+                ledger = getattr(self, "_num_last", {})
+                ledger[o.committed_number] = (self._frame_n, o.x, o.y)
+                self._num_last = ledger
 
     def _arbitrate_numbers(self) -> None:
         """GLOBAL EXCLUSIVE ASSIGNMENT of ball identities — one of each,

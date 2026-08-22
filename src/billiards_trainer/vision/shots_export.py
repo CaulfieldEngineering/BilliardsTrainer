@@ -275,8 +275,12 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                             entry["aim"] = aim
             except Exception:  # noqa: BLE001 - aim is enrichment
                 pass
-        # MISS TAGS: labels first (Joe), numbers underneath
-        if entry["outcome"] == "miss" and space is not None                 and entry["action"] in ("stroke", "break"):
+        # SHOT LINES for every stroke (Joe: "the revealed overlay should
+        # just be something related to the shot line"). The geometry is
+        # the same for a make or a miss — where the ball had to go versus
+        # where it went — so it is exported for ALL strokes; only the
+        # MISS keeps the over/undercut labels.
+        if space is not None and entry["action"] in ("stroke", "break"):
             try:
                 from .miss_tags import tag_shot
                 tg = tag_shot(reader, s, space)
@@ -287,7 +291,9 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                     if g and tf is not None:
                         tg["geom"] = {k: _rect_to_video(v, tf)
                                       for k, v in g.items()}
-                    entry["tags"] = tg
+                        entry["lines"] = tg["geom"]
+                    if entry["outcome"] == "miss":
+                        entry["tags"] = tg
             except Exception:  # noqa: BLE001 - tagging is enrichment
                 pass
         shots.append(entry)

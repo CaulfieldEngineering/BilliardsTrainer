@@ -596,3 +596,63 @@ class TestCueSizeFloor:
             out = tr.update([ball], 400, ball_r=15.0)
         assert any(t.number == 0 for t in out), \
             "full-size returning cue denied its number"
+
+
+class TestFlightLinking:
+    """A struck ball must not go ANONYMOUS for its whole flight.
+
+    Rest-linking only handed the number over once the ball settled, so
+    measured on a real session the cue had no numbered track during
+    flight on 10 of 36 shots — the ball was tracked the entire time,
+    only its name was late. Flight-linking transfers as soon as the
+    geometry is unambiguous, and refuses when it is not."""
+
+    def _struck(self, tr, short=400):
+        """Confirm a numbered ball, then have it 'die' mid-flight."""
+        d = Detection(x=100, y=100, radius=12, cls=BallClass.SOLID, number=5)
+        for _ in range(12):
+            tr.update([d], short, ball_r=12.0)
+        # it moves fast, then vanishes (blur) — the track ages out
+        x = 100.0
+        for _ in range(4):
+            x += 40
+            tr.update([Detection(x=x, y=100, radius=12,
+                                 cls=BallClass.SOLID, number=5)], short,
+                      ball_r=12.0)
+        for _ in range(30):
+            tr.update([], short, ball_r=12.0)
+        return x
+
+    def test_number_migrates_off_the_coasting_ghost(self):
+        """The bug's real shape, measured at 005647@386: the numbered
+        track does NOT die — it coasts at the address spot on the
+        occlusion budget while a fresh anonymous track carries the ball
+        away. The name must follow the ball, not the ghost."""
+        tr = BallTracker(min_hits=3, max_misses=60, still_frames=3)
+        d = Detection(x=100, y=100, radius=12, cls=BallClass.SOLID, number=5)
+        for _ in range(14):
+            tr.update([d], 400, ball_r=12.0)
+        assert any(t.number == 5 for t in tr.tracks)
+        x, out = 100.0, []
+        for _ in range(10):        # struck: nothing at the old spot any more
+            x += 26
+            out = tr.update([det(x, 100, r=12)], 400, ball_r=12.0)
+        five = [t for t in out if t.number == 5]
+        assert five, "the number vanished during flight"
+        assert abs(five[0].x - x) < 45, \
+            "the number stayed on the ghost instead of following the ball"
+
+    def test_resting_neighbour_never_steals_the_number(self):
+        """Only a track BORN at the spot and MOVING may take the name —
+        a ball merely sitting nearby while another is occluded must not
+        (that would re-break Joe's long-address case)."""
+        tr = BallTracker(min_hits=3, max_misses=60, still_frames=3)
+        d = Detection(x=100, y=100, radius=12, cls=BallClass.SOLID, number=5)
+        neighbour = det(300, 300, r=12)
+        for _ in range(14):
+            tr.update([d, neighbour], 400, ball_r=12.0)
+        out = []
+        for _ in range(10):                  # #5 occluded, neighbour still
+            out = tr.update([neighbour], 400, ball_r=12.0)
+        assert not [t for t in out if t.number == 5 and abs(t.x - 300) < 40], \
+            "a resting neighbour stole the occluded ball's name"
