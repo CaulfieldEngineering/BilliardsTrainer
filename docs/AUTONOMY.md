@@ -97,3 +97,7 @@ session did. Refreshed at the END of each successful work session.
   debugging deltas within one sitting, never for cross-checking corpus
   verdicts. The loop-23 "environmental drift across days" reading was
   this category error — corrected here.
+- INCIDENT 2026-08-22: loop.lock orphaned — the 18:38Z session closed out
+  (heartbeat, GOALS, push all done) but omitted the lock delete; detected
+  by heartbeat-newer-than-lock at the next session start. Cleared. The
+  close-out checklist exists for exactly this; follow it in order.
