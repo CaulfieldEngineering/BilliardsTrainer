@@ -1537,3 +1537,20 @@ Rounds continue with Joe's visual feedback as the gate.
   gates; (2) tracking.py split (hygiene); (3) blur recovery stays ON for
   trails but its output must carry a lower weight or a flag so downstream
   geometry can discount smear-centroid positions.
+
+- 2026-08-22 (session 6) — Incident first: the 18:38Z session's lock was
+  orphaned (close-out ran heartbeat and push but omitted the delete);
+  detected by heartbeat-newer-than-lock, logged in AUTONOMY.md, cleared.
+  Then the thrice-queued hygiene item: tracking.py (1035 lines) split
+  along its natural seam. Motion half (WHERE: association, coasting,
+  budgets) stays; identity half (WHO: arbitration, migration, colour
+  consensus, the colour veto) is now vision/identity.py, a mixin
+  BallTracker inherits. VERBATIM move — no re-indentation, after the
+  hand-dedent attempt broke the file last week. tracking.py 716,
+  identity.py 345, suite green, lint at baseline.
+  Remaining hygiene drift is smaller and known: index.html grew across the
+  overlay round (Joe-driven, each change his explicit ask), tag_shot at
+  203 lines, _arbitrate_numbers 190 (pre-existing, now just visible in its
+  own file), _locate 111. NEXT: the trajectory fit against the 12-miss
+  label set — supersedes the departure heuristics and per-shot gates;
+  flag blur-recovered detections so geometry can discount them.
