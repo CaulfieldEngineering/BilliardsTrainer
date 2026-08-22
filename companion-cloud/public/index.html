@@ -1121,6 +1121,7 @@ $("video").addEventListener("seeked", () => {
     });
   };
   lane.addEventListener("pointerdown", ev => {
+    if (typeof Warmer !== "undefined") Warmer.stop(false);
     scrubbing = true;
     window.scrubActive = true;           // rAF loop hands the playhead over
     wasPlaying = !$("video").paused;
@@ -1220,8 +1221,62 @@ const FrameCache = (() => {
     cv.style.display = "block";
     return true;
   }
-  return { draw, hide: () => { $("scrubcv").style.display = "none"; } };
+  return { draw, hide: () => { $("scrubcv").style.display = "none"; },
+           has: t => blobs.has(idx(t)) };
 })();
+
+// ---- CACHE WARMER (Joe: "scrubbing backwards is still sticky"):
+// backward seeks restart from the previous keyframe, so uncached
+// regions are slow in reverse. While PAUSED, quietly seek through the
+// shot's uncached frames under a frozen cover frame; once harvested,
+// scrubbing is instant in both directions.
+const Warmer = (() => {
+  const FPS = 30;
+  let on = false, holdT = null, timer = null;
+  function nextUncached() {
+    if (!win) return null;
+    const lo = Math.max(0, Math.round(win.t0 * FPS));
+    const hi = Math.round(win.t1 * FPS);
+    for (let i = lo; i <= hi; i++) {
+      if (!FrameCache.has(i / FPS)) return i / FPS;
+    }
+    return null;
+  }
+  function stop(restore) {
+    if (!on) return;
+    on = false;
+    clearInterval(timer);
+    const v = $("video");
+    if (restore && holdT != null) {
+      requestSeek(holdT, false);
+      const off = () => { FrameCache.hide(); v.removeEventListener("seeked", off); };
+      v.addEventListener("seeked", off);
+      setTimeout(off, 800);
+    } else {
+      FrameCache.hide();
+    }
+    holdT = null;
+  }
+  function start() {
+    const v = $("video");
+    if (on || !win || !v.paused || !v.videoWidth) return;
+    if (nextUncached() == null) return;      // already fully covered
+    holdT = v.currentTime;
+    FrameCache.draw(holdT);                  // freeze the view (best-effort)
+    on = true;
+    timer = setInterval(() => {
+      if (!on) return;
+      const v2 = $("video");
+      if (!v2.paused || window.scrubActive || seekBusy) return;
+      const t = nextUncached();
+      if (t == null) { stop(true); return; }
+      requestSeek(t, false);
+    }, 90);
+  }
+  return { start, stop };
+})();
+$("video").addEventListener("pause", () => setTimeout(() => Warmer.start(), 400));
+$("video").addEventListener("play", () => Warmer.stop(false));
 
 // ---- DRAWING SUITE (Joe: "straight lines that can be drawn and moved
 // around, persistent across frames of a shot... maybe a protractor").
