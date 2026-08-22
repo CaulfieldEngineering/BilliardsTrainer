@@ -254,6 +254,10 @@
   <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex;">
     <video id="video" playsinline preload="metadata"></video>
     <div id="paused-glyph">▶</div>
+    <button id="zoomreset" style="display:none;position:absolute;top:12px;
+         right:12px;z-index:21;background:rgba(13,17,23,.85);color:#EAF2F3;
+         border:1px solid #2A323D;border-radius:14px;padding:4px 12px;
+         font-size:13px;font-weight:700">1×</button>
     <div id="holdpill" style="display:none;position:absolute;top:12px;
          left:50%;transform:translateX(-50%);background:rgba(13,17,23,.85);
          color:#EAF2F3;border:1px solid #2A323D;border-radius:14px;
@@ -1591,6 +1595,84 @@ function togglePlay() {
   const v = $("video");
   if (v.paused) v.play(); else v.pause();
 }
+// ---- ZOOM (Joe: "zoom features for dialing in my paint overlays"):
+// pinch scales the video AND every overlay canvas with one shared
+// transform, so drawings stay glued and remain editable while zoomed.
+// One-finger drag pans when zoomed (flick nav suspends until 1x).
+const Zoom = (() => {
+  let scale = 1, tx = 0, ty = 0;
+  const els = () => [$("video"), $("trails"), $("drawcv"), $("scrubcv")];
+  function apply() {
+    const t = scale > 1
+      ? `translate(${tx}px, ${ty}px) scale(${scale})` : "";
+    els().forEach(el => {
+      el.style.transformOrigin = "0 0";
+      el.style.transform = t;
+    });
+    $("zoomreset").style.display = scale > 1 ? "block" : "none";
+  }
+  function clamp() {
+    const r = $("vwrap").getBoundingClientRect();
+    tx = Math.min(0, Math.max(r.width * (1 - scale), tx));
+    ty = Math.min(0, Math.max(r.height * (1 - scale), ty));
+  }
+  return {
+    get scale() { return scale; },
+    pinch(cx, cy, factor) {
+      const ns = Math.min(4, Math.max(1, scale * factor));
+      const r = $("vwrap").getBoundingClientRect();
+      const px = cx - r.left, py = cy - r.top;
+      // keep the pinch centre stationary
+      tx = px - (px - tx) * (ns / scale);
+      ty = py - (py - ty) * (ns / scale);
+      scale = ns;
+      if (scale <= 1.02) { scale = 1; tx = ty = 0; }
+      clamp(); apply();
+    },
+    pan(dx, dy) {
+      if (scale <= 1) return;
+      tx += dx; ty += dy; clamp(); apply();
+    },
+    reset() { scale = 1; tx = ty = 0; apply(); },
+  };
+})();
+$("zoomreset").onclick = () => Zoom.reset();
+// two-pointer tracking shared by video + draw canvas
+const Pinch = { pts: new Map(), lastD: 0, active: false };
+function pinchDown(e) {
+  Pinch.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (Pinch.pts.size === 2) { Pinch.active = true; Pinch.lastD = 0; }
+}
+function pinchMove(e) {
+  if (!Pinch.pts.has(e.pointerId)) return false;
+  Pinch.pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (Pinch.pts.size === 2) {
+    const [a, b] = [...Pinch.pts.values()];
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
+    if (Pinch.lastD > 0) Zoom.pinch(cx, cy, d / Pinch.lastD);
+    Pinch.lastD = d;
+    return true;
+  }
+  return false;
+}
+function pinchUp(e) {
+  Pinch.pts.delete(e.pointerId);
+  if (Pinch.pts.size < 2) {
+    Pinch.lastD = 0;
+    if (Pinch.pts.size === 0) Pinch.active = false;
+  }
+}
+["pointerdown"].forEach(ev => {
+  $("drawcv").addEventListener(ev, pinchDown, true);
+});
+["pointermove"].forEach(ev => {
+  $("drawcv").addEventListener(ev, e => { pinchMove(e); }, true);
+});
+["pointerup", "pointercancel"].forEach(ev => {
+  $("drawcv").addEventListener(ev, pinchUp, true);
+});
+
 // ---- P1 GESTURE LAYER (clip-UI v2, Joe-approved): hold = momentary
 // 1/4x peek (latched speed chip untouched — sacred), double-tap sides =
 // +/-1s replay hop, horizontal flick = prev/next shot. Tap stays
@@ -1601,10 +1683,13 @@ function togglePlay() {
   let holdTimer = null, holding = false, savedRate = 1;
   let lastTap = 0, tapTimer = null;
   const cancelHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+  let panX = 0, panY = 0;
   v.addEventListener("pointerdown", e => {
     if (window.scrubActive) return;
+    pinchDown(e);
     down = true; moved = false;
     t0 = Date.now(); x0 = e.clientX; y0 = e.clientY;
+    panX = e.clientX; panY = e.clientY;
     holdTimer = setTimeout(() => {
       if (!down || moved) return;
       holding = true;
@@ -1615,14 +1700,21 @@ function togglePlay() {
     }, 380);
   });
   v.addEventListener("pointermove", e => {
+    if (pinchMove(e)) { moved = true; cancelHold(); return; }
     if (!down) return;
     if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) {
       moved = true; cancelHold();
+      if (Zoom.scale > 1 && !Pinch.active) {
+        Zoom.pan(e.clientX - panX, e.clientY - panY);
+      }
     }
+    panX = e.clientX; panY = e.clientY;
   });
   const finish = e => {
+    pinchUp(e);
     if (!down) return;
     down = false; cancelHold();
+    if (Zoom.scale > 1 && moved) return;   // that was a pan, not a flick
     if (holding) {
       holding = false;
       v.playbackRate = savedRate;
