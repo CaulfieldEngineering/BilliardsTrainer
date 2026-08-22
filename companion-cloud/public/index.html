@@ -910,9 +910,15 @@ function updateInfo() {
     // verdict (Joe was shown "Straight-in · missed right" on a shot whose
     // object ball went untracked for half a second right after contact).
     const sure = (t.confidence || "high") === "high";
-    chip.textContent = `${head} · missed ${t.miss_side}`
-      + (t.fullness ? ` · ${t.fullness}` : "")
-      + (sure ? "" : " · unreliable");
+    // When the ball was LOST right after contact we do not merely doubt the
+    // side, we have no measurement of it -- 005048@233 said "missed right"
+    // about a ball that missed left. Say what we know and stop there.
+    const blind = /untracked/.test(t.confidence || "");
+    chip.textContent = blind
+      ? `${head} · can't tell which side — ball lost after contact`
+      : `${head} · missed ${t.miss_side}`
+        + (t.fullness ? ` · ${t.fullness}` : "")
+        + (sure ? "" : " · unreliable");
     if (!sure) {
       chip.style.cssText =
         "color:var(--faint);font-weight:600;margin-right:8px;"

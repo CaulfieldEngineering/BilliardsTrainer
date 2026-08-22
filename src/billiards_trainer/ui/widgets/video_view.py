@@ -167,12 +167,16 @@ class VideoView(QWidget):
         p.setBrush(Qt.NoBrush)
         head = ("Straight-in" if tags.get("cut") == "straight"
                 else f"{str(tags.get('cut', '')).title()} cut")
-        line = f"{head}, missed {tags.get('miss_side', '?')}"
-        if tags.get("fullness"):
-            line += f" — {tags['fullness']}"
-        # never wear an untrusted tag as a verdict (parity with the phone)
-        if str(tags.get("confidence", "high")) != "high":
-            line += "  · unreliable"
+        conf = str(tags.get("confidence", "high"))
+        if "untracked" in conf:
+            # no measurement of the side at all, not merely a doubtful one
+            line = f"{head}, can't tell which side — ball lost after contact"
+        else:
+            line = f"{head}, missed {tags.get('miss_side', '?')}"
+            if tags.get("fullness"):
+                line += f" — {tags['fullness']}"
+            if conf != "high":
+                line += "  · unreliable"
         p.setFont(QFont("Arial", 10, QFont.Bold))
         box = QRectF(r.x() + 8, r.y() + r.height() - 26, r.width() - 16, 20)
         p.setPen(QColor(13, 17, 23, 200))
