@@ -1255,3 +1255,16 @@ Rounds continue with Joe's visual feedback as the gate.
   REMAINING AMBER: concept scatter (pocket geometry in 7 modules, scale
   in 3) — next chunk. STILL OPEN and gating analytics coverage: the
   cue-ball association bug (~40% of flight untracked).
+- 2026-08-22 (loop, 7am): CONCEPT SCATTER CLEARED — the whole L1-L4
+  review is green. FOUR modules had each grown a private copy of pocket
+  geometry (tablespace, describe, outcomes, eval/invariants) while
+  core/geometry already modelled it properly; they had drifted on
+  vocabulary too ("left-middle" vs the DB's "left-side") and eval's copy
+  put the side pockets on the wrong edges for a landscape rect. core now
+  owns it (pockets_for_rect / nearest_pocket_in_rect / POCKET_LABEL for
+  prose); all four delegate; re-export of a real session changed ZERO
+  entries, so it was a pure consolidation. The audit also learned
+  definition-vs-use, which had been burying the real finding under
+  legitimate callers. Scattered concepts 4 -> 0, parity 0, contract
+  clean. NEXT: the cue-ball association bug (~40% of flight untracked),
+  which gates miss-tag and aim coverage.
