@@ -1134,3 +1134,9 @@ Rounds continue with Joe's visual feedback as the gate.
   P4 pen-modal annotate rail; P5 polish + two-tap parity audit from the
   spec's table. Keep every capability reachable; deploy per phase so
   Joe can veto early.
+- 2026-08-22 (loop, 12am): CLIP-UI V2 PHASE 1 shipped — gesture layer
+  live behind the unchanged layout (hold=1/4x peek w/ pill, double-tap
+  sides=1s hop, flick=shot nav, tap=play/pause after dbl window; pinch
+  deferred to P2). Plus Joe's line-LENGTH slider in the paint pill
+  (anchored endpoint, extend along angle, aspect-corrected). Joe should
+  live with the gestures before P2 (chrome swap + IG-style overlays).
