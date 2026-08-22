@@ -1152,3 +1152,13 @@ Rounds continue with Joe's visual feedback as the gate.
   for thresholds. Audio was only ever used for offline VALIDATION;
   the live segmenter is vision-only today. Also tonight: Shot IDs,
   pinch-zoom for paint, length slider, state-aware slo-mo button.
+- 2026-08-22 (1am, Joe-directed design): AIM LINE v2 — replace the
+  per-shot on/off toggle with ON-DEMAND per-frame analysis: paused
+  frame -> "Analyze Aim Line" button -> request {session, aim_at: t}
+  rides the corrections channel -> watcher decodes THAT frame, runs
+  detect_cue_aim (calib H + sidecar cue pos), appends the segment to
+  the export as per-frame aims -> phone polls the summary (~15-45s,
+  same accepted pattern as RIFE) and draws the line on that frame
+  (tracer style, parallax-inverted). Keep the stored per-shot aim as
+  the instant default where it exists; the button refines/overrides at
+  any paused moment. Build next loop.
