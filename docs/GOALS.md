@@ -1199,3 +1199,16 @@ Rounds continue with Joe's visual feedback as the gate.
   outranks a confident guess (no tip-contact-point, no spin measure,
   30fps blur). The running forensics get an ADVERSARIAL PHYSICS CHECK
   before any of it reaches Joe or ships as analytics.
+- 2026-08-22 (loop, 2am): STEP 0 of the miss-analytics build order
+  shipped — vision/tablespace.py (true-inch frame from calibration,
+  ball-anchored scale, pockets, gates) + tools/audit_calibration.py.
+  Two measured design corrections: the ball-position cloud is a LOWER
+  BOUND on the bed (first version failed 34/35 sessions), and geometry
+  CANNOT settle 8ft-vs-9ft (measured short side 42.5-47.8in across
+  sessions) — table size is a configured fact needing Joe's word, after
+  which px/in should come from the known bed with the ball as
+  cross-check. Archive: 13/35 measurable (15 stubs, 8 scale-implausible
+  vs configured 9ft, 5 bad stored transforms). NEXT: Step 1
+  analysis/forensic.py (per-shot geometry card + required-vs-actual
+  overlays — Joe's Yahoo-Pool instinct), then Step 3 cue-tip tracking
+  which REPLACES the planned full-shaft aim work.
