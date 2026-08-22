@@ -325,6 +325,8 @@
     </div>
     <div id="sheet">
       <p id="sh-desc"></p>
+      <button id="sh-copyid" class="lrow" style="height:40px;font-size:14px">
+        ⧉ Copy Shot ID <span class="chev" id="sh-idtxt"></span></button>
       <div class="row" id="sh-outcome">
         <button data-o="make">MAKE</button>
         <button data-o="miss">MISS</button>
@@ -1773,6 +1775,27 @@ $("video").addEventListener("loadstart", () => _vw.classList.add("loading"));
 // ---- "Correct this clip" (Joe: human intervention) ---------------------
 let curSession = null;
 let pending = {};
+function shotId(s2) {
+  // stable conversational handle (Joe: "assign a Shot ID... so I can
+  // address them with you"): session stem @ start-second. Survives
+  // small re-segmentation drift via the reader's containment matching.
+  const sess = ((s2 && s2._session) || curSession || "")
+    .replace(/^session-/, "").replace(/\.mp4$/, "");
+  return `${sess}@${Math.round((s2 && s2.start) || 0)}`;
+}
+$("sh-copyid").onclick = async () => {
+  if (!target) return;
+  const id = shotId(target);
+  try {
+    await navigator.clipboard.writeText(id);
+    $("sh-copyid").firstChild.textContent = "✓ Copied ";
+  } catch (e) {
+    $("sh-copyid").firstChild.textContent = id + " ";
+  }
+  setTimeout(() => {
+    $("sh-copyid").firstChild.textContent = "⧉ Copy Shot ID ";
+  }, 1500);
+};
 let target = null;    // the clip being corrected, FROZEN at sheet-open —
                       // playback keeps rolling and cur keeps advancing,
                       // which used to save the verdict to the wrong clip
@@ -1794,6 +1817,7 @@ $("correct").onclick = () => {
   pending = {};
   target = shots[cur] || null;
   if (!target) return;
+  $("sh-idtxt").textContent = shotId(target);
   const no = shots.indexOf(target) + 1;
   // Details LOOPS the clip under judgment; the previous mode returns on
   // close (Joe). Snap playback onto the clip if it has rolled past.
