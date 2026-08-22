@@ -1505,3 +1505,35 @@ Rounds continue with Joe's visual feedback as the gate.
   the only thing that fixes shots where the ball was never tracked; it is
   also the overdue library-scale validation of colour adoption; (2) find
   out why 19 shots lost their drawn line; (3) tracking.py 1035 lines.
+
+- 2026-08-22 (session 5, close) — THE LIBRARY RE-ANALYSIS IS OFF. Measured
+  the yield on the best-case session first (210621, the one with the most
+  tracking-failure abstentions), instead of committing 13 hours on faith:
+  tagged went 27 -> 24, and on IDENTICAL shot windows (old sidecar vs new,
+  same boundaries, confound removed) OLD tags 5, NEW tags 3. Two shots
+  fell to "cut angle beyond 88 deg", one to "cue not tracked", one gained.
+  Blur recovery helps the DRAWN TRAIL (that part is real and Joe confirmed
+  it: "that's better for tracking the tails") but the recovered positions
+  are centroid-of-smear estimates, and feeding them into the tagger's
+  2-3-sample geometry makes the departure line WORSE than the honest gap
+  did. Recovery is a rendering win and, for now, a tagging wash.
+  The real conclusion, which Joe reached before I did ("this has to be
+  such a common issue — how is this overcome?"): stop deriving verdicts
+  from local heuristics entirely. Serious systems fit a PHYSICS TRAJECTORY
+  (straight roll, deceleration, known cushion reflections) to ALL
+  observations at once and read every answer off the fit — departure,
+  first rail, miss side — with uncertainty from the fit itself. Four
+  heuristics in four days each broke differently; the last flipped its
+  answer with sampling phase. A 12-miss ground-truth label set is drafted
+  in scratchpad/labelset.json for validating the fit before it ships.
+  UI, meanwhile, is where Joe actually lives, and after three corrections
+  in one evening the overlay is finally what he asked for: the red line is
+  the ball's ENTIRE recorded trail (no trimming, no inference), no text on
+  the video, legend draggable and clamped to the picture, the chip is the
+  single place the verdict is stated. New standing rule for overlay work:
+  RENDER against real footage before deploying.
+  NEXT: (1) the trajectory fit, validated against the label set — this
+  supersedes rail-flip detection, departure heuristics, and the per-shot
+  gates; (2) tracking.py split (hygiene); (3) blur recovery stays ON for
+  trails but its output must carry a lower weight or a flag so downstream
+  geometry can discount smear-centroid positions.
