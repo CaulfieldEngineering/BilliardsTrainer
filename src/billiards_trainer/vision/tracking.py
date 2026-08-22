@@ -53,6 +53,10 @@ class _Internal:
     #: derived ball number; a veto needs the colour itself, and t.bgr is a
     #: canonical palette constant from the classifier, not a measurement.
     mbgr_hist: deque = field(default_factory=lambda: deque(maxlen=20))
+    #: this track's spot was observed EMPTY (bare felt, no detection) long
+    #: enough that the ball is demonstrably elsewhere. It keeps coasting on
+    #: the occlusion budget, but it may not hold a NUMBER hostage meanwhile.
+    vacated: bool = False
     pos_hist: deque = field(default_factory=lambda: deque(maxlen=64))
 
     def predict(self) -> None:
@@ -196,6 +200,28 @@ class BallTracker:
         minutes (Joe: "lingering cue ball assumed positions")."""
         ids = set(ids)
         self._tracks = [t for t in self._tracks if t.id not in ids]
+
+    def release_numbers(self, ids) -> None:
+        """Let go of a number whose ball is demonstrably somewhere else.
+
+        005048 @233: with the colour veto in place the 4's track correctly
+        refuses the arriving cue ball, but then sits frozen at the address
+        spot STILL HOLDING number 4 — so the real 4, which a fresh track
+        finds near the pocket, cannot be named and its path goes
+        unrecorded. Vacancy pruning already detects this exact state, but
+        its patience is 60 detect frames (~6s) before it kills the track,
+        and the whole shot is 7s.
+
+        Killing a track early is dangerous — that was the phantom-departure
+        bug spot-occupancy was written to fix. Releasing its NUMBER is not:
+        it cannot invent a ball, it only stops one track blocking a name
+        that the real ball needs. So the two are separated, and the number
+        goes back in the pool much sooner than the track dies."""
+        ids = set(ids)
+        for t in self._tracks:
+            if t.id in ids and t.committed_number >= 0:
+                t.committed_number = -1
+                t.vacated = True
 
     def update(self, detections: list[Detection], short_side: float,
                bounds: tuple[float, float, float, float] | None = None,
@@ -454,8 +480,13 @@ class BallTracker:
         deaths = getattr(self, "_flyer_deaths", [])
         keep = []
         for t in self._tracks:
+            # A track that RELEASED its number to vacancy pruning is still a
+            # resting ball as far as patience goes — it was named a moment
+            # ago. Keying the budget on the current number would make
+            # letting go of a name collapse the budget from the occlusion
+            # allowance to max_misses, i.e. punish the track for it.
             limit = (self.occluded_budget
-                     if t.settled and t.committed_number >= 0
+                     if t.settled and (t.committed_number >= 0 or t.vacated)
                      and not _at_pocket(t) else self.max_misses)
             if t.misses <= limit:
                 keep.append(t)
@@ -651,6 +682,8 @@ class BallTracker:
         cue_floor = 0.9 * pop[len(pop) // 2] if len(pop) >= 3 else (
             0.85 * self._ball_r if self._ball_r > 2.0 else 0.0)
         for i, t in enumerate(tracks):
+            if t.vacated:
+                continue      # its spot was seen empty; it is not that ball now
             votes = Counter(n for n in t.num_hist if n is not None and n >= 0)
             colour_num, colour_frac = self._colour_consensus(t)
             nums = set(votes) | ({colour_num} if colour_num > 0 else set())
@@ -713,7 +746,7 @@ class BallTracker:
                 s += COLOUR_MAX
             return s
         order = sorted((i for i, t in enumerate(tracks)
-                        if rest[i] and t.committed_number >= 0),
+                        if rest[i] and t.committed_number >= 0 and not t.vacated),
                        key=_claim_strength, reverse=True)
         for i in order:
             t = tracks[i]
@@ -851,6 +884,9 @@ class BallTracker:
         return cand if 1 <= cand <= 15 and cand not in taken else -1
 
     def _apply_match(self, t: _Internal, d: Detection) -> None:
+        # A detection landed on it, so the spot is not empty after all —
+        # whatever vacancy pruning concluded is superseded by the evidence.
+        t.vacated = False
         # Anchor for the published per-frame step: the last position handed
         # out, NOT the post-predict() one — prediction already carries the
         # velocity, so anchoring after it would hide steady rolling motion

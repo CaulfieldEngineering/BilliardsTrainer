@@ -627,10 +627,46 @@ class TestVacancyPruning:
         ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
         self._feed(p, calib, [ball], 12)              # establish + settle
         tracks = self._feed(p, calib, [], 59)         # picked up by hand...
-        assert any(t.number == 0 for t in tracks), "died too early"
+        assert tracks, "the track died too early"
         tracks = self._feed(p, calib, [], 2)          # ...60th bare frame
-        assert not any(t.number == 0 for t in tracks), \
+        assert not tracks, \
             "lingering assumed position survived a visibly empty spot"
+
+    def test_bare_spot_releases_the_number_long_before_the_track_dies(self):
+        """005048@233: with the colour veto in place the 4's track correctly
+        refuses the arriving cue ball, then parks at the address spot still
+        HOLDING number 4 — so the real 4, picked up near the pocket by a
+        fresh track, can never be named and its path goes unrecorded.
+
+        Killing a resting track early is the phantom-departure bug that
+        spot-occupancy exists to prevent. Letting go of the NUMBER cannot
+        invent a ball, so the two are separated: the name returns to the
+        pool ~1s in, the track keeps its full occlusion patience."""
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
+        self._feed(p, calib, [ball], 12)
+        tracks = self._feed(p, calib, [], 3)
+        assert any(t.number == 0 for t in tracks), "let go far too eagerly"
+        tracks = self._feed(p, calib, [], 12)         # past the release bar
+        assert tracks, "the track must survive on its occlusion budget"
+        assert not any(t.number == 0 for t in tracks), \
+            "a demonstrably empty spot still held number 0 hostage"
+
+    def test_a_returning_detection_takes_its_number_back(self):
+        """Release is a claim about right now, not a life sentence: the ball
+        reappearing on its own spot is evidence that outranks it."""
+        p = self._pipeline()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, p.settings.table.size)
+        ball = _mk(200, 200, exp, cls=BallClass.CUE, number=0, score=0.9)
+        self._feed(p, calib, [ball], 12)
+        tracks = self._feed(p, calib, [], 14)
+        assert not any(t.number == 0 for t in tracks)
+        tracks = self._feed(p, calib, [ball], 6)      # it was only occluded
+        assert any(t.number == 0 for t in tracks), \
+            "the ball came back and never got its name again"
 
     def test_unnumbered_blob_dies_faster(self):
         p = self._pipeline()

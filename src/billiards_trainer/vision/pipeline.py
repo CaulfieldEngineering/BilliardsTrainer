@@ -73,6 +73,13 @@ class PipelineResult:
     foreign_frac: float = 0.0
 
 
+#: vacant DETECT frames before a numbered track lets go of its number.
+#: Ten (~1s at the 10Hz detect cadence) is long enough to ride out the
+#: detector blinking on a resting ball, and far short of the 60 frames
+#: (~6s) it takes to kill the track — a whole shot is only ~7s.
+_RELEASE_AFTER = 10
+
+
 class Pipeline:
     def __init__(self, settings: Settings, source: str = ""):
         self.settings = settings
@@ -551,7 +558,9 @@ class Pipeline:
             return win.size > 0 and float(win.mean()) >= 0.34
 
         near_r2 = (2.2 * max(exp_r, 6.0)) ** 2
+        self._released = getattr(self, "_released", set())
         doomed: list[int] = []
+        vacated: list[int] = []
         live_ids: set[int] = set()
         for tr in tracks:
             live_ids.add(tr.id)
@@ -571,10 +580,35 @@ class Pipeline:
             # under the stick for many seconds with no detection and no
             # (blob-sized) foreign cover — 60 detect frames still kills a
             # true lingerer 25x faster than the occlusion budget did
-            if self._vacant[tr.id] >= (60 if tr.number >= 0 else 8):
+            # Patience is about what this track IS, not what it currently
+            # answers to. Releasing the number below must not quietly drop a
+            # resting ball into the unnumbered bucket and kill it at 8 frames
+            # instead of 60 — that would make letting go of a name 7x more
+            # lethal than keeping it, the opposite of the intent.
+            was_named = tr.number >= 0 or tr.id in self._released
+            if self._vacant[tr.id] >= (60 if was_named else 8):
                 doomed.append(tr.id)
+            elif tr.number >= 0 and self._vacant[tr.id] >= _RELEASE_AFTER:
+                # Its spot is bare felt and no detection is near it, so this
+                # ball is demonstrably somewhere else — but the track keeps
+                # its long occlusion patience because killing a resting ball
+                # early is what produced phantom departures (spot-occupancy
+                # was written for exactly that). Killing is dangerous;
+                # letting go of the NUMBER is not. 005048 @233: the 4's
+                # track correctly refuses the arriving cue ball, then sits
+                # at the address spot holding number 4 for the whole 7s
+                # shot, so the real 4 — found near the pocket by a fresh
+                # track — can never be named and its path is lost.
+                vacated.append(tr.id)
         self._vacant = {k: v for k, v in self._vacant.items()
                         if k in live_ids}
+        # a track that got its number back (a detection returned) is no
+        # longer "released", and dead ids must not leak
+        self._released = {i for i in self._released if i in live_ids} - {
+            t.id for t in tracks if t.number >= 0}
+        if vacated:
+            self.tracker.release_numbers(vacated)
+            self._released.update(vacated)
         if doomed:
             self.tracker.remove_ids(doomed)
             tracks = [t for t in tracks if t.id not in doomed]
