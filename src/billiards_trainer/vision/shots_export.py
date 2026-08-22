@@ -177,11 +177,13 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
         return None
     tf = None
     old_aims: dict = {}
+    old_space = None
     if with_trails:
         try:
             old_doc = json.loads(summary_path(video_path).read_text(
                 encoding="utf-8"))
             tf = old_doc.get("transform")
+            old_space = old_doc.get("space")
             for o in old_doc.get("shots", []):
                 if o.get("aim"):
                     old_aims[round(float(o.get("start", -1)), 2)] = o["aim"]
@@ -191,6 +193,18 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             tf = _video_transform(video_path)
     aim_cap = None
     aim_H = None
+    # TRUE-INCH frame for miss tagging (Joe's left/right cut, missed
+    # left/right, over/undercut). One pipeline warmup per session,
+    # cached in the summary like the transform.
+    space = None
+    try:
+        from .tablespace import TableSpace, space_for_video
+        if old_space:
+            space = TableSpace(**old_space)
+        else:
+            space = space_for_video(video_path, reader)
+    except Exception:  # noqa: BLE001 - tagging is enrichment
+        space = None
     shots = []
     for s in reader.shots:
         entry = {
@@ -252,6 +266,15 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                             entry["aim"] = aim
             except Exception:  # noqa: BLE001 - aim is enrichment
                 pass
+        # MISS TAGS: labels first (Joe), numbers underneath
+        if entry["outcome"] == "miss" and space is not None                 and entry["action"] in ("stroke", "break"):
+            try:
+                from .miss_tags import tag_shot
+                tg = tag_shot(reader, s, space)
+                if tg:
+                    entry["tags"] = tg
+            except Exception:  # noqa: BLE001 - tagging is enrichment
+                pass
         shots.append(entry)
     if aim_cap is not None:
         aim_cap.release()
@@ -261,6 +284,7 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
         "session": Path(video_path).name,
         "duration_s": round(reader._times[-1], 1) if reader._times else 0.0,
         "exported": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "space": ({k: getattr(space, k) for k in ("x0","y0","x1","y1","px_per_in","ball_r_px","size","n_samples")} if space else None),
         "shots": shots,
     }
     out = summary_path(video_path)

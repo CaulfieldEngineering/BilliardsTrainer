@@ -874,6 +874,19 @@ function updateInfo() {
     b.textContent = n > 0 ? n : (n === 0 ? "" : "?");
     box.appendChild(b);
   });
+  // MISS TAG (Joe: "start by simply tagging each miss") — labels, not
+  // degrees; the numbers live in Details.
+  if (s.tags) {
+    const t = s.tags;
+    const chip = document.createElement("span");
+    chip.className = "frag";
+    chip.style.cssText = "color:#E5484D;font-weight:600;margin-right:8px";
+    const head = t.cut === "straight" ? "Straight-in" :
+      (t.cut === "left" ? "Left cut" : "Right cut");
+    chip.textContent = `${head} · missed ${t.miss_side}`
+      + (t.fullness ? ` · ${t.fullness}` : "");
+    box.appendChild(chip);
+  }
   const frag = document.createElement("span");
   frag.className = "frag";
   // skip the bare opener ("Stroke") — show the first INFORMATIVE clause
