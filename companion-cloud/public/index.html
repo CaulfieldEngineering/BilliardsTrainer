@@ -301,11 +301,6 @@
     <div id="ovscrim"></div>
     <div id="ovmenu">
       <div class="grab"></div>
-      <button id="pl-save" class="lrow">☆ Save clip to playlist
-        <span class="chev">›</span></button>
-      <button id="rife-req" class="lrow">✨ Smooth slo-mo (renders ~1 min)
-        <span class="chev">›</span></button>
-      <div id="pl-pick" style="display:none"></div>
       <h3>Drawing tools</h3>
       <div class="tools">
         <button id="d-line" class="tool"><span class="ic">╱</span>
@@ -348,6 +343,11 @@
         <button id="sh-split">✂ Split at playhead</button>
         <button id="sh-copyid">⧉ Copy Shot ID</button>
       </div>
+      <div class="row">
+        <button id="pl-save">☆ Playlist</button>
+        <button id="rife-req">✨ Slo-mo</button>
+      </div>
+      <div id="pl-pick" style="display:none"></div>
       <div class="row" id="sh-outcome">
         <button data-o="make">MAKE</button>
         <button data-o="miss">MISS</button>
@@ -1553,10 +1553,7 @@ function ovOpen(open) {
   $("ovmenu").style.display = open ? "block" : "none";
   $("ovscrim").style.display = open ? "block" : "none";
   if (!open) $("pl-pick").style.display = "none";
-  if (open) {
-    syncRifeBtn();
-    PL.pull().then(syncRifeBtn);   // catch renders that finished since
-  }
+
 }
 // The slo-mo button is STATE-AWARE (Joe): if this shot's render already
 // exists in the Slow-mo playlist, the button VIEWS it instead of
@@ -1574,10 +1571,9 @@ function findSlowmo(s2) {
   return idx >= 0 ? { pl, idx } : null;
 }
 function syncRifeBtn() {
-  const hit = findSlowmo(shots[cur]);
-  $("rife-req").innerHTML = hit
-    ? '▶ View smooth slo-mo <span class="chev">›</span>'
-    : '✨ Smooth slo-mo (renders ~1 min) <span class="chev">›</span>';
+  const hit = findSlowmo((typeof target !== "undefined" && target)
+                         || shots[cur]);
+  $("rife-req").textContent = hit ? "▶ View slo-mo" : "✨ Slo-mo";
 }
 $("ovbtn").onclick = () => ovOpen($("ovmenu").style.display !== "block");
 $("ovscrim").onclick = () => ovOpen(false);
@@ -1599,11 +1595,8 @@ $("pl-save").onclick = () => {
     if (!ls.some(p => p.id === t.id)) ls.push(t);
     PL.save(ls);
     box.style.display = "none";
-    $("pl-save").innerHTML = `✓ Saved to ${t.name}`;
-    setTimeout(() => {
-      $("pl-save").innerHTML =
-        '☆ Save clip to playlist <span class="chev">›</span>';
-    }, 1600);
+    $("pl-save").textContent = `✓ ${t.name}`;
+    setTimeout(() => { $("pl-save").textContent = "☆ Playlist"; }, 1600);
   };
   PL.all().forEach(pl => {
     const b = document.createElement("button");
@@ -1623,7 +1616,7 @@ $("pl-save").onclick = () => {
   box.style.display = "block";
 };
 $("rife-req").onclick = async () => {
-  const s2 = shots[cur];
+  const s2 = target || shots[cur];
   if (!s2 || s2._slowmo) return;
   const hit = findSlowmo(s2);
   if (hit) {                        // already rendered: jump to the clip
@@ -1640,14 +1633,11 @@ $("rife-req").onclick = async () => {
       body: JSON.stringify({ session: s2._session || curSession,
                              start: s2.start, end: s2.end, rife: true }),
     });
-    $("rife-req").textContent = "✓ Requested — see the Slow-mo playlist soon";
+    $("rife-req").textContent = "✓ Queued";
   } catch (e) {
-    $("rife-req").textContent = "✕ Request failed — try again";
+    $("rife-req").textContent = "✕ Retry";
   }
-  setTimeout(() => {
-    $("rife-req").innerHTML =
-      '✨ Smooth slo-mo (renders ~1 min) <span class="chev">›</span>';
-  }, 2500);
+  setTimeout(syncRifeBtn, 2500);
 };
 // pinch-zoom belt-and-suspenders (iOS ignores user-scalable in odd cases)
 document.addEventListener("gesturestart", e => e.preventDefault());
@@ -1944,6 +1934,8 @@ $("correct").onclick = () => {
   pending = {};
   target = shots[cur] || null;
   if (!target) return;
+  syncRifeBtn();
+  PL.pull().then(syncRifeBtn);     // catch renders finished since
   const no = shots.indexOf(target) + 1;
   // Details LOOPS the clip under judgment; the previous mode returns on
   // close (Joe). Snap playback onto the clip if it has rolled past.
