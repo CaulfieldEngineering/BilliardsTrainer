@@ -233,7 +233,11 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     outbound = []
     denom = math.hypot(px - ox, py - oy) or 1.0
     prog = -1e9
-    for (_t, qx, qy) in tpath[tidx:]:
+    for (_t, qx, qy) in tpath[cidx:]:
+        # from CONTACT, not from the first sample seen moving — otherwise
+        # the drawn line starts wherever the ball was first caught, which
+        # on a hard shot is most of the way to the rail (@233: it began at
+        # 0.23,0.81 instead of at the ball's address, a 2-point stub)
         d = ((qx - ox) * (px - ox) + (qy - oy) * (py - oy)) / denom
         if d < -0.5 * space.ball_r_px:
             continue                      # behind contact: not this ball
