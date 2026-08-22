@@ -1367,3 +1367,36 @@ Rounds continue with Joe's visual feedback as the gate.
   scale (it is reachable for the first time) via a re-analysis scored on
   id_hops and duplicate-identity; (3) blur recovery with a median
   background and ballistic validation.
+
+- 2026-08-22 (session 2) — Hygiene first: lifted the colour veto out of
+  update() onto the class (update had grown to 366 lines, 62 of them mine
+  last session); function-size drift cleared, pure move, suite green.
+  Then the top goal, and it landed. Last session's veto stopped the 4's
+  track adopting the arriving cue ball but left a stalemate: the track
+  parked at the address spot still HOLDING number 4, so the real 4 could
+  never be named. Vacancy pruning already detects that state exactly — a
+  still track, no detection near it, bare felt underneath — but waits 60
+  detect frames (~6s) before acting, and a shot is 7s. Killing a resting
+  track early is the phantom-departure bug spot-occupancy exists to
+  prevent, so the patience stays; releasing its NUMBER cannot invent a
+  ball, so that is now separated and happens after ~1s. A returning
+  detection takes the number straight back.
+  Measured on 005048@233: before, the ghost reclaimed number 4 at 233.97
+  and held it to the end of the shot; now the REAL 4 takes it at 234.17
+  and keeps it, (211,1205) -> (230,1086), which is the ball.
+  Two coupling regressions caught by tests BEFORE shipping, both from
+  patience keyed on the CURRENT number: a released track fell into the
+  unnumbered vacancy bucket (death at 8 frames, not 60), and the tracker's
+  own miss budget collapsed from occluded_budget to max_misses. Both now
+  key on "was ever named" — letting go of a name must not be punished.
+  STILL OPEN and unchanged: the 4's OUTBOUND leg (232.9-233.5) is
+  undetected because the strike blurs it, so @233's miss side is still an
+  honest "can't tell". That is blur recovery, not this. What changed is
+  that the ball is correctly named wherever it IS detected.
+  NEXT: (1) blur recovery — median background, per-ball colour reference,
+  3+ frames of ballistic validation before accepting a candidate; gate on
+  "a confirmed track's detection just vanished", NOT move_streak; (2)
+  validate colour adoption at library scale via re-analysis scored on
+  id_hops + duplicate-identity (still unexercised at scale); (3)
+  tracking.py is 991 lines — the identity/arbitration half is a cohesive
+  ~250-line concern that would split cleanly into vision/identity.py.
