@@ -1400,3 +1400,43 @@ Rounds continue with Joe's visual feedback as the gate.
   id_hops + duplicate-identity (still unexercised at scale); (3)
   tracking.py is 991 lines — the identity/arbitration half is a cohesive
   ~250-line concern that would split cleanly into vision/identity.py.
+
+- 2026-08-22 (session 3) — BLUR RECOVERY LANDED, after five attempts, and
+  the failure mode is the lesson. Joe called a remedy mandatory: "we can't
+  move forward if we can't get accuracy on this 4. This shot will be very
+  common" — and it is a medium 8ft/s cut, not a break. Measured why the
+  detector fails: at the ~1/75s shutter this footage was shot at, the ball
+  smears ~17px past its own 28px diameter, and worse, CONTRAST collapses
+  because each pixel only holds the ball for part of the exposure. The
+  model is trained on solid discs; it returned nothing for half a second.
+  Recovery uses a rolling MEDIAN background (a frame difference lights up
+  the withdrawing cue stick, which an earlier attempt adopted) and a
+  RELATIVE colour test (blur washes a ball toward felt, so an absolute
+  threshold fails exactly when needed; the ball still resembles its own
+  measured colour more than any other ball's). Measured on the decisive
+  frame: ball 51, felt 234 and 254, stick rejected on size.
+  THE LESSON: four A/B runs came back BYTE-IDENTICAL with recovery on and
+  off. That is not a mistuned mechanism — a mistuned one gives different
+  wrong answers. Identical output means the work is discarded. It was:
+  recovery found the ball 311px from the parked track and a settled
+  track's gate is ~99px, so every recovered detection was generated
+  correctly and silently dropped. Three iterations went into tuning
+  thresholds inside a function whose whole output was being thrown away,
+  because I diagnosed by hypothesis instead of instrumenting the rejection
+  paths. Instrument first when a mechanism "does nothing".
+  A recovered detection now names the track it was found for and
+  association honours that rather than re-judging it on distance.
+  MEASURED vs a path recovered from raw video independently of the
+  pipeline: mean error 236px -> 186px; picks the ball up 0.3s earlier and
+  follows it through the rail approach (err 37, 28, 5px on the last three).
+  Also wrote docs/CAMERA_SETTINGS.md for Joe in plain language — target
+  1/250 shutter, paid for by aperture first then ISO, since table lighting
+  cannot change. That helps future sessions only; recovery is what rescues
+  the 35 already recorded.
+  NEXT: (1) re-analyse 005048 through the PRODUCTION path and check
+  whether @233's miss side now computes LEFT — my scratch harness read the
+  library sidecar instead of its own, so that check is still outstanding;
+  (2) then re-analyse the library and re-score miss tags, which is also
+  the overdue library-scale validation of colour adoption; (3) tracking.py
+  and pipeline.py are both well over the size bar — split the identity /
+  arbitration concern out.
