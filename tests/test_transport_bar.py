@@ -94,6 +94,7 @@ class TestStatsRailIsAList:
 
     def test_rows_not_blocks_and_no_session_fold(self):
         from pathlib import Path
+
         import billiards_trainer.ui.pages.live_page as m
         src = Path(m.__file__).read_text(encoding="utf-8")
         assert "class _StatRow" in src, "the vertical stat rows are gone"
@@ -107,6 +108,7 @@ def test_video_view_draws_stored_aim_line(app):
     then assert green tracer pixels along the segment."""
     import numpy as np
     from PySide6.QtGui import QImage
+
     from billiards_trainer.ui.widgets.video_view import VideoView
 
     v = VideoView()

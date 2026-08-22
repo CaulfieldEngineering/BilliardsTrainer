@@ -7,7 +7,6 @@ slow-mo renderer (companion/rife_render.py) expects them here.
 """
 
 import io
-import sys
 import urllib.request
 import zipfile
 from pathlib import Path

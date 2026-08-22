@@ -175,6 +175,7 @@ class TestShotThumbnails:
 
     def test_rows_swap_dots_for_thumbnails(self, app, tmp_path):
         import numpy as np
+
         from billiards_trainer.ui.widgets.shot_list import ShotListPanel
         pnl = ShotListPanel()
         pnl.set_shots(_shots())
@@ -188,6 +189,7 @@ class TestShotThumbnails:
 
     def test_thumbnails_survive_correction_rebuild(self, app):
         import numpy as np
+
         from billiards_trainer.ui.widgets.shot_list import ShotListPanel
         pnl = ShotListPanel()
         pnl.set_shots(_shots())

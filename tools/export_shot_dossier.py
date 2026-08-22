@@ -158,7 +158,7 @@ def export_shot(video: Path, reader: SidecarReader, shot_no: int,
             cue_metrics = _stroke_metrics(e["points"])
     out_dir = out_root / f"{video.stem}_shot{shot_no:02d}"
     out_dir.mkdir(parents=True, exist_ok=True)
-    _diagram(participants, (int(400), int(400 * sh / max(1.0, sw))),
+    _diagram(participants, (400, int(400 * sh / max(1.0, sw))),
              out_dir / "trajectory.png")
     doc = {
         "session": video.name,

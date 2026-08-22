@@ -515,7 +515,6 @@ class BallTracker:
         Ghost cleanup rides along as before: a stale coasting claimant of a
         LIVE number is deleted outright (its frozen graphic haunted the
         table otherwise)."""
-        from .balls import measured_identity
 
         tracks = [t for t in self._tracks if t.confirmed]
         if not tracks:

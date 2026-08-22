@@ -1,6 +1,5 @@
 """Sidebar session summaries: duration + shots, cached, stub detection."""
 
-import json
 
 from billiards_trainer.ui import session_summaries as ss
 

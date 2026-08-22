@@ -42,6 +42,7 @@ def _sidecar(tmp_path):
 class TestDossier:
     def test_export_shape_and_participants(self, tmp_path):
         from export_shot_dossier import export_shot
+
         from billiards_trainer.vision.analysis_cache import SidecarReader
         video = _sidecar(tmp_path)
         r = SidecarReader(video)

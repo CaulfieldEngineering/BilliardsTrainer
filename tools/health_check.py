@@ -250,6 +250,27 @@ def _check_corrections() -> tuple[str, str]:
     return GREEN, "queue clear, no new verdicts"
 
 
+def _check_hygiene() -> tuple:
+    """Code hygiene DRIFT (Joe: "make sure... everything's not turning
+    into spaghetti"). Absolutes are noise — a 1200-line pipeline is not
+    news — so this reports only what got WORSE since the recorded
+    baseline. AMBER, never RED: hygiene must not block a fix.
+    """
+    import subprocess
+    try:
+        r = subprocess.run([sys.executable, "tools/hygiene_audit.py", "--json"],
+                           cwd=ROOT, capture_output=True, text=True,
+                           timeout=600)
+        d = json.loads(r.stdout or "{}")
+    except (subprocess.SubprocessError, ValueError, OSError) as exc:
+        return "AMBER", f"hygiene audit failed: {exc}"
+    worse = d.get("worse") or []
+    lint = d.get("lint", {}).get("n", -1)
+    if not worse:
+        return "GREEN", f"no drift; {lint} lint findings"
+    return "AMBER", f"{len(worse)} regressions: " + "; ".join(worse[:3])
+
+
 def _check_identity_hops() -> tuple[str, str]:
     """Identity-wander tripwire: numbers teleporting between tracks (the
     shot-36 family, gated 2026-08-20). Baseline after the reachability
@@ -289,6 +310,7 @@ CHECKS = {
     "cue_sensor": _check_cue_sensor,
     "corrections": _check_corrections,
     "id_hops": _check_identity_hops,
+    "hygiene": _check_hygiene,
     "disk": _check_disk,
 }
 

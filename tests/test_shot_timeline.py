@@ -258,6 +258,7 @@ class TestCompactLane:
 
     def test_no_placeholder_help_text(self):
         from pathlib import Path
+
         import billiards_trainer.ui.widgets.shot_timeline as m
         src = Path(m.__file__).read_text(encoding="utf-8")
         assert "clips appear here" not in src, \
@@ -300,6 +301,7 @@ class TestFlatPanelLanguage:
 
     def test_timeline_panel_is_labeled(self):
         from pathlib import Path
+
         import billiards_trainer.ui.pages.live_page as m
         src = Path(m.__file__).read_text(encoding="utf-8")
         assert "SHOT TIMELINE" in src, "the timeline lost its caption"

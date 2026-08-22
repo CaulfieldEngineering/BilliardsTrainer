@@ -99,8 +99,8 @@ class TestComposeText:
 class TestShotsExport:
     def test_summary_reflects_final_sidecar_state(self, tmp_path):
         import json as _json
-        from billiards_trainer.vision.shots_export import (
-            export_shots_summary, summary_path)
+
+        from billiards_trainer.vision.shots_export import export_shots_summary, summary_path
         vid = TestCorrectionRanking()._mismatched(tmp_path)
         derive_and_correct(vid)                      # miss -> make (derived)
         append_correction(vid, 8.0, "scratch", src="review")

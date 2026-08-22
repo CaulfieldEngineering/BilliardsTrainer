@@ -160,8 +160,8 @@ class TestVerdictCarryover:
 
     def test_only_human_records_carry(self, tmp_path):
         import json
-        from billiards_trainer.vision.analysis_cache import (
-            carry_review_verdicts)
+
+        from billiards_trainer.vision.analysis_cache import carry_review_verdicts
         old = self._old_sidecar(tmp_path)
         vid = tmp_path / "session-x.mp4"
         _write_sample(vid)
@@ -176,8 +176,8 @@ class TestVerdictCarryover:
 
     def test_carried_verdict_reattaches_by_containment(self, tmp_path):
         import json
-        from billiards_trainer.vision.analysis_cache import (
-            carry_review_verdicts)
+
+        from billiards_trainer.vision.analysis_cache import carry_review_verdicts
         vid = tmp_path / "session-x.mp4"
         vid.write_bytes(b"0")
         new = tmp_path / "session-x.mp4.analysis.jsonl"

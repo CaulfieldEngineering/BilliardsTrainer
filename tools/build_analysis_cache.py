@@ -71,8 +71,7 @@ def build(video: Path, force: bool = False) -> bool:
     # wherever a review-ranked record locks a shot.
     prev = Path(str(video) + ".analysis.jsonl.prev")
     if force and prev.is_file():
-        from billiards_trainer.vision.analysis_cache import (
-            carry_review_verdicts)
+        from billiards_trainer.vision.analysis_cache import carry_review_verdicts
         kept = carry_review_verdicts(prev, Path(str(video) + ".analysis.jsonl"))
         if kept:
             print(f"    review verdicts carried forward: {kept}")
@@ -83,8 +82,7 @@ def build(video: Path, force: bool = False) -> bool:
     from billiards_trainer.vision.outcomes import derive_and_correct
     n = derive_and_correct(video)
     counts = classify_and_mark(video)
-    from billiards_trainer.vision.shots_export import (
-        export_library_index, export_shots_summary)
+    from billiards_trainer.vision.shots_export import export_library_index, export_shots_summary
     export_shots_summary(video)
     export_library_index(Path(video).parent)
     print(f"    outcomes re-derived: {n}; actions: {counts}")

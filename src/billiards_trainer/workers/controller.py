@@ -793,8 +793,7 @@ class PipelineController(QObject):
                     log.info("session close: actions labeled for %s: %s",
                              video, counts)
                 # Phone summary rides Dropbox sync to the cloud review app.
-                from ..vision.shots_export import (
-                    export_library_index, export_shots_summary)
+                from ..vision.shots_export import export_library_index, export_shots_summary
                 export_shots_summary(video)
                 export_library_index(_P(video).parent)
             except Exception:  # noqa: BLE001 - never disturb the app

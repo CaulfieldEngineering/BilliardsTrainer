@@ -172,8 +172,7 @@ class TestDeriveAndCorrect:
         assert derive_and_correct(vid) == 0
 
     def test_human_verdict_appended_later_wins(self, tmp_path):
-        from billiards_trainer.vision.analysis_cache import (
-            SidecarReader, append_correction)
+        from billiards_trainer.vision.analysis_cache import SidecarReader, append_correction
         from billiards_trainer.vision.outcomes import derive_and_correct
         vid = self._mismatched(tmp_path)
         derive_and_correct(vid)                  # derivation says make
@@ -326,6 +325,7 @@ def test_split_record_bisects_the_shot(tmp_path):
     bisects the clip; both halves exist with adjoining boundaries and
     verdicts attach to the right half by containment."""
     import json
+
     from billiards_trainer.vision.analysis_cache import SidecarReader
     vid = tmp_path / "s.mp4"
     vid.write_bytes(b"0")

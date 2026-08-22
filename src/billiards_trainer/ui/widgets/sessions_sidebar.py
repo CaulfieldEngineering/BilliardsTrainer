@@ -197,8 +197,9 @@ class SessionsSidebar(QFrame):
         threading.Thread(target=work, daemon=True, name="session-summaries").start()
 
     def _apply_summary(self, path: str, summary: dict) -> None:
-        from .. import session_summaries as ss
         from PySide6.QtGui import QColor
+
+        from .. import session_summaries as ss
         for i in range(self._list.topLevelItemCount()):
             it = self._list.topLevelItem(i)
             if it.data(0, Qt.UserRole) != path:

@@ -104,6 +104,7 @@ class TestCorrectionsWatcher:
 
     def test_verdict_applied_review_ranked_and_archived(self, tmp_path):
         import json
+
         from billiards_trainer.companion.corrections_watcher import scan_once
         from billiards_trainer.vision.actions import classify_and_mark
         from billiards_trainer.vision.analysis_cache import SidecarReader
@@ -127,6 +128,7 @@ class TestCorrectionsWatcher:
 
     def test_garbage_and_traversal_archived_harmlessly(self, tmp_path):
         import json
+
         from billiards_trainer.companion.corrections_watcher import scan_once
         box = tmp_path / "corrections"
         box.mkdir()
@@ -138,6 +140,7 @@ class TestCorrectionsWatcher:
 
     def test_note_flows_into_sidecar_and_summary(self, tmp_path):
         import json
+
         from billiards_trainer.companion.corrections_watcher import scan_once
         from billiards_trainer.vision.analysis_cache import SidecarReader
         from billiards_trainer.vision.shots_export import summary_path
@@ -156,6 +159,7 @@ class TestCorrectionsWatcher:
 
     def test_clear_restores_derived_authority(self, tmp_path):
         import json
+
         from billiards_trainer.companion.corrections_watcher import scan_once
         from billiards_trainer.vision.analysis_cache import SidecarReader
         vid = self._session(tmp_path)
@@ -177,6 +181,7 @@ class TestCorrectionsWatcher:
 
     def test_confirm_locks_and_marks_reviewed(self, tmp_path):
         import json
+
         from billiards_trainer.companion.corrections_watcher import scan_once
         from billiards_trainer.vision.actions import classify_and_mark
         from billiards_trainer.vision.analysis_cache import SidecarReader
@@ -207,6 +212,7 @@ class TestRifeRequests:
         import json
         import os
         import time
+
         from billiards_trainer.companion import corrections_watcher as cw
         from billiards_trainer.companion import rife_render
         vid = tmp_path / "session-x.mp4"
@@ -240,6 +246,7 @@ class TestRifeRequests:
         """Joe's presence outranks renders: an active recording keeps the
         request queued (not archived)."""
         import json
+
         from billiards_trainer.companion import corrections_watcher as cw
         vid = tmp_path / "session-x.mp4"
         vid.write_bytes(b"0")     # fresh mtime = active recording

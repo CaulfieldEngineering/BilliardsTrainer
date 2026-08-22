@@ -49,6 +49,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         return True
     if isinstance(d.get("split"), (int, float)):
         import json as _json
+
         from ..vision.actions import classify_and_mark
         from ..vision.analysis_cache import sidecar_path as _sp
         from ..vision.outcomes import derive_and_correct
@@ -85,6 +86,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         return True        # rendered or hopeless — archive the request
     if d.get("confirm"):
         import json as _json
+
         from ..vision.analysis_cache import sidecar_path as _sp
         with open(_sp(video), "a", encoding="utf-8") as fh:
             fh.write(_json.dumps({"type": "reviewed",
@@ -95,6 +97,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         return True
     if d.get("clear"):
         import json as _json
+
         from ..vision.actions import classify_and_mark
         from ..vision.analysis_cache import sidecar_path as _sp
         from ..vision.outcomes import derive_and_correct
@@ -117,6 +120,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
     note = str(d.get("note", "")).strip()[:500]
     if note:
         import json as _json
+
         from ..vision.analysis_cache import sidecar_path as _sp
         with open(_sp(video), "a", encoding="utf-8") as fh:
             fh.write(_json.dumps({"type": "note", "start": round(start, 3),

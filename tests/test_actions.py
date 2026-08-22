@@ -123,6 +123,7 @@ class TestActionAwareSurfaces:
 
     def test_summary_counts_attempts_only(self, tmp_path):
         import json
+
         from billiards_trainer.ui.session_summaries import _sidecar_shot_count
         vid = tmp_path / "s.mp4"
         vid.write_bytes(b"0")
@@ -140,6 +141,7 @@ class TestActionAwareSurfaces:
 
     def test_companion_attaches_action(self, tmp_path):
         import json
+
         from billiards_trainer.companion.server import read_shots
         vid = tmp_path / "s.mp4"
         vid.write_bytes(b"0")
@@ -157,6 +159,7 @@ class TestClosePassWiring:
         """The post-recording daemon must run BOTH passes: outcomes and
         action labels — a new recording is born fully labeled."""
         from pathlib import Path
+
         import billiards_trainer.workers.controller as m
         src = Path(m.__file__).read_text(encoding="utf-8")
         i = src.find("def _derive")

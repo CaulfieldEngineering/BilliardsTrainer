@@ -217,7 +217,8 @@ class ShotTimeline(QWidget):
         self._strip_pending.update(missing)
         import threading
 
-        from PySide6.QtCore import QObject, Signal as _Sig
+        from PySide6.QtCore import QObject
+        from PySide6.QtCore import Signal as _Sig
 
         if not hasattr(self, "_strip_bridge"):
             class _Bridge(QObject):

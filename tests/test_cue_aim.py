@@ -47,7 +47,7 @@ class TestDetectCueAim:
             import math as _m
             d_axis = abs(_m.sin(ang) * (anchor[0] - 350)
                          - _m.cos(ang) * (anchor[1] - 650))
-            assert d_axis < 6.0, "anchor off the stick axis" 
+            assert d_axis < 6.0, "anchor off the stick axis"
             assert self._angle_err(ang, want) < 2.0, \
                 f"aim off by {self._angle_err(ang, want):.1f} deg at {want}"
             assert q > 0.2
@@ -99,7 +99,6 @@ class TestInferTarget:
         assert got[0] == 5
 
     def test_offset_hit_and_clean_miss(self):
-        import math
         from billiards_trainer.vision.cue_aim import infer_target
         # centre passes 29px from the ball: still a (thin) hit at 2r=30
         got = infer_target((100, 100), 0.0, [(3, 400, 129)], 15.0)

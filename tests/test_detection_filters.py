@@ -494,7 +494,8 @@ class TestNameUnknownByMeasuredColour:
         """Pin for frame-level uniqueness: two green blobs in one frame must
         not BOTH be named 6 (parallel vote streams would commit two tracks
         to one number and the at-rest contest demotes the real ball)."""
-        import numpy as np, cv2
+        import cv2
+        import numpy as np
         _use_fixture_refs(monkeypatch, tmp_path)
         from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
         f = np.zeros((60, 120, 3), np.uint8)
@@ -539,7 +540,8 @@ class TestNameUnknownByMeasuredColour:
         a session and stayed nameless (duplicate stripped by arbitration).
         Unmatched numbered finds must get the same measured-colour
         correction matched pairs get."""
-        import numpy as np, cv2
+        import cv2
+        import numpy as np
         _use_fixture_refs(monkeypatch, tmp_path)
         from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
         from billiards_trainer.vision.types import BallClass, Detection
