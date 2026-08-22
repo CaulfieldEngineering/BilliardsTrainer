@@ -1173,3 +1173,15 @@ Rounds continue with Joe's visual feedback as the gate.
   visible shaft, measured before/after on >=4 address frames, plus 3x
   zoom renders for Joe. Ship only if the metric improves and the zooms
   look glued. Pairs with the Aim Line v2 on-demand build.
+- 2026-08-22 (1:30am, Joe): ACCURACY PASS 2 UPGRADED — "use as much of
+  the visible cue stick as possible." Design: full-shaft sub-pixel
+  dual-edge sampling, then a STRAIGHTNESS-CONSTRAINED fit: the stick is
+  straight in 3D, so solve line params + a linear height profile
+  (tip ~40mm -> grip ~300mm) whose radial parallax correction (toward
+  the camera, factor h_pt/h_cam) makes the corrected samples maximally
+  collinear — the stick's own straightness calibrates out the butt
+  parallax that biased the naive full-shaft fit (measured 2.9->5.9px
+  regression previously). Deliverables unchanged: mean-perpendicular-
+  deviation metric before/after on >=4 frames + 3x zoom renders for
+  Joe; the drawn line then hugs the ENTIRE shaft, and the aim ray uses
+  the corrected table-plane direction.
