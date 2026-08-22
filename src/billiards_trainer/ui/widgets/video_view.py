@@ -147,8 +147,20 @@ class VideoView(QWidget):
         p.drawLine(_pt("cue"), _pt("obj"))
         p.setPen(QPen(QColor("#7DF29B"), 1.8))
         p.drawLine(_pt("obj"), _pt("pocket"))
+        # WHERE IT ACTUALLY WENT — the MEASURED path, not a ray re-derived
+        # from the departure direction (Joe, on 005048@233: "the purple 4
+        # is not travelling on your red line at all"; those six departure
+        # samples straddled a half-second hole in the ball's track). Same
+        # rule as the phone: draw the measurement, fall back to the ray.
         p.setPen(QPen(QColor("#E5484D"), 1.8))
-        p.drawLine(_pt("obj"), _pt("went"))
+        path = self._target_path()
+        if path:
+            for a, b in zip(path, path[1:]):
+                p.drawLine(
+                    QPointF(r.x() + a[0] * r.width(), r.y() + a[1] * r.height()),
+                    QPointF(r.x() + b[0] * r.width(), r.y() + b[1] * r.height()))
+        else:
+            p.drawLine(_pt("obj"), _pt("went"))
         p.setBrush(QColor("#7DF29B"))
         p.setPen(Qt.NoPen)
         p.drawEllipse(_pt("pocket"), 4.5, 4.5)
@@ -158,6 +170,9 @@ class VideoView(QWidget):
         line = f"{head}, missed {tags.get('miss_side', '?')}"
         if tags.get("fullness"):
             line += f" — {tags['fullness']}"
+        # never wear an untrusted tag as a verdict (parity with the phone)
+        if str(tags.get("confidence", "high")) != "high":
+            line += "  · unreliable"
         p.setFont(QFont("Arial", 10, QFont.Bold))
         box = QRectF(r.x() + 8, r.y() + r.height() - 26, r.width() - 16, 20)
         p.setPen(QColor(13, 17, 23, 200))
@@ -167,6 +182,23 @@ class VideoView(QWidget):
         p.setBrush(Qt.NoBrush)
         p.setPen(QColor("#E6EDF3"))
         p.drawText(box, Qt.AlignLeft | Qt.AlignVCenter, line)
+
+    def _target_path(self) -> list:
+        """The tagged target ball's MEASURED polyline in normalized video
+        coords, or [] when this shot has no trail for it."""
+        tags = getattr(self, "_tags", None)
+        trails = getattr(self, "_trails", None)
+        if not isinstance(tags, dict) or not trails:
+            return []
+        num = tags.get("target")
+        if num is None:
+            return []
+        for e in trails:
+            if isinstance(e, dict) and e.get("n") == num:
+                pts = e.get("p") or []
+                if len(pts) > 2:
+                    return [(q[1], q[2]) for q in pts]
+        return []
 
     def set_balls(self, balls: list) -> None:
         """Ball markers for hover-to-reveal: [(x, y, r, label)] in image pixels.

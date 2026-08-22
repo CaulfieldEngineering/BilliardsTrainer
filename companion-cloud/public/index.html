@@ -95,6 +95,7 @@
             pointer-events:none; }
   /* Legend is HUD, not overlay: it lives outside #vrot so it stays
      upright and bottom-left no matter how the video is rotated. */
+  #vwrap.rot #vrot { transform: rotate(180deg); }
   #legend { position:absolute; left:10px; bottom:10px; display:none;
             flex-direction:column; gap:3px; pointer-events:none; z-index:19;
             font-size:11px; line-height:1.35; }
@@ -905,8 +906,19 @@ function updateInfo() {
     chip.style.cssText = "color:#E5484D;font-weight:600;margin-right:8px";
     const head = t.cut === "straight" ? "Straight-in" :
       (t.cut === "left" ? "Left cut" : "Right cut");
+    // A tag the analysis itself does not trust must not be worn as a
+    // verdict (Joe was shown "Straight-in · missed right" on a shot whose
+    // object ball went untracked for half a second right after contact).
+    const sure = (t.confidence || "high") === "high";
     chip.textContent = `${head} · missed ${t.miss_side}`
-      + (t.fullness ? ` · ${t.fullness}` : "");
+      + (t.fullness ? ` · ${t.fullness}` : "")
+      + (sure ? "" : " · unreliable");
+    if (!sure) {
+      chip.style.cssText =
+        "color:var(--faint);font-weight:600;margin-right:8px;"
+        + "text-decoration:underline dotted";
+      chip.title = t.confidence;
+    }
     box.appendChild(chip);
   }
   const frag = document.createElement("span");
@@ -994,7 +1006,12 @@ const OV = {
 // register; pointer coords are inverted where they are consumed.
 let ROT = localStorage.getItem("rot180") === "1";
 function applyRot() {
-  $("vrot").style.transform = ROT ? "rotate(180deg)" : "";
+  // Joe: "when I enabled the shot lines, the video re-rotated itself.
+  // Rotation should be independent of state like that." A class, not an
+  // inline transform: inline styles on these layers are also written by
+  // Zoom, and any stray call could stomp the rotation. One owner, one
+  // source of truth, and overlay toggles cannot reach it.
+  $("vwrap").classList.toggle("rot", ROT);
   $("ov-rot-st").textContent = ROT ? "On" : "Off";
   $("ov-rot-st").style.color = ROT ? "var(--make)" : "var(--faint)";
 }
@@ -1014,7 +1031,6 @@ $("ov-aim").onclick = () => {
   OV.aim = !OV.aim;
   localStorage.setItem("ov_aim", OV.aim ? "1" : "");
   ovSync();
-applyRot();
 };
 $("ov-paths").onclick = () => {
   OV.paths = !OV.paths;
@@ -1066,7 +1082,21 @@ function drawWhy() {
   };
   line(g.cue, g.obj, "#8AA0FF", 1.6, [6, 5]);      // the approach
   line(g.obj, g.pocket, "#7DF29B", 1.8);           // should have gone
-  line(g.obj, g.went, "#E5484D", 1.8);             // actually went
+  // WHERE IT ACTUALLY WENT. Joe: "look at the purple 4 ball here, it's
+  // not travelling on your red line at all" -- because this used to be a
+  // straight ray re-derived from six samples of departure direction, and
+  // on that shot those samples straddled a half-second hole in the ball's
+  // track. We already MEASURED the path; draw the measurement. The ray is
+  // kept only as a fallback for shots that have no trail.
+  const targ = s.tags && s.tags.target;
+  const tr = (s.trails || []).find(e => e.n === targ && e.p && e.p.length > 2);
+  if (tr) {
+    const path = tr.p.map(q => [q[1], q[2]]);
+    for (let i = 1; i < path.length; i++)
+      line(path[i - 1], path[i], "#E5484D", 1.8);
+  } else {
+    line(g.obj, g.went, "#E5484D", 1.8);
+  }
   dot(g.obj, "#FFFFFF", 3.5);
   dot(g.pocket, "#7DF29B", 4.5);
   showLegend([["#7DF29B", "line to the pocket"],
