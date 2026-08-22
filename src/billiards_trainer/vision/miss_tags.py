@@ -32,6 +32,18 @@ STRAIGHT_DEG = 5.0
 _MOVE_PX = 6.0
 _STEP = 0.1
 
+#: Why the last tag_shot() call abstained. Diagnostics only — an abstention
+#: is silent by design (a guessed label is worse than none), but when
+#: coverage moves you need to know WHICH gate moved it. Same reasoning as
+#: RECOV_DEBUG: instrument the rejection paths, do not theorise about them.
+LAST_ABSTAIN = ""
+
+
+def _no(reason: str):
+    global LAST_ABSTAIN
+    LAST_ABSTAIN = reason
+    return None
+
 
 def _cross(ux, uy, vx, vy) -> float:
     """z of u x v in image coords (y grows DOWN). Negative = v lies to
@@ -74,15 +86,16 @@ def _first_motion(path: list) -> int | None:
 
 
 def tag_shot(reader, shot: dict, space) -> dict | None:
-    """Label one shot. Returns None when the geometry can't be read —
-    an honest abstention beats a guessed label (Joe's standing rule).
+    """Label one shot. Returns None when the geometry can't be read — an
+    honest abstention beats a guessed label (Joe's standing rule), and
+    ``LAST_ABSTAIN`` then says which gate stopped it.
 
     ``space`` is a TableSpace (true-inch frame); its pockets define the
     targets and its scale turns the miss into inches.
     """
     t0, t1 = float(shot.get("start", 0.0)), float(shot.get("end", 0.0))
     if t1 <= t0 or space is None:
-        return None
+        return _no("no shot window or no table space")
     lo, hi = max(0.0, t0 - 1.2), t1 + 0.5
     # --- the TARGET is the first object ball that moves in the window
     target, tpath, tidx = None, None, None
@@ -94,7 +107,7 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
         if target is None or p[i][0] < tpath[tidx][0]:
             target, tpath, tidx = num, p, i
     if target is None:
-        return None                       # nothing was struck
+        return _no("nothing was struck")
     contact_t = tpath[tidx][0]
     # CONTACT IS WHERE THE BALL WAS SITTING, not where it was first seen
     # moving. _first_motion returns the first sample DISPLACED from the
@@ -112,6 +125,20 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # straight into the rebound off the rail and reports the ball leaving
     # UP the table (measured on @233: v = (-0.118,-0.993), pointing back
     # the way it came). The outbound extremum is the honest departure.
+    # Measured to where the ball GOT TO before it turned back toward
+    # contact. Compared against the two alternatives across all 701
+    # strokes in the library:
+    #     rule       tagged  nonsense-angle  @233 (truth LEFT)
+    #     window        290        199         RIGHT   <- wrong
+    #     extremum      289        203         LEFT
+    #     heading       253        238         LEFT
+    # The original fixed 6-sample window ties this within noise on both
+    # aggregate counts and is wrong on the only shot with ground truth, so
+    # this is chosen for correctness at no measurable cost — not, as I
+    # first assumed, because it improves coverage. Stopping instead at a
+    # HEADING swing is clearly worse: the reference heading gets locked
+    # from a baseline of half a ball radius, which is far too short to be
+    # stable, so noise sets it and real samples then break the test.
     far, fx, fy = -1.0, ox, oy
     seg = []
     for q in tpath[tidx:]:
@@ -123,7 +150,7 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
             far, fx, fy = d, q[1], q[2]
     vx, vy = _unit(fx - ox, fy - oy)
     if (vx, vy) == (0.0, 0.0):
-        return None
+        return _no("object ball never displaced")
     # PATH CONTINUITY (005048 @233, Joe: "this one should be a pretty
     # clear miss left" against a tag that said right). That label was
     # measured across a 0.9s HOLE in the object ball's track: the strike
@@ -149,19 +176,19 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # verified to 0.15px over 232px in the frame forensics).
     cue = _track_path(reader, 0, lo, contact_t - 0.05)
     if len(cue) < 3:
-        return None
+        return _no("cue ball not tracked before contact")
     ax = sum(q[1] for q in cue[:5]) / min(5, len(cue))
     ay = sum(q[2] for q in cue[:5]) / min(5, len(cue))
     d = 2.0 * float(space.ball_r_px)
     cx_hit, cy_hit = ox - d * vx, oy - d * vy
     ux, uy = _unit(cx_hit - ax, cy_hit - ay)
     if (ux, uy) == (0.0, 0.0):
-        return None
+        return _no("degenerate cue direction")
     if math.hypot(cx_hit - ax, cy_hit - ay) < 3.0 * d:
-        return None                       # too close to resolve a direction
+        return _no("cue too close to the object ball to resolve a direction")
     cut = _signed_angle(ux, uy, vx, vy)
     if abs(cut) > 88.0:
-        return None                       # nonsense geometry
+        return _no("cut angle beyond 88 deg")
     # --- which pocket was he playing? the one whose line from the object
     # ball best explains where it actually went (ahead of it, smallest
     # angular disagreement). Inference, flagged as such.
@@ -174,7 +201,7 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
         if off < best_off:
             best, best_off = (name, px, py), off
     if best is None or best_off > 45.0:
-        return None
+        return _no("object path points at no pocket (>45 deg off)")
     pname, px, py = best
     # --- required cut for that pocket, and the error
     rx, ry = _unit(px - ox, py - oy)
