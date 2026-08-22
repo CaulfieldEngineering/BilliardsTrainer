@@ -1140,3 +1140,15 @@ Rounds continue with Joe's visual feedback as the gate.
   deferred to P2). Plus Joe's line-LENGTH slider in the paint pill
   (anchored endpoint, extend along angle, aspect-corrected). Joe should
   live with the gestures before P2 (chrome swap + IG-style overlays).
+- 2026-08-22 (12:30am, Joe-directed): SPLIT VERDICT shipped end-to-end
+  (Details -> "Split into two shots at playhead"; reader bisects;
+  watcher re-derives halves; carryover preserves; test pinned). Joe
+  asked for the MECHANISM, not just the patch: AUDIO-TRANSIENT
+  SEGMENTATION AID is now a designed goal — extract session audio,
+  detect cue-strike onsets (percussive, high-SNR; energy-derivative
+  picker, no ML), then (a) >=2 strikes inside one shot window ->
+  auto-split at the 2nd strike; (b) zero strikes in a "stroke" window
+  -> rearrange evidence; (c) Joe's manual split records = ground truth
+  for thresholds. Audio was only ever used for offline VALIDATION;
+  the live segmenter is vision-only today. Also tonight: Shot IDs,
+  pinch-zoom for paint, length slider, state-aware slo-mo button.
