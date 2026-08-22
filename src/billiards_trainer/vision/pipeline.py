@@ -740,7 +740,18 @@ class Pipeline:
         out = []
         for d, (rx, ry), (ox, oy) in zip(raw_dets, rect, rect_off, strict=False):
             out.append(Detection(float(rx), float(ry), float(np.hypot(ox - rx, oy - ry)),
-                                 d.bgr, d.cls, d.score, number=d.number))
+                                 d.bgr, d.cls, d.score, number=d.number,
+                                 # carry the MEASURED colour across the
+                                 # projection. Dropping it here quietly
+                                 # starved every consumer downstream:
+                                 # Detection.measured_bgr is the only feed
+                                 # for _Internal.colour_hist, so the
+                                 # colour-consensus and colour-adoption
+                                 # machinery in the tracker -- tested, and
+                                 # hardened by review -- never once ran on
+                                 # real footage. Measured on 005048 @233:
+                                 # 0 of 6 detections carried a colour.
+                                 measured_bgr=getattr(d, "measured_bgr", None)))
         return out
 
     def _camera_position(self, calib, frame_shape) -> np.ndarray | None:

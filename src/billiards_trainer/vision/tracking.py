@@ -15,6 +15,12 @@ from dataclasses import dataclass, field
 
 from ..core.types import BallClass, Detection, Track
 
+#: squared BGR distance at which a SETTLED track refuses a detection as
+#: "not my ball". White vs purple is ~300 (90k squared); glare and motion
+#: blur move a ball's own measured colour by well under half that, so the
+#: bar sits high enough to veto only the unambiguous cases.
+_COLOUR_VETO_SQ = 150.0 ** 2
+
 
 @dataclass
 class _Internal:
@@ -43,6 +49,10 @@ class _Internal:
     # whole life — the 6 went unnamed for a full session — but its colour
     # names it from any orientation. Arbitration adopts a mature consensus.
     colour_hist: deque = field(default_factory=lambda: deque(maxlen=40))
+    #: the raw MEASURED colours behind colour_hist. colour_hist stores the
+    #: derived ball number; a veto needs the colour itself, and t.bgr is a
+    #: canonical palette constant from the classifier, not a measurement.
+    mbgr_hist: deque = field(default_factory=lambda: deque(maxlen=20))
     pos_hist: deque = field(default_factory=lambda: deque(maxlen=64))
 
     def predict(self) -> None:
@@ -259,6 +269,33 @@ class BallTracker:
             return (d.cls != BallClass.UNKNOWN and tc != BallClass.UNKNOWN
                     and (tc == BallClass.CUE) != (d.cls == BallClass.CUE))
 
+        def _colour_contradicts(t, d) -> bool:
+            """A settled ball's own colour cannot change. 005048 @233: Joe
+            struck the purple 4; the arriving white CUE BALL came to rest
+            against it, and the 4's settled track took that white detection
+            28px away while the cue's own track sat 287px back at address,
+            far outside its gate. The track then rode the cue for the rest
+            of the shot and the 4's real path was never recorded — which is
+            what put Joe's miss on the wrong side of the pocket.
+
+            Distance cannot separate two touching balls, and the CLASS veto
+            above deliberately exempts healthy tracks so one-frame class
+            flicker never starves live tracking. Measured colour is the
+            stable signal the class vote is not: white against purple is a
+            BGR distance of ~300, far outside anything glare or blur does
+            to a ball's own reading. Only a LARGE mismatch vetoes, and only
+            for a settled track that has actually established a colour.
+            """
+            mb = getattr(d, "measured_bgr", None)
+            if mb is None or not t.settled or len(t.mbgr_hist) < 8:
+                return False
+            # compare MEASURED to MEASURED. t.bgr is the classifier's palette
+            # constant, so comparing against it vetoed a ball's own detections.
+            ref = [sorted(c[i] for c in t.mbgr_hist)[len(t.mbgr_hist) // 2]
+                   for i in range(3)]
+            return sum((float(a) - float(b)) ** 2
+                       for a, b in zip(mb, ref, strict=False)) > _COLOUR_VETO_SQ
+
         cls_pen = 0.30 * self._short_side
         pairs = []
         for ti, t in enumerate(self._tracks):
@@ -278,6 +315,8 @@ class BallTracker:
                     contra = t.confirmed and _contradicts(t, d)
                     if contra and t.committed_number >= 0 and t.misses >= 1:
                         continue
+                    if t.confirmed and _colour_contradicts(t, d):
+                        continue          # a resting ball did not change colour
                     pairs.append((dist + (cls_pen if contra else 0.0), ti, di))
         pairs.sort(key=lambda p: p[0])
 
@@ -872,6 +911,7 @@ class BallTracker:
             from ..core.balls import measured_identity
             t.colour_hist.append(
                 measured_identity(tuple(int(v) for v in mb)))
+            t.mbgr_hist.append(tuple(int(v) for v in mb))
         t.cls_hist.append(d.cls)
         t.num_hist.append(d.number)
         t.r_max = max(t.r_max, d.radius)

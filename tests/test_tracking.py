@@ -656,3 +656,55 @@ class TestFlightLinking:
             out = tr.update([neighbour], 400, ball_r=12.0)
         assert not [t for t in out if t.number == 5 and abs(t.x - 300) < 40], \
             "a resting neighbour stole the occluded ball's name"
+
+
+def _coloured(x, y, bgr, cls=BallClass.SOLID, num=-1, r=10):
+    """A detection carrying a MEASURED colour, as the ensemble detector emits."""
+    d = Detection(x=x, y=y, radius=r, cls=cls, number=num)
+    d.measured_bgr = bgr
+    return d
+
+
+PURPLE = (139, 30, 60)      # the solid 4
+WHITE = (245, 245, 245)     # the cue ball
+
+
+def test_settled_ball_refuses_a_detection_of_a_different_colour():
+    """005048@233, the swap that put Joe's miss on the wrong side.
+
+    He struck the purple 4. The cue ball rolled into it and came to rest
+    against it, so a WHITE detection appeared ~2 ball radii from the 4's
+    settled track — well inside the widened strike gate a settled track
+    gets. The class veto exempts healthy tracks, so that track adopted the
+    cue ball and rode it for the rest of the shot; the real 4 was never
+    recorded. Distance cannot separate two touching balls. Colour can.
+    """
+    tr = BallTracker(min_hits=3)
+    short = 552.0
+    for _ in range(40):                       # a settled, purple, numbered 4
+        tr.update([_coloured(200, 800, PURPLE, num=4)], short)
+    four = next(t for t in tr._tracks if t.committed_number == 4)
+    assert four.settled and len(four.colour_hist) >= 8
+
+    # the cue ball arrives and stops touching it; the 4 is gone (blurred)
+    for _ in range(3):
+        tr.update([_coloured(228, 800, WHITE, cls=BallClass.CUE)], short)
+
+    four = next(t for t in tr._tracks if t.id == four.id)
+    assert four.misses > 0, "the 4's track took the white ball instead of coasting"
+    assert abs(four.x - 200) < 12, f"the 4's track walked onto the cue at {four.x:.0f}"
+
+
+def test_colour_veto_does_not_block_a_ball_matching_its_own_colour():
+    """The veto must only fire on a LARGE mismatch — a ball's own reading
+    wanders under glare and blur, and vetoing that would starve tracking."""
+    tr = BallTracker(min_hits=3)
+    short = 552.0
+    for _ in range(40):
+        tr.update([_coloured(200, 800, PURPLE, num=4)], short)
+    four = next(t for t in tr._tracks if t.committed_number == 4)
+    # same ball, moved, with a glare-shifted reading of its own colour
+    tr.update([_coloured(232, 800, (170, 70, 95), num=4)], short)
+    same = next(t for t in tr._tracks if t.id == four.id)
+    assert same.misses == 0, "a ball's own glare-shifted colour was vetoed"
+    assert same.x > 210, "the track did not follow its own ball"

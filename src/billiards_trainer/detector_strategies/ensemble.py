@@ -46,6 +46,14 @@ class FindIdEnsemble(DetectorStrategy):
         found = self._finder.detect(frame_bgr, calib, rescan)
         if not found:
             return found
+        # Measure every ball's colour up front. Everything downstream that
+        # reasons about appearance depends on it, and it was previously set
+        # only on a rare correction path (see sample_colour).
+        for f in found:
+            try:
+                self.sample_colour(frame_bgr, f)
+            except Exception:  # noqa: BLE001 - a colour read is never fatal
+                pass
         # Identity pass every 2nd cycle (it costs a full tiled inference and
         # settled balls don't change number between cycles); stale identity
         # detections still match — the pairing radius absorbs the drift.
@@ -156,6 +164,35 @@ class FindIdEnsemble(DetectorStrategy):
         f.cls = BallClass.SOLID
         f.bgr = med
         f.measured_bgr = med
+
+    @staticmethod
+    def sample_colour(frame_bgr, f) -> None:
+        """Record what this ball ACTUALLY looks like, on every detection.
+
+        The tracker has a whole colour-evidence subsystem — colour_hist,
+        _colour_consensus, colour adoption, and the settled-track colour
+        veto — and all of it feeds on Detection.measured_bgr. That field
+        was only ever set on the rare path where the ensemble corrects a
+        number from an unambiguous colour, so it was None on 6 of 6
+        detections through the 005048 @233 strike: the subsystem was
+        starved, and the veto that should have stopped the purple 4's
+        track adopting the white cue ball could not fire.
+
+        Same tight, glare-trimmed crop the naming path already trusts,
+        just recorded unconditionally. This is a MEASUREMENT, not a
+        verdict: nothing here names a ball.
+        """
+        import numpy as np
+        rr = max(2, int(round(f.radius * 0.7)))
+        y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
+        crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
+        if crop.size < 30:
+            return
+        px = crop.reshape(-1, 3).astype(np.float32)
+        keep = px[px.mean(1) <= np.percentile(px.mean(1), 75)]   # trim glare
+        if len(keep) < 10:
+            return
+        f.measured_bgr = tuple(int(v) for v in np.median(keep, axis=0))
 
     @staticmethod
     def _fix_colour(frame_bgr, f) -> None:
