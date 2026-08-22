@@ -1554,3 +1554,20 @@ Rounds continue with Joe's visual feedback as the gate.
   own file), _locate 111. NEXT: the trajectory fit against the 12-miss
   label set — supersedes the departure heuristics and per-shot gates;
   flag blur-recovered detections so geometry can discount them.
+
+- 2026-08-23 (early) — Straight-roll validation shipped, from Joe pressing
+  on the "can't tell" verdict he refused to accept. Principle: a rolling
+  ball travels in a straight line, so a post-strike hole hides nothing IF
+  every observed outbound point is collinear with the resting spot
+  (residual bound 0.75 ball radii, judged on ALL observations — the
+  trajectory fit in miniature). @233 now exports "missed LEFT, 1.26in,
+  confidence HIGH" — matching Joe and the raw-video ground truth. The
+  gate now fires only when observations BEND (a cushion hidden in the
+  hole). Tests pin both directions; the fixture took three tries because
+  the reader interpolates away fake holes — a real hole is frames that
+  EXIST with the ball absent. Library re-export: trusted tags 30 -> 33,
+  hole-gated 36 -> 31; modest because most gated shots reappear with <2
+  usable pre-rail observations — the full trajectory fit (deceleration +
+  reflections) is what unlocks those. First real pattern visible in the
+  trusted set: Joe misses RIGHT 25:8 over left. Worth surfacing once the
+  fit lands and the sample grows.
