@@ -344,10 +344,10 @@
     </div>
     <div id="sheet">
       <p id="sh-desc"></p>
-      <button id="sh-split" class="lrow" style="height:40px;font-size:14px">
-        ✂ Split into two shots at playhead</button>
-      <button id="sh-copyid" class="lrow" style="height:40px;font-size:14px">
-        ⧉ Copy Shot ID <span class="chev" id="sh-idtxt"></span></button>
+      <div class="row">
+        <button id="sh-split">✂ Split at playhead</button>
+        <button id="sh-copyid">⧉ Copy Shot ID</button>
+      </div>
       <div class="row" id="sh-outcome">
         <button data-o="make">MAKE</button>
         <button data-o="miss">MISS</button>
@@ -1888,10 +1888,9 @@ $("sh-split").onclick = async () => {
   if (!target) return;
   const t = $("video").currentTime;
   if (!(t > target.start + 0.5 && t < target.end - 0.5)) {
-    $("sh-split").textContent =
-      "Scrub inside the clip to where shot 2 begins, then tap";
+    $("sh-split").textContent = "Scrub to shot 2 first";
     setTimeout(() => {
-      $("sh-split").textContent = "✂ Split into two shots at playhead";
+      $("sh-split").textContent = "✂ Split at playhead";
     }, 2200);
     return;
   }
@@ -1903,12 +1902,12 @@ $("sh-split").onclick = async () => {
                              start: target.start,
                              split: Math.round(t * 100) / 100 }),
     });
-    $("sh-split").textContent = "✓ Split queued — re-deriving both halves";
+    $("sh-split").textContent = "✓ Split queued";
   } catch (e) {
-    $("sh-split").textContent = "✕ Failed — try again";
+    $("sh-split").textContent = "✕ Failed — retry";
   }
   setTimeout(() => {
-    $("sh-split").textContent = "✂ Split into two shots at playhead";
+    $("sh-split").textContent = "✂ Split at playhead";
   }, 2500);
 };
 $("sh-copyid").onclick = async () => {
@@ -1916,13 +1915,13 @@ $("sh-copyid").onclick = async () => {
   const id = shotId(target);
   try {
     await navigator.clipboard.writeText(id);
-    $("sh-copyid").firstChild.textContent = "✓ Copied ";
+    $("sh-copyid").textContent = "✓ " + id;
   } catch (e) {
-    $("sh-copyid").firstChild.textContent = id + " ";
+    $("sh-copyid").textContent = id;
   }
   setTimeout(() => {
-    $("sh-copyid").firstChild.textContent = "⧉ Copy Shot ID ";
-  }, 1500);
+    $("sh-copyid").textContent = "⧉ Copy Shot ID";
+  }, 1800);
 };
 let target = null;    // the clip being corrected, FROZEN at sheet-open —
                       // playback keeps rolling and cur keeps advancing,
@@ -1945,7 +1944,6 @@ $("correct").onclick = () => {
   pending = {};
   target = shots[cur] || null;
   if (!target) return;
-  $("sh-idtxt").textContent = shotId(target);
   const no = shots.indexOf(target) + 1;
   // Details LOOPS the clip under judgment; the previous mode returns on
   // close (Joe). Snap playback onto the clip if it has rolled past.
