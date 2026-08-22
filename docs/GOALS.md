@@ -1296,3 +1296,39 @@ Rounds continue with Joe's visual feedback as the gate.
   wider gate, and a resting track must not accept a match onto a ball
   arriving at it (appearance/colour would separate a purple 4 from a
   white cue instantly). Needs library-wide measurement before it ships.
+
+- 2026-08-22 (late) — Joe reviewed 005048@233 on the phone and was right on
+  every count. Verified his call INDEPENDENTLY of the pipeline, by tracking
+  the 4 in the raw video with background differencing plus a colour match:
+  closest approach (210,1364), which is 26px from the BOTTOM SHORT rail and
+  45px from the left long rail — it reaches the SHORT rail first, exactly as
+  he said. It passes 32px on the SHORT-RAIL side of the pocket; the analysis
+  had it on the long-rail side, i.e. the wrong side. Feeding the TRUE path
+  through the existing formula gives cross(v, pocket-obj) = +27.9 => miss_side
+  LEFT — which is what Joe called it. So the left/right CONVENTION is correct
+  and stays; the wrong label came entirely from losing the ball mid-flight.
+  Joe also confirmed he is left-handed, which independently matches a
+  non-mirrored overhead view. No tags were flipped. That question is closed.
+  Shipped: overlay graphics rebuilt (one smoothed Path2D per line, thin core
+  under a faint same-hue bloom, gradient fade instead of a stroke per segment
+  — the beading came from stroking every segment with its own halo); the red
+  line now draws the MEASURED outbound leg instead of a re-derived ray; the
+  aim ray stops at the first ball it would hit instead of running to the
+  cushion; untrusted tags render greyed and marked, on both surfaces.
+  ATTEMPTED AND REVERTED, honestly: motion-blur detection recovery, to fix the
+  root cause Joe named ("hit really hard so the analysis isn't keeping up...
+  this may explain a lot of tracking losses"). The idea is right and the
+  information IS in the frames — my offline tracker followed both balls
+  through the blur. But the in-pipeline version adopted the WRONG blob: with
+  frame-to-frame differencing the retreating cue stick sits right where the
+  struck cue ball was, so the cue track drifted to (290,491) instead of
+  freezing at (263,516), while the real ball went the other way. A drifting
+  wrong position is worse than an honest gap, so it is out.
+  NEXT, and this is the highest-value work left: redo recovery the way the
+  offline tracker did it — a running MEDIAN background rather than a
+  frame-to-frame difference (kills the static felt/chalk and does not light up
+  the whole stick), a colour match against the specific ball's own reference,
+  and ballistic validation before acceptance (require 3+ frames of consistent
+  direction and speed). Note the first gate I wrote excluded the only case
+  that matters: I required move_streak>=2, but a struck ball was at REST one
+  frame earlier. Gate on "a confirmed track's detection just vanished".
