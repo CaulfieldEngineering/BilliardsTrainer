@@ -292,6 +292,7 @@ class UiSettings:
     schematic_birdseye: bool = True  # clean rendered overhead vs warped camera
     overlay_aim: bool = False        # playback: draw the stored aim line
     overlay_paths: bool = False      # playback: draw the stored ball paths
+    overlay_why: bool = False        # playback: draw the miss explanation
     mirror_preview: bool = False
     # Render balls in their MEASURED mean colour (a blue ball looks blue), with a
     # neutral grey "?" when the class is uncertain — instead of a fixed per-class

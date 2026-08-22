@@ -387,8 +387,10 @@ class LivePage(QWidget):
         # Analysis overlays (Joe): SAME stored geometry the phone draws.
         self._aim_btn = QPushButton("Aim")
         self._paths_btn = QPushButton("Paths")
+        self._why_btn = QPushButton("Why")
         for b, attr in ((self._aim_btn, "overlay_aim"),
-                        (self._paths_btn, "overlay_paths")):
+                        (self._paths_btn, "overlay_paths"),
+                        (self._why_btn, "overlay_why")):
             b.setObjectName("Ghost")
             b.setCheckable(True)
             b.setCursor(Qt.PointingHandCursor)
@@ -1078,8 +1080,9 @@ class LivePage(QWidget):
         ui = self._settings.ui
         want_aim = bool(getattr(ui, "overlay_aim", False))
         want_paths = bool(getattr(ui, "overlay_paths", False))
-        if doc is None or t < 0 or not (want_aim or want_paths):
-            self._persp.set_analysis(None, None, -1.0)
+        want_why = bool(getattr(ui, "overlay_why", False))
+        if doc is None or t < 0 or not (want_aim or want_paths or want_why):
+            self._persp.set_analysis(None, None, -1.0, None)
             return
         shot = None
         for sh in doc.get("shots", []):
@@ -1087,11 +1090,12 @@ class LivePage(QWidget):
                 shot = sh
                 break
         if shot is None:
-            self._persp.set_analysis(None, None, -1.0)
+            self._persp.set_analysis(None, None, -1.0, None)
             return
         aim = (shot.get("aim") or {}).get("p") if want_aim else None
         trails = shot.get("trails") if want_paths else None
-        self._persp.set_analysis(aim, trails, t)
+        tags = shot.get("tags") if getattr(ui, "overlay_why", False) else None
+        self._persp.set_analysis(aim, trails, t, tags)
 
     def _ingest_label_frame(self, packet) -> None:
         try:

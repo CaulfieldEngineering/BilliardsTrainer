@@ -124,7 +124,11 @@ def check_contract() -> dict:
                    {"length", "name", "start", "end", "map", "filter",
                     "forEach", "push", "slice", "tags", "trails", "aim",
                     "textContent", "style", "id", "className", "clips",
-                    "session", "mod", "slowmo", "label", "then", "catch"})
+                    "session", "mod", "slowmo", "label", "then", "catch",
+                    # client-side only (set by the player, never exported)
+                    "_session", "_slowmo", "_resolved",
+                    # session-row fields from /api/sessions, not shots.json
+                    "analyzed", "modified", "dur_s", "shots"})
     return {"written": sorted(written), "written_never_read": unread,
             "read_never_written": ghost}
 
@@ -136,22 +140,33 @@ def check_parity() -> dict:
     for sub in ("ui", "workers"):
         for p in (SRC / sub).rglob("*.py"):
             desktop += p.read_text(encoding="utf-8")
+    # INTENT, declared. A difference is only rot when nobody chose it:
+    # the PC renders slow motion and the phone requests it; playlists are
+    # a review-on-the-go idea. But anything ANALYTICAL marked "both" and
+    # found on one surface IS drift — Joe's rule is that the two must
+    # never disagree about what a shot means.
     caps = {
-        "aim-line overlay": (r"ov-aim|drawAim", r"overlay_aim|_aim\b"),
-        "ball-paths overlay": (r"ov-paths|drawTrails", r"overlay_paths|trails"),
-        "miss tags": (r"\.tags\b", r"tags"),
-        "playlists": (r"playlists", r"playlist"),
-        "smooth slo-mo": (r"rife", r"rife"),
-        "shot verdicts": (r"api/correct", r"correction|verdict"),
-        "drawing tools": (r"drawcv|Draw\.", r"draw_tools|annotation"),
-        "frame stepping": (r"fprev|fnext", r"frame_step|step_frame"),
+        "aim-line overlay": ("both", r"ov-aim|drawAim", r"overlay_aim"),
+        "ball-paths overlay": ("both", r"ov-paths|drawTrails",
+                               r"overlay_paths"),
+        "why-this-miss overlay": ("both", r"drawWhy|ov-why",
+                                  r"draw_why|why_miss"),
+        "miss tags": ("both", r"\.tags\b", r"miss_tags"),
+        "shot verdicts": ("both", r"api/correct", r"correction"),
+        "frame stepping": ("both", r"fprev|fnext", r"video_step|step_frame"),
+        "playlists": ("phone", r"playlists", r"playlist"),
+        "smooth slo-mo request": ("phone", r"rife", r"rife"),
+        "drawing tools": ("phone", r"drawcv|Draw\.", r"draw_tools"),
     }
     out = {}
-    for name, (pre, dre) in caps.items():
+    for name, (intent, pre, dre) in caps.items():
         on_phone = bool(re.search(pre, phone))
         on_desktop = bool(re.search(dre, desktop))
-        if on_phone != on_desktop:
-            out[name] = "phone only" if on_phone else "desktop only"
+        where = ("both" if on_phone and on_desktop else
+                 "phone" if on_phone else
+                 "desktop" if on_desktop else "neither")
+        if where != intent:
+            out[name] = f"intended {intent}, found {where}"
     return out
 
 

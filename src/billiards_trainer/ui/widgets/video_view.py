@@ -59,13 +59,14 @@ class VideoView(QWidget):
             self.update()
         super().leaveEvent(event)
 
-    def set_analysis(self, aim, trails, t: float) -> None:
+    def set_analysis(self, aim, trails, t: float, tags=None) -> None:
         """Playback analysis overlays from the SAME shots.json the phone
         reads (compute-once: the two surfaces can never disagree).
         ``aim`` = [[x1,y1],[x2,y2]] video-normalized or None; ``trails`` =
         [{"n": ball, "p": [[t,x,y],...]}] or None; ``t`` = media seconds."""
         self._aim = aim
         self._trails = trails
+        self._tags = tags
         self._media_t = float(t)
         # no forced repaint — set_frame() drives the per-frame update
 
@@ -96,6 +97,7 @@ class VideoView(QWidget):
                     p.setPen(QPen(col, 3))
                     p.drawLine(QPointF(X(pts[i - 1]), Y(pts[i - 1])),
                                QPointF(X(pts[i]), Y(pts[i])))
+        self._draw_why_miss(p, r)
         if aim:
             a = (0.0, aim[0][0], aim[0][1])
             b = (0.0, aim[1][0], aim[1][1])
@@ -107,6 +109,46 @@ class VideoView(QWidget):
             core.setAlphaF(0.8)
             p.setPen(QPen(core, 1.6, Qt.SolidLine, Qt.RoundCap))
             p.drawLine(QPointF(X(a), Y(a)), QPointF(X(b), Y(b)))
+
+    def _draw_why_miss(self, p: QPainter, r) -> None:
+        """The miss explanation — the SAME figure the phone draws, from
+        the same stored geometry (miss_tags.geom): the cue's approach,
+        the line to the pocket the ball was on, and the line it actually
+        took, plus the label. Parity is the contract."""
+        tags = getattr(self, "_tags", None)
+        g = (tags or {}).get("geom") if isinstance(tags, dict) else None
+        if not (g and all(k in g for k in ("cue", "obj", "pocket", "went"))):
+            return
+
+        def _pt(k):
+            return QPointF(r.x() + g[k][0] * r.width(),
+                           r.y() + g[k][1] * r.height())
+        pen = QPen(QColor("#8AA0FF"), 1.6)
+        pen.setStyle(Qt.DashLine)
+        p.setPen(pen)
+        p.drawLine(_pt("cue"), _pt("obj"))
+        p.setPen(QPen(QColor("#7DF29B"), 1.8))
+        p.drawLine(_pt("obj"), _pt("pocket"))
+        p.setPen(QPen(QColor("#E5484D"), 1.8))
+        p.drawLine(_pt("obj"), _pt("went"))
+        p.setBrush(QColor("#7DF29B"))
+        p.setPen(Qt.NoPen)
+        p.drawEllipse(_pt("pocket"), 4.5, 4.5)
+        p.setBrush(Qt.NoBrush)
+        head = ("Straight-in" if tags.get("cut") == "straight"
+                else f"{str(tags.get('cut', '')).title()} cut")
+        line = f"{head}, missed {tags.get('miss_side', '?')}"
+        if tags.get("fullness"):
+            line += f" — {tags['fullness']}"
+        p.setFont(QFont("Arial", 10, QFont.Bold))
+        box = QRectF(r.x() + 8, r.y() + r.height() - 26, r.width() - 16, 20)
+        p.setPen(QColor(13, 17, 23, 200))
+        p.setBrush(QColor(13, 17, 23, 200))
+        p.drawRect(QRectF(box.x() - 4, box.y() - 2,
+                          min(box.width(), 260), box.height()))
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QColor("#E6EDF3"))
+        p.drawText(box, Qt.AlignLeft | Qt.AlignVCenter, line)
 
     def set_balls(self, balls: list) -> None:
         """Ball markers for hover-to-reveal: [(x, y, r, label)] in image pixels.

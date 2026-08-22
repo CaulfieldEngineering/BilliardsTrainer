@@ -128,3 +128,36 @@ def test_video_view_draws_stored_aim_line(app):
                 hits += 1
                 break
     assert hits == 3, f"aim tracer not painted along the segment ({hits}/3)"
+
+
+def test_video_view_draws_the_miss_explanation(app):
+    """Surface parity (Joe: the two must never disagree about what a shot
+    means): the desktop draws the SAME 'why this miss' figure the phone
+    does, from the same stored geometry."""
+    import numpy as np
+    from PySide6.QtGui import QImage
+
+    from billiards_trainer.ui.widgets.video_view import VideoView
+
+    v = VideoView()
+    v.resize(400, 300)
+    v.show()
+    frame = np.zeros((300, 400, 3), np.uint8)
+    frame[:] = (60, 60, 60)
+    v.set_frame(frame)
+    v.set_analysis(None, None, 1.0, {
+        "cut": "left", "miss_side": "left", "fullness": "overcut",
+        "geom": {"cue": [0.2, 0.9], "obj": [0.5, 0.5],
+                 "pocket": [0.9, 0.2], "went": [0.75, 0.1]},
+    })
+    img = v.grab().toImage().convertToFormat(QImage.Format_RGB888)
+    greens = reds = 0
+    for x in range(0, img.width(), 2):
+        for y in range(0, img.height(), 2):
+            c = img.pixelColor(x, y)
+            if c.green() > 150 and c.green() > c.red() + 50:
+                greens += 1
+            elif c.red() > 150 and c.red() > c.green() + 50:
+                reds += 1
+    assert greens > 20, "the to-the-pocket line is missing"
+    assert reds > 20, "the where-it-went line is missing"
