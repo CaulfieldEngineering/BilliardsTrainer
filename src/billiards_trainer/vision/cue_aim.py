@@ -18,6 +18,7 @@ Aim direction points AWAY from the stick's mass (tip through ball).
 import math
 
 import cv2
+import numpy as np
 
 #: Bump when the aim GEOMETRY changes. Stored aim records carry this, and
 #: the exporter recomputes any record stamped with an older one -- without
@@ -28,7 +29,6 @@ import cv2
 #:       visible cue as possible")
 #:   3 = ray stops at the first ball it would hit, instead of the rail
 AIM_VERSION = 3
-import numpy as np
 
 #: minimum Hough segment length (rect px) — arms produce short curly
 #: edges at this threshold; the stick produces 100-400px runs

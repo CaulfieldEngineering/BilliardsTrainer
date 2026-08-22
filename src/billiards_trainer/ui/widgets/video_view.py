@@ -156,7 +156,7 @@ class VideoView(QWidget):
         p.setPen(QPen(QColor("#E5484D"), 1.8))
         path = self._target_path()
         if path:
-            for a, b in zip(path, path[1:]):
+            for a, b in zip(path, path[1:], strict=False):
                 p.drawLine(
                     QPointF(r.x() + a[0] * r.width(), r.y() + a[1] * r.height()),
                     QPointF(r.x() + b[0] * r.width(), r.y() + b[1] * r.height()))
