@@ -18,12 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from billiards_trainer.config import Settings  # noqa: E402
-from billiards_trainer.vision.analysis_cache import (  # noqa: E402
-    SidecarReader,
-    sidecar_path,
-)
-from billiards_trainer.vision.miss_tags import label, tag_shot  # noqa: E402
-from billiards_trainer.vision.tablespace import space_for_video  # noqa: E402
+from billiards_trainer.vision.miss_tags import label  # noqa: E402
 
 
 def main() -> int:
@@ -38,24 +33,27 @@ def main() -> int:
             else sorted(d.glob("session-*.mp4")))
     rows, skipped = [], Counter()
     for v in vids:
-        if not sidecar_path(v).is_file():
+        # Read the EXPORTED tags — the same ones the phone shows — so the
+        # pattern table can never disagree with what Joe sees on a clip.
+        sj = Path(str(v) + ".shots.json")
+        if not sj.is_file():
             continue
         try:
-            reader = SidecarReader(v)
+            doc = json.loads(sj.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        space = space_for_video(v, reader, st)
-        if space is None:
-            skipped["no_frame"] += 1
-            continue
-        for s in reader.shots:
+        for s in doc.get("shots", []):
             if s.get("outcome") != "miss":
                 continue
             if s.get("action", "stroke") not in ("stroke", "break"):
                 continue
-            tags = tag_shot(reader, s, space)
-            if tags is None:
-                skipped["ungeometric"] += 1
+            tags = s.get("tags")
+            if not tags:
+                skipped["untagged"] += 1
+                continue
+            tags = dict(tags)
+            if not str(tags.get("confidence", "high")).startswith("high"):
+                skipped["low_confidence"] += 1
                 continue
             tags["session"] = v.name
             tags["start"] = round(float(s.get("start", 0)), 2)

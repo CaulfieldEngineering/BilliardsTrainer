@@ -150,6 +150,23 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # perpendicular miss distance at the pocket
     miss_px = abs(side_sign) / max(1e-9, math.hypot(vx, vy))
     straight = abs(required) < STRAIGHT_DEG
+    # CONFIDENCE — the pocket is INFERRED, and a wrong inference inverts
+    # every label downstream. Two tells, both measured on the archive:
+    # a "miss" of a foot or more usually means the ball was played at a
+    # DIFFERENT pocket than the one geometry picked; and a sub-inch
+    # "miss" at the mouth is a ball that went in (or rattled), not a
+    # miss at all. Those tags stay in the record but are excluded from
+    # the pattern counts rather than quietly skewing them.
+    miss_in_val = (abs(side_sign) / max(1e-9, math.hypot(vx, vy))
+                   / space.px_per_in)
+    if miss_in_val > 8.0:
+        conf = "low: pocket inference doubtful (missed by %.0fin)" % miss_in_val
+    elif miss_in_val < 0.8:
+        conf = "low: ball was at the pocket mouth (rattle or mislabelled)"
+    elif best_off > 25.0:
+        conf = "low: object path %.0f deg off any pocket line" % best_off
+    else:
+        conf = "high"
     tags = {
         "target": int(target),
         "pocket": pname,
@@ -159,6 +176,7 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
         "miss_side": miss_side,
         "miss_in": round(miss_px / space.px_per_in, 2),
         "pocket_inferred": True,
+        "confidence": conf,
     }
     # GEOMETRY THE LABEL IS MADE OF (Joe: "an optional visual overlay to
     # understand where your 'shot left, misses left' definition is coming
