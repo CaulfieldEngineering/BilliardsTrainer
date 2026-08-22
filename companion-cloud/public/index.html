@@ -325,6 +325,8 @@
     </div>
     <div id="sheet">
       <p id="sh-desc"></p>
+      <button id="sh-split" class="lrow" style="height:40px;font-size:14px">
+        ✂ Split into two shots at playhead</button>
       <button id="sh-copyid" class="lrow" style="height:40px;font-size:14px">
         ⧉ Copy Shot ID <span class="chev" id="sh-idtxt"></span></button>
       <div class="row" id="sh-outcome">
@@ -1783,6 +1785,33 @@ function shotId(s2) {
     .replace(/^session-/, "").replace(/\.mp4$/, "");
   return `${sess}@${Math.round((s2 && s2.start) || 0)}`;
 }
+$("sh-split").onclick = async () => {
+  if (!target) return;
+  const t = $("video").currentTime;
+  if (!(t > target.start + 0.5 && t < target.end - 0.5)) {
+    $("sh-split").textContent =
+      "Scrub inside the clip to where shot 2 begins, then tap";
+    setTimeout(() => {
+      $("sh-split").textContent = "✂ Split into two shots at playhead";
+    }, 2200);
+    return;
+  }
+  try {
+    await api("/api/correct", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: target._session || curSession,
+                             start: target.start,
+                             split: Math.round(t * 100) / 100 }),
+    });
+    $("sh-split").textContent = "✓ Split queued — re-deriving both halves";
+  } catch (e) {
+    $("sh-split").textContent = "✕ Failed — try again";
+  }
+  setTimeout(() => {
+    $("sh-split").textContent = "✂ Split into two shots at playhead";
+  }, 2500);
+};
 $("sh-copyid").onclick = async () => {
   if (!target) return;
   const id = shotId(target);

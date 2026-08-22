@@ -319,3 +319,29 @@ class TestRespotDepartures:
         row = audit(vid)[0]
         assert row["derived"] == "miss", \
             "a hand-moved resting ball was booked as a pot"
+
+
+def test_split_record_bisects_the_shot(tmp_path):
+    """Joe: 'some shot clips actually include two shots.' A split record
+    bisects the clip; both halves exist with adjoining boundaries and
+    verdicts attach to the right half by containment."""
+    import json
+    from billiards_trainer.vision.analysis_cache import SidecarReader
+    vid = tmp_path / "s.mp4"
+    vid.write_bytes(b"0")
+    rows = [
+        {"type": "meta", "v": 1, "fps": 30},
+        {"type": "shot", "start": 10.0, "end": 30.0, "outcome": "make"},
+        {"type": "split", "start": 10.0, "at": 21.5},
+        {"type": "correction", "start": 24.0, "outcome": "scratch",
+         "src": "review"},
+    ]
+    (tmp_path / "s.mp4.analysis.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    r = SidecarReader(vid)
+    assert len(r.shots) == 2
+    assert (r.shots[0]["start"], r.shots[0]["end"]) == (10.0, 21.5)
+    assert (r.shots[1]["start"], r.shots[1]["end"]) == (21.5, 30.0)
+    assert r.shots[0]["outcome"] == "make"
+    assert r.shots[1]["outcome"] == "scratch", \
+        "verdict inside the second half must attach to it"

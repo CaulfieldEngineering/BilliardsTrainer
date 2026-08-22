@@ -20,12 +20,15 @@ module.exports = async (req, res) => {
   const clear = b.clear === true;
   const confirm = b.confirm === true;
   const rife = b.rife === true;
+  const split = isFinite(Number(b.split)) ? Number(b.split) : null;
   if (!name || !isFinite(start)
-      || (!outcome && !action && !note && !clear && !confirm && !rife)) {
+      || (!outcome && !action && !note && !clear && !confirm && !rife
+          && split == null)) {
     return res.status(400).json({ error: "bad verdict" });
   }
   const doc = { session: name, start: Math.round(start * 100) / 100,
                 ts: new Date().toISOString() };
+  if (split != null) doc.split = Math.round(split * 100) / 100;
   if (rife) {
     doc.rife = true;
     if (isFinite(Number(b.end))) doc.end = Math.round(Number(b.end) * 100) / 100;

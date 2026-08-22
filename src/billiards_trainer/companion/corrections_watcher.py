@@ -47,6 +47,22 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         start = float(d["start"])
     except (KeyError, TypeError, ValueError):
         return True
+    if isinstance(d.get("split"), (int, float)):
+        import json as _json
+        from ..vision.actions import classify_and_mark
+        from ..vision.analysis_cache import sidecar_path as _sp
+        from ..vision.outcomes import derive_and_correct
+        with open(_sp(video), "a", encoding="utf-8") as fh:
+            fh.write(_json.dumps({"type": "split",
+                                  "start": round(start, 3),
+                                  "at": round(float(d["split"]), 3)}) + "\n")
+        derive_and_correct(video)
+        classify_and_mark(video)
+        export_shots_summary(video)
+        export_library_index(recordings)
+        log.info("shot SPLIT: %s @ %.1fs at t=%.1fs", name, start,
+                 float(d["split"]))
+        return True
     if d.get("rife"):
         # Smooth slow-mo request (Joe: "Rife looks great... it pushes to
         # a slow mo playlist in a separate folder"): render 4x-interpolated

@@ -201,6 +201,23 @@ class SidecarReader:
                                   "action_corrected", "_action_reviewed",
                                   "note", "reviewed_ok"):
                             s.pop(k, None)
+                elif d.get("type") == "split":
+                    # HUMAN verdict (Joe: "some shot clips actually
+                    # include two shots"): bisect the clip at `at`; each
+                    # half re-derives independently (the watcher re-runs
+                    # derivation right after appending this record).
+                    s = _shot_for(self.shots, float(d["start"]))
+                    at = float(d.get("at", -1))
+                    if (s is not None
+                            and float(s.get("start", 0)) < at
+                            < float(s.get("end", 0))):
+                        idx = self.shots.index(s)
+                        second = {"type": "shot", "start": round(at, 3),
+                                  "end": s.get("end"),
+                                  "outcome": "miss", "pocketed": 0,
+                                  "_orig_outcome": "miss"}
+                        s["end"] = round(at, 3)
+                        self.shots.insert(idx + 1, second)
                 elif d.get("type") == "note":
                     # plain-text review note (phone correction Details)
                     s = _shot_for(self.shots, float(d["start"]))
@@ -336,7 +353,7 @@ def carry_review_verdicts(prev_sidecar: str | Path,
             except ValueError:
                 continue
             t = d.get("type")
-            keep = (t in ("note", "reviewed", "correction_clear")
+            keep = (t in ("note", "reviewed", "correction_clear", "split")
                     or (t == "correction" and d.get("src") == "review")
                     or (t == "action" and d.get("src") == "review"))
             if keep:
