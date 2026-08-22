@@ -1128,18 +1128,25 @@ function fitCanvas(cv, box) {
   return dpr;
 }
 
+//: object-fit:contain letterboxing -- where the picture actually sits
+//: inside the canvas, and the mapper from normalized video coords to
+//: device pixels. All three overlays computed this separately.
+function videoBox(cv, v) {
+  const box = cv.parentElement.getBoundingClientRect();
+  const dpr = fitCanvas(cv, box);
+  const sc = Math.min(box.width / v.videoWidth, box.height / v.videoHeight);
+  const cw = v.videoWidth * sc, ch = v.videoHeight * sc;
+  const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
+  return { box, dpr, P: q => [(ox + q[0] * cw) * dpr, (oy + q[1] * ch) * dpr] };
+}
+
 function drawWhy() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   const g = s && (s.lines || (s.tags && s.tags.geom));
   if (!g || !v.videoWidth) { hideLegend(); return; }
-  const box = cv.parentElement.getBoundingClientRect();
-  const dpr = fitCanvas(cv, box);
+  const { dpr, P } = videoBox(cv, v);
   const ctx = cv.getContext("2d");
-  const sc = Math.min(box.width / v.videoWidth, box.height / v.videoHeight);
-  const cw = v.videoWidth * sc, ch = v.videoHeight * sc;
-  const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
-  const P = p2 => [(ox + p2[0] * cw) * dpr, (oy + p2[1] * ch) * dpr];
   const line = (a, b, col, w, dash) =>
     strokeLine(ctx, smoothPath([P(a), P(b)]), col, w, dpr, { dash: dash });
   const dot = (a, col, r) => { const q = P(a); markDot(ctx, q[0], q[1], col, r, dpr); };
@@ -1194,19 +1201,13 @@ function drawAim() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   if (!s || !s.aim || !v.videoWidth) return;
-  const box = cv.parentElement.getBoundingClientRect();
-  const dpr = fitCanvas(cv, box);
+  const { dpr, P } = videoBox(cv, v);
   const ctx = cv.getContext("2d");
-  const scale = Math.min(box.width / v.videoWidth,
-                         box.height / v.videoHeight);
-  const cw = v.videoWidth * scale, ch = v.videoHeight * scale;
-  const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
   const [a, b] = s.aim.p;
-  const Q = q => [(ox + q[0] * cw) * dpr, (oy + q[1] * ch) * dpr];
   // amber, NOT the green of "line to the pocket": with both overlays on,
   // two different meanings in one colour read as a single line running
   // straight through the object ball.
-  strokeLine(ctx, smoothPath([Q(a), Q(b)]), "#F0B429", 1.2, dpr);
+  strokeLine(ctx, smoothPath([P(a), P(b)]), "#F0B429", 1.2, dpr);
 }
 
 function drawTrails() {
@@ -1217,12 +1218,9 @@ function drawTrails() {
   const ctx = cv.getContext("2d");
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (!s || !s.trails || !v.videoWidth) return;
-  const scale = Math.min(box.width / v.videoWidth,
-                         box.height / v.videoHeight);
-  const cw = v.videoWidth * scale, ch = v.videoHeight * scale;
-  const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
+  const { P } = videoBox(cv, v);
   const t = v.currentTime;
-  const Q = q => [(ox + q[1] * cw) * dpr, (oy + q[2] * ch) * dpr];
+  const Q = q => P([q[1], q[2]]);      // trail points are [t, x, y]
   s.trails.forEach(tr => {
     // WHOLE SHOT, not a 4s tail (Joe: "should persist through the
     // entire duration of the shot") — the path is the record of what
