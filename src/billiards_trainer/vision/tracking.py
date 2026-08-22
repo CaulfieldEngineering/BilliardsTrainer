@@ -310,6 +310,14 @@ class BallTracker:
             for di in unmatched_dets:
                 d = detections[di]
                 dist = math.hypot(t.x - d.x, t.y - d.y)
+                # A blur-recovered detection names the track it belongs to.
+                # A struck ball is far outside any gate by the time it is
+                # found again — that is the whole reason it needed
+                # recovering — so the gate must not be the thing that
+                # rejects it. It still competes on distance below.
+                if getattr(d, "recovered_for", None) == t.id:
+                    pairs.append((dist, ti, di))
+                    continue
                 if dist <= t_gate:
                     contra = t.confirmed and _contradicts(t, d)
                     if contra and t.committed_number >= 0 and t.misses >= 1:
