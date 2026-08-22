@@ -71,7 +71,7 @@ def test_overhead_uses_synthetic_center_pose():
     # the table centre at the configured lens height.
     import types
 
-    from billiards_trainer.vision.geometry import TableModel
+    from billiards_trainer.core.geometry import TableModel
     from billiards_trainer.vision.pipeline import Pipeline
 
     s = Settings()

@@ -7,9 +7,9 @@ blit a QImage) and keeps the live + rectified overlays visually consistent.
 import cv2
 import numpy as np
 
-from .geometry import TableModel
-from .rectify import project_points
-from .types import BallClass, Track
+from ..core.geometry import TableModel
+from ..core.rectify import project_points
+from ..core.types import BallClass, Track
 
 _CLS_COLOR = {
     BallClass.CUE: (255, 255, 255),

@@ -20,9 +20,9 @@ import cv2
 import numpy as np
 
 from ..config import FeltSettings, Settings
+from ..core.geometry import TableModel
+from ..core.rectify import rectify_tabletop
 from .felt import detect_felt, estimate_felt_settings
-from .geometry import TableModel
-from .rectify import rectify_tabletop
 
 log = logging.getLogger("vision.calibration")
 

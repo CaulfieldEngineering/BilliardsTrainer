@@ -12,10 +12,10 @@ Three mechanisms, all found by looking at actual violation frames:
 """
 
 from billiards_trainer.config import Settings
+from billiards_trainer.core.geometry import expected_ball_radius_px
+from billiards_trainer.core.types import BallClass, Detection
 from billiards_trainer.detector_strategies.onnx_model import OnnxModelStrategy
-from billiards_trainer.vision.geometry import expected_ball_radius_px
 from billiards_trainer.vision.tracking import BallTracker
-from billiards_trainer.vision.types import BallClass, Detection
 
 
 # --------------------------------------------------------------------------- #
@@ -74,7 +74,7 @@ class TestSeamDrop:
 def _fake_calib():
     import numpy as np
 
-    from billiards_trainer.vision.geometry import TableModel
+    from billiards_trainer.core.geometry import TableModel
 
     class C:
         H = np.eye(3)

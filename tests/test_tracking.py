@@ -1,7 +1,7 @@
 """Tracker tests using synthetic detections (deterministic, detector-independent)."""
 
+from billiards_trainer.core.types import BallClass, Detection
 from billiards_trainer.vision.tracking import BallTracker
-from billiards_trainer.vision.types import BallClass, Detection
 
 
 def det(x, y, cls=BallClass.SOLID, r=10):
@@ -277,7 +277,7 @@ class TestColourAdoption:
         from pathlib import Path
 
         import billiards_trainer.config as cfg
-        from billiards_trainer.vision import balls
+        from billiards_trainer.core import balls
         fixture = Path(__file__).parent / "fixtures" / "colour_refs.json"
         shutil.copy2(fixture, tmp_path / "colour_refs.json")
         monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
@@ -350,7 +350,7 @@ class TestColourAdoption:
         """Pin for len(colour_hist) >= 25: a mature track whose colour was
         confidently measured only a handful of times must not adopt
         (mutation deleting the floor survived the old suite)."""
-        from billiards_trainer.vision.types import BallClass
+        from billiards_trainer.core.types import BallClass
         self._refs(monkeypatch, tmp_path)
         tr = BallTracker(min_hits=2, still_frames=3)
         out = []

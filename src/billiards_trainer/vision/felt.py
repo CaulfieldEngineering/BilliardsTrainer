@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 
 from ..config import FeltSettings
-from .types import FeltResult
+from ..core.types import FeltResult
 
 
 def _build_mask(bgr: np.ndarray, felt: FeltSettings) -> np.ndarray:

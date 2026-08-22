@@ -10,10 +10,10 @@ import time
 import numpy as np
 import pytest
 
+from billiards_trainer.core.geometry import TableModel
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.detector_strategies import table_polygon_mask
-from billiards_trainer.vision.geometry import TableModel
 from billiards_trainer.vision.overlay import render_schematic
-from billiards_trainer.vision.types import BallClass, Track
 
 
 # --------------------------------------------------------------------------- #

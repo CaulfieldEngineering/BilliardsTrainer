@@ -14,7 +14,7 @@ Returns [] rather than raising on any frame (self-healing contract).
 import cv2
 import numpy as np
 
-from ..vision.types import BallClass, Detection
+from ..core.types import BallClass, Detection
 from . import DetectorStrategy, ball_radius_raw, table_polygon_mask
 
 

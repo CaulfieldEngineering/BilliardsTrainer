@@ -16,13 +16,13 @@ import cv2
 import numpy as np
 
 from ..config import CALIBRATION_PATH, Settings
+from ..core.geometry import TableModel, expected_ball_radius_px
+from ..core.types import BallClass, Detection, Track
 from ..events.shot_detector import ShotDetector, ShotEvent
 from .background import BackgroundModel, downscale, flow_activity
 from .calibration import CalibrationManager
-from .geometry import TableModel, expected_ball_radius_px
 from .overlay import draw_perspective, draw_rectified, render_schematic
 from .tracking import BallTracker
-from .types import BallClass, Detection, Track
 
 log = logging.getLogger("vision.pipeline")
 
@@ -675,7 +675,7 @@ class Pipeline:
             if self._paths_alpha <= 0.0:
                 self._play_paths.clear()
         self._prev_shot_state = shot_state
-        from .balls import pool_ball_bgr
+        from ..core.balls import pool_ball_bgr
         for tr in tracks:
             if tr.misses > 0 or (abs(tr.vx) + abs(tr.vy)) < 1.2:
                 continue
@@ -727,7 +727,7 @@ class Pipeline:
         bias everywhere (and tightens pocket-capture geometry for free)."""
         if not raw_dets:
             return []
-        from .rectify import project_points
+        from ..core.rectify import project_points
         pts = np.array([[d.x, d.y] for d in raw_dets], np.float64)
         rect = project_points(pts, calib.H)
         off = np.array([[d.x + max(d.radius, 1.0), d.y] for d in raw_dets], np.float64)
@@ -770,7 +770,7 @@ class Pipeline:
         key = (calib.H.tobytes(), frame_shape[1], frame_shape[0])
         if self._cam_pose is not None and self._cam_pose[0] == key:
             return self._cam_pose[1]
-        from .rectify import estimate_camera_position
+        from ..core.rectify import estimate_camera_position
         cam = estimate_camera_position(calib.Hinv, (frame_shape[1], frame_shape[0]))
         if cam is not None:
             # plausibility: the camera should sit somewhere between "just above

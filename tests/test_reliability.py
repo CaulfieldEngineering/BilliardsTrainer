@@ -6,11 +6,11 @@ import numpy as np
 
 from billiards_trainer.capture.camera import DemoSource
 from billiards_trainer.config import FeltSettings, Settings, ShotClockSettings
+from billiards_trainer.core.types import BallClass, Detection
 from billiards_trainer.game.shot_clock import ShotClock
 from billiards_trainer.vision.calibration import CalibrationManager
 from billiards_trainer.vision.felt import felt_from_point
 from billiards_trainer.vision.tracking import BallTracker
-from billiards_trainer.vision.types import BallClass, Detection
 
 
 # ---- calibration persistence --------------------------------------------- #
@@ -235,7 +235,7 @@ def _synthetic_plane_camera(cam_center, img_w=1920, img_h=1080, f=1400.0):
 
 
 def test_camera_position_recovery_from_homography():
-    from billiards_trainer.vision.rectify import estimate_camera_position
+    from billiards_trainer.core.rectify import estimate_camera_position
     for true_c in [(283.0, 1900.0, 700.0), (100.0, 1600.0, 500.0),
                    (500.0, 2400.0, 420.0)]:
         G = _synthetic_plane_camera(true_c)
@@ -251,10 +251,10 @@ def test_parallax_correction_pulls_projected_balls_toward_camera():
     camera ray — and leave points untouched when the flag is off."""
     import types
 
-    from billiards_trainer.vision.geometry import TableModel, expected_ball_radius_px
+    from billiards_trainer.core.geometry import TableModel, expected_ball_radius_px
+    from billiards_trainer.core.rectify import project_points
+    from billiards_trainer.core.types import Detection
     from billiards_trainer.vision.pipeline import Pipeline
-    from billiards_trainer.vision.rectify import project_points
-    from billiards_trainer.vision.types import Detection
 
     cam = np.array([283.0, 1900.0, 480.0])       # like the real rig: end-on, ~55" up
     G = _synthetic_plane_camera(cam)             # rect -> image

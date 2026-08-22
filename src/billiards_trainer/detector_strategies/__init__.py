@@ -19,8 +19,8 @@ import pkgutil
 import cv2
 import numpy as np
 
-from ..vision.rectify import project_points
-from ..vision.types import BallClass, Detection
+from ..core.rectify import project_points
+from ..core.types import BallClass, Detection
 
 log = logging.getLogger("detector_strategies")
 
@@ -151,7 +151,7 @@ def project_rect_dets_to_raw(dets, calib) -> list[Detection]:
 
 def classify_crop(frame_bgr, cx, cy, r) -> tuple[BallClass, tuple]:
     """Colour/type of a ball from its raw-frame crop (reuses the classical logic)."""
-    from ..vision.balls import classify_ball
+    from ..core.balls import classify_ball
     h, w = frame_bgr.shape[:2]
     x0, y0 = max(0, int(cx - r)), max(0, int(cy - r))
     x1, y1 = min(w, int(cx + r) + 1), min(h, int(cy + r) + 1)

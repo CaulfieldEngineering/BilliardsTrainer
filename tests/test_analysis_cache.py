@@ -1,13 +1,13 @@
 """The analysis sidecar: write once, play back forever (Joe's architecture:
 'by the time we're playing back, it should all be cached data')."""
 
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.events.shot_detector import ShotEvent, ShotOutcome
 from billiards_trainer.vision.analysis_cache import (
     SidecarReader,
     SidecarWriter,
     sidecar_path,
 )
-from billiards_trainer.vision.types import BallClass, Track
 
 
 def _track(tid, x, y, num=3):

@@ -3,8 +3,8 @@
 import cv2
 import numpy as np
 
-from billiards_trainer.vision.balls import classify_pool_ball
-from billiards_trainer.vision.types import BallClass
+from billiards_trainer.core.balls import classify_pool_ball
+from billiards_trainer.core.types import BallClass
 
 FELT_HSV = (99, 199, 255)   # Joe's blue felt, as calibrated
 

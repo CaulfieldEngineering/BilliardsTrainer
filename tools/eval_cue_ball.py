@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from billiards_trainer.config import Settings  # noqa: E402
+from billiards_trainer.core.types import BallClass  # noqa: E402
 from billiards_trainer.vision.pipeline import Pipeline  # noqa: E402
-from billiards_trainer.vision.types import BallClass  # noqa: E402
 
 
 def main() -> int:

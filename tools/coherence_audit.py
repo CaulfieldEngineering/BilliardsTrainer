@@ -44,7 +44,7 @@ CONCEPTS = {
     },
     "true-inch scale": {
         "owner": "vision/tablespace.py",
-        "signals": [r"2\.25", r"px_per_in", r"BALL_DIAM"],
+        "signals": [r"px_per_in", r"BALL_DIAM"],
     },
     "shot geometry (cut/aim angles)": {
         "owner": "vision/miss_tags.py",

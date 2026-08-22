@@ -150,7 +150,7 @@ def load_detector():
 def build_layouts(session: Path, max_layouts: int = 12, stride: int = 2,
                   progress=None) -> list[Layout]:
     """Session -> distinct settled layouts, each with detected ball boxes."""
-    from ..vision.balls import classify_pool_ball
+    from ..core.balls import classify_pool_ball
     frames = load_frames(session, stride)
     if not frames:
         return []

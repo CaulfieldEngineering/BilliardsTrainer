@@ -12,8 +12,8 @@ import numpy as np
 
 from billiards_trainer.capture.camera import DemoSource
 from billiards_trainer.config import Settings
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.vision.pipeline import Pipeline
-from billiards_trainer.vision.types import BallClass, Track
 
 
 # ---- ball colour rendering (the "why were balls yellow/black" fix) -------- #

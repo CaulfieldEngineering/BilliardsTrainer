@@ -197,7 +197,7 @@ def _write_crop_sheet(path: Path, frame: np.ndarray, dets, cell: int = 150,
 
 
 def stage_montages(args) -> int:
-    from billiards_trainer.vision.balls import classify_pool_ball
+    from billiards_trainer.core.balls import classify_pool_ball
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
     tmp: list = []

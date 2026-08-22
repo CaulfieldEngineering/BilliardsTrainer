@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import logging
 
-from ..vision.balls import pool_ball_bgr, stripe_reading
-from ..vision.types import BallClass
+from ..core.balls import pool_ball_bgr, stripe_reading
+from ..core.types import BallClass
 from . import DetectorStrategy, onnx_model
 
 log = logging.getLogger("detector.ensemble")
@@ -124,7 +124,7 @@ class FindIdEnsemble(DetectorStrategy):
         band is model-readable from any orientation; whites never name), and
         the result is an ordinary per-frame READ: the tracker still demands
         a 3-vote majority and global uniqueness before commitment."""
-        from ..vision.balls import lab_distance_to_ref, measured_identity
+        from ..core.balls import lab_distance_to_ref, measured_identity
         rr = max(2, int(round(f.radius * 0.7)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
         crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
@@ -146,7 +146,7 @@ class FindIdEnsemble(DetectorStrategy):
         # (review finding). And FAIL CLOSED: no runner-up reference to
         # measure a margin against means no decisive naming, not a free
         # pass — a sparse regenerated refs file must not widen the gate.
-        from ..vision.balls import _load_measured_refs
+        from ..core.balls import _load_measured_refs
         runner = min((d for k in _load_measured_refs() if k != m
                       for d in [lab_distance_to_ref(med, k)] if d is not None),
                      default=None)
@@ -177,7 +177,7 @@ class FindIdEnsemble(DetectorStrategy):
             return FindIdEnsemble._fix_stripe_colour(frame_bgr, f)
         # SOLID FAMILY (1..8): whole-crop median arbitrates identity — the
         # dark trio 4/7/8 is THE confusion cluster under warm light.
-        from ..vision.balls import lab_distance_to_ref, measured_identity
+        from ..core.balls import lab_distance_to_ref, measured_identity
         rr = max(2, int(round(f.radius * 0.7)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
         crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
@@ -214,7 +214,7 @@ class FindIdEnsemble(DetectorStrategy):
         nothing). Sample only the saturated band pixels and compare to the
         SOLID references (a band is its base colour). No band at all means
         the "stripe" is the CUE (0-as-15 x5) — hand it back."""
-        from ..vision.balls import band_colour, lab_distance_to_ref, measured_identity
+        from ..core.balls import band_colour, lab_distance_to_ref, measured_identity
         n = f.number
         rr = max(2, int(round(f.radius * 0.85)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)

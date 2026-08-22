@@ -65,8 +65,8 @@ except Exception:  # noqa: BLE001
     pass
 
 from billiards_trainer.config import Settings  # noqa: E402
+from billiards_trainer.core.rectify import project_points  # noqa: E402
 from billiards_trainer.vision.pipeline import Pipeline  # noqa: E402
-from billiards_trainer.vision.rectify import project_points  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #

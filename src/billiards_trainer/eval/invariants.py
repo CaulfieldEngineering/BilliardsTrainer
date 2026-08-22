@@ -40,7 +40,7 @@ import math
 from collections import Counter
 from dataclasses import dataclass, field
 
-from ..vision.types import BallClass, Track
+from ..core.types import BallClass, Track
 
 # --------------------------------------------------------------------------- #
 # Physical constants, in ball diameters (see "Scale independence" above).

@@ -23,8 +23,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..config import BallSettings, DetectionSettings
-from ..vision.geometry import TableModel
-from ..vision.types import BallClass, Track
+from ..core.geometry import TableModel
+from ..core.types import BallClass, Track
 
 log = logging.getLogger("events.shot")
 

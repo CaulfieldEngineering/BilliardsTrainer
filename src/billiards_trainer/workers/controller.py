@@ -26,13 +26,13 @@ from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 from ..capture import audio as audio_mod
 from ..capture.preprocess import preprocess_frame
 from ..config import EXPORTS_DIR, SHOTLOG_PATH, Settings
+from ..core.types import BallClass
 from ..db.repository import Repository
 from ..events.shot_detector import ShotEvent
 from ..game.shot_clock import ShotClock
 from ..version import __version__
 from ..vision.felt import felt_from_point
 from ..vision.pipeline import Pipeline
-from ..vision.types import BallClass
 
 log = logging.getLogger("controller")
 

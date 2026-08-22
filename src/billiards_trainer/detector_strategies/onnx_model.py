@@ -18,8 +18,8 @@ import cv2
 import numpy as np
 
 from ..config import MODELS_DIR as USER_MODELS_DIR
-from ..vision.balls import classify_pool_ball, number_to_class, pool_ball_bgr
-from ..vision.types import BallClass, Detection
+from ..core.balls import classify_pool_ball, number_to_class, pool_ball_bgr
+from ..core.types import BallClass, Detection
 from . import (
     DetectorStrategy,
     ball_radius_raw,

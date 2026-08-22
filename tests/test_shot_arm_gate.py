@@ -15,9 +15,9 @@ survivor.)
 """
 
 from billiards_trainer.config import Settings
+from billiards_trainer.core.geometry import TableModel
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.events.shot_detector import ShotDetector
-from billiards_trainer.vision.geometry import TableModel
-from billiards_trainer.vision.types import BallClass, Track
 
 
 def _table() -> TableModel:

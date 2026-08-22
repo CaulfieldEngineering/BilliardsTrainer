@@ -105,7 +105,7 @@ def main() -> int:
             # and ball size from its calibration — not re-derived from the
             # frame (the rect frame is bed + margin, so a frame-derived ruler
             # over-measures whenever the lock includes any rail).
-            from billiards_trainer.vision.geometry import expected_ball_radius_px
+            from billiards_trainer.core.geometry import expected_ball_radius_px
             calib = getattr(pipeline.calib, "calib", None)
             if calib is not None:
                 tbl = calib.table

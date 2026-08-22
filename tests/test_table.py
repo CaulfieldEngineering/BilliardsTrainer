@@ -7,8 +7,8 @@ Python output against the labelled C++ reference capture.
 import numpy as np
 
 from billiards_trainer.config import FeltSettings
+from billiards_trainer.core.rectify import project_points, rectify_tabletop
 from billiards_trainer.vision.felt import detect_felt
-from billiards_trainer.vision.rectify import project_points, rectify_tabletop
 
 
 def _rmse(a, b):
@@ -18,7 +18,7 @@ def _rmse(a, b):
 def test_expected_ball_radius_scales_with_bed_size():
     """The known ball radius (2.25in ball) in rectified px scales with table size:
     a smaller bed packs the same ball into proportionally more pixels."""
-    from billiards_trainer.vision.geometry import TableModel, expected_ball_radius_px
+    from billiards_trainer.core.geometry import TableModel, expected_ball_radius_px
 
     # short side = play width; build a table whose short side is 400 px
     table = TableModel.from_rect((400 + 40, 800 + 40), pad=20)
@@ -34,9 +34,9 @@ def test_expected_ball_radius_scales_with_bed_size():
 def test_render_schematic_fixed_radius_overrides_track_radius():
     """fixed_radius makes every ball the same drawn size regardless of the
     tracker's per-ball radius (the bird's-eye size-normalization)."""
-    from billiards_trainer.vision.geometry import TableModel
+    from billiards_trainer.core.geometry import TableModel
+    from billiards_trainer.core.types import BallClass, Track
     from billiards_trainer.vision.overlay import render_schematic
-    from billiards_trainer.vision.types import BallClass, Track
 
     table = TableModel.from_rect((300, 560), pad=20)
     cx = table.x0 + 40

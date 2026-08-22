@@ -29,7 +29,7 @@ import logging
 from bisect import bisect_right
 from pathlib import Path
 
-from .types import BallClass, Track
+from ..core.types import BallClass, Track
 
 log = logging.getLogger("vision.cache")
 
@@ -315,7 +315,7 @@ class SidecarReader:
         if num == 0:
             bgr = (250, 250, 250)
         elif num > 0:
-            from .balls import pool_ball_bgr
+            from ..core.balls import pool_ball_bgr
             bgr = pool_ball_bgr(num)
         else:
             bgr = (200, 200, 200)

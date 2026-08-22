@@ -22,8 +22,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from billiards_trainer.config import FeltSettings  # noqa: E402
+from billiards_trainer.core.rectify import rectify_tabletop  # noqa: E402
 from billiards_trainer.vision.felt import detect_felt  # noqa: E402
-from billiards_trainer.vision.rectify import rectify_tabletop  # noqa: E402
 
 CORNER_ORDER = ("TL", "TR", "BR", "BL")
 

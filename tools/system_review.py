@@ -38,7 +38,7 @@ API = ROOT / "companion-cloud" / "api"
 #: and anything BELOW it, never above. This is the contract the block
 #: diagram is checked against.
 LAYERS = {
-    "config": 0, "db": 0, "version": 0,
+    "config": 0, "db": 0, "version": 0, "core": 0,
     "capture": 1, "vision": 1, "events": 1, "detector_strategies": 1,
     "pose": 1,
     "cue": 2, "game": 2, "train": 2, "eval": 2, "sync": 2, "update": 2,

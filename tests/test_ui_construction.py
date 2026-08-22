@@ -125,8 +125,8 @@ def test_training_mode_label_correct_add_save(app):
     import numpy as np
 
     from billiards_trainer.config import Settings
+    from billiards_trainer.core.types import BallClass, Detection
     from billiards_trainer.ui.pages.live_page import LivePage
-    from billiards_trainer.vision.types import BallClass, Detection
 
     lp = LivePage(Settings())
     lp.set_training(True)
@@ -163,8 +163,8 @@ def test_training_entry_on_paused_frame_no_phantom_ball(app):
     import numpy as np
 
     from billiards_trainer.config import Settings
+    from billiards_trainer.core.types import BallClass, Detection
     from billiards_trainer.ui.pages.live_page import LivePage
-    from billiards_trainer.vision.types import BallClass, Detection
 
     # A: no frame yet -> click is a no-op, never a phantom ball at (0,0)
     lp = LivePage(Settings())
@@ -421,8 +421,8 @@ def test_shot_clock_cue_ball_rules(app):
     from pathlib import Path
 
     from billiards_trainer.config import Settings
+    from billiards_trainer.core.types import BallClass
     from billiards_trainer.db.repository import Repository
-    from billiards_trainer.vision.types import BallClass
     from billiards_trainer.workers.controller import PipelineController
 
     s = Settings()

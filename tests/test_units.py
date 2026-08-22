@@ -3,10 +3,10 @@
 import numpy as np
 
 from billiards_trainer.config import Settings
+from billiards_trainer.core.balls import classify_ball
+from billiards_trainer.core.geometry import TableModel
+from billiards_trainer.core.types import BallClass
 from billiards_trainer.update.updater import is_newer, parse_version
-from billiards_trainer.vision.balls import classify_ball
-from billiards_trainer.vision.geometry import TableModel
-from billiards_trainer.vision.types import BallClass
 
 
 # ---- geometry ------------------------------------------------------------- #

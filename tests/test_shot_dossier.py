@@ -6,8 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.vision.analysis_cache import SidecarWriter
-from billiards_trainer.vision.types import BallClass, Track
 
 
 def _mk(tid, x, y, num, cls=BallClass.SOLID):

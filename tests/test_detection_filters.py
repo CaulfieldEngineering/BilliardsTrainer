@@ -12,9 +12,9 @@ it. If someone re-loosens the band or re-exempts model detectors, these fail.
 from pathlib import Path
 
 from billiards_trainer.config import Settings
-from billiards_trainer.vision.geometry import expected_ball_radius_px
+from billiards_trainer.core.geometry import expected_ball_radius_px
+from billiards_trainer.core.types import BallClass, Detection
 from billiards_trainer.vision.tracking import BallTracker
-from billiards_trainer.vision.types import BallClass, Detection
 
 
 def _mk(x, y, r, cls=BallClass.UNKNOWN, number=-1, score=0.8):
@@ -34,7 +34,7 @@ def _use_fixture_refs(monkeypatch, tmp_path):
     import shutil
 
     import billiards_trainer.config as cfg
-    from billiards_trainer.vision import balls
+    from billiards_trainer.core import balls
     shutil.copy2(_REFS_FIXTURE, tmp_path / "colour_refs.json")
     monkeypatch.setattr(cfg, "APP_DIR", tmp_path)
     monkeypatch.setattr(balls, "_MEASURED_REFS", None)   # drop cache
@@ -152,7 +152,7 @@ class TestSettledIdentityLock:
 def _fake_calib():
     import numpy as np
 
-    from billiards_trainer.vision.geometry import TableModel
+    from billiards_trainer.core.geometry import TableModel
 
     class C:
         H = np.eye(3)
@@ -448,7 +448,7 @@ class TestNameUnknownByMeasuredColour:
     GREEN6 = (126, 152, 11)    # the 6's tight-crop median (measured)
 
     def _det(self, x=30.0, y=30.0, r=10.0):
-        from billiards_trainer.vision.types import BallClass, Detection
+        from billiards_trainer.core.types import BallClass, Detection
         return Detection(x=x, y=y, radius=r, cls=BallClass.UNKNOWN, number=-1)
 
     def _frame(self, ball_bgr, felt_bgr=None, ball_r=10):
@@ -543,8 +543,8 @@ class TestNameUnknownByMeasuredColour:
         import cv2
         import numpy as np
         _use_fixture_refs(monkeypatch, tmp_path)
+        from billiards_trainer.core.types import BallClass, Detection
         from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
-        from billiards_trainer.vision.types import BallClass, Detection
 
         class _Finder:
             name = "stub"

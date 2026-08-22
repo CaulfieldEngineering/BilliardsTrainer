@@ -13,7 +13,7 @@ import math
 from collections import Counter, deque
 from dataclasses import dataclass, field
 
-from .types import BallClass, Detection, Track
+from ..core.types import BallClass, Detection, Track
 
 
 @dataclass
@@ -691,7 +691,7 @@ class BallTracker:
         swings the +COLOUR_MAX evidence). Falls back to the single current
         sample (frac 0.0, so it can never satisfy the adoption gate) until
         enough history exists."""
-        from .balls import measured_identity
+        from ..core.balls import measured_identity
         hist = [n for n in t.colour_hist if n > 0]
         if len(hist) >= 8:
             num, k = Counter(hist).most_common(1)[0]
@@ -710,7 +710,7 @@ class BallTracker:
         import cv2
         import numpy as np
 
-        from .balls import _hue_to_base, measured_identity
+        from ..core.balls import _hue_to_base, measured_identity
 
         # This table's measured references first — they separate 4/7 by 71 Lab
         # units where canonical hues collapse them.
@@ -794,7 +794,7 @@ class BallTracker:
         # sampled the frame.
         mb = getattr(d, "measured_bgr", None)
         if mb is not None:
-            from .balls import measured_identity
+            from ..core.balls import measured_identity
             t.colour_hist.append(
                 measured_identity(tuple(int(v) for v in mb)))
         t.cls_hist.append(d.cls)

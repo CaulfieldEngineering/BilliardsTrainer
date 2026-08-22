@@ -57,8 +57,8 @@ def test_cue_ball_white_detects_cue_on_synthetic_table():
     """The M2 cue-ball detector finds a white ball on felt and labels it CUE."""
     import numpy as np
 
+    from billiards_trainer.core.types import BallClass
     from billiards_trainer.detector_strategies import discover
-    from billiards_trainer.vision.types import BallClass
 
     img = np.full((360, 640, 3), (110, 90, 40), np.uint8)  # bluish felt
     cv2.circle(img, (320, 180), 13, (245, 245, 245), -1, cv2.LINE_AA)  # cue ball
@@ -96,9 +96,9 @@ def test_cue_ball_white_rejects_stripes_and_is_single_instance():
 @pytest.mark.skipif(not FIXTURE.exists(), reason="demo fixture missing")
 def test_detector_runs_on_raw_frame():
     from billiards_trainer.config import Settings
+    from billiards_trainer.core.types import Detection
     from billiards_trainer.detector_strategies import discover
     from billiards_trainer.vision.calibration import CalibrationManager
-    from billiards_trainer.vision.types import Detection
 
     cap = cv2.VideoCapture(str(FIXTURE))
     cap.set(cv2.CAP_PROP_POS_FRAMES, 5)

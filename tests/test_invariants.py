@@ -9,13 +9,13 @@ thing any optimiser will discover is that detecting nothing breaks no laws.
 
 import math
 
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.eval.invariants import (
     SequenceScorer,
     bed_and_pockets,
     check_frame,
     check_sequence,
 )
-from billiards_trainer.vision.types import BallClass, Track
 
 R = 15.0          # ball radius used throughout; diameter 30
 D = 2 * R

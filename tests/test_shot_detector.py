@@ -5,9 +5,9 @@ presence, ball travel, and pocket approach+vanish for the outcome.
 """
 
 from billiards_trainer.config import BallSettings, DetectionSettings
+from billiards_trainer.core.geometry import TableModel
+from billiards_trainer.core.types import BallClass, Track
 from billiards_trainer.events.shot_detector import ShotDetector, ShotOutcome
-from billiards_trainer.vision.geometry import TableModel
-from billiards_trainer.vision.types import BallClass, Track
 
 TABLE = TableModel.from_rect((488, 895), 40)
 BR = next(p for p in TABLE.pockets if p.name == "bottom-right")  # (448, 855)
