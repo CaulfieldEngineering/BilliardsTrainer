@@ -251,7 +251,7 @@
     <button id="ovbtn" title="overlays &amp; drawing"
             style="flex:0 0 auto;min-width:46px;margin-left:8px">☰</button>
   </div>
-  <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex;">
+  <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex; overflow:hidden;">
     <video id="video" playsinline preload="metadata"></video>
     <div id="paused-glyph">▶</div>
     <button id="zoomreset" style="display:none;position:absolute;top:12px;
@@ -1352,11 +1352,24 @@ const Draw = (() => {
         return;
       }
     }
+    if (Zoom.scale > 1) {                   // zoomed: empty-drag pans
+      drag = { pan: true, lx: x / dpr, ly: y / dpr, moved: false };
+      cv.setPointerCapture(ev.pointerId);
+      return;
+    }
     if (sel >= 0) { sel = -1; syncUI(); }   // tap-away deselects...
     else togglePlay();                       // ...or acts like the video
   });
   cv.addEventListener("pointermove", ev => {
     if (!drag) return;
+    if (drag.pan) {
+      const dx = ev.clientX - (drag.sx == null ? ev.clientX : drag.sx);
+      const dy = ev.clientY - (drag.sy == null ? ev.clientY : drag.sy);
+      if (Math.hypot(dx, dy) > 4) drag.moved = true;
+      if (drag.sx != null) Zoom.pan(dx, dy);
+      drag.sx = ev.clientX; drag.sy = ev.clientY;
+      return;
+    }
     const dpr = window.devicePixelRatio || 1;
     const r = cv.getBoundingClientRect();
     const x = (ev.clientX - r.left) * dpr, y = (ev.clientY - r.top) * dpr;
@@ -1369,7 +1382,19 @@ const Draw = (() => {
       drag.lx = x; drag.ly = y;
     }
   });
-  const endDrag = () => { if (drag) { drag = null; save(); } };
+  const endDrag = () => {
+    if (!drag) return;
+    if (drag.pan) {
+      const tapped = !drag.moved;
+      drag = null;
+      if (tapped) {                        // a plain tap while zoomed
+        if (sel >= 0) { sel = -1; syncUI(); }
+        else togglePlay();
+      }
+      return;
+    }
+    drag = null; save();
+  };
   cv.addEventListener("pointerup", endDrag);
   cv.addEventListener("pointercancel", endDrag);
   const COLORS = ["#7DF29B", "#FFD54A", "#FF6B6B", "#6BD5FF", "#F2F6FA"];
