@@ -1134,7 +1134,14 @@ $("video").addEventListener("seeked", () => {
     // cache first: a harvested frame draws instantly with NO seek at
     // all; only gaps hit the decoder (and self-heal once harvested)
     const seq = ++drawSeq;
-    FrameCache.draw(lastT).then(hit => {
+    // WIDE tolerance while dragging (Joe: "seeking backwards is still
+    // unacceptable"): a backward seek restarts from the previous
+    // keyframe (~200-400ms on iOS), so waiting on the decoder is what
+    // feels stuck. Draw the nearest cached frame INSTANTLY — the
+    // picture tracks the thumb and sharpens as the cache fills — and
+    // only fall back to a seek when nothing near is cached. Release
+    // still lands the exact frame.
+    FrameCache.draw(lastT, 24).then(hit => {
       if (seq !== drawSeq) return;       // a newer thumb position won
       if (!hit) requestSeek(lastT, false);
     });
@@ -1213,10 +1220,11 @@ const FrameCache = (() => {
   }
   if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
     $("video").requestVideoFrameCallback(harvest);
-  async function draw(t) {                // true = drawn from cache
+  async function draw(t, tol) {           // true = drawn from cache
     const v = $("video");
+    const T = tol == null ? 2 : tol;
     let i = idx(t), hit = null;
-    for (let d = 0; d <= 2 && hit == null; d++)   // tolerate tiny gaps
+    for (let d = 0; d <= T && hit == null; d++)
       hit = blobs.has(i + d) ? i + d : blobs.has(i - d) ? i - d : null;
     if (hit == null) return false;
     let bm = bitmaps.get(hit);
@@ -1256,8 +1264,14 @@ const Warmer = (() => {
     if (!win) return null;
     const lo = Math.max(0, Math.round(win.t0 * FPS));
     const hi = Math.round(win.t1 * FPS);
-    for (let i = lo; i <= hi; i++) {
-      if (!FrameCache.has(i / FPS)) return i / FPS;
+    // NEAREST-FIRST around the playhead: the frames the thumb is most
+    // likely to want next get cached first (a linear sweep left the
+    // region under his finger cold for the longest).
+    const cur = Math.round(($("video").currentTime || win.t0) * FPS);
+    for (let d = 0; d <= (hi - lo); d++) {
+      const a = cur - d, b = cur + d;
+      if (a >= lo && !FrameCache.has(a / FPS)) return a / FPS;
+      if (b <= hi && !FrameCache.has(b / FPS)) return b / FPS;
     }
     return null;
   }
@@ -1290,11 +1304,12 @@ const Warmer = (() => {
       const t = nextUncached();
       if (t == null) { stop(true); return; }
       requestSeek(t, false);
-    }, 90);
+    }, 45);
   }
   return { start, stop };
 })();
-$("video").addEventListener("pause", () => setTimeout(() => Warmer.start(), 400));
+$("video").addEventListener("pause", () => setTimeout(() => Warmer.start(), 250));
+$("video").addEventListener("loadeddata", () => setTimeout(() => Warmer.start(), 600));
 $("video").addEventListener("play", () => Warmer.stop(false));
 
 // ---- DRAWING SUITE (Joe: "straight lines that can be drawn and moved
