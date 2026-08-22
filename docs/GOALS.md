@@ -1185,3 +1185,8 @@ Rounds continue with Joe's visual feedback as the gate.
   deviation metric before/after on >=4 frames + 3x zoom renders for
   Joe; the drawn line then hugs the ENTIRE shaft, and the aim ray uses
   the corrected table-plane direction.
+- 2026-08-22 (Joe): KEEP BOTH aim modes — the AUTO per-shot line
+  (precomputed at export, instant, the existing toggle) AND the
+  by-frame "Analyze Aim Line" on any paused frame. Same detector,
+  same accuracy pass benefits both; the sheet offers the toggle and
+  the button side by side.
