@@ -38,11 +38,45 @@ module.exports = async (req, res) => {
           name: String(p.name || "").slice(0, 80),
           mod: Number(p.mod) || 0,
           clips: (Array.isArray(p.clips) ? p.clips : []).slice(0, 500)
-            .map(c => ({ session: String(c.session || "").slice(0, 80),
-                         start: Math.round(Number(c.start) * 100) / 100 }))
-            .filter(c => c.session && isFinite(c.start)),
+            .map(c => {
+              const o = { session: String(c.session || "").slice(0, 80),
+                          start: Math.round(Number(c.start) * 100) / 100 };
+              if (c.slowmo) o.slowmo = String(c.slowmo).slice(0, 120);
+              if (c.label) o.label = String(c.label).slice(0, 120);
+              return o;
+            })
+            .filter(c => c.slowmo || (c.session && isFinite(c.start))),
         })).filter(p => p.id && p.name),
       };
+      // The "Slow-mo" playlist is PC-OWNED: the render watcher appends
+      // to it. A phone push carries the phone's whole document, so a
+      // stale/empty copy there would ERASE finished renders — which is
+      // exactly what happened (three renders on disk, zero clips in the
+      // list). Union the server's Slow-mo clips into whatever arrives.
+      try {
+        const cur = await fetch(
+          "https://content.dropboxapi.com/2/files/download", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + token,
+                       "Dropbox-API-Arg": JSON.stringify({ path: PATH }) },
+          });
+        if (cur.ok) {
+          const prev = await cur.json();
+          const srv = (prev.playlists || []).find(q => q.name === "Slow-mo");
+          if (srv && srv.clips && srv.clips.length) {
+            let mine = doc.playlists.find(q => q.name === "Slow-mo");
+            if (!mine) {
+              mine = { id: srv.id || "slowmo", name: "Slow-mo",
+                       mod: srv.mod || 0, clips: [] };
+              doc.playlists.push(mine);
+            }
+            const have = new Set(mine.clips.map(c => c.slowmo || ""));
+            for (const c of srv.clips) {
+              if (c.slowmo && !have.has(c.slowmo)) mine.clips.push(c);
+            }
+          }
+        }
+      } catch (e) { /* merge is best-effort; never block the save */ }
       const body = JSON.stringify(doc);
       if (body.length > MAX_BYTES)
         return res.status(413).json({ error: "too large" });
