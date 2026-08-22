@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 10,
+   "date": "2026-08-23",
+   "title": "What's New moved home",
+   "body": "This panel now lives at the top of the home screen, where it belongs \u2014 the menu inside the player is back to being just overlays and drawing tools.",
+   "details": [
+    "Fair catch: the update feed had been tucked into the player's drawing menu, which made no sense. It's now a single row above your sessions \u2014 latest headline visible, dot when there's something unread, tap to read.",
+    "A broader cleanup of the sessions screen is queued next."
+   ]
+  },
+  {
    "id": 9,
    "date": "2026-08-23",
    "title": "Your disputed shot now reads correctly",

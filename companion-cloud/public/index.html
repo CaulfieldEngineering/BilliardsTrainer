@@ -93,6 +93,9 @@
   #vwrap.loading #paused-glyph { display:none; }
   #trails { position:absolute; inset:0; width:100%; height:100%;
             pointer-events:none; }
+  .newsbar { display:flex; align-items:center; gap:4px; margin:10px 12px;
+             padding:11px 14px; background:var(--panel,#12161C);
+             border:1px solid #2A323D; border-radius:12px; cursor:pointer; }
   /* Legend is HUD, not overlay: it lives outside #vrot so it stays
      upright and bottom-left no matter how the video is rotated. */
   #vwrap.rot #vrot { transform: rotate(180deg); }
@@ -352,8 +355,6 @@
       <h3>View</h3>
       <button id="ov-rot" class="lrow">Rotate 180°
         <span class="chev" id="ov-rot-st">Off</span></button>
-      <button id="ov-news" class="lrow">What’s New
-        <span class="chev" id="ov-news-dot" style="color:var(--accent)"></span></button>
       <h3>Overlays</h3>
       <button id="ov-aim" class="lrow">Aim line
         <span class="chev" id="ov-aim-st">Off</span></button>
@@ -638,6 +639,20 @@ function _plRow(pl) {
 function renderHome() {
   const box = $("sessions");
   box.innerHTML = "";
+  // What's New lives on the HOME page (Joe: it has no business in the
+  // player's drawing menu). One tappable row: latest title, unread dot.
+  const ns = window._newsState;
+  if (ns) {
+    const nb = document.createElement("div");
+    nb.className = "newsbar";
+    nb.innerHTML = `<span style="font-weight:700">What’s New</span>
+      ${ns.unread ? '<span style="color:var(--accent);font-size:12px;margin-left:6px">● new</span>' : ""}
+      <span style="color:var(--faint);font-size:13px;margin-left:10px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ns.title}</span>
+      <span style="color:var(--faint)">›</span>`;
+    nb.onclick = () => window._openNews && window._openNews();
+    box.appendChild(nb);
+  }
   _accHeader(box, "sess", "Sessions", sessCache.length);
   if (HOME.sess) {
     const wrap = document.createElement("div");
@@ -1078,17 +1093,26 @@ const News = (() => {
       box.appendChild(d);
     });
   }
-  fetch("whatsnew.json").then(r => r.json()).then(j => {
-    entries = j.entries || [];
-    const latest = entries.length ? entries[0].id : 0;
-    $("ov-news-dot").textContent = latest > seen() ? "● new" : "";
-  }).catch(() => {});
-  $("ov-news").onclick = () => {
+  function open() {
     render();
     $("newssheet").style.display = "block";
     if (entries.length) localStorage.setItem("news_seen", String(entries[0].id));
-    $("ov-news-dot").textContent = "";
-  };
+    window._newsState = { unread: false,
+                          title: entries.length ? entries[0].title : "" };
+    if (typeof renderHome === "function"
+        && $("sessions").style.display !== "none") renderHome();
+  }
+  window._openNews = open;
+  fetch("whatsnew.json").then(r => r.json()).then(j => {
+    entries = j.entries || [];
+    const latest = entries.length ? entries[0].id : 0;
+    // home-page banner state (Joe: "why is What's New in the painting
+    // hamburger menu? put it on the home page")
+    window._newsState = { unread: latest > seen(),
+                          title: entries.length ? entries[0].title : "" };
+    if (typeof renderHome === "function"
+        && $("sessions").style.display !== "none") renderHome();
+  }).catch(() => {});
   $("news-close").onclick = () => { $("newssheet").style.display = "none"; };
   $("newssheet").onclick = e => {
     if (e.target === $("newssheet")) $("newssheet").style.display = "none";
