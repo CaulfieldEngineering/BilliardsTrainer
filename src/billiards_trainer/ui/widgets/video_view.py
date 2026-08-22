@@ -120,7 +120,8 @@ class VideoView(QWidget):
             halo.setAlphaF(0.4)
             p.setPen(QPen(halo, 4.0, Qt.SolidLine, Qt.RoundCap))
             p.drawLine(QPointF(X(a), Y(a)), QPointF(X(b), Y(b)))
-            core = QColor("#7DF29B")
+            core = QColor("#F0B429")   # aim: amber, distinct from the
+            #                              green "line to the pocket"
             core.setAlphaF(0.8)
             p.setPen(QPen(core, 1.6, Qt.SolidLine, Qt.RoundCap))
             p.drawLine(QPointF(X(a), Y(a)), QPointF(X(b), Y(b)))

@@ -124,7 +124,10 @@ def test_video_view_draws_stored_aim_line(app):
         x = int(img.width() * fx)
         for y in range(int(img.height() * 0.42), int(img.height() * 0.58)):
             c = img.pixelColor(x, y)
-            if c.green() > 150 and c.green() > c.red() + 40:
+            # AMBER, deliberately not the green used for "line to the
+            # pocket": with both overlays on, one colour for two meanings
+            # rendered as a single line running through the object ball.
+            if c.red() > 150 and c.green() > 100 and c.blue() < c.red() - 60:
                 hits += 1
                 break
     assert hits == 3, f"aim tracer not painted along the segment ({hits}/3)"

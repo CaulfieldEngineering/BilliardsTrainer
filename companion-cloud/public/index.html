@@ -1162,7 +1162,8 @@ function drawWhy() {
   }
   dot(g.obj, "#FFFFFF", 2.6);
   dot(g.pocket, "#7DF29B", 3.4);
-  showLegend([["#7DF29B", "line to the pocket"],
+  showLegend([...(OV.aim ? [["#F0B429", "where the cue pointed"]] : []),
+              ["#7DF29B", "line to the pocket"],
               ["#E5484D", "line it took"],
               ["#8AA0FF", "cue line"]]);
 }
@@ -1202,7 +1203,10 @@ function drawAim() {
   const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
   const [a, b] = s.aim.p;
   const Q = q => [(ox + q[0] * cw) * dpr, (oy + q[1] * ch) * dpr];
-  strokeLine(ctx, smoothPath([Q(a), Q(b)]), "#7DF29B", 1.2, dpr);
+  // amber, NOT the green of "line to the pocket": with both overlays on,
+  // two different meanings in one colour read as a single line running
+  // straight through the object ball.
+  strokeLine(ctx, smoothPath([Q(a), Q(b)]), "#F0B429", 1.2, dpr);
 }
 
 function drawTrails() {
