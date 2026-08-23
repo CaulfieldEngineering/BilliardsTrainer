@@ -1657,3 +1657,16 @@ Rounds continue with Joe's visual feedback as the gate.
   day). The productive frontier moved from solver cleverness to input
   quality, exactly as the fusion design predicted. NEXT: SD push when the
   card copy lands; RIFE-glue trial on a sample of the 53; audio anchor.
+
+- 2026-08-23 (session 12) — Diagnostic over the 93 uncategorized KILLED
+  the RIFE-glue hypothesis before it was built: the failed shots are NOT
+  sparse. 52 of them carry 84-88 observations with 0.1s gaps — they fail
+  because the WHOLE path has more structure than two straight legs
+  (rattles, multi-bounce aftermath) so the global residual blows up. The
+  verdict only needs the FIRST leg. NEXT BUILD (top): PREFIX-FIT — fit
+  progressively longer prefixes from contact, keep the longest trusted
+  one, read departure off it. Gates: both ground-truth shots unchanged;
+  measure conversions across the 52. RIFE-glue demoted (its target class
+  has population 1). The 39 never-observed remain a capture problem
+  (Joe's shutter day). One shot now fits outright (tracker improvements
+  landed since tagging) — picked up by the next batch automatically.
