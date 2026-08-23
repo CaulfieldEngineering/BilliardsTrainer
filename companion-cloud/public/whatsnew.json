@@ -1,20 +1,16 @@
 {
  "entries": [
   {
+   "id": 13,
+   "date": "2026-08-23",
+   "title": "Home screen restored",
+   "body": "The card list is gone \u2014 the home screen is back to the layout you didn't mind (What's New row stays, pause-fade stays). The real redesign target is the clips player, Instagram-style, coming next."
+  },
+  {
    "id": 12,
    "date": "2026-08-23",
    "title": "Pause button gets out of the way",
    "body": "The play symbol now fades out a moment after you pause, so it no longer sits on top of the frame you paused to study."
-  },
-  {
-   "id": 11,
-   "date": "2026-08-23",
-   "title": "New home screen",
-   "body": "Sessions and playlists are now cards under a simple two-tab switch \u2014 no more collapsible spreadsheet. The old look is bookmarked; say the word to evolve or revert.",
-   "details": [
-    "Each session is one card: date on top, length and shot count underneath, dimmed if it hasn't been analysed yet. Playlists get their own tab with the same card style.",
-    "Per your direction this was a clean blast rather than a tweak: the previous UI is saved as a bookmark (ui-v1), so nothing is lost \u2014 we iterate from here or roll straight back."
-   ]
   },
   {
    "id": 10,
