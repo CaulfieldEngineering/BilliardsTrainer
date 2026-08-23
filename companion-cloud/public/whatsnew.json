@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 16,
+   "date": "2026-08-23",
+   "title": "Lifetime Stats \u2014 and your verdicts now count",
+   "body": "New on the home screen: Lifetime Stats, a tight table of your misses \u2014 Cut Left/Straight/Right against Missed Left/Right. And in any shot's Details you can now set Cut and Missed yourself; your word overrides the machine and feeds the table.",
+   "details": [
+    "Only trusted verdicts are counted: shots the analysis saw clearly, plus anything you've corrected by hand. Shots where the ball was lost stay out of the table rather than polluting it.",
+    "Your corrections do double duty: they fix the record, and they become the ground truth that validates the physics-fit work \u2014 every verdict you enter makes the automatic tagging measurably better."
+   ]
+  },
+  {
    "id": 15,
    "date": "2026-08-23",
    "title": "Player restored",

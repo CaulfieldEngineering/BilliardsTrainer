@@ -31,7 +31,9 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
     False = transient failure, retry later."""
     from ..vision.actions import append_action
     from ..vision.analysis_cache import append_correction, sidecar_path
-    from ..vision.shots_export import export_library_index, export_shots_summary
+    from ..vision.shots_export import (export_library_index,
+                                       export_lifetime_stats,
+                                       export_shots_summary)
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -61,6 +63,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         classify_and_mark(video)
         export_shots_summary(video)
         export_library_index(recordings)
+        export_lifetime_stats(recordings)
         log.info("shot SPLIT: %s @ %.1fs at t=%.1fs", name, start,
                  float(d["split"]))
         return True
@@ -93,6 +96,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
                                   "start": round(start, 3)}) + chr(10))
         export_shots_summary(video)
         export_library_index(recordings)
+        export_lifetime_stats(recordings)
         log.info("shot CONFIRMED reviewed: %s @ %.1fs", name, start)
         return True
     if d.get("clear"):
@@ -110,6 +114,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         classify_and_mark(video)
         export_shots_summary(video)
         export_library_index(recordings)
+        export_lifetime_stats(recordings)
         log.info("verdict CLEARED: %s @ %.1fs", name, start)
         return True
     did = False
@@ -117,6 +122,18 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         did |= append_correction(video, start, d["outcome"], src="review")
     if d.get("action") in _ACTIONS:
         did |= append_action(video, start, d["action"], src="review")
+    # Joe's cut / miss-side verdicts (the ground truth the miss stats and
+    # the trajectory-fit validation feed on). Review-ranked like outcomes.
+    tc = {k: d[k] for k in ("cut", "miss_side")
+          if d.get(k) in ("left", "right", "straight")}
+    if tc:
+        import json as _json
+        from ..vision.analysis_cache import sidecar_path as _sc
+        with open(_sc(video), "a", encoding="utf-8") as fh:
+            fh.write(_json.dumps({"type": "tag_correction",
+                                  "start": round(start, 3),
+                                  **tc, "src": "review"}) + "\n")
+        did = True
     note = str(d.get("note", "")).strip()[:500]
     if note:
         import json as _json
@@ -129,6 +146,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
     if did:
         export_shots_summary(video)
         export_library_index(recordings)
+        export_lifetime_stats(recordings)
         log.info("phone verdict applied: %s @ %.1fs %s", name, start,
                  {k: d[k] for k in ("outcome", "action") if d.get(k)})
     return True

@@ -331,6 +331,11 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             try:
                 from .miss_tags import tag_shot
                 tg = tag_shot(reader, s, space)
+                if tg is None and s.get("_tag_review"):
+                    # the machine abstained but Joe called it: his verdict
+                    # IS the tag
+                    tg = {"confidence": "review", "pocket_inferred": False,
+                          **{k: v for k, v in s["_tag_review"].items()}}
                 if tg:
                     # map the explanation geometry into normalized video
                     # coords so phone and desktop draw the same figure
@@ -346,6 +351,15 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                             entry["lines"]["path"] = [
                                 _rect_to_video(q, tf) for q in tg["path"]]
                             tg["path"] = entry["lines"]["path"]
+                    rv = s.get("_tag_review") or {}
+                    if rv:
+                        # Joe looked. His word outranks the derivation and
+                        # clears any machine-side confidence gate on the
+                        # fields he called.
+                        for k in ("cut", "miss_side"):
+                            if rv.get(k):
+                                tg[k] = rv[k]
+                        tg["confidence"] = "review"
                     if entry["outcome"] == "miss":
                         entry["tags"] = tg
             except Exception:  # noqa: BLE001 - tagging is enrichment
@@ -370,6 +384,36 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
         log.exception("shots summary write failed for %s", video_path)
         return None
     return out
+
+
+def export_lifetime_stats(recordings_dir) -> Path | None:
+    """Joe's Lifetime Stats: the cut x miss-side tally he reads patterns
+    from. TRUSTED tags only (confidence high, or his own review) — one
+    wrong side pollutes a pattern more than ten honest abstentions."""
+    import json as _json
+    d = Path(recordings_dir)
+    cells = {}
+    trusted = gated = 0
+    for sp in sorted(d.glob("session-*.mp4.shots.json")):
+        try:
+            doc = _json.loads(sp.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for sh in doc.get("shots", []):
+            t = sh.get("tags")
+            if not t or not t.get("miss_side"):
+                continue
+            if t.get("confidence") in ("high", "review"):
+                trusted += 1
+                key = f"{t.get('cut', '?')}|{t['miss_side']}"
+                cells[key] = cells.get(key, 0) + 1
+            else:
+                gated += 1
+    out = {"updated": __import__("time").strftime("%Y-%m-%d %H:%M"),
+           "trusted": trusted, "gated": gated, "cells": cells}
+    fp = d / "lifetime_stats.json"
+    fp.write_text(_json.dumps(out, indent=1), encoding="utf-8")
+    return fp
 
 
 def export_library_index(recordings_dir) -> Path | None:

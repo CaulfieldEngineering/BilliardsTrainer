@@ -5,6 +5,8 @@ const { dbxToken, checkKey, safeName, FOLDER } = require("./_lib.js");
 // companion watcher applies it REVIEW-ranked to the session's sidecar.
 // The write path is server-enforced to exactly one folder.
 const OUTCOMES = new Set(["make", "miss", "scratch"]);
+const CUTS = new Set(["left", "right", "straight"]);
+const SIDES = new Set(["left", "right"]);
 const ACTIONS = new Set(["stroke", "break", "ball_in_hand", "rearrange",
                          "nothing"]);
 
@@ -17,13 +19,15 @@ module.exports = async (req, res) => {
   const outcome = OUTCOMES.has(b.outcome) ? b.outcome : undefined;
   const action = ACTIONS.has(b.action) ? b.action : undefined;
   const note = (typeof b.note === "string" ? b.note : "").trim().slice(0, 500);
+  const cut = CUTS.has(b.cut) ? b.cut : undefined;
+  const missSide = SIDES.has(b.miss_side) ? b.miss_side : undefined;
   const clear = b.clear === true;
   const confirm = b.confirm === true;
   const rife = b.rife === true;
   const split = isFinite(Number(b.split)) ? Number(b.split) : null;
   if (!name || !isFinite(start)
       || (!outcome && !action && !note && !clear && !confirm && !rife
-          && split == null)) {
+          && !cut && !missSide && split == null)) {
     return res.status(400).json({ error: "bad verdict" });
   }
   const doc = { session: name, start: Math.round(start * 100) / 100,
@@ -35,6 +39,8 @@ module.exports = async (req, res) => {
   }
   if (clear) doc.clear = true;
   if (confirm) doc.confirm = true;
+  if (cut) doc.cut = cut;
+  if (missSide) doc.miss_side = missSide;
   if (outcome) doc.outcome = outcome;
   if (action) doc.action = action;
   if (note) doc.note = note;

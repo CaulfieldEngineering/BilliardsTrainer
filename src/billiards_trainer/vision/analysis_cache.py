@@ -167,6 +167,15 @@ class SidecarReader:
                 elif d.get("type") == "shot":
                     d["_orig_outcome"] = d.get("outcome", "miss")
                     self.shots.append(d)
+                elif d.get("type") == "tag_correction":
+                    # Joe's cut / miss-side verdict — review-ranked, last
+                    # wins, carried on the shot for the exporter to overlay
+                    s2 = _shot_for(self.shots, float(d["start"]))
+                    if s2 is not None:
+                        tr = s2.setdefault("_tag_review", {})
+                        for k in ("cut", "miss_side"):
+                            if d.get(k):
+                                tr[k] = d[k]
                 elif d.get("type") == "correction":
                     # last-wins WITHIN a rank, but a human verdict is FINAL:
                     # once a review-source correction lands, derived re-runs
