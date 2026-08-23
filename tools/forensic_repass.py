@@ -27,6 +27,17 @@ after POC is realtime, maybe slight latency").
 """
 
 import argparse
+
+# Joe: "my mouse and keyboard have been completely lagging when the app
+# and AI are running hard." Heavy batch work must never starve the
+# desktop or the live pipeline: drop OURSELVES to below-normal priority.
+try:
+    import ctypes
+    ctypes.windll.kernel32.SetPriorityClass(
+        ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)  # BELOW_NORMAL
+except Exception:
+    pass
+
 import json
 import math
 import sys

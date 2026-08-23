@@ -10,6 +10,17 @@ again (unless a better model is promoted — then re-run with --force).
 """
 
 import argparse
+
+# Joe: "my mouse and keyboard have been completely lagging when the app
+# and AI are running hard." Heavy batch work must never starve the
+# desktop or the live pipeline: drop OURSELVES to below-normal priority.
+try:
+    import ctypes
+    ctypes.windll.kernel32.SetPriorityClass(
+        ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)  # BELOW_NORMAL
+except Exception:
+    pass
+
 import sys
 from pathlib import Path
 
