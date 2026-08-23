@@ -31,9 +31,11 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
     False = transient failure, retry later."""
     from ..vision.actions import append_action
     from ..vision.analysis_cache import append_correction, sidecar_path
-    from ..vision.shots_export import (export_library_index,
-                                       export_lifetime_stats,
-                                       export_shots_summary)
+    from ..vision.shots_export import (
+        export_library_index,
+        export_lifetime_stats,
+        export_shots_summary,
+    )
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -128,6 +130,7 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
           if d.get(k) in ("left", "right", "straight")}
     if tc:
         import json as _json
+
         from ..vision.analysis_cache import sidecar_path as _sc
         with open(_sc(video), "a", encoding="utf-8") as fh:
             fh.write(_json.dumps({"type": "tag_correction",
