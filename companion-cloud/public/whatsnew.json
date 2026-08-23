@@ -1,6 +1,12 @@
 {
  "entries": [
   {
+   "id": 17,
+   "date": "2026-08-23",
+   "title": "What's New and Stats actually open now",
+   "body": "Both are full pages with a \u2039 Home button, not pop-ups \u2014 and the bug where tapping them did nothing until you opened a session is fixed (they were opening inside a hidden layer)."
+  },
+  {
    "id": 16,
    "date": "2026-08-23",
    "title": "Lifetime Stats \u2014 and your verdicts now count",

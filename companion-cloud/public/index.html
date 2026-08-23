@@ -283,83 +283,16 @@
 </div>
 
 <div id="sessions"></div>
-
-<div id="player">
-  <div id="topbar">
-    <button id="back">‹ Sessions</button>
-    <span id="title"></span>
-    <button id="ovbtn" title="overlays &amp; drawing"
-            style="flex:0 0 auto;min-width:46px;margin-left:8px">☰</button>
-  </div>
-  <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex; overflow:hidden;">
-    <!-- ONLY this layer rotates (Joe: "keep your legend upright when I
-         rotate the video", "play button seems to flip"). The video and
-         the canvases that share its coordinate space live inside; every
-         piece of HUD chrome stays outside and upright. -->
-    <div id="vrot" style="position:absolute; inset:0; display:flex;">
-    <video id="video" playsinline preload="metadata"></video>
-    <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
-    <canvas id="trails"></canvas>
-    <canvas id="drawcv" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none"></canvas>
-    </div><!-- /vrot -->
-    <button id="zoomreset" style="display:none;position:absolute;top:12px;
-         right:12px;z-index:21;background:rgba(13,17,23,.85);color:#EAF2F3;
-         border:1px solid #2A323D;border-radius:14px;padding:4px 12px;
-         font-size:13px;font-weight:700">1×</button>
-    <div id="holdpill" style="display:none;position:absolute;top:12px;
-         left:50%;transform:translateX(-50%);background:rgba(13,17,23,.85);
-         color:#EAF2F3;border:1px solid #2A323D;border-radius:14px;
-         padding:4px 12px;font-size:13px;font-weight:700;z-index:20">¼×</div>
-    <div id="spinner"><div></div></div>
-    <div id="paused-glyph">▶</div>
-    <div id="legend"></div>
-  </div>
-  <div id="shotbar">
-    <div id="shotinfo">
-      <span class="n" id="shot-n">–</span>
-      <span class="oc" id="shot-oc"></span>
-      <span class="t" id="shot-t"></span>
-    </div>
-    <div id="inline"></div>
-    <div id="lane"><div id="playhead"></div></div>
-    <div id="nav">
-      <button id="prev">‹</button>
-      <button id="fprev" title="back one frame">‹·</button>
-      <button id="play" title="play / pause">▶</button>
-      <button id="mode" title="repeat this shot">⟳</button>
-      <button id="rate" title="playback speed">1×</button>
-      <button id="fnext" title="forward one frame">·›</button>
-      <button id="next">›</button>
-    </div>
-    <div id="lower">
-      <button id="correct">✎ Correct this clip</button>
-      <div id="chips"></div>
-    </div>
-    <div id="ovscrim"></div>
-    <div id="newssheet" style="display:none;position:fixed;inset:0;z-index:60;
-         background:rgba(4,8,12,.72)">
-      <div style="position:absolute;left:12px;right:12px;top:8%;bottom:8%;
+    <div id="statsheet" style="display:none;position:fixed;inset:0;z-index:40;
+         background:var(--bg,#0B0F14);overflow-y:auto">
+      <div style="margin:calc(10px + env(safe-area-inset-top)) 12px 20px;
            background:var(--panel,#12161C);border:1px solid #2A323D;
-           border-radius:16px;padding:18px 16px 12px;display:flex;
-           flex-direction:column">
-        <div style="display:flex;align-items:center;margin-bottom:8px">
-          <h3 style="margin:0;font-size:17px">What’s New</h3>
-          <button id="news-close" style="margin-left:auto;min-width:44px">✕</button>
-        </div>
-        <div id="news-list" style="overflow-y:auto;flex:1"></div>
-      </div>
-    </div>
-    <div id="statsheet" style="display:none;position:fixed;inset:0;z-index:60;
-         background:rgba(4,8,12,.72)">
-      <div style="position:absolute;left:12px;right:12px;top:12%;bottom:12%;
-           background:var(--panel,#12161C);border:1px solid #2A323D;
-           border-radius:16px;padding:18px 16px 12px;display:flex;
-           flex-direction:column">
+           border-radius:16px;padding:18px 16px 12px">
         <div style="display:flex;align-items:center;margin-bottom:4px">
           <h3 style="margin:0;font-size:17px">Lifetime Stats</h3>
-          <button id="stats-close" style="margin-left:auto;min-width:44px">✕</button>
+          <button id="stats-close" style="margin-left:auto;min-width:44px">‹ Home</button>
         </div>
-        <div id="stats-body" style="overflow-y:auto;flex:1"></div>
+        <div id="stats-body" ></div>
       </div>
     </div>
     <div id="ovmenu">
@@ -456,6 +389,71 @@
       </div>
     </div>
   </div>
+    <div id="newssheet" style="display:none;position:fixed;inset:0;z-index:40;
+         background:var(--bg,#0B0F14);overflow-y:auto">
+      <div style="margin:calc(10px + env(safe-area-inset-top)) 12px 20px;
+           background:var(--panel,#12161C);border:1px solid #2A323D;
+           border-radius:16px;padding:18px 16px 12px">
+        <div style="display:flex;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:17px">What’s New</h3>
+          <button id="news-close" style="margin-left:auto;min-width:44px">‹ Home</button>
+        </div>
+        <div id="news-list" ></div>
+      </div>
+    </div>
+
+<div id="player">
+  <div id="topbar">
+    <button id="back">‹ Sessions</button>
+    <span id="title"></span>
+    <button id="ovbtn" title="overlays &amp; drawing"
+            style="flex:0 0 auto;min-width:46px;margin-left:8px">☰</button>
+  </div>
+  <div id="vwrap" style="position:relative; flex:1 1 auto; min-height:120px; display:flex; overflow:hidden;">
+    <!-- ONLY this layer rotates (Joe: "keep your legend upright when I
+         rotate the video", "play button seems to flip"). The video and
+         the canvases that share its coordinate space live inside; every
+         piece of HUD chrome stays outside and upright. -->
+    <div id="vrot" style="position:absolute; inset:0; display:flex;">
+    <video id="video" playsinline preload="metadata"></video>
+    <canvas id="scrubcv" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
+    <canvas id="trails"></canvas>
+    <canvas id="drawcv" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none"></canvas>
+    </div><!-- /vrot -->
+    <button id="zoomreset" style="display:none;position:absolute;top:12px;
+         right:12px;z-index:21;background:rgba(13,17,23,.85);color:#EAF2F3;
+         border:1px solid #2A323D;border-radius:14px;padding:4px 12px;
+         font-size:13px;font-weight:700">1×</button>
+    <div id="holdpill" style="display:none;position:absolute;top:12px;
+         left:50%;transform:translateX(-50%);background:rgba(13,17,23,.85);
+         color:#EAF2F3;border:1px solid #2A323D;border-radius:14px;
+         padding:4px 12px;font-size:13px;font-weight:700;z-index:20">¼×</div>
+    <div id="spinner"><div></div></div>
+    <div id="paused-glyph">▶</div>
+    <div id="legend"></div>
+  </div>
+  <div id="shotbar">
+    <div id="shotinfo">
+      <span class="n" id="shot-n">–</span>
+      <span class="oc" id="shot-oc"></span>
+      <span class="t" id="shot-t"></span>
+    </div>
+    <div id="inline"></div>
+    <div id="lane"><div id="playhead"></div></div>
+    <div id="nav">
+      <button id="prev">‹</button>
+      <button id="fprev" title="back one frame">‹·</button>
+      <button id="play" title="play / pause">▶</button>
+      <button id="mode" title="repeat this shot">⟳</button>
+      <button id="rate" title="playback speed">1×</button>
+      <button id="fnext" title="forward one frame">·›</button>
+      <button id="next">›</button>
+    </div>
+    <div id="lower">
+      <button id="correct">✎ Correct this clip</button>
+      <div id="chips"></div>
+    </div>
+    <div id="ovscrim"></div>
 </div>
 
 <script>
@@ -674,6 +672,7 @@ function _plRow(pl) {
 }
 
 async function openStats() {
+  $("sessions").style.display = "none";
   $("statsheet").style.display = "block";
   const box = $("stats-body");
   box.innerHTML = "<div class='empty'>Loading…</div>";
@@ -705,8 +704,10 @@ async function openStats() {
     box.innerHTML = "<div class='empty'>No stats yet — they appear after the next analysis pass.</div>";
   }
 }
-$("stats-close") && ($("stats-close").onclick = () =>
-  $("statsheet").style.display = "none");
+$("stats-close") && ($("stats-close").onclick = () => {
+  $("statsheet").style.display = "none";
+  $("sessions").style.display = "";
+});
 
 function renderHome() {
   const box = $("sessions");
@@ -1177,6 +1178,7 @@ const News = (() => {
   }
   function open() {
     render();
+    $("sessions").style.display = "none";
     $("newssheet").style.display = "block";
     if (entries.length) localStorage.setItem("news_seen", String(entries[0].id));
     window._newsState = { unread: false,
@@ -1195,9 +1197,9 @@ const News = (() => {
     if (typeof renderHome === "function"
         && $("sessions").style.display !== "none") renderHome();
   }).catch(() => {});
-  $("news-close").onclick = () => { $("newssheet").style.display = "none"; };
-  $("newssheet").onclick = e => {
-    if (e.target === $("newssheet")) $("newssheet").style.display = "none";
+  $("news-close").onclick = () => {
+    $("newssheet").style.display = "none";
+    $("sessions").style.display = "";
   };
   return {};
 })();
