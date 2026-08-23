@@ -699,11 +699,14 @@ async function openStats() {
     html += line("Cut Right / Miss Left (Undercut)", g("right|left"), true);
     html += line("Straight / Miss Left", g("straight|left"), true);
     html += line("Straight / Miss Right", g("straight|right"), true);
+    const cat = ["left|left","left|right","right|right","right|left",
+                 "straight|left","straight|right"].reduce((a,k)=>a+g(k),0);
+    html += line("Uncategorized", Math.max(0, (d.misses ?? 0) - cat), true, true);
     if (d.scratches) html += line("Scratches", d.scratches);
     html += `<p style="color:var(--dim);font-size:12px;margin-top:10px">
-      Subgenres count the ${d.trusted} misses with a trusted read
-      (${d.gated} more couldn’t be read clearly — correct them in a
-      shot’s Details and they join the table). Updated ${d.updated}.</p>`;
+      Uncategorized = misses without a trusted cut/side read yet —
+      set Cut and Missed in any shot’s Details to move it into its
+      subgenre. Updated ${d.updated}.</p>`;
     box.innerHTML = html;
   } catch (e) {
     box.innerHTML = "<div class='empty'>No stats yet — they appear after the next analysis pass.</div>";
