@@ -157,10 +157,19 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
     # The fit reads the departure over all observations of the first leg
     # and is immune to the rattle excursion that fooled the extremum.
     try:
-        from .trajectory import fit_shot
+        from .trajectory import fit_first_leg, fit_shot
         _f = fit_shot(tpath[cidx:], space, space.ball_r_px)
         if _f is not None and _f.residual <= 1.5 * space.ball_r_px:
             vx, vy = _f.departure
+        else:
+            # PREFIX FALLBACK, promoted from the forensic re-pass where it
+            # solved 31 backlog shots (rank: full fit > first leg >
+            # extremum). Densely-observed rattle paths fail the global fit
+            # while their first leg is clean — and the verdict only needs
+            # the first leg. Tighter residual bar inside fit_first_leg.
+            _fl = fit_first_leg(tpath[cidx:], space.ball_r_px)
+            if _fl is not None and _fl[2] >= 5:
+                vx, vy = _fl[0], _fl[1]
     except Exception:  # noqa: BLE001 - fit is an upgrade, never a break
         log.exception("trajectory fit failed; extremum stands")
     if (vx, vy) == (0.0, 0.0):
