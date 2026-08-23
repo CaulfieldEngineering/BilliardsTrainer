@@ -505,6 +505,16 @@ class Pipeline:
                     from .blur_recovery import BlurRecovery
                     self._blur = BlurRecovery()
                 extra = self._blur.find(frame, calib, self.tracker, detections)
+                # OFF by default: measured 2026-08-23 on the ground-truth
+                # strike, the sweep FAILED both acceptance gates — 37
+                # phantoms on a quiet table, and ball-4 moving coverage
+                # DROPPED 8 -> 2 because sweep blobs register as coverage
+                # and suppress the targeted recovery that was working.
+                # Fix before re-enabling: run sweep AFTER find(), exclude
+                # sweep emissions from every coverage test, re-verify.
+                if getattr(self.settings.detection, "sweep_channel", False):
+                    extra = extra + self._blur.sweep(frame, calib,
+                                                     self.tracker, detections)
                 if extra:
                     detections = detections + self._project_raw_to_rect(
                         extra, calib, frame_shape)

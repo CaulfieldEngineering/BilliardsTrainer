@@ -71,6 +71,71 @@ class BlurRecovery:
     def __init__(self) -> None:
         self._buf: deque = deque(maxlen=_BUF)
 
+    def sweep(self, frame, calib, tracker, detections) -> list:
+        """PRESENCE channel: ball-sized MOVING blobs anywhere on the table
+        that the model produced no detection for. The fusion design's
+        always-on subtraction pass (FUSION.md item 3), promoted from
+        lost-track-only recovery at Joe's direction: "rerun all of the
+        footage via subtraction". Emits UNNUMBERED low-score detections —
+        identity still comes from tracking continuity and the colour
+        contest, never from here.
+        """
+        h, w = frame.shape[:2]
+        small = cv2.resize(frame, (w // 2, h // 2),
+                           interpolation=cv2.INTER_AREA)
+        buf = getattr(self, "_small", None)
+        if buf is None:
+            buf = self._small = deque(maxlen=_BUF)
+        buf.append(small)
+        if len(buf) < _MIN_BUF:
+            return []
+        self._sweep_n = getattr(self, "_sweep_n", 0) + 1
+        if self._sweep_n % 4 == 1 or getattr(self, "_bg_small", None) is None:
+            self._bg_small = np.median(
+                np.stack(buf).astype(np.float32), axis=0)
+        moved = np.linalg.norm(small.astype(np.float32) - self._bg_small,
+                               axis=2)
+        mask = (moved > _MOVED).astype(np.uint8) * 255
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE,
+                                np.ones((3, 3), np.uint8))
+        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_SIMPLE)
+        r_raw = max(4.0, 0.5 * (h + w) / 90.0)
+        r_s = r_raw / 2.0                       # half-res radius
+        felt = np.median(self._bg_small.reshape(-1, 3), axis=0)
+        out = []
+        for c in cnts:
+            a = cv2.contourArea(c)
+            if not (0.3 * math.pi * r_s * r_s <= a <= 12 * math.pi * r_s * r_s):
+                continue
+            (_bx, _by), enc_r = cv2.minEnclosingCircle(c)
+            if enc_r > _MAX_BLOB_R * r_s:
+                continue                        # stick / forearm streak
+            m = cv2.moments(c)
+            if m["m00"] <= 0:
+                continue
+            x, y = m["m10"] / m["m00"] * 2, m["m01"] / m["m00"] * 2
+            if any((x - d.x) ** 2 + (y - d.y) ** 2 <= (2.0 * r_raw) ** 2
+                   for d in detections):
+                continue                        # the model already has it
+            cm = np.zeros(mask.shape, np.uint8)
+            cv2.drawContours(cm, [c], -1, 255, -1)
+            mean = np.array(cv2.mean(small, mask=cm)[:3], dtype=float)
+            was = np.array(cv2.mean(self._bg_small.astype(np.uint8),
+                                    mask=cm)[:3], dtype=float)
+            # a VACANCY looks like felt now and like a ball before; a BALL
+            # is the reverse — same physics as _locate's hole guard
+            if (np.linalg.norm(mean - felt)
+                    < np.linalg.norm(was - felt)):
+                continue
+            rec = Detection(x=float(x), y=float(y), radius=float(r_raw),
+                            bgr=tuple(int(q) for q in mean),
+                            cls=BallClass.UNKNOWN, score=0.25, number=-1)
+            out.append(rec)
+            if len(out) >= 4:
+                break                           # phantom-churn bound
+        return out
+
     def find(self, frame, calib, tracker, detections) -> list:
         """Detections for tracks whose ball the finder lost to blur.
 
