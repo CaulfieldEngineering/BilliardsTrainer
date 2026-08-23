@@ -102,6 +102,71 @@ def corridor_observations(video, tf, contact_vis, reappear_vis, t0, t1,
     return out
 
 
+def streak_directions(video, t0, t1, contact_vis, reappear_vis, colour_ref,
+                      r_vis):
+    """STREAK-AS-SENSOR: a motion smear's long axis IS the ball's velocity
+    direction at that instant, readable even when the smear is too faint
+    to localize as a position. Returns unit vectors (sign resolved toward
+    the reappearance point) for elongated, ball-coloured blobs in the
+    corridor. 180-degree ambiguity is resolved by the chord."""
+    cap = cv2.VideoCapture(str(video))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, (t0 - 0.8)) * 1000.0)
+    frames = []
+    for _ in range(int((t1 - t0 + 1.6) * fps) + 2):
+        ok, fr = cap.read()
+        if not ok:
+            break
+        frames.append(fr)
+    cap.release()
+    if len(frames) < 8:
+        return []
+    bg = np.median(np.stack(frames[:: max(1, len(frames) // 12)])
+                   .astype(np.float32), axis=0)
+    ax, ay = contact_vis
+    bx, by = reappear_vis
+    cux, cuy = bx - ax, by - ay
+    seg = math.hypot(cux, cuy)
+    if seg < 1e-6:
+        return []
+    cux, cuy = cux / seg, cuy / seg
+    dirs = []
+    for i, fr in enumerate(frames):
+        t = t0 - 0.8 + i / fps
+        if not (t0 <= t <= t1):
+            continue
+        moved = np.linalg.norm(fr.astype(np.float32) - bg, axis=2)
+        mask = (moved > 14).astype(np.uint8) * 255
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE,
+                                np.ones((5, 5), np.uint8))
+        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_SIMPLE)
+        for c in cnts:
+            if len(c) < 5 or cv2.contourArea(c) < 0.3 * math.pi * r_vis ** 2:
+                continue
+            (x, y), (MA, ma), ang = cv2.fitEllipse(c)
+            major, minor = max(MA, ma), min(MA, ma)
+            if major < 2.2 * r_vis or major / max(minor, 1) < 1.6:
+                continue                      # round blob: not a streak
+            along = (x - ax) * cux + (y - ay) * cuy
+            perp = abs(-(y - ay) * cux + (x - ax) * cuy)
+            if not (-r_vis <= along <= seg + 2 * r_vis) or perp > 3 * r_vis:
+                continue
+            cm = np.zeros(mask.shape, np.uint8)
+            cv2.drawContours(cm, [c], -1, 255, -1)
+            mean = np.array(cv2.mean(fr, mask=cm)[:3], dtype=float)
+            if float(np.linalg.norm(mean - colour_ref)) > 150.0:
+                continue
+            # ellipse angle: OpenCV's is the MINOR-axis bearing from
+            # vertical; the major axis direction in image coords:
+            th = math.radians(ang + 90.0)
+            dx, dy = math.cos(th), math.sin(th)
+            if dx * cux + dy * cuy < 0:       # resolve the 180-deg ambiguity
+                dx, dy = -dx, -dy
+            dirs.append((dx, dy))
+    return dirs
+
+
 def repass_shot(video, start, end, ball=None):
     """Recover the gap for one shot and return the fitted verdict."""
     from billiards_trainer.vision import miss_tags as MT
@@ -167,10 +232,32 @@ def repass_shot(video, start, end, ball=None):
               + list(tpath[tidx:]))
     merged.sort(key=lambda q: q[0])
     fit = fit_shot(merged, space, space.ball_r_px)
+    basis = "fit"
     if fit is None or fit.residual > 1.5 * space.ball_r_px:
-        return {"ok": False, "why": "fit not trustworthy",
-                "recovered": len(rec),
-                "residual": None if fit is None else round(fit.residual, 1)}
+        # STREAK FALLBACK: when positions are too sparse or noisy for a
+        # trusted fit, the smears themselves can corroborate the chord.
+        # Two independent streaks each within 15 degrees of the chord =
+        # the ball demonstrably travelled the chord line.
+        dirs = streak_directions(video, gap_t0, gap_t1, contact_vis,
+                                 reappear_vis, colour_ref, r_vis)
+        cvx, cvy = reappear_vis[0] - contact_vis[0], reappear_vis[1] - contact_vis[1]
+        n = math.hypot(cvx, cvy) or 1.0
+        cvx, cvy = cvx / n, cvy / n
+        agree = [d for d in dirs
+                 if d[0] * cvx + d[1] * cvy >= math.cos(math.radians(15.0))]
+        if len(agree) < 2:
+            return {"ok": False, "why": "fit not trustworthy",
+                    "recovered": len(rec), "streaks": len(agree),
+                    "residual": None if fit is None else round(fit.residual, 1)}
+        # departure = the chord, in RECT space, validated by the streaks
+        r0 = to_rect(*contact_vis)
+        r1 = to_rect(*reappear_vis)
+        class _ChordFit:
+            departure = MT._unit(r1[0] - r0[0], r1[1] - r0[1])
+            residual = -1.0
+            rail = None
+        fit = _ChordFit()
+        basis = f"streaks x{len(agree)}"
     ux, uy = fit.departure
     best = None
     for name, px_, py_ in space.pockets():
@@ -202,7 +289,7 @@ def repass_shot(video, start, end, ball=None):
                     else ("left" if ang < 0 else "right"))
     return {"ok": True, "ball": tgt, "pocket": pname, "side": side,
             "cut": cut, "rail": fit.rail, "recovered": len(rec),
-            "residual": round(fit.residual, 1)}
+            "basis": basis, "residual": round(fit.residual, 1)}
 
 
 def main():
