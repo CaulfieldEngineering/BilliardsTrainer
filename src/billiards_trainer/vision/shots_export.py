@@ -393,6 +393,7 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
     import json as _json
     d = Path(recordings_dir)
     cells = {}
+    clips = {}
     trusted = gated = 0
     makes = misses = scratches = 0
     for sp in sorted(d.glob("session-*.mp4.shots.json")):
@@ -411,15 +412,27 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
                     scratches += 1
             t = sh.get("tags")
             if not t or not t.get("miss_side"):
+                if sh.get("outcome") == "miss" and sh.get("action") in (
+                        "stroke", "break"):
+                    clips.setdefault("uncat", []).append(
+                        {"session": sp.name[:-len(".shots.json")],
+                         "start": sh.get("start")})
                 continue
             if t.get("confidence") in ("high", "review"):
                 trusted += 1
                 key = f"{t.get('cut', '?')}|{t['miss_side']}"
                 cells[key] = cells.get(key, 0) + 1
+                clips.setdefault(key, []).append(
+                    {"session": sp.name[:-len(".shots.json")],
+                     "start": sh.get("start")})
             else:
                 gated += 1
+                clips.setdefault("uncat", []).append(
+                    {"session": sp.name[:-len(".shots.json")],
+                     "start": sh.get("start")})
     out = {"updated": __import__("time").strftime("%Y-%m-%d %H:%M"),
            "trusted": trusted, "gated": gated, "cells": cells,
+           "clips": clips,
            "makes": makes, "misses": misses, "scratches": scratches,
            "total": makes + misses + scratches}
     fp = d / "lifetime_stats.json"

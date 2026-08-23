@@ -1,6 +1,12 @@
 {
  "entries": [
   {
+   "id": 19,
+   "date": "2026-08-23",
+   "title": "Tap a stats line to grade those clips",
+   "body": "Every miss subgenre in Lifetime Stats \u2014 including Uncategorized \u2014 is now a playlist. Tap it, watch the clips, and set Cut/Missed in each shot's Details. Grading an Uncategorized miss moves it into its subgenre and sharpens the table."
+  },
+  {
    "id": 18,
    "date": "2026-08-23",
    "title": "Stats restructured your way",

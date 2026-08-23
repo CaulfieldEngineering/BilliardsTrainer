@@ -683,31 +683,44 @@ async function openStats() {
     // Joe's structure: totals, then misses broken into subgenres with the
     // overcut/undercut reading built in (overcut = too thin: a left cut
     // missing LEFT went too thin; missing RIGHT was hit too full)
-    const line = (label, n, indent, dim) =>
-      `<div style="display:flex;padding:7px 2px ${indent ? "7px 18px" : "7px 2px"};
-         border-bottom:1px solid #232B36;${dim ? "color:var(--dim)" : ""}">
-         <span>${indent ? "• " : ""}${label}</span>
+    // subgenre lines are SYSTEM PLAYLISTS (Joe: "click these and
+    // manually grade/categorize these clips") — a tap opens the bucket's
+    // clips in the player, where Details carries the Cut/Missed verdicts
+    const line = (label, n, indent, dim, key) =>
+      `<div ${key && n ? `data-bucket="${key}" data-label="${label}"` : ""}
+         style="display:flex;padding:7px 2px ${indent ? "7px 18px" : "7px 2px"};
+         border-bottom:1px solid #232B36;${dim ? "color:var(--dim)" : ""}
+         ${key && n ? "cursor:pointer" : ""}">
+         <span>${indent ? "• " : ""}${label}${key && n ? " ›" : ""}</span>
          <span style="margin-left:auto;font-weight:800;
            font-variant-numeric:tabular-nums">${n}</span></div>`;
     let html = "";
     html += line("Total Shots", d.total ?? "–");
     html += line("Makes", d.makes ?? "–");
     html += line("Misses", d.misses ?? "–");
-    html += line("Cut Left / Miss Left (Overcut)", g("left|left"), true);
-    html += line("Cut Left / Miss Right (Undercut)", g("left|right"), true);
-    html += line("Cut Right / Miss Right (Overcut)", g("right|right"), true);
-    html += line("Cut Right / Miss Left (Undercut)", g("right|left"), true);
-    html += line("Straight / Miss Left", g("straight|left"), true);
-    html += line("Straight / Miss Right", g("straight|right"), true);
+    html += line("Cut Left / Miss Left (Overcut)", g("left|left"), true, false, "left|left");
+    html += line("Cut Left / Miss Right (Undercut)", g("left|right"), true, false, "left|right");
+    html += line("Cut Right / Miss Right (Overcut)", g("right|right"), true, false, "right|right");
+    html += line("Cut Right / Miss Left (Undercut)", g("right|left"), true, false, "right|left");
+    html += line("Straight / Miss Left", g("straight|left"), true, false, "straight|left");
+    html += line("Straight / Miss Right", g("straight|right"), true, false, "straight|right");
     const cat = ["left|left","left|right","right|right","right|left",
                  "straight|left","straight|right"].reduce((a,k)=>a+g(k),0);
-    html += line("Uncategorized", Math.max(0, (d.misses ?? 0) - cat), true, true);
+    html += line("Uncategorized", (d.clips && d.clips.uncat || []).length, true, true, "uncat");
     if (d.scratches) html += line("Scratches", d.scratches);
     html += `<p style="color:var(--dim);font-size:12px;margin-top:10px">
       Uncategorized = misses without a trusted cut/side read yet —
       set Cut and Missed in any shot’s Details to move it into its
       subgenre. Updated ${d.updated}.</p>`;
     box.innerHTML = html;
+    [...box.querySelectorAll("[data-bucket]")].forEach(el => {
+      el.onclick = () => {
+        const clips = (d.clips || {})[el.dataset.bucket] || [];
+        if (!clips.length) return;
+        $("statsheet").style.display = "none";
+        openPlaylist({ name: el.dataset.label, clips });
+      };
+    });
   } catch (e) {
     box.innerHTML = "<div class='empty'>No stats yet — they appear after the next analysis pass.</div>";
   }
