@@ -65,6 +65,20 @@ def main() -> int:
     log = logging.getLogger("app")
     log.info("Starting %s %s", APP_NAME, __version__)
 
+    # Self-demote to BELOW_NORMAL on Windows so sustained CPU work (inference
+    # runs on the CPU now — see DetectionSettings.inference_provider) never
+    # competes with the user's input/desktop at equal priority. This was
+    # previously applied by hand to the running process and silently lost on
+    # every restart. Child processes (ffmpeg capture/encode) do NOT inherit
+    # the class — they start Normal, so recording is unaffected.
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetPriorityClass(
+                ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)
+        except Exception:  # noqa: BLE001 - priority is best-effort, never fatal
+            log.warning("could not lower process priority", exc_info=True)
+
     # Import Qt lazily so logging/paths are ready first and import errors are clear.
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QGuiApplication
