@@ -394,12 +394,21 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
     d = Path(recordings_dir)
     cells = {}
     trusted = gated = 0
+    makes = misses = scratches = 0
     for sp in sorted(d.glob("session-*.mp4.shots.json")):
         try:
             doc = _json.loads(sp.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         for sh in doc.get("shots", []):
+            if sh.get("action") in ("stroke", "break"):
+                oc = sh.get("outcome")
+                if oc == "make":
+                    makes += 1
+                elif oc == "miss":
+                    misses += 1
+                elif oc == "scratch":
+                    scratches += 1
             t = sh.get("tags")
             if not t or not t.get("miss_side"):
                 continue
@@ -410,7 +419,9 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
             else:
                 gated += 1
     out = {"updated": __import__("time").strftime("%Y-%m-%d %H:%M"),
-           "trusted": trusted, "gated": gated, "cells": cells}
+           "trusted": trusted, "gated": gated, "cells": cells,
+           "makes": makes, "misses": misses, "scratches": scratches,
+           "total": makes + misses + scratches}
     fp = d / "lifetime_stats.json"
     fp.write_text(_json.dumps(out, indent=1), encoding="utf-8")
     return fp

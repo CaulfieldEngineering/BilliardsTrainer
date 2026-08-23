@@ -1,6 +1,12 @@
 {
  "entries": [
   {
+   "id": 18,
+   "date": "2026-08-23",
+   "title": "Stats restructured your way",
+   "body": "Lifetime Stats now reads top-down: Total Shots, Makes, Misses \u2014 then each miss subgenre with its meaning built in: Cut Left / Miss Left (Overcut), Cut Left / Miss Right (Undercut), and so on."
+  },
+  {
    "id": 17,
    "date": "2026-08-23",
    "title": "What's New and Stats actually open now",
