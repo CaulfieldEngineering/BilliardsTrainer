@@ -1616,3 +1616,18 @@ Rounds continue with Joe's visual feedback as the gate.
   HIS queue by design, via the stats playlists. REMAINING fusion items
   (better, not blocking): flag recovered detections' quality; audio
   contact anchor; subtraction as an always-on channel.
+
+- 2026-08-23 (Joe: "I refuse to believe you can't think of something") —
+  TOP BUILD: the SHOT-WINDOW FORENSIC RE-PASS. Productize the manual
+  forensics that settled @233 and @223: for each uncategorized miss (~7s
+  each, ~20min of footage TOTAL — not 13h), an offline solver that (a)
+  tracks BACKWARD from the ball's known rest position into the blur,
+  (b) searches only the straight-roll CORRIDOR between rest and
+  reappearance (near-1D, trivially robust), (c) reads the blur STREAK'S
+  ORIENTATION as a direct velocity-direction measurement, (d) hands all
+  of it to the trajectory fit. Gates: the two ground-truth shots must
+  come out right; per-bucket count deltas reported honestly. Then in
+  order: audio contact anchor (pins the decel model); sweep-channel
+  defects (mask, persistence, source-typed evidence — do not let it
+  refresh resting tracks); RIFE-as-association-glue in strike windows;
+  blur-trained challenger through the existing gate.
