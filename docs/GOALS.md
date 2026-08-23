@@ -1670,3 +1670,13 @@ Rounds continue with Joe's visual feedback as the gate.
   has population 1). The 39 never-observed remain a capture problem
   (Joe's shutter day). One shot now fits outright (tracker improvements
   landed since tagging) — picked up by the next batch automatically.
+
+- 2026-08-23 (session 13) — PREFIX-FIT PAID: 31 of the 52 bent shots
+  solved (17L/14R), integrated as ranked records. Trusted 116 -> 147,
+  Uncategorized 93 -> 62, @233 unchanged (straight/left/high). Remaining:
+  39 never-observed (capture; Joe's shutter day), 21 still-untrusted
+  (genuinely messy; Joe's taps or nothing), 2 no-pocket. Backlog arc
+  across three techniques: 171 -> 62 (64% cleared) for ~20 min total
+  compute. Deployed with What's New. NEXT: SD push when the card lands;
+  wire fit_first_leg into the LIVE tagger as the same fallback rank;
+  sweep fixes; audio anchor.
