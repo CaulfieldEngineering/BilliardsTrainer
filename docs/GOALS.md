@@ -1645,3 +1645,15 @@ Rounds continue with Joe's visual feedback as the gate.
   copy lands; then sweep fixes / audio anchor / RIFE-glue / blur
   challenger; the 54 fit-untrusted are candidates for streak-orientation
   observations (the not-yet-built third forensic technique).
+
+- 2026-08-23 (session 11) — Streak-as-sensor: honest near-null. Of the 94
+  remaining uncategorized, streaks rescued exactly 1 (integrated; uncat
+  now 93). The 53 fit-untrusted stay untrusted: their smears are too
+  faint/occluded to clear the two-streaks-within-15-degrees bar, and
+  loosening that bar without ground truth is how verdicts go wrong.
+  Classification of value: the backlog now splits into 53 "observed but
+  unfittable" (candidates for RIFE-glue + audio anchor + Joe's taps) and
+  39 "never observed" (only better capture fixes these — Joe's shutter
+  day). The productive frontier moved from solver cleverness to input
+  quality, exactly as the fusion design predicted. NEXT: SD push when the
+  card copy lands; RIFE-glue trial on a sample of the 53; audio anchor.
