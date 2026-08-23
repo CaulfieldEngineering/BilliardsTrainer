@@ -1711,3 +1711,16 @@ Rounds continue with Joe's visual feedback as the gate.
   honesty working) but the claim stays open until checked.
   AWAITING: Joe's remounted-camera true-1/250 clip for the smear
   before/after that retires the blur saga.
+
+- 2026-08-23 (session 16) — Session-15's open claim SETTLED with data. Six
+  flips (not 5), all high->gated, and crucially: where both configs
+  produce a side, the SIDES AGREE (right->right, left->left) — the
+  first-leg direction never contradicted the old labels, it shifted miss
+  distances enough that pocket-doubt gates fired (two shots now abstain).
+  No forensic record contradicts any flip. Verdict: the fallback stands;
+  no wrong sides were introduced; the 6 join Joe's grading playlists
+  where a tap settles each. Camera meanwhile REMOUNTED with EOS Utility
+  remote control (1/500 F4.5 visible); flagged ISO 6400 -> 3200 and
+  AWB -> fixed to Joe; unmanned sampling impossible (server is read-only
+  by design) — a record endpoint is now a queued build. Awaiting his
+  true-1/500 hard-shot clip; smear monitor armed.
