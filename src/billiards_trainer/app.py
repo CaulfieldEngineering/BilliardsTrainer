@@ -74,8 +74,18 @@ def main() -> int:
     if sys.platform == "win32":
         try:
             import ctypes
-            ctypes.windll.kernel32.SetPriorityClass(
-                ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)
+            # Explicit handle types are REQUIRED: bare windll mangles the
+            # 64-bit pseudo-handle and SetPriorityClass fails silently
+            # (returns 0 — measured 2026-08-23; the first version of this
+            # demote was a no-op).
+            k = ctypes.WinDLL("kernel32", use_last_error=True)
+            k.GetCurrentProcess.restype = ctypes.c_void_p
+            k.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+            if k.SetPriorityClass(k.GetCurrentProcess(), 0x4000):
+                log.info("process priority: BelowNormal")
+            else:
+                log.warning("could not lower process priority (err %d)",
+                            ctypes.get_last_error())
         except Exception:  # noqa: BLE001 - priority is best-effort, never fatal
             log.warning("could not lower process priority", exc_info=True)
 

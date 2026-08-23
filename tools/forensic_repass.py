@@ -33,8 +33,7 @@ import argparse
 # desktop or the live pipeline: drop OURSELVES to below-normal priority.
 try:
     import ctypes
-    ctypes.windll.kernel32.SetPriorityClass(
-        ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)  # BELOW_NORMAL
+    from _lowprio import demote as _demote; _demote()
 except Exception:
     pass
 

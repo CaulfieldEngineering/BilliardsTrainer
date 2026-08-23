@@ -769,6 +769,7 @@ class PipelineController(QObject):
         but slow on the phone."""
         import subprocess
         from pathlib import Path as _P
+
         from ..capture.audio import NO_WINDOW, find_ffmpeg
         p = _P(path)
         ff = find_ffmpeg()
@@ -1120,8 +1121,15 @@ class PipelineController(QObject):
         # applied by hand on 2026-08-23.
         try:
             import ctypes
-            ctypes.windll.kernel32.SetThreadPriority(
-                ctypes.windll.kernel32.GetCurrentThread(), -1)  # BELOW_NORMAL
+            # Explicit handle types are REQUIRED: bare windll mangles the
+            # 64-bit pseudo-handle and the call fails silently (returns 0,
+            # measured 2026-08-23 — this demote was a no-op until typed).
+            k = ctypes.WinDLL("kernel32", use_last_error=True)
+            k.GetCurrentThread.restype = ctypes.c_void_p
+            k.SetThreadPriority.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            if not k.SetThreadPriority(k.GetCurrentThread(), -1):  # BELOW_NORMAL
+                log.warning("detect-worker thread demote failed (err %d)",
+                            ctypes.get_last_error())
         except Exception:  # noqa: BLE001 - priority is best-effort
             pass
         while True:

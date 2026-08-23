@@ -17,7 +17,6 @@ Usage: python tools/check_exposure.py [clip.mp4] [--ball-diam 28]
 Defaults to the newest session recording. ASCII output (cp1252 console).
 """
 import argparse
-import ctypes
 import glob
 import os
 import sys
@@ -36,8 +35,7 @@ def newest_session() -> str:
 
 
 def main() -> None:
-    ctypes.windll.kernel32.SetPriorityClass(
-        ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)  # BELOW_NORMAL
+    from _lowprio import demote as _demote; _demote()
     ap = argparse.ArgumentParser()
     ap.add_argument("clip", nargs="?", default=None)
     ap.add_argument("--ball-diam", type=float, default=28.0,
@@ -49,7 +47,7 @@ def main() -> None:
     cap = cv2.VideoCapture(clip)
     n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    print("clip: %s  (%.1f min @ %.0ffps)" % (os.path.basename(clip), n / fps / 60, fps))
+    print(f"clip: {os.path.basename(clip)}  ({n / fps / 60:.1f} min @ {fps:.0f}fps)")
 
     # median background from sparse frames
     bg_frames = []
@@ -117,7 +115,7 @@ def main() -> None:
         rows.sort(key=lambda r: -r[0])
         print("\n%s (top 5 of %d):" % (name, len(rows)))
         for smear, t, _c, major, minor in rows[:5]:
-            print("  t=%7.1fs  %3.0f x %3.0f   smear %3.0fpx" % (t, major, minor, smear))
+            print(f"  t={t:7.1f}s  {major:3.0f} x {minor:3.0f}   smear {smear:3.0f}px")
         return rows[:5]
 
     top_b = report("BALL-LIKE moving blobs (the smear verdict)", balls)
@@ -126,9 +124,9 @@ def main() -> None:
     if top_b:
         tiles = []
         size = 96
-        for smear, t, crop, *_ in top_b:
+        for smear, _t, crop, *_ in top_b:
             c = cv2.resize(crop, (size, size))
-            cv2.putText(c, "%.0fpx" % smear, (4, 14),
+            cv2.putText(c, f"{smear:.0f}px", (4, 14),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
             tiles.append(c)
         sheet = cv2.hconcat(tiles)
@@ -137,9 +135,9 @@ def main() -> None:
         out = os.path.abspath(out)
         os.makedirs(os.path.dirname(out), exist_ok=True)
         cv2.imwrite(out, sheet)
-        print("\ncrops of top ball-like blobs: %s" % out)
+        print(f"\ncrops of top ball-like blobs: {out}")
         worst = top_b[0][0]
-        print("VERDICT: worst ball smear %.0fpx -> %s" % (
+        print("VERDICT: worst ball smear {:.0f}px -> {}".format(
             worst, "CRISP (fast shutter confirmed)" if worst < 12
             else "check the contact sheet before blaming the camera"))
 

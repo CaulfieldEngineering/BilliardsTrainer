@@ -11,7 +11,6 @@ then an atomic replace; original mtime is preserved (session tooling
 verifies UTC filename stamps against mtime). Already-faststart files are
 detected (front moov > 10 KB) and skipped, so reruns are cheap no-ops.
 """
-import ctypes
 import glob
 import os
 import struct
@@ -27,24 +26,28 @@ from billiards_trainer.config import EXPORTS_DIR  # noqa: E402
 SESS_DIR = "C:/Users/Joe/Dropbox/Billiards/BilliardsTrainer"
 
 
-def front_moov_size(path: str) -> int:
-    """Size of the moov box among the first two top-level boxes (0 if absent)."""
+def is_fragmented(path: str) -> bool:
+    """True if the file is a fragmented mp4 (moof boxes near the head).
+
+    A size threshold on the front moov misclassifies SHORT sessions (a
+    complete index for a 10s clip is tiny) and re-remuxes them forever;
+    the presence of a moof box is structural and idempotent."""
     with open(path, "rb") as f:
         pos = 0
-        for _ in range(2):
+        for _ in range(4):
             f.seek(pos)
             hdr = f.read(8)
             if len(hdr) < 8:
-                return 0
+                return False
             size, typ = struct.unpack(">I4s", hdr)
-            if typ == b"moov":
-                return size
+            if typ == b"moof":
+                return True
             if size == 1:
                 size = struct.unpack(">Q", f.read(8))[0]
             if size <= 0:
-                return 0
+                return False
             pos += size
-    return 0
+    return False
 
 
 def recording_active() -> bool:
@@ -56,8 +59,7 @@ def recording_active() -> bool:
 
 
 def main() -> None:
-    ctypes.windll.kernel32.SetPriorityClass(
-        ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)
+    from _lowprio import demote as _demote; _demote()
     ff = find_ffmpeg()
     if not ff:
         sys.exit("no ffmpeg")
@@ -68,7 +70,7 @@ def main() -> None:
         if recording_active():
             print("recording active - stopping backfill (rerun later)")
             break
-        if front_moov_size(p) > 10_000:
+        if not is_fragmented(p):
             skipped += 1
             continue
         mtime = os.path.getmtime(p)
@@ -84,15 +86,14 @@ def main() -> None:
                 os.replace(tmp, p)
                 os.utime(p, (mtime, mtime))
                 done += 1
-                print("ok  %s (%.1f GB)" % (os.path.basename(p),
-                                            os.path.getsize(p) / 1e9))
+                print(f"ok  {os.path.basename(p)} ({os.path.getsize(p) / 1e9:.1f} GB)")
             else:
                 failed += 1
                 err = (r.stderr or b"")[-200:].decode("utf-8", "replace")
-                print("FAIL %s: %s" % (os.path.basename(p), err.strip()))
+                print(f"FAIL {os.path.basename(p)}: {err.strip()}")
         except Exception as exc:  # noqa: BLE001
             failed += 1
-            print("FAIL %s: %s" % (os.path.basename(p), exc))
+            print(f"FAIL {os.path.basename(p)}: {exc}")
         finally:
             if os.path.exists(tmp):
                 try:
