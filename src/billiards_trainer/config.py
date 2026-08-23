@@ -268,6 +268,16 @@ class DetectionSettings:
     # capped at 4 intra-op threads and the process runs BelowNormal, so input
     # handling preempts it cleanly.
     inference_provider: str = "auto"
+    # Denoise the LIVE ANALYSIS stream (hqdn3d, default strength) before the
+    # detector sees it. The recorder already lightly denoises what it WRITES;
+    # the detector historically ate raw frames. High-ISO grain (2026-08-23
+    # camera settings) measurably hurt tracking — identity hops 4.3x the
+    # clean-era rate. A/B on a grainy session slice (tools/exp_hqdn3d_ab.py):
+    # hops/1k 3.82 -> 3.13, numbered 82.8 -> 83.6%, track churn -14%,
+    # balls-per-state +12%, no metric worse. Costs one ffmpeg filter stage
+    # in the capture process (~measured 98 fps offline at 1080p). Applies to
+    # the LIVE stream only; offline rebuilds decode with cv2 and stay raw.
+    denoise_analysis: bool = False
 
 
 @dataclass

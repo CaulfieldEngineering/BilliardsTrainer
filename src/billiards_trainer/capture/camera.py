@@ -442,12 +442,16 @@ def _ffmpeg_camera(index: int, cam: CameraSettings | None):
             found = list_audio_devices()
             mic = found[0] if found else None
         qp = 20
+        denoise = False
         try:
             from ..config import Settings
-            qp = int(Settings.load().recording.video_qp)
+            s = Settings.load()
+            qp = int(s.recording.video_qp)
+            denoise = bool(getattr(s.detection, "denoise_analysis", False))
         except Exception:  # noqa: BLE001 - a bad/missing setting must not block capture
             pass
-        return FfmpegCameraSource(name, audio_device=mic, cam=cam, qp=qp)
+        return FfmpegCameraSource(name, audio_device=mic, cam=cam, qp=qp,
+                                  denoise_analysis=denoise)
     except Exception as exc:  # noqa: BLE001 - any failure => use the OpenCV path
         log.warning("ffmpeg capture unavailable (%s); using OpenCV", exc)
         return None

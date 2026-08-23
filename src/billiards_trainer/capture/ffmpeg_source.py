@@ -60,13 +60,15 @@ class FfmpegCameraSource:
 
     def __init__(self, video_device: str, width: int = 1920, height: int = 1080,
                  in_fps: int = 60, audio_device: str | None = None,
-                 cam: CameraSettings | None = None, qp: int = 20):
+                 cam: CameraSettings | None = None, qp: int = 20,
+                 denoise_analysis: bool = False):
         self._video = video_device
         self._audio = audio_device
         self._w, self._h = width, height
         self._in_fps = in_fps
         self._cam = cam
         self._qp = int(qp)
+        self._denoise_analysis = bool(denoise_analysis)
         self._proc: subprocess.Popen | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -114,8 +116,12 @@ class FfmpegCameraSource:
             if self._audio:
                 cmd += ["-c:a", "aac", "-b:a", "160k"]
             cmd += ["-y", self._rec_path]
-        # analysis output, always last
-        cmd += ["-map", "0:v", "-vf", f"fps={ANALYSIS_FPS}",
+        # analysis output, always last. hqdn3d BEFORE fps decimation: the
+        # temporal filter accumulates over full-rate frames (matches the
+        # measured A/B, tools/exp_hqdn3d_ab.py); the recording is untouched.
+        vf_a = (f"hqdn3d,fps={ANALYSIS_FPS}" if self._denoise_analysis
+                else f"fps={ANALYSIS_FPS}")
+        cmd += ["-map", "0:v", "-vf", vf_a,
                 "-pix_fmt", "bgr24", "-f", "rawvideo", "-"]
         return cmd
 
