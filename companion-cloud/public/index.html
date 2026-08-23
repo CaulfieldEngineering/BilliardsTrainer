@@ -53,6 +53,23 @@
   .swipe .swdel { position:absolute; right:0; top:0; bottom:0; width:80px;
                   background:#D64545; color:#fff; border:none;
                   font-weight:700; font-size:14px; }
+  /* HOME v2 (Joe: "bookmark then blast") — cards, not a spreadsheet */
+  .seg { display:flex; gap:8px; margin:12px 12px 4px; }
+  .seg button { flex:1; height:40px; border-radius:12px; font-weight:700;
+      background:var(--panel,#12161C); color:var(--dim);
+      border:1px solid #2A323D; }
+  .seg button.on { color:var(--text,#EAF2F3); border-color:var(--accent);
+      background:rgba(58,151,212,.12); }
+  .card { margin:8px 12px; padding:13px 14px; border-radius:14px;
+      background:var(--panel,#12161C); border:1px solid #2A323D;
+      display:flex; align-items:center; gap:12px; }
+  .card:active { background:#1A222C; }
+  .card .big { font-weight:700; font-size:15px; }
+  .card .sub { color:var(--dim); font-size:13px; margin-top:2px; }
+  .card .go { margin-left:auto; color:var(--faint); font-size:20px; }
+  .card.stub .big { color:var(--faint); font-weight:500; }
+  .card.new { justify-content:center; color:var(--accent); font-weight:700;
+      border-style:dashed; }
   .swipe .sess { position:relative; background:var(--bg); }
   .sess.new { color:var(--accent); font-weight:600; display:block; }
   .sess { display:grid; grid-template-columns: 1fr 64px 56px;
@@ -562,27 +579,9 @@ let sessCache = [];                       // last /api/sessions payload
 // playlists header, drop downs with indented content, entries slidable
 // to delete")
 const HOME = {
-  sess: localStorage.getItem("home_sess") === "1",   // start collapsed (Joe)
-  pl: localStorage.getItem("home_pl") === "1",
+  // HOME v2: one visible tab instead of two accordions
+  tab: localStorage.getItem("home_tab") || "sess",
 };
-function _accHeader(box, key, title, count) {
-  const h = document.createElement("div");
-  h.className = "acc" + (HOME[key] ? " open" : "");
-  const ch = document.createElement("span");
-  ch.className = "ch"; ch.textContent = "\u203A";
-  const t = document.createElement("span");
-  t.textContent = title;
-  const c = document.createElement("span");
-  c.className = "cnt"; c.textContent = count === 0 ? "" : count;
-  h.append(ch, t, c);
-  h.onclick = () => {
-    HOME[key] = !HOME[key];
-    localStorage.setItem("home_" + key, HOME[key] ? "1" : "0");
-    if (key === "pl" && HOME.pl) PL.pull();
-    renderHome();
-  };
-  box.appendChild(h);
-}
 const fmtDur = d => d == null ? "\u2013"
   : d >= 3600 ? `${Math.floor(d / 3600)}h${String(Math.floor(d % 3600 / 60)).padStart(2, "0")}`
   : d >= 60 ? `${Math.floor(d / 60)}m` : `${Math.floor(d)}s`;
@@ -639,8 +638,6 @@ function _plRow(pl) {
 function renderHome() {
   const box = $("sessions");
   box.innerHTML = "";
-  // What's New lives on the HOME page (Joe: it has no business in the
-  // player's drawing menu). One tappable row: latest title, unread dot.
   const ns = window._newsState;
   if (ns) {
     const nb = document.createElement("div");
@@ -653,58 +650,57 @@ function renderHome() {
     nb.onclick = () => window._openNews && window._openNews();
     box.appendChild(nb);
   }
-  _accHeader(box, "sess", "Sessions", sessCache.length);
-  if (HOME.sess) {
-    const wrap = document.createElement("div");
-    wrap.className = "indent";
+  // one screen, one choice: Sessions or Playlists (the accordion pair
+  // collapsed into a spreadsheet was the "mess" — cards now)
+  const seg = document.createElement("div");
+  seg.className = "seg";
+  [["sess", "Sessions"], ["pl", "Playlists"]].forEach(([k, label]) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.className = (HOME.tab || "sess") === k ? "on" : "";
+    b.onclick = () => { HOME.tab = k;
+      localStorage.setItem("home_tab", k);
+      if (k === "pl") PL.pull();
+      renderHome(); };
+    seg.appendChild(b);
+  });
+  box.appendChild(seg);
+  if ((HOME.tab || "sess") === "sess") {
     if (!sessCache.length) {
-      wrap.innerHTML = "<div class='empty'>Loading sessions\u2026</div>";
-    } else {
-      const head = document.createElement("div");
-      head.className = "sess head";
-      ["DATE", "LENGTH", "SHOTS"].forEach((t, i) => {
-        const sp = document.createElement("span");
-        if (i > 0) sp.className = "num";
-        sp.textContent = t;
-        head.appendChild(sp);
-      });
-      wrap.appendChild(head);
-      sessCache.forEach(s2 => {
-        const el = document.createElement("div");
-        el.className = "sess" + (s2.analyzed ? "" : " stub");
-        // textContent only — a Dropbox filename is untrusted input and
-        // the fmtDate fallback returns it raw (security review).
-        const d = document.createElement("span");
-        d.className = "d";
-        d.textContent = fmtDate(s2.name, s2.modified);
-        const len = document.createElement("span");
-        len.className = "num" + (s2.dur_s == null ? " dim" : "");
-        len.textContent = fmtDur(s2.dur_s);
-        const sh = document.createElement("span");
-        sh.className = "num" + (s2.shots == null ? " dim" : "");
-        sh.textContent = s2.shots == null ? "\u2013" : s2.shots;
-        el.append(d, len, sh);
-        el.onclick = () => openSession(s2);
-        wrap.appendChild(el);
-      });
+      const e = document.createElement("div");
+      e.className = "empty"; e.textContent = "Loading sessions…";
+      box.appendChild(e);
+      return;
     }
-    box.appendChild(wrap);
-  }
-  const ls = PL.all();
-  _accHeader(box, "pl", "Playlists", ls.length);
-  if (HOME.pl) {
-    const wrap = document.createElement("div");
-    wrap.className = "indent";
+    sessCache.forEach(s2 => {
+      const el = document.createElement("div");
+      el.className = "card" + (s2.analyzed ? "" : " stub");
+      const t = document.createElement("div");
+      const big = document.createElement("div");
+      big.className = "big";
+      big.textContent = fmtDate(s2.name, s2.modified);
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.textContent = s2.analyzed
+        ? `${fmtDur(s2.dur_s)} · ${s2.shots == null ? "–" : s2.shots} shots`
+        : "not analyzed yet";
+      t.append(big, sub);
+      const go = document.createElement("span");
+      go.className = "go"; go.textContent = "›";
+      el.append(t, go);
+      el.onclick = () => openSession(s2);
+      box.appendChild(el);
+    });
+  } else {
     const nw = document.createElement("div");
-    nw.className = "sess new";
-    nw.textContent = "\uFF0B New Playlist";
+    nw.className = "card new";
+    nw.textContent = "＋ New Playlist";
     nw.onclick = () => {
       const name = (prompt("Playlist name") || "").trim();
       if (name) { PL.create(name); renderHome(); }
     };
-    wrap.appendChild(nw);
-    ls.forEach(pl => wrap.appendChild(_plRow(pl)));
-    box.appendChild(wrap);
+    box.appendChild(nw);
+    PL.all().forEach(pl => box.appendChild(_plRow(pl)));
   }
 }
 

@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 11,
+   "date": "2026-08-23",
+   "title": "New home screen",
+   "body": "Sessions and playlists are now cards under a simple two-tab switch \u2014 no more collapsible spreadsheet. The old look is bookmarked; say the word to evolve or revert.",
+   "details": [
+    "Each session is one card: date on top, length and shot count underneath, dimmed if it hasn't been analysed yet. Playlists get their own tab with the same card style.",
+    "Per your direction this was a clean blast rather than a tweak: the previous UI is saved as a bookmark (ui-v1), so nothing is lost \u2014 we iterate from here or roll straight back."
+   ]
+  },
+  {
    "id": 10,
    "date": "2026-08-23",
    "title": "What's New moved home",
