@@ -1,76 +1,98 @@
 {
  "entries": [
   {
+   "id": 25,
+   "date": "2026-08-23",
+   "title": "You were right about the shutter — blur is fixed",
+   "body": "The new camera settings are real and working: a crop of the fastest-moving thing in your latest clip (the cue stick mid-stroke) is tack sharp. My earlier claim that the shutter 'wasn't applying' was my measurement's fault — it was counting pieces of your cue stick as blurred balls.",
+   "details": [
+    "The smear detector ranks elongated blobs, and a cue stick is naturally elongated — no motion needed. Once your 1/500 shutter made the balls crisp, stick fragments were the only stretched shapes left, and they topped the list looking like blur.",
+    "The decisive test: the fastest mover in session 18:55 (inter-frame extent 199px — full stroke speed) shows zero smear in a single frame. At the old 1/60 exposure it would have smeared ~75px.",
+    "What this unlocks: fast shots stop vanishing mid-flight. 39 of the 62 remaining uncategorized misses failed because the ball was never captured between strike and pocket — that failure class should not exist in new recordings."
+   ]
+  },
+  {
+   "id": 24,
+   "date": "2026-08-23",
+   "title": "Fixed the laggy mouse and keyboard",
+   "body": "The AI was hogging the graphics chip — the same chip Windows uses to draw your cursor and keystrokes, which is why typing felt broken whenever the app ran. Ball detection now runs on the CPU instead: your desktop got its graphics chip back (app's share: 69% → 0%), and detection barely slows down.",
+   "details": [
+    "Root cause: DirectML inference saturated the Radeon 780M's 3D engine at ~30 inferences/sec. On an integrated GPU that's the exact engine the Windows compositor needs for the cursor, and GPU engines have no preemptive priority — which is why every process/thread priority fix failed to help.",
+    "Measured before choosing: CPU at 4 threads does a full tiled detection in 88ms (~11/sec) vs ~15/sec on the GPU. Detections verified identical between the two (6/6 balls matched within 2px, same numbers).",
+    "It's a setting (detection.inference_provider: auto/gpu/cpu), so a future camera-PC or GPU upgrade flips it back with one word. The CPU session is capped at 4 threads and the app runs below-normal priority, so your input always preempts it."
+   ]
+  },
+  {
    "id": 22,
    "date": "2026-08-23",
-   "title": "31 more misses solved \u2014 backlog down to 62",
-   "body": "A smarter read of rattle-heavy shots (judging only the ball's initial run, not the chaos after it hits the jaws) solved 31 more misses. Trusted verdicts: 116 \u2192 147. Uncategorized: 93 \u2192 62.",
+   "title": "31 more misses solved — backlog down to 62",
+   "body": "A smarter read of rattle-heavy shots (judging only the ball's initial run, not the chaos after it hits the jaws) solved 31 more misses. Trusted verdicts: 116 → 147. Uncategorized: 93 → 62.",
    "details": [
-    "A measurement pass showed most stuck shots weren't missing data \u2014 they were fully observed but their paths bend too much (rattles, rebounds) for a whole-journey fit. The verdict only ever needed the first straight run from contact, so that's what gets judged now, under an even stricter straightness bar.",
+    "A measurement pass showed most stuck shots weren't missing data — they were fully observed but their paths bend too much (rattles, rebounds) for a whole-journey fit. The verdict only ever needed the first straight run from contact, so that's what gets judged now, under an even stricter straightness bar.",
     "Of the 62 remaining: 39 were never captured at all (the shutter-speed change will prevent these going forward), 21 are genuinely too messy to trust, 2 pointed at no pocket. All stay in your grading playlist rather than being guessed.",
-    "Your categorized misses now split about even left/right overall \u2014 with 'cut right, missed right' (overcut) still the single biggest bucket at 28."
+    "Your categorized misses now split about even left/right overall — with 'cut right, missed right' (overcut) still the single biggest bucket at 28."
    ]
   },
   {
    "id": 21,
    "date": "2026-08-23",
    "title": "77 backlog misses solved automatically",
-   "body": "The forensic solver you pushed for went through the uncategorized pile: 77 of 171 misses now carry a verdict (Uncategorized 171 \u2192 94, trusted verdicts 38 \u2192 115). Your own corrections still outrank everything.",
+   "body": "The forensic solver you pushed for went through the uncategorized pile: 77 of 171 misses now carry a verdict (Uncategorized 171 → 94, trusted verdicts 38 → 115). Your own corrections still outrank everything.",
    "details": [
-    "It re-opens only the blurry second of each miss and searches the narrow corridor physics allows, matched against that ball's own colour \u2014 about 8 minutes of compute for the whole pile, versus the 13-hour full rerun that measurably didn't work.",
-    "Interesting early signal: the newly solved misses split 36 left / 41 right \u2014 much more balanced than the first trusted batch suggested. Worth watching as the rest get graded.",
-    "Honestly held back: 54 shots where the fit wasn't trustworthy and 39 where the ball's flight was never captured at all \u2014 those stay in your grading queue rather than being guessed. 49 solved shots know the miss side but not the cut (the cue wasn't tracked); they're listed as 'cut unknown' and count toward totals."
+    "It re-opens only the blurry second of each miss and searches the narrow corridor physics allows, matched against that ball's own colour — about 8 minutes of compute for the whole pile, versus the 13-hour full rerun that measurably didn't work.",
+    "Interesting early signal: the newly solved misses split 36 left / 41 right — much more balanced than the first trusted batch suggested. Worth watching as the rest get graded.",
+    "Honestly held back: 54 shots where the fit wasn't trustworthy and 39 where the ball's flight was never captured at all — those stay in your grading queue rather than being guessed. 49 solved shots know the miss side but not the cut (the cue wasn't tracked); they're listed as 'cut unknown' and count toward totals."
    ]
   },
   {
    "id": 20,
    "date": "2026-08-23",
    "title": "Miss verdicts now come from physics",
-   "body": "Every clip's miss side is now read off a physics fit of the ball's whole path \u2014 the method that got both hand-verified shots right, including one the old approach called confidently wrong. Trusted misses grew 33 \u2192 38 and the table updated.",
+   "body": "Every clip's miss side is now read off a physics fit of the ball's whole path — the method that got both hand-verified shots right, including one the old approach called confidently wrong. Trusted misses grew 33 → 38 and the table updated.",
    "details": [
-    "The old approach judged direction from a few samples near the pocket, which a rattle could fool \u2014 your 4-ball shot and one other verified clip proved it. The new approach fits straight rolling legs to every observation of the ball and reads the verdict off the fit, with its own error bar deciding when to trust it.",
-    "Your grading queue (Uncategorized) still works exactly the same \u2014 and every verdict you enter keeps training the system's honesty checks."
+    "The old approach judged direction from a few samples near the pocket, which a rattle could fool — your 4-ball shot and one other verified clip proved it. The new approach fits straight rolling legs to every observation of the ball and reads the verdict off the fit, with its own error bar deciding when to trust it.",
+    "Your grading queue (Uncategorized) still works exactly the same — and every verdict you enter keeps training the system's honesty checks."
    ]
   },
   {
    "id": 19,
    "date": "2026-08-23",
    "title": "Tap a stats line to grade those clips",
-   "body": "Every miss subgenre in Lifetime Stats \u2014 including Uncategorized \u2014 is now a playlist. Tap it, watch the clips, and set Cut/Missed in each shot's Details. Grading an Uncategorized miss moves it into its subgenre and sharpens the table."
+   "body": "Every miss subgenre in Lifetime Stats — including Uncategorized — is now a playlist. Tap it, watch the clips, and set Cut/Missed in each shot's Details. Grading an Uncategorized miss moves it into its subgenre and sharpens the table."
   },
   {
    "id": 18,
    "date": "2026-08-23",
    "title": "Stats restructured your way",
-   "body": "Lifetime Stats now reads top-down: Total Shots, Makes, Misses \u2014 then each miss subgenre with its meaning built in: Cut Left / Miss Left (Overcut), Cut Left / Miss Right (Undercut), and so on."
+   "body": "Lifetime Stats now reads top-down: Total Shots, Makes, Misses — then each miss subgenre with its meaning built in: Cut Left / Miss Left (Overcut), Cut Left / Miss Right (Undercut), and so on."
   },
   {
    "id": 17,
    "date": "2026-08-23",
    "title": "What's New and Stats actually open now",
-   "body": "Both are full pages with a \u2039 Home button, not pop-ups \u2014 and the bug where tapping them did nothing until you opened a session is fixed (they were opening inside a hidden layer)."
+   "body": "Both are full pages with a ‹ Home button, not pop-ups — and the bug where tapping them did nothing until you opened a session is fixed (they were opening inside a hidden layer)."
   },
   {
    "id": 16,
    "date": "2026-08-23",
-   "title": "Lifetime Stats \u2014 and your verdicts now count",
-   "body": "New on the home screen: Lifetime Stats, a tight table of your misses \u2014 Cut Left/Straight/Right against Missed Left/Right. And in any shot's Details you can now set Cut and Missed yourself; your word overrides the machine and feeds the table.",
+   "title": "Lifetime Stats — and your verdicts now count",
+   "body": "New on the home screen: Lifetime Stats, a tight table of your misses — Cut Left/Straight/Right against Missed Left/Right. And in any shot's Details you can now set Cut and Missed yourself; your word overrides the machine and feeds the table.",
    "details": [
     "Only trusted verdicts are counted: shots the analysis saw clearly, plus anything you've corrected by hand. Shots where the ball was lost stay out of the table rather than polluting it.",
-    "Your corrections do double duty: they fix the record, and they become the ground truth that validates the physics-fit work \u2014 every verdict you enter makes the automatic tagging measurably better."
+    "Your corrections do double duty: they fix the record, and they become the ground truth that validates the physics-fit work — every verdict you enter makes the automatic tagging measurably better."
    ]
   },
   {
    "id": 15,
    "date": "2026-08-23",
    "title": "Player restored",
-   "body": "The chrome-free player experiment is rolled back \u2014 the clips screen is exactly as it was. The Instagram-style redesign is shelved for another day."
+   "body": "The chrome-free player experiment is rolled back — the clips screen is exactly as it was. The Instagram-style redesign is shelved for another day."
   },
   {
    "id": 13,
    "date": "2026-08-23",
    "title": "Home screen restored",
-   "body": "The card list is gone \u2014 the home screen is back to the layout you didn't mind (What's New row stays, pause-fade stays). The real redesign target is the clips player, Instagram-style, coming next."
+   "body": "The card list is gone — the home screen is back to the layout you didn't mind (What's New row stays, pause-fade stays). The real redesign target is the clips player, Instagram-style, coming next."
   },
   {
    "id": 12,
@@ -82,9 +104,9 @@
    "id": 10,
    "date": "2026-08-23",
    "title": "What's New moved home",
-   "body": "This panel now lives at the top of the home screen, where it belongs \u2014 the menu inside the player is back to being just overlays and drawing tools.",
+   "body": "This panel now lives at the top of the home screen, where it belongs — the menu inside the player is back to being just overlays and drawing tools.",
    "details": [
-    "Fair catch: the update feed had been tucked into the player's drawing menu, which made no sense. It's now a single row above your sessions \u2014 latest headline visible, dot when there's something unread, tap to read.",
+    "Fair catch: the update feed had been tucked into the player's drawing menu, which made no sense. It's now a single row above your sessions — latest headline visible, dot when there's something unread, tap to read.",
     "A broader cleanup of the sessions screen is queued next."
    ]
   },
@@ -92,13 +114,13 @@
    "id": 9,
    "date": "2026-08-23",
    "title": "Your disputed shot now reads correctly",
-   "body": "The 4-ball at 3:52 now shows 'missed left, 1.3 inches' with full confidence \u2014 matching what you saw. The same check was applied to every clip.",
+   "body": "The 4-ball at 3:52 now shows 'missed left, 1.3 inches' with full confidence — matching what you saw. The same check was applied to every clip.",
    "details": [
     "When you flagged the shot at 3:52 ('this should be a pretty clear miss left'), the app said the opposite. Getting it right ended up fixing four separate problems, and each one is now better for every clip in your library.",
-    "First: the camera. When you hit a ball hard, the shutter is open long enough that the ball smears into a faint streak \u2014 and the ball-detector, trained on crisp round balls, sees nothing at all. For about half a second after contact, your 4-ball simply didn't exist to the software.",
-    "Second: mistaken identity. While the 4-ball was invisible, the cue ball rolled up and stopped where the 4 used to be. The software saw a ball sitting right where it expected the 4 \u2014 and assumed it WAS the 4. So the '4' it tracked afterwards was actually the cue ball, and the miss got called on the wrong side. The fix: a resting ball now refuses to become a different-coloured ball. White can't become purple.",
-    "Third: the ghost. Even after that fix, the old '4' label stayed stuck at the spot the ball had left, so the real 4 \u2014 found again near the pocket \u2014 couldn't get its name back. Now a label lets go when its spot is visibly empty, and the real ball reclaims it.",
-    "Fourth: the verdict itself. Even with the ball tracked, the app judged the miss from the blurriest instant of the shot. Now it checks something simpler: every glimpse it DID get of the ball lies on one straight line \u2014 and a rolling ball can't leave its line and sneak back. So the gap hides nothing, and the verdict is trusted: missed left, 1.3 inches."
+    "First: the camera. When you hit a ball hard, the shutter is open long enough that the ball smears into a faint streak — and the ball-detector, trained on crisp round balls, sees nothing at all. For about half a second after contact, your 4-ball simply didn't exist to the software.",
+    "Second: mistaken identity. While the 4-ball was invisible, the cue ball rolled up and stopped where the 4 used to be. The software saw a ball sitting right where it expected the 4 — and assumed it WAS the 4. So the '4' it tracked afterwards was actually the cue ball, and the miss got called on the wrong side. The fix: a resting ball now refuses to become a different-coloured ball. White can't become purple.",
+    "Third: the ghost. Even after that fix, the old '4' label stayed stuck at the spot the ball had left, so the real 4 — found again near the pocket — couldn't get its name back. Now a label lets go when its spot is visibly empty, and the real ball reclaims it.",
+    "Fourth: the verdict itself. Even with the ball tracked, the app judged the miss from the blurriest instant of the shot. Now it checks something simpler: every glimpse it DID get of the ball lies on one straight line — and a rolling ball can't leave its line and sneak back. So the gap hides nothing, and the verdict is trusted: missed left, 1.3 inches."
    ]
   },
   {
@@ -107,19 +129,19 @@
    "title": "What the pros do, and what we're borrowing",
    "body": "We compared our tracking against published pool-vision systems. Three lessons are now the roadmap.",
    "details": [
-    "You asked whether fast-ball tracking is a solved problem \u2014 it mostly is, and not with expensive cameras. Systems like POOL-AID and PoolLiveAid ran on ordinary webcams a decade ago.",
-    "Their trick #1: don't look FOR balls, look for anything that isn't table. A smeared ball doesn't look like a ball, but it never looks like blue felt either. We had this backwards \u2014 our smart detector finds balls brilliantly when they're sharp and goes blind when they move. Their approach never goes blind.",
-    "Their trick #2: carry uncertainty. When a system loses sight of a ball, it should get less sure about where it is \u2014 and search wider \u2014 automatically. We'd hand-built a dozen special rules that each approximate a piece of that.",
-    "Their trick #3: fit physics to the whole shot. A ball rolls straight, slows smoothly, and bounces off rails at known angles. Fit that model to every glimpse you got, and it fills the gaps \u2014 with an honest error bar. That's the plan now, in that order, each step measured before it replaces anything."
+    "You asked whether fast-ball tracking is a solved problem — it mostly is, and not with expensive cameras. Systems like POOL-AID and PoolLiveAid ran on ordinary webcams a decade ago.",
+    "Their trick #1: don't look FOR balls, look for anything that isn't table. A smeared ball doesn't look like a ball, but it never looks like blue felt either. We had this backwards — our smart detector finds balls brilliantly when they're sharp and goes blind when they move. Their approach never goes blind.",
+    "Their trick #2: carry uncertainty. When a system loses sight of a ball, it should get less sure about where it is — and search wider — automatically. We'd hand-built a dozen special rules that each approximate a piece of that.",
+    "Their trick #3: fit physics to the whole shot. A ball rolls straight, slows smoothly, and bounces off rails at known angles. Fit that model to every glimpse you got, and it fills the gaps — with an honest error bar. That's the plan now, in that order, each step measured before it replaces anything."
    ]
   },
   {
    "id": 7,
    "date": "2026-08-23",
    "title": "A first pattern in your misses",
-   "body": "Among misses the app is confident about, you miss RIGHT about 3x as often as left (25 vs 8). Small sample \u2014 a hint, not a diagnosis.",
+   "body": "Among misses the app is confident about, you miss RIGHT about 3x as often as left (25 vs 8). Small sample — a hint, not a diagnosis.",
    "details": [
-    "Only trusted verdicts are counted \u2014 every miss where the app couldn't clearly see the ball is excluded rather than guessed. That keeps the pattern honest, but it also keeps the sample small for now.",
+    "Only trusted verdicts are counted — every miss where the app couldn't clearly see the ball is excluded rather than guessed. That keeps the pattern honest, but it also keeps the sample small for now.",
     "As more shots earn trusted verdicts (the physics-fit work in progress), this number firms up. If it holds near 3-to-1, that's the first concrete thing to take to the practice table."
    ]
   },
@@ -127,9 +149,9 @@
    "id": 6,
    "date": "2026-08-22",
    "title": "The red line is now the real path",
-   "body": "The 'line it took' overlay draws the ball's entire recorded path \u2014 rail bounces included. Nothing is written on top of the video anymore.",
+   "body": "The 'line it took' overlay draws the ball's entire recorded path — rail bounces included. Nothing is written on top of the video anymore.",
    "details": [
-    "After a few rounds of your feedback the overlay settled on one principle: draw measurements, not conclusions. The red line is the ball's entire recorded path \u2014 rail bounce and all \u2014 not a simplified arrow.",
+    "After a few rounds of your feedback the overlay settled on one principle: draw measurements, not conclusions. The red line is the ball's entire recorded path — rail bounce and all — not a simplified arrow.",
     "Nothing is written on top of the video anymore; the verdict lives in the bar below. The legend drags anywhere and remembers its spot. And a new rule for future changes: overlays get rendered against real footage before they ship, because two of the earlier misses would have been caught by simply looking."
    ]
   },
@@ -137,7 +159,7 @@
    "id": 5,
    "date": "2026-08-22",
    "title": "Drag the legend out of the way",
-   "body": "The overlay legend can be dragged anywhere on the video and remembers where you put it \u2014 even through rotation."
+   "body": "The overlay legend can be dragged anywhere on the video and remembers where you put it — even through rotation."
   },
   {
    "id": 4,
@@ -145,8 +167,8 @@
    "title": "Fast shots keep their trails",
    "body": "Hard-hit balls used to vanish from the trails mid-flight. The app now recovers them through the motion blur.",
    "details": [
-    "A hard-hit ball crosses four of its own widths between frames and smears into a translucent streak. The detector sees nothing \u2014 but the pixels still hold the ball.",
-    "The recovery: remember what the empty table looks like (the average of the last second and a half), subtract it, and whatever remains that's ball-sized and matches the missing ball's own colour better than any other ball's \u2014 that's your ball. It's how your trails now follow the ball all the way to the rail.",
+    "A hard-hit ball crosses four of its own widths between frames and smears into a translucent streak. The detector sees nothing — but the pixels still hold the ball.",
+    "The recovery: remember what the empty table looks like (the average of the last second and a half), subtract it, and whatever remains that's ball-sized and matches the missing ball's own colour better than any other ball's — that's your ball. It's how your trails now follow the ball all the way to the rail.",
     "One honest limit: a smeared ball's measured position is the middle of the streak, not the ball. Good enough to draw a trail; not good enough to judge a miss by. So recovery feeds the drawings, and verdicts wait for the physics fit."
    ]
   },
@@ -163,18 +185,18 @@
    "body": "When the app can't actually see which side a miss went, it says 'can't tell' instead of guessing.",
    "details": [
     "Early on, the app labelled every miss with a side, even when its data was garbage. That's how your miss-left got called miss-right: it measured a direction across a half-second hole and confidently reported nonsense.",
-    "The standing rule now: the app only states what it actually measured. When the ball was lost at the decisive moment, the verdict says 'can't tell which side \u2014 ball lost after contact' instead of guessing. When it IS sure, that confidence means something.",
-    "This matters for the stats. Your miss patterns are only useful if every counted miss is real \u2014 one wrong-side label pollutes the pattern more than ten honest abstentions. Trusted verdicts went from 30 to 33 this week, and each 'can't tell' is a known repair target, not a mystery."
+    "The standing rule now: the app only states what it actually measured. When the ball was lost at the decisive moment, the verdict says 'can't tell which side — ball lost after contact' instead of guessing. When it IS sure, that confidence means something.",
+    "This matters for the stats. Your miss patterns are only useful if every counted miss is real — one wrong-side label pollutes the pattern more than ten honest abstentions. Trusted verdicts went from 30 to 33 this week, and each 'can't tell' is a known repair target, not a mystery."
    ]
   },
   {
    "id": 1,
    "date": "2026-08-22",
    "title": "Sharper shots for free (when you have a minute)",
-   "body": "One camera dial change \u2014 shutter to 1/250 \u2014 would make every future recording dramatically easier to analyse. Plain-language walkthrough saved for you.",
+   "body": "One camera dial change — shutter to 1/250 — would make every future recording dramatically easier to analyse. Plain-language walkthrough saved for you.",
    "details": [
     "Most of this week's problems trace to motion blur, and most of that traces to shutter speed. Your camera is exposing each frame for about 1/75th of a second; at 1/250th, a hard-hit ball stays a crisp dot instead of a streak.",
-    "The full plain-language walkthrough is saved as CAMERA_SETTINGS.md in the project \u2014 which dial, which direction, what it costs (a bit of grain, which the software barely notices). No new lighting needed. Whenever you get a minute at the table, it's the single highest-value tweak available."
+    "The full plain-language walkthrough is saved as CAMERA_SETTINGS.md in the project — which dial, which direction, what it costs (a bit of grain, which the software barely notices). No new lighting needed. Whenever you get a minute at the table, it's the single highest-value tweak available."
    ]
   }
  ]
