@@ -1526,7 +1526,7 @@ function drawTrails() {
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (!s || !s.trails || !v.videoWidth) return;
   const { P } = videoBox(cv, v);
-  const t = v.currentTime;
+  const t = playheadTime(v);
   const Q = q => P([q[1], q[2]]);      // trail points are [t, x, y]
   s.trails.forEach(tr => {
     // WHOLE SHOT, not a 4s tail (Joe: "should persist through the
@@ -1552,6 +1552,25 @@ function drawTrails() {
   ctx.globalAlpha = 1;
 }
 
+
+// Frame-accurate overlay clock. On iOS the video composites out-of-process
+// and v.currentTime is the spec's stale "official playback position" — the
+// drawn tail trailed the real ball by that staleness (worse in Low Power
+// Mode, where rAF drops to 30Hz while the video keeps presenting at full
+// rate). requestVideoFrameCallback stamps the EXACT presented-frame time;
+// between stamps we extrapolate by wall clock. Falls back to currentTime
+// when paused, stalled (>300ms without a stamp), or on pre-15.4 iOS.
+let vfcT = -1, vfcWall = 0;
+if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
+  (function ovClock(now, meta) {
+    if (meta) { vfcT = meta.mediaTime; vfcWall = performance.now(); }
+    $("video").requestVideoFrameCallback(ovClock);
+  })();
+function playheadTime(v) {
+  if (vfcT >= 0 && !v.paused && performance.now() - vfcWall < 300)
+    return vfcT + (performance.now() - vfcWall) / 1000 * (v.playbackRate || 1);
+  return v.currentTime;
+}
 
 // A render loop, not timeupdate: iOS fires timeupdate ~4x/s and the
 // playhead visibly stepped (Joe). rAF moves it every frame.
@@ -1613,6 +1632,7 @@ function drawTrails() {
 let seekBusy = false, seekPending = null, seekFastMode = false;
 function requestSeek(t, fast) {
   const v = $("video");
+  vfcT = -1;   // a pre-seek frame stamp must never bridge the jump
   if (seekBusy) { seekPending = t; return; }
   seekBusy = true;
   seekFastMode = !!fast;
@@ -1717,9 +1737,20 @@ const FrameCache = (() => {
     }
     const i = idx(meta.mediaTime);
     if (blobs.has(i) || !v.videoWidth) return;
+    // During PLAYBACK store every 3rd frame: draw()'s +/-2-index search
+    // still always hits, the per-frame GPU-readback + JPEG-encode cost
+    // drops 3x (it was eating the iPhone's main thread and dragging the
+    // tail overlay), and CAP now spans ~70s of clip instead of ~23s.
+    // Landed seeks (paused) still harvest exactly.
+    if (!v.paused && i % 3) return;
     const scale = Math.min(1, 720 / v.videoHeight);
-    cap0.width = Math.round(v.videoWidth * scale);
-    cap0.height = Math.round(v.videoHeight * scale);
+    const cw = Math.round(v.videoWidth * scale),
+          ch = Math.round(v.videoHeight * scale);
+    // reassigning width/height reallocates the backing store even when
+    // unchanged — only touch them on a real size change
+    if (cap0.width !== cw || cap0.height !== ch) {
+      cap0.width = cw; cap0.height = ch;
+    }
     cap0.getContext("2d").drawImage(v, 0, 0, cap0.width, cap0.height);
     cap0.toBlob(b => {
       if (!b) return;
@@ -1856,8 +1887,12 @@ const Draw = (() => {
   function box() {                       // video CONTENT rect in canvas px
     const v = $("video"), r = v.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    cv.width = Math.round(r.width * dpr);
-    cv.height = Math.round(r.height * dpr);
+    const bw = Math.round(r.width * dpr), bh = Math.round(r.height * dpr);
+    // unconditional size assignment reallocated the backing store on
+    // EVERY rAF tick (fitCanvas already guards; this didn't)
+    if (cv.width !== bw || cv.height !== bh) {
+      cv.width = bw; cv.height = bh;
+    }
     if (!v.videoWidth) return { ox: 0, oy: 0, w: cv.width, h: cv.height };
     const s = Math.min(cv.width / v.videoWidth, cv.height / v.videoHeight);
     const w = v.videoWidth * s, h = v.videoHeight * s;
@@ -1865,8 +1900,21 @@ const Draw = (() => {
   }
   const toPx = (b, p) => [b.ox + p[0] * b.w, b.oy + p[1] * b.h];
   const toN = (b, x, y) => [(x - b.ox) / b.w, (y - b.oy) / b.h];
+  let idleCleared = false;
   function render() {
     if (loadedKey !== key()) load();
+    // nothing to show and nothing shown: clear ONCE, then skip the
+    // per-tick getBoundingClientRect + clear entirely (this ran every
+    // rAF frame even with the drawing layer empty and hidden)
+    if (!show && !objs.length) {
+      if (!idleCleared) {
+        cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+        cv.style.pointerEvents = "none";
+        idleCleared = true;
+      }
+      return;
+    }
+    idleCleared = false;
     const g = cv.getContext("2d");
     const b = box();
     g.clearRect(0, 0, cv.width, cv.height);

@@ -1,6 +1,28 @@
 {
  "entries": [
   {
+   "id": 27,
+   "date": "2026-08-23",
+   "title": "Trail animations keep up with the ball now",
+   "body": "The animated trails lagged because the phone's browser reports video time slightly in the past, and three hidden per-frame costs were eating the iPhone's processing budget. The overlay now reads the exact time of each displayed frame, and those costs are gone.",
+   "details": [
+    "The overlay clock now uses frame callbacks (exact presented-frame timestamps, iOS 15.4+) instead of the stale 'official playback position', with a clean fallback when paused or on older devices. This also fixes extra lag in Low Power Mode.",
+    "The frame cache that makes scrubbing instant was JPEG-encoding every single frame during playback; it now stores every 3rd frame (scrubbing still always hits, and the cache covers 70 seconds instead of 23).",
+    "Two canvas layers were being reallocated on every animation tick even when nothing was drawn - both now only rebuild when the size actually changes."
+   ]
+  },
+  {
+   "id": 26,
+   "date": "2026-08-23",
+   "title": "Clips now start instantly on your phone",
+   "body": "Every recording had its seek index at the wrong end of the file, so your phone had to download huge chunks (up to ~2 GB for a late shot in a long session) before it could play anything. The index now sits at the front: playing any shot needs ~5-10 MB. All 26 older recordings were fixed tonight, and every new recording fixes itself automatically.",
+   "details": [
+    "The recorder writes 'fragmented' video on purpose - it means a crash can't destroy a recording mid-write. But fragmented files carry an empty index up front; iOS can't even learn the clip's duration from it, let alone jump to a shot, so Safari crawled the file from the beginning.",
+    "The fix re-containers the finished file (a pure copy, ~1.4 seconds per GB, no quality change) right after recording stops - before it ever reaches Dropbox. Crash safety is unchanged: the file stays fragmented while recording is live.",
+    "Also found: tonight's high-ISO settings inflate file bitrate 4.6x (16 Mbps vs 3.5), which multiplies every download. The grain recommendation coming separately addresses this too."
+   ]
+  },
+  {
    "id": 25,
    "date": "2026-08-23",
    "title": "You were right about the shutter — blur is fixed",

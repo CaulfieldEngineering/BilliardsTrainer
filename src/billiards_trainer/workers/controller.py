@@ -752,6 +752,51 @@ class PipelineController(QObject):
         parts.append("setsar=1")
         return ",".join(parts)
 
+    @staticmethod
+    def _remux_faststart(path) -> None:
+        """Re-container a FINISHED fragmented recording as faststart, in place.
+
+        Recordings are written fragmented (crash-safe: playable at any cut),
+        but a fragmented mp4 carries an EMPTY front moov — iOS/Safari can't
+        even learn the duration from the head, let alone seek, so playing a
+        late shot on the phone forced downloading nearly the whole file
+        (measured ~2 GB for a median shot in a 36-min session). A copy-only
+        remux moves a complete index to the front: ~1.4 s/GB, no re-encode,
+        and the phone's cost drops to ~5-10 MB per seek. Runs on the hidden
+        .part file BEFORE it lands in the Dropbox-synced folder, so nothing
+        (Dropbox, the derive pass, cv2 readers) can race it. Failure is
+        non-fatal: the fragmented original stays, still playable everywhere
+        but slow on the phone."""
+        import subprocess
+        from pathlib import Path as _P
+        from ..capture.audio import NO_WINDOW, find_ffmpeg
+        p = _P(path)
+        ff = find_ffmpeg()
+        if ff is None or not p.is_file():
+            return
+        tmp = p.with_suffix(".fs.mp4")
+        try:
+            r = subprocess.run(
+                [ff, "-v", "error", "-i", str(p), "-c", "copy",
+                 "-movflags", "+faststart", "-y", str(tmp)],
+                capture_output=True, timeout=300, creationflags=NO_WINDOW)
+            # remuxed file drops moof overhead but must stay ~the same size —
+            # a short output means ffmpeg bailed partway
+            if r.returncode == 0 and tmp.stat().st_size > p.stat().st_size * 0.9:
+                tmp.replace(p)
+                log.info("recording re-containered faststart: %s", p.name)
+            else:
+                err = (r.stderr or b"")[-300:].decode("utf-8", "replace")
+                log.warning("faststart remux failed (%s); keeping fragmented "
+                            "file %s", err.strip() or r.returncode, p.name)
+                tmp.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001 - remux is best-effort, never fatal
+            log.exception("faststart remux errored; keeping fragmented file")
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+
     def _finalize_recording_file(self) -> None:
         """Move the finished in-progress file into the recordings folder."""
         sc = getattr(self, "_sidecar", None)
@@ -763,6 +808,7 @@ class PipelineController(QObject):
         from pathlib import Path as _P
         try:
             if _P(self._recording_tmp).is_file():
+                self._remux_faststart(self._recording_tmp)
                 _P(self._recording_tmp).replace(self._recording_path)
         except OSError:
             log.exception("finalizing recording failed")
@@ -1025,6 +1071,9 @@ class PipelineController(QObject):
                     continue
                 stamp = part.name[len(".session-"):-len(".part.mp4")]
                 dest = rec_dir / f"session-{stamp}-recovered.mp4"
+                # a truncated fragmented file remuxes up to its last complete
+                # fragment; on failure the raw (still playable) file moves as-is
+                self._remux_faststart(part)
                 part.replace(dest)
                 log.info("recovered interrupted recording -> %s", dest.name)
                 self.replay_saved.emit(str(dest))
