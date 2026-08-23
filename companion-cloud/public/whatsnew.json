@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 22,
+   "date": "2026-08-23",
+   "title": "31 more misses solved \u2014 backlog down to 62",
+   "body": "A smarter read of rattle-heavy shots (judging only the ball's initial run, not the chaos after it hits the jaws) solved 31 more misses. Trusted verdicts: 116 \u2192 147. Uncategorized: 93 \u2192 62.",
+   "details": [
+    "A measurement pass showed most stuck shots weren't missing data \u2014 they were fully observed but their paths bend too much (rattles, rebounds) for a whole-journey fit. The verdict only ever needed the first straight run from contact, so that's what gets judged now, under an even stricter straightness bar.",
+    "Of the 62 remaining: 39 were never captured at all (the shutter-speed change will prevent these going forward), 21 are genuinely too messy to trust, 2 pointed at no pocket. All stay in your grading playlist rather than being guessed.",
+    "Your categorized misses now split about even left/right overall \u2014 with 'cut right, missed right' (overcut) still the single biggest bucket at 28."
+   ]
+  },
+  {
    "id": 21,
    "date": "2026-08-23",
    "title": "77 backlog misses solved automatically",
