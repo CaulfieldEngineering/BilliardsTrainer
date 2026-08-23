@@ -1,6 +1,12 @@
 {
  "entries": [
   {
+   "id": 12,
+   "date": "2026-08-23",
+   "title": "Pause button gets out of the way",
+   "body": "The play symbol now fades out a moment after you pause, so it no longer sits on top of the frame you paused to study."
+  },
+  {
    "id": 11,
    "date": "2026-08-23",
    "title": "New home screen",
