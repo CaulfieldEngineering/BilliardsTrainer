@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 28,
+   "date": "2026-08-23",
+   "title": "Tracking sees through the grain now",
+   "body": "Tonight's high-ISO footage was confusing the ball tracker (identity mix-ups ran 4x the usual rate). The analysis feed now gets cleaned of grain before the detector looks at it - measured on your grainiest session: fewer identity mix-ups, better ball numbering, and 12-13% more balls held per frame. Your recordings are untouched.",
+   "details": [
+    "Verified on two separate 6-minute slices before enabling: identity hops down 15%, ball-number coverage up, track fragmentation down 14-21%, and more balls tracked per frame in both tests with no metric worse.",
+    "This is the software half of the grain fix. The camera half (1/250 shutter + half the ISO next time you're at the rig) removes grain at the source and roughly halves file sizes too."
+   ]
+  },
+  {
    "id": 27,
    "date": "2026-08-23",
    "title": "Trail animations keep up with the ball now",
