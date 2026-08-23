@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 20,
+   "date": "2026-08-23",
+   "title": "Miss verdicts now come from physics",
+   "body": "Every clip's miss side is now read off a physics fit of the ball's whole path \u2014 the method that got both hand-verified shots right, including one the old approach called confidently wrong. Trusted misses grew 33 \u2192 38 and the table updated.",
+   "details": [
+    "The old approach judged direction from a few samples near the pocket, which a rattle could fool \u2014 your 4-ball shot and one other verified clip proved it. The new approach fits straight rolling legs to every observation of the ball and reads the verdict off the fit, with its own error bar deciding when to trust it.",
+    "Your grading queue (Uncategorized) still works exactly the same \u2014 and every verdict you enter keeps training the system's honesty checks."
+   ]
+  },
+  {
    "id": 19,
    "date": "2026-08-23",
    "title": "Tap a stats line to grade those clips",

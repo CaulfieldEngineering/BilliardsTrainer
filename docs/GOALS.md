@@ -1603,3 +1603,16 @@ Rounds continue with Joe's visual feedback as the gate.
   (bookmark tag ui-v1, cards + two-tab switch, accordion spreadsheet
   gone), What's New moved to the home page, paused glyph fades. All
   deployed with What's New entries.
+
+- 2026-08-23 (session 9) — THE ACCURACY CHAIN IS CLOSED. @223 settled by
+  jaw frames: the 2 lodges on the shooter's-LEFT jaw — the fit was right,
+  the extremum tag confidently wrong. Fit 2-for-2 on ground truth, so it
+  is now the tagger's departure source wherever residual <= 1.5 ball
+  radii (extremum fallback). Both ground-truth shots verify through the
+  wired path. Library relabelled: trusted 33 -> 38, gated 54 -> 53,
+  right|left grew 6 -> 9 (three confident wrong-side tags corrected by
+  physics). Joe notified per his standing request ("let me know when it's
+  all fixed"): machine side done; the 53 gated + uncategorized pile are
+  HIS queue by design, via the stats playlists. REMAINING fusion items
+  (better, not blocking): flag recovered detections' quality; audio
+  contact anchor; subtraction as an always-on channel.
