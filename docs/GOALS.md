@@ -1680,3 +1680,16 @@ Rounds continue with Joe's visual feedback as the gate.
   compute. Deployed with What's New. NEXT: SD push when the card lands;
   wire fit_first_leg into the LIVE tagger as the same fallback rank;
   sweep fixes; audio anchor.
+
+- 2026-08-23 (session 14, light — Joe live at the camera) — Camera saga
+  resolved: his Movie exposure was ALWAYS Canon-Manual, so the ML card
+  override never applied (bv.* only hijacks auto). Real shutter: ~1/60 on
+  the dial through the whole library — the week's blur was one thumb-turn.
+  Fix = Canon screen: 1/250, F4.5, ISO 1600 (stretch: 1/500 @ 3200).
+  Exposure verified correct at ISO 400 @ 1/60 (felt 201, clip 0.05%);
+  awaiting his first true-1/250 clip for the smear before/after. ALSO:
+  app demoted to below-normal priority (his input lag; NOT persistent
+  across app restarts — make permanent in app startup, queued). Keyboard
+  still partially hobbled — remoting_host CPU suspicious, awaiting his
+  answer on Chrome Remote Desktop. Colour-filter preprocessing (his ask)
+  queued behind the smear verification.
