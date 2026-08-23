@@ -1589,3 +1589,17 @@ Rounds continue with Joe's visual feedback as the gate.
   high-confidence right); (2) wire the fit as the tagger's geometry
   source behind a comparison flag, measure library-wide deltas; (3) flag
   blur-recovered detections; (4) audio contact anchor.
+
+- 2026-08-23 (session 8) — @223 disagreement CHARACTERIZED, not yet
+  settled. Both methods use the identical contact point (579,1153) and
+  agree the ball ran down-right to the bottom-right pocket; they diverge
+  only at the JAW: the ball rattles at t=225.9 (vx flips at the mouth,
+  668->673->668), and the fit reads the pre-rattle leg while the tagger's
+  extremum includes the rattle excursion. Which is the true side needs
+  frames — next session opens with rendering 225.8-226.2 and calling it
+  on evidence. Fit residual there is 15.4px (moderate trust), consistent
+  with a jaw shot being genuinely messy. No wiring until this is decided.
+  Also this window (interactive): Home v2 blasted per Joe's direction
+  (bookmark tag ui-v1, cards + two-tab switch, accordion spreadsheet
+  gone), What's New moved to the home page, paused glyph fades. All
+  deployed with What's New entries.
