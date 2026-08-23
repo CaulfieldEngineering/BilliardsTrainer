@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 14,
+   "date": "2026-08-23",
+   "title": "The clips player, round one: chrome-free watching",
+   "body": "The Instagram-style rebuild has begun \u2014 on the right screen this time. While a clip plays: full-bleed video, shot number and outcome floating on a top gradient, and a thin progress hairline. Pause, and the full precision controls return.",
+   "details": [
+    "Tap-to-pause is now the mode switch, exactly as specced: playing means watching (nearly no chrome), paused means inspecting (scrub lane, frame steps, verdicts \u2014 everything). No auto-hiding while paused, ever.",
+    "This is round one of the approved redesign. Coming next: double-tap to replay the stroke, swipe between shots, the two-resolution scrub lanes, and the verdict sheet. Bookmarked at player-v1, so this can evolve or roll back the same as the home experiment."
+   ]
+  },
+  {
    "id": 13,
    "date": "2026-08-23",
    "title": "Home screen restored",
