@@ -1693,3 +1693,21 @@ Rounds continue with Joe's visual feedback as the gate.
   still partially hobbled — remoting_host CPU suspicious, awaiting his
   answer on Chrome Remote Desktop. Colour-filter preprocessing (his ask)
   queued behind the smear verification.
+
+- 2026-08-23 (session 15) — Two builds shipped: (1) inference thread
+  self-demotes to below-normal (permanent fix for Joe's input lag;
+  recording path untouched; effective at next app start); (2) first-leg
+  fallback promoted into the LIVE tagger (rank full-fit > first-leg >
+  extremum), both ground truths correct and high through the wired path.
+  Library re-exported (38 sessions now — 3 new test clips today).
+  HONEST DELTAS, mixed: uncat 62 -> 68 (+6, from today's 1/60 test clip's
+  new misses — expected, blurry footage), trusted 147 -> 142 (-5: the
+  first-leg direction differs from the extremum on ~5 previously-high
+  derived tags and they now fail pocket-inference gates). NOT verified
+  which is righter on those 5 — SCRUTINIZE next session: list the
+  flipped shots, compare against forensic records where present, spot
+  frames if needed. The fallback stays (2/2 truths + 31 solves say the
+  direction source is better; the gates flagging doubt on 5 may be the
+  honesty working) but the claim stays open until checked.
+  AWAITING: Joe's remounted-camera true-1/250 clip for the smear
+  before/after that retires the blur saga.
