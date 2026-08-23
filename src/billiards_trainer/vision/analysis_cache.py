@@ -168,11 +168,16 @@ class SidecarReader:
                     d["_orig_outcome"] = d.get("outcome", "miss")
                     self.shots.append(d)
                 elif d.get("type") == "tag_correction":
-                    # Joe's cut / miss-side verdict — review-ranked, last
-                    # wins, carried on the shot for the exporter to overlay
+                    # cut / miss-side verdicts, ranked by source: Joe's
+                    # review is final; "forensic" (the corridor re-pass)
+                    # outranks the derivation but never Joe. Last wins
+                    # within a rank.
                     s2 = _shot_for(self.shots, float(d["start"]))
                     if s2 is not None:
-                        tr = s2.setdefault("_tag_review", {})
+                        slot = ("_tag_review"
+                                if d.get("src", "review") == "review"
+                                else "_tag_forensic")
+                        tr = s2.setdefault(slot, {})
                         for k in ("cut", "miss_side"):
                             if d.get(k):
                                 tr[k] = d[k]

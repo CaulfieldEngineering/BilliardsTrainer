@@ -331,6 +331,17 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             try:
                 from .miss_tags import tag_shot
                 tg = tag_shot(reader, s, space)
+                fo = s.get("_tag_forensic") or {}
+                if fo and (tg is None
+                           or tg.get("confidence") not in ("high", "review")):
+                    # corridor re-pass verdict: fills where the derivation
+                    # abstained or was gated; never displaces high/review
+                    base = tg or {"pocket_inferred": True}
+                    for k in ("cut", "miss_side"):
+                        if fo.get(k):
+                            base[k] = fo[k]
+                    base["confidence"] = "forensic"
+                    tg = base
                 if tg is None and s.get("_tag_review"):
                     # the machine abstained but Joe called it: his verdict
                     # IS the tag
@@ -418,7 +429,7 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
                         {"session": sp.name[:-len(".shots.json")],
                          "start": sh.get("start")})
                 continue
-            if t.get("confidence") in ("high", "review"):
+            if t.get("confidence") in ("high", "review", "forensic"):
                 trusted += 1
                 key = f"{t.get('cut', '?')}|{t['miss_side']}"
                 cells[key] = cells.get(key, 0) + 1

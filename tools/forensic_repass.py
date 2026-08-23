@@ -67,7 +67,7 @@ def corridor_observations(video, tf, contact_vis, reappear_vis, t0, t1,
     ux, uy = ux / seg, uy / seg
     band = 2.5 * r_vis
     out = []
-    for fr, t in zip(frames, times):
+    for fr, t in zip(frames, times, strict=False):
         if not (t0 <= t <= t1):
             continue
         moved = np.linalg.norm(fr.astype(np.float32) - bg, axis=2)
@@ -184,8 +184,24 @@ def repass_shot(video, start, end, ball=None):
         return {"ok": False, "why": "no pocket ahead", "recovered": len(rec)}
     off, pname, px_, py_ = best
     side = "right" if MT._cross(ux, uy, px_ - ox, py_ - oy) < 0 else "left"
+    # CUT, same construction as the tagger: cue address from the sidecar,
+    # contact point one diameter back along the fitted departure
+    cut = None
+    cue = MT._track_path(reader, 0, lo, contact_t - 0.05)
+    if len(cue) >= 3:
+        ax = sum(q[1] for q in cue[:5]) / min(5, len(cue))
+        ay = sum(q[2] for q in cue[:5]) / min(5, len(cue))
+        d2 = 2.0 * float(space.ball_r_px)
+        cxh, cyh = ox - d2 * ux, oy - d2 * uy
+        cux, cuy = MT._unit(cxh - ax, cyh - ay)
+        if (cux, cuy) != (0.0, 0.0) and math.hypot(cxh - ax, cyh - ay) >= 3 * d2:
+            ang = MT._signed_angle(cux, cuy, ux, uy)
+            if abs(ang) <= 88.0:
+                cut = ("straight" if abs(MT._signed_angle(
+                    cux, cuy, *MT._unit(px_ - ox, py_ - oy))) < MT.STRAIGHT_DEG
+                    else ("left" if ang < 0 else "right"))
     return {"ok": True, "ball": tgt, "pocket": pname, "side": side,
-            "rail": fit.rail, "recovered": len(rec),
+            "cut": cut, "rail": fit.rail, "recovered": len(rec),
             "residual": round(fit.residual, 1)}
 
 

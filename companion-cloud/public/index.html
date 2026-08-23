@@ -704,8 +704,11 @@ async function openStats() {
     html += line("Cut Right / Miss Left (Undercut)", g("right|left"), true, false, "right|left");
     html += line("Straight / Miss Left", g("straight|left"), true, false, "straight|left");
     html += line("Straight / Miss Right", g("straight|right"), true, false, "straight|right");
+    html += line("Miss Left (cut unknown)", g("?|left"), true, false, "?|left");
+    html += line("Miss Right (cut unknown)", g("?|right"), true, false, "?|right");
     const cat = ["left|left","left|right","right|right","right|left",
-                 "straight|left","straight|right"].reduce((a,k)=>a+g(k),0);
+                 "straight|left","straight|right","?|left","?|right"]
+                .reduce((a,k)=>a+g(k),0);
     html += line("Uncategorized", (d.clips && d.clips.uncat || []).length, true, true, "uncat");
     if (d.scratches) html += line("Scratches", d.scratches);
     html += `<p style="color:var(--dim);font-size:12px;margin-top:10px">

@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 21,
+   "date": "2026-08-23",
+   "title": "77 backlog misses solved automatically",
+   "body": "The forensic solver you pushed for went through the uncategorized pile: 77 of 171 misses now carry a verdict (Uncategorized 171 \u2192 94, trusted verdicts 38 \u2192 115). Your own corrections still outrank everything.",
+   "details": [
+    "It re-opens only the blurry second of each miss and searches the narrow corridor physics allows, matched against that ball's own colour \u2014 about 8 minutes of compute for the whole pile, versus the 13-hour full rerun that measurably didn't work.",
+    "Interesting early signal: the newly solved misses split 36 left / 41 right \u2014 much more balanced than the first trusted batch suggested. Worth watching as the rest get graded.",
+    "Honestly held back: 54 shots where the fit wasn't trustworthy and 39 where the ball's flight was never captured at all \u2014 those stay in your grading queue rather than being guessed. 49 solved shots know the miss side but not the cut (the cue wasn't tracked); they're listed as 'cut unknown' and count toward totals."
+   ]
+  },
+  {
    "id": 20,
    "date": "2026-08-23",
    "title": "Miss verdicts now come from physics",
