@@ -1063,6 +1063,18 @@ class PipelineController(QObject):
     def _detect_worker(self) -> None:
         """Inference loop (worker thread). Only the strategy is touched here —
         it has its own lock — and results go back via a queued signal."""
+        # Joe: "my mouse and keyboard have been completely lagging when the
+        # app and AI are running hard." Inference is the app's CPU hog; the
+        # RECORDING path stays at normal priority (frames must never drop),
+        # but this thread yields to the desktop. Thread-level, so it
+        # persists across app restarts unlike the process-level demote
+        # applied by hand on 2026-08-23.
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetThreadPriority(
+                ctypes.windll.kernel32.GetCurrentThread(), -1)  # BELOW_NORMAL
+        except Exception:  # noqa: BLE001 - priority is best-effort
+            pass
         while True:
             frame, calib = self._det_queue.get()
             try:
