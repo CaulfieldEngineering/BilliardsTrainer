@@ -149,6 +149,20 @@ def tag_shot(reader, shot: dict, space) -> dict | None:
         if d > far:
             far, fx, fy = d, q[1], q[2]
     vx, vy = _unit(fx - ox, fy - oy)
+    # THE TRAJECTORY FIT OUTRANKS THE EXTREMUM where it is trustworthy.
+    # Validated on both ground-truth shots before this wiring: 005048@233
+    # (bottom rail, missed LEFT — fit correct, extremum also correct) and
+    # 002402@223 (jaw frames show the ball lodging on the shooter's-LEFT
+    # jaw — fit correct, the extremum-based tag was confidently WRONG).
+    # The fit reads the departure over all observations of the first leg
+    # and is immune to the rattle excursion that fooled the extremum.
+    try:
+        from .trajectory import fit_shot
+        _f = fit_shot(tpath[cidx:], space, space.ball_r_px)
+        if _f is not None and _f.residual <= 1.5 * space.ball_r_px:
+            vx, vy = _f.departure
+    except Exception:  # noqa: BLE001 - fit is an upgrade, never a break
+        log.exception("trajectory fit failed; extremum stands")
     if (vx, vy) == (0.0, 0.0):
         return _no("object ball never displaced")
     # STRAIGHT-ROLL VALIDATION (Joe, on the shot still reading "can't
