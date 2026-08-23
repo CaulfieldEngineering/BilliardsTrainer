@@ -234,6 +234,20 @@ def repass_shot(video, start, end, ball=None):
     fit = fit_shot(merged, space, space.ball_r_px)
     basis = "fit"
     if fit is None or fit.residual > 1.5 * space.ball_r_px:
+        # PREFIX FALLBACK (the backlog's dominant case): the path is
+        # densely observed but bent by rattle/aftermath — the first leg
+        # alone is still clean. Tighter residual bar than the global fit.
+        from billiards_trainer.vision.trajectory import fit_first_leg
+        fl = fit_first_leg(merged, space.ball_r_px)
+        if fl is not None and fl[2] >= 5:
+            class _LegFit:
+                departure = (fl[0], fl[1])
+                residual = fl[3]
+                rail = None
+            fit = _LegFit()
+            basis = f"first-leg x{fl[2]}"
+    if basis == "fit" and (fit is None
+                           or fit.residual > 1.5 * space.ball_r_px):
         # STREAK FALLBACK: when positions are too sparse or noisy for a
         # trusted fit, the smears themselves can corroborate the chord.
         # Two independent streaks each within 15 degrees of the chord =

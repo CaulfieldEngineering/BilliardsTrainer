@@ -147,3 +147,34 @@ def fit_shot(obs, table, ball_r):
                         (bt, b[-1][0], (bx, by), db)],
                        worst, rail, bt)
     return best
+
+
+def fit_first_leg(obs, ball_r):
+    """The DEPARTURE leg alone: grow a single-leg TLS fit from contact and
+    keep the longest prefix that stays straight.
+
+    Built for the backlog's dominant failure (measured 2026-08-23): 52 of
+    93 unresolved misses carry 84-88 observations with no real gaps, yet
+    the whole-path fit fails — rattles and multi-bounce aftermath give the
+    journey more structure than two legs, so the GLOBAL residual blows up.
+    A verdict only needs the first leg. Tighter bar than the global fit
+    (0.75 ball radii, single leg, no breakpoint to absorb noise).
+
+    Returns (ux, uy, n_points, residual) or None.
+    """
+    if len(obs) < 4:
+        return None
+    x0, y0 = obs[0][1], obs[0][2]
+    moved = next((i for i, p in enumerate(obs)
+                  if math.hypot(p[1] - x0, p[2] - y0) > 0.5 * ball_r), None)
+    if moved is None:
+        return None
+    pts = [obs[max(0, moved - 1)]] + list(obs[moved:])
+    best = None
+    for n in range(3, len(pts) + 1):
+        _m, d, r = _fit_line(pts[:n])
+        if r <= 0.75 * ball_r:
+            best = (d[0], d[1], n, r)
+        elif best is not None and n > best[2] + 2:
+            break                          # clearly past the bend
+    return best

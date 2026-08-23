@@ -52,3 +52,20 @@ def test_mid_table_bend_is_a_contact_not_a_rail():
 
 def test_too_little_data_returns_none():
     assert fit_shot([(0.0, 10.0, 10.0)] * 4, _T, 12.0) is None
+
+
+def test_first_leg_survives_a_rattle_heavy_path():
+    """The global 2-leg fit fails on rattle + aftermath; the first leg is
+    still perfectly measurable — the backlog's dominant failure mode."""
+    from billiards_trainer.vision.trajectory import fit_first_leg
+    leg = _leg(0.0, 200, 500, 150, 1000)               # clean departure
+    rattle = [(1.1, 155, 1040), (1.2, 148, 1010), (1.3, 158, 1035),
+              (1.4, 150, 1005), (1.5, 160, 1030), (1.6, 300, 900),
+              (1.7, 310, 700)]                          # chaos afterwards
+    f = fit_first_leg([(0.0, 200.0, 500.0)] * 2 + leg + rattle, 12.0)
+    assert f is not None
+    ux, uy, n, r = f
+    import math as m
+    ex, ey = -50 / m.hypot(50, 500), 500 / m.hypot(50, 500)
+    assert ux * ex + uy * ey > 0.995, f"direction off ({ux:.2f},{uy:.2f})"
+    assert n >= 8, "should have used most of the clean leg"
