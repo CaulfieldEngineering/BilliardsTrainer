@@ -72,24 +72,8 @@
   #player { display:none; flex-direction:column; height:100dvh;
             overflow:hidden; }
   #player.open { display:flex; }
-  /* IG-style player (CLIP_UI_V2): WATCH = chrome-free playing with a
-     2px hairline; INSPECT = paused, precision cluster revealed. Tap to
-     pause IS the mode switch. Bookmarked at player-v1. */
-  #topbar { display:flex; align-items:center; gap:12px; z-index:25;
-            padding:calc(8px + env(safe-area-inset-top)) 16px 8px;
-            position:absolute; top:0; left:0; right:0;
-            background:linear-gradient(rgba(4,8,12,.72), rgba(4,8,12,0)); }
-  #player.watching #shotbar { display:none; }
-  #player.watching #legend { display:none !important; }
-  #hairline { position:absolute; left:0; right:0; bottom:0; height:2px;
-              background:rgba(255,255,255,.14); z-index:22; display:none; }
-  #player.watching #hairline { display:block; }
-  #hairline i { display:block; height:100%; width:0;
-                background:var(--accent); }
-  #topinfo { display:flex; align-items:center; gap:8px; margin:0 auto;
-             font-size:14px; font-weight:700; }
-  #topinfo .oc { font-size:12px; font-weight:800; padding:1px 8px;
-                 border-radius:9px; background:rgba(255,255,255,.08); }
+  #topbar { display:flex; align-items:center; gap:12px;
+            padding:calc(8px + env(safe-area-inset-top)) 16px 8px; }
   #back { color:var(--accent); font-weight:600; background:none; border:none;
           font-size:15px; }
   #title { color:var(--dim); font-size:13px; margin-left:auto; }
@@ -295,8 +279,7 @@
 
 <div id="player">
   <div id="topbar">
-    <button id="back">‹</button>
-    <span id="topinfo"><span id="top-n"></span><span class="oc" id="top-oc"></span></span>
+    <button id="back">‹ Sessions</button>
     <span id="title"></span>
     <button id="ovbtn" title="overlays &amp; drawing"
             style="flex:0 0 auto;min-width:46px;margin-left:8px">☰</button>
@@ -323,7 +306,6 @@
     <div id="spinner"><div></div></div>
     <div id="paused-glyph">▶</div>
     <div id="legend"></div>
-    <div id="hairline"><i></i></div>
   </div>
   <div id="shotbar">
     <div id="shotinfo">
@@ -931,7 +913,6 @@ function updateInfo() {
   }
   const s = shots[cur];
   $("shot-n").textContent = `Shot ${cur + 1}/${shots.length}`;
-  $("top-n").textContent = `Shot ${cur + 1}/${shots.length}`;
   const act = s.action || "stroke";
   const label = act === "ball_in_hand" ? "BALL IN HAND"
               : act === "rearrange" ? "REARRANGING"
@@ -939,9 +920,6 @@ function updateInfo() {
               : act === "break" ? "BREAK · " + (s.outcome || "").toUpperCase()
               : (s.outcome || "").toUpperCase();
   $("shot-oc").textContent = label + (s.corrected ? " ✓" : "");
-  $("top-oc").textContent = label;
-  $("top-oc").style.color = s.outcome === "make" ? "var(--make)" : s.outcome === "scratch" ? "var(--scratch)"
-                           : "var(--dim)";
   $("shot-oc").style.color = s.outcome === "make" ? "var(--make)"
                            : s.outcome === "scratch" ? "var(--scratch)"
                            : "var(--dim)";
@@ -1477,14 +1455,6 @@ function drawTrails() {
   requestAnimationFrame(tick);
   const v = $("video");
   if (!$("player").classList.contains("open")) return;
-  // WATCH vs INSPECT: playing hides the chrome, pausing reveals it
-  $("player").classList.toggle("watching", !v.paused && !v.ended);
-  const s0 = shots[cur];
-  if (s0 && !v.paused) {
-    const d = Math.max(0.01, (s0.end ?? v.duration) - (s0.start ?? 0));
-    const f = Math.min(1, Math.max(0, (v.currentTime - (s0.start ?? 0)) / d));
-    $("hairline").firstElementChild.style.width = (f * 100) + "%";
-  }
   // trails paused per Joe ("I don't want the animated trails on here
   // yet") — data still exports; flip TRAILS_ON to re-enable
   if (OV.paths || window.TRAILS_ON) drawTrails();
