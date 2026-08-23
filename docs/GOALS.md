@@ -1631,3 +1631,17 @@ Rounds continue with Joe's visual feedback as the gate.
   defects (mask, persistence, source-typed evidence — do not let it
   refresh resting tracks); RIFE-as-association-glue in strike windows;
   blur-trained challenger through the existing gate.
+
+- 2026-08-23 (session 10) — FORENSIC VERDICTS INTEGRATED. The 77 corridor
+  re-pass solutions land as src="forensic" tag records — a true evidence
+  rank (review > forensic > derived; Joe's word final; derivation keeps
+  anything already high). Measured: trusted 38 -> 115, Uncategorized
+  171 -> 94, @233 unchanged through the rank ordering. Cut computation
+  added to the re-pass (gate re-verified: straight/left/bottom on @233);
+  49 side-only verdicts (cue untracked) render as "cut unknown" rows with
+  playlists rather than hiding. Solved sides 36L/41R — flags sampling
+  bias in the early trusted set; pattern conclusions should wait for the
+  remaining 94. Deployed with What's New. NEXT: SD-card push when Joe's
+  copy lands; then sweep fixes / audio anchor / RIFE-glue / blur
+  challenger; the 54 fit-untrusted are candidates for streak-orientation
+  observations (the not-yet-built third forensic technique).
