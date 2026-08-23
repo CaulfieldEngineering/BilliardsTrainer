@@ -42,6 +42,18 @@ class FindIdEnsemble(DetectorStrategy):
         self._finder.far_rail_rescan = v
         self._identifier.far_rail_rescan = v
 
+    # same forwarding for the execution-provider knob (input-lag fix): without
+    # this the pipeline's hasattr check skips the ensemble and the inner
+    # sessions silently stay on DirectML.
+    @property
+    def inference_provider(self):
+        return getattr(self._finder, "inference_provider", "auto")
+
+    @inference_provider.setter
+    def inference_provider(self, v) -> None:
+        self._finder.inference_provider = v
+        self._identifier.inference_provider = v
+
     def detect(self, frame_bgr, calib, rescan: bool | None = None):
         found = self._finder.detect(frame_bgr, calib, rescan)
         if not found:

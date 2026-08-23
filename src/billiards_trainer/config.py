@@ -257,6 +257,17 @@ class DetectionSettings:
     w_fg: float = 0.65
     fusion_active: float = 0.45       # fused activity (0..1) needed to be "active"
     preset: str = "balanced"          # conservative | balanced | aggressive
+    # Where ONNX inference runs: "auto" (GPU-first, CPU fallback), "gpu", or
+    # "cpu". On an iGPU the desktop compositor shares the SAME 3D engine as
+    # DirectML — sustained inference at ~30 infer/s starves cursor/keystroke
+    # rendering system-wide (measured 69% 3D-engine load from the app alone,
+    # with visible input lag). GPU engines have no preemptive priority, so the
+    # only fix is moving inference off the GPU. Measured on the Radeon 780M
+    # box: CPU @ 4 threads = 88ms tiled detect (~11 det/s) vs ~15 det/s on
+    # DML — a modest cadence cost for a responsive desktop. The CPU session is
+    # capped at 4 intra-op threads and the process runs BelowNormal, so input
+    # handling preempts it cleanly.
+    inference_provider: str = "auto"
 
 
 @dataclass

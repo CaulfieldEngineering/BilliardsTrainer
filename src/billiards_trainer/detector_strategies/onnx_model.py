@@ -62,6 +62,12 @@ class OnnxModelStrategy(DetectorStrategy):
     # merged). Doubles GPU cost per detection; the pipeline wires this from
     # settings.balls.far_rail_rescan so it can be tuned live.
     far_rail_rescan = True
+    # Execution-provider preference: "auto" (GPU-first), "gpu", or "cpu".
+    # Wired from settings.detection.inference_provider by the pipeline (see the
+    # config.py comment for the iGPU cursor-starvation measurement behind it);
+    # the BILLIARDS_ONNX_EP env var overrides both (offline tools). Changing it
+    # rebuilds the session on the next detect().
+    inference_provider = "auto"
 
     def __init__(self, model_path: Path, conf: float = 0.25, iou: float = 0.45):
         self._path = Path(model_path)
@@ -73,13 +79,29 @@ class OnnxModelStrategy(DetectorStrategy):
         self._size = 640
 
     def _session(self):
+        import os
+        pref = os.environ.get("BILLIARDS_ONNX_EP", "").strip().lower() \
+            or str(self.inference_provider or "auto").lower()
+        prev = getattr(self, "_sess_pref", None)
+        # Rebuild only when a RECORDED pref differs — a session with no pref
+        # recorded is a hand-built test fake and must be left alone.
+        if self._sess is not None and prev is not None and prev != pref:
+            self._sess = None                 # provider changed — rebuild
         if self._sess is None:
             import onnxruntime as ort
-            providers = pick_providers(ort.get_available_providers())
-            self._sess = ort.InferenceSession(str(self._path), providers=providers)
+            self._sess_pref = pref
+            so = ort.SessionOptions()
+            if pref == "cpu":
+                providers = ["CPUExecutionProvider"]
+                # Cap the threadpool: 4 threads = 88ms tiled detect on the
+                # reference box while leaving half the cores to the desktop.
+                so.intra_op_num_threads = 4
+            else:
+                providers = pick_providers(ort.get_available_providers())
+            self._sess = ort.InferenceSession(str(self._path), so, providers=providers)
             active = self._sess.get_providers()
             log.info("ONNX detector %s on %s", self._path.name, active[0] if active else "?")
-            if active and active[0] == "CPUExecutionProvider":
+            if active and active[0] == "CPUExecutionProvider" and pref != "cpu":
                 log.warning("ONNX running on CPU — real-time may be slow; install "
                             "onnxruntime-directml (Windows) or onnxruntime-gpu "
                             "(CUDA) for GPU. On Apple silicon the standard "

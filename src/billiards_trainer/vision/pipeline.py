@@ -166,6 +166,11 @@ class Pipeline:
                 # the rescan, absent at full-frame scale).
                 strat.far_rail_rescan = bool(
                     getattr(self.settings.balls, "far_rail_rescan", True))
+            if strat is not None and hasattr(strat, "inference_provider"):
+                # "cpu" moves inference off the iGPU so the desktop compositor
+                # keeps its 3D engine (input-lag fix — see DetectionSettings).
+                strat.inference_provider = str(
+                    getattr(self.settings.detection, "inference_provider", "auto"))
             return strat
         except Exception as exc:  # noqa: BLE001 - never let strategy loading break the app
             log.warning("Could not load live strategy '%s' (%s); using legacy", name, exc)
