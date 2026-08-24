@@ -167,6 +167,12 @@ def _detector():
     models = glob.glob(str(MODELS_DIR / "*.onnx")) + glob.glob(str(ROOT / "_eval" / "models" / "*.onnx"))
     if not models:
         raise SystemExit("no .onnx detector found to bootstrap ball boxes")
+    # the FINDER (single-class, high recall) — not whatever globs first:
+    # models[0] was alphabetically pool_ballid_r2 (the 16-class identifier,
+    # built for identity not recall), which detected 4/10 balls on a
+    # clustered settled frame vs the finder's 13 — the whole 2026-08-18
+    # "rack mining ceiling" was measured with the wrong model.
+    models.sort(key=lambda p: ("yolo" not in Path(p).stem.lower(), p))
     det = OnnxModelStrategy(models[0])
     det.far_rail_rescan = True
     return det
