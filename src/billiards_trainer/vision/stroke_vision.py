@@ -291,7 +291,7 @@ def measure_shot(sess: _Session, start: float) -> dict:
     if not events:
         return {"confidence": "none",
                 "reason": "no validated stroke (cue occluded or moved by hand)"}
-    events.sort()
+    events.sort(key=lambda e: e[0])   # rest is an ndarray - never compare it
     t_strike, rest = events[-1]
 
     # pass 3: tip timeline, pre-strike through the window end
