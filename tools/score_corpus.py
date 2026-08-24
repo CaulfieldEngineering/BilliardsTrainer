@@ -14,6 +14,12 @@ Skips sessions already scored into --out (resumable), so a crashed or
 interrupted run continues where it left off.
 """
 
+try:
+    from _lowprio import demote
+    demote()
+except Exception:
+    pass
+
 import argparse
 import json
 import subprocess

@@ -125,3 +125,5 @@ separate journal file or menu row — that was built and then folded in at
 Joe's direction. Same discipline: no Joe-perceptible change, no entry. Separately: when the accuracy chain completes (trajectory fit
 validated + library relabelled), notify Joe proactively — he asked to be
 told when it's all fixed.
+
+- INCIDENT 2026-08-24: c7 gate run held loop.lock >5h — the champion same-batch corpus pass blew score_challenger's 4h subprocess timeout (CPU inference is ~4x slower than the DML-era runs the timeout was sized for). Champion restored cleanly by the finally block (verified 12,277,106 bytes, no .bak). Challenger pass completed; champion pass resumed standalone. Lock cleared here.

@@ -88,7 +88,7 @@ def main() -> int:
         cmd = [sys.executable, str(ROOT / "tools" / "score_corpus.py"),
                "--out", str(champ_out), "--stride", str(args.stride),
                "--max-seconds", str(args.max_seconds)]
-        subprocess.run(cmd, check=False, timeout=4 * 3600)
+        subprocess.run(cmd, check=False, timeout=12 * 3600)
         champ_agg_path = champ_out / "aggregate.json"
         if not champ_agg_path.exists():
             print("champion same-batch run failed", file=sys.stderr)
@@ -108,7 +108,7 @@ def main() -> int:
         cmd = [sys.executable, str(ROOT / "tools" / "score_corpus.py"),
                "--out", str(out_dir), "--stride", str(args.stride),
                "--max-seconds", str(args.max_seconds)]
-        subprocess.run(cmd, check=False, timeout=4 * 3600)
+        subprocess.run(cmd, check=False, timeout=12 * 3600)
     finally:
         shutil.copy2(backup, champion)
         backup.unlink(missing_ok=True)
