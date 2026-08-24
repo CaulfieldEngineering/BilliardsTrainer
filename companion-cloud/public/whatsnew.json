@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 30,
+   "date": "2026-08-24",
+   "title": "You were right: quick pop-ups go with misses",
+   "body": "Overnight, every shot in the library (1,193 across 35 sessions) got its stroke measured. The pattern you predicted is real: 32% of your misses come with a stay-down under 1 second, versus 16% of your makes - exactly double. Your median hold is also 0.3s shorter on misses (1.27s vs 1.57s). Lifetime Stats now shows medians and quick-exit rates.",
+   "details": [
+    "The averages almost hid this (1.58s vs 1.65s) - the signature is a fat tail of quick exits on misses, so the stats show median and %-under-1-second instead.",
+    "No shot in the library measured under 0.7s, so your 'pop-ups' are subtle - a 0.9s exit, not a jump. The camera catches what feels invisible.",
+    "Every shot's Details sheet now carries its own numbers - check a few of your misses against your makes."
+   ]
+  },
+  {
    "id": 29,
    "date": "2026-08-24",
    "title": "New metric: how long you stay down on the shot",

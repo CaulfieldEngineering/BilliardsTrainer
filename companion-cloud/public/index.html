@@ -706,12 +706,13 @@ async function openStats() {
     html += line("Misses", d.misses ?? "–");
     if (d.stay_down) {
       const sd = d.stay_down;
-      const f = o => (o && o.avg_s != null)
-        ? `${o.avg_s.toFixed(2)}s (${o.n})` : "–";
-      html += line("Stay-down avg — Makes", f(sd.make), true);
-      html += line("Stay-down avg — Misses", f(sd.miss), true);
-      const pops = (sd.make?.popped_early || 0) + (sd.miss?.popped_early || 0);
-      if (pops) html += line("Popped up early", pops, true);
+      const f = o => (o && o.median_s != null)
+        ? `${o.median_s.toFixed(2)}s (${o.n})` : "–";
+      const q = o => (o && o.quick_pct != null) ? `${o.quick_pct}%` : "–";
+      html += line("Stay-down median — Makes", f(sd.make), true);
+      html += line("Stay-down median — Misses", f(sd.miss), true);
+      html += line("Quick exit (<1s) — Makes", q(sd.make), true);
+      html += line("Quick exit (<1s) — Misses", q(sd.miss), true);
     }
     html += line("Cut Left / Miss Left (Overcut)", g("left|left"), true, false, "left|left");
     html += line("Cut Left / Miss Right (Undercut)", g("left|right"), true, false, "left|right");

@@ -464,11 +464,19 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
            "makes": makes, "misses": misses, "scratches": scratches,
            "total": makes + misses + scratches}
     if stay["make"] or stay["miss"]:
-        out["stay_down"] = {
-            oc: {"n": len(v),
-                 "avg_s": round(sum(v) / len(v), 2) if v else None,
-                 "popped_early": pops[oc]}
-            for oc, v in stay.items()}
+        # median + quick-exit rate, not mean: the miss signature is a fat
+        # low tail (measured 2026-08-24: 32% of misses under 1.0s vs 16%
+        # of makes, while the MEANS differed by only 0.07s)
+        def _sd(v, oc):
+            if not v:
+                return {"n": 0}
+            sv = sorted(v)
+            return {"n": len(sv),
+                    "median_s": round(sv[len(sv) // 2], 2),
+                    "quick_pct": round(100.0 * sum(1 for x in sv if x < 1.0)
+                                       / len(sv)),
+                    "popped_early": pops[oc]}
+        out["stay_down"] = {oc: _sd(v, oc) for oc, v in stay.items()}
     fp = d / "lifetime_stats.json"
     fp.write_text(_json.dumps(out, indent=1), encoding="utf-8")
     return fp
