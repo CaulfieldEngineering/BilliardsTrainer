@@ -1,0 +1,97 @@
+"""Live stroke metrics: the sidecar append contract + UI text helper.
+
+The live worker measures a shot from the growing .part and its record
+must (1) survive the 'w'-mode writer's buffered flushes when appended
+through the writer itself, (2) attach to the right shot on read, and
+(3) carry the exact idempotence key annotate_session skips at close.
+"""
+
+from billiards_trainer.core.types import BallClass, Track
+from billiards_trainer.events.shot_detector import ShotEvent, ShotOutcome
+from billiards_trainer.ui.widgets.stroke_text import stroke_text
+from billiards_trainer.vision.analysis_cache import SidecarReader, SidecarWriter
+from billiards_trainer.vision.stroke_vision import STROKE_VISION_VERSION
+
+
+def _track(tid, x, y, num=3):
+    return Track(id=tid, x=x, y=y, radius=15.0, number=num,
+                 cls=BallClass.SOLID, active=True)
+
+
+REC = {"type": "stroke_vision", "v": STROKE_VISION_VERSION, "start": 0.2,
+       "stay_down_s": 1.4, "popped_early": False, "pause_ms": 167,
+       "back_depth_px": 116.2, "practice_strokes": 3, "confidence": "high"}
+
+
+class TestLiveStrokeSidecar:
+    def test_add_stroke_survives_writer_flushes(self, tmp_path):
+        """A record appended mid-session through the WRITER must still be
+        there after later frames force the writer's own buffered flush —
+        the failure mode that forbids external 'a'-mode appends."""
+        video = tmp_path / "session-live.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_frame(0.0, [_track(1, 100.0, 200.0)])
+        w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=1,
+                             start_t=0.2, end_t=0.9))
+        w.add_stroke(dict(REC))
+        for i in range(120):          # >2 of the writer's 50-record flushes
+            w.add_frame(1.0 + i * 0.1, [_track(1, 100.0 + i, 200.0)])
+        w.close()
+        r = SidecarReader(video)
+        sv = r.shots[0].get("_stroke")
+        assert sv is not None, "stroke record lost to a buffered flush"
+        assert sv["stay_down_s"] == 1.4
+
+    def test_reader_attaches_to_nearest_shot(self, tmp_path):
+        video = tmp_path / "session-two.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_frame(0.0, [_track(1, 100.0, 200.0)])
+        w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=1,
+                             start_t=0.2, end_t=0.9))
+        w.add_shot(ShotEvent(outcome=ShotOutcome.MISS, num_pocketed=0,
+                             start_t=30.0, end_t=31.0))
+        w.add_stroke({**REC, "start": 30.0, "stay_down_s": 0.6})
+        w.close()
+        r = SidecarReader(video)
+        assert r.shots[0].get("_stroke") is None
+        assert r.shots[1]["_stroke"]["stay_down_s"] == 0.6
+
+    def test_close_pass_skips_live_measured(self, tmp_path):
+        """annotate_session's idempotence: a live record with the rebased
+        start + current version must be recognised and skipped."""
+        import json
+        video = tmp_path / "session-skip.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_frame(0.0, [_track(1, 100.0, 200.0)])
+        w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=1,
+                             start_t=0.2, end_t=0.9))
+        w.add_stroke(dict(REC))
+        w.close()
+        # replicate annotate_session's have-map logic against this file
+        have = {}
+        for line in (tmp_path / "session-skip.mp4.analysis.jsonl") \
+                .read_text(encoding="utf-8").splitlines():
+            d = json.loads(line)
+            if d.get("type") == "stroke_vision":
+                have[round(float(d["start"]), 2)] = int(d.get("v", 0))
+        r = SidecarReader(video)
+        start = round(float(r.shots[0]["start"]), 2)
+        assert have.get(start, 0) >= STROKE_VISION_VERSION
+
+
+class TestStrokeText:
+    def test_full_line(self):
+        line = stroke_text({"stroke": dict(REC)})
+        assert "stay-down 1.4s" in line
+        assert "pause 167ms" in line
+        assert "back 116px" in line
+        assert "3 practice" in line
+        assert "POPPED" not in line
+
+    def test_popped_early_flagged(self):
+        line = stroke_text({"_stroke": {**REC, "popped_early": True}})
+        assert "POPPED UP EARLY" in line
+
+    def test_none_when_absent_or_unmeasurable(self):
+        assert stroke_text({}) is None
+        assert stroke_text({"stroke": {"confidence": "none"}}) is None
