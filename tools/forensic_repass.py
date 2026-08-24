@@ -32,8 +32,8 @@ import argparse
 # and AI are running hard." Heavy batch work must never starve the
 # desktop or the live pipeline: drop OURSELVES to below-normal priority.
 try:
-    import ctypes
-    from _lowprio import demote as _demote; _demote()
+    from _lowprio import demote
+    demote()
 except Exception:
     pass
 
