@@ -107,7 +107,13 @@ def level2() -> dict:
             scopes[f"src/{_subsystem(p)}"] = scopes.get(f"src/{_subsystem(p)}", "") \
                 + p.read_text(encoding="utf-8", errors="ignore")
     if PHONE.is_file():
-        scopes["phone"] = PHONE.read_text(encoding="utf-8", errors="ignore")
+        # the phone surface is index.html PLUS its extracted script(s) —
+        # the 2026-08-24 split moved the app JS to app.js, and scanning
+        # only the html reported every phone feature as missing
+        scopes["phone"] = "".join(
+            f.read_text(encoding="utf-8", errors="ignore")
+            for f in sorted(PHONE.parent.glob("*.html"))
+            + sorted(PHONE.parent.glob("*.js")))
     if API.is_dir():
         scopes["cloud api"] = "".join(
             f.read_text(encoding="utf-8", errors="ignore")
