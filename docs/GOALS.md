@@ -129,6 +129,7 @@ Rounds continue with Joe's visual feedback as the gate.
 ---
 
 ## Progress log
+- 2026-08-23 (loop 2): Joe's colour-filter ask answered with evidence — 5 candidates A/B'd on 104 labelled frames, ALL hurt or flat (saturation kills stripes 79.5->54.7%); DECLINED, detection stays raw. Snapshot: overall 94.7%, dark cluster 99.3%, stripes 79.5% (G2b path = c5+labels). Lint 10->8. id-hops AMBER awaits post-denoise footage + Joe's camera change.
 - 2026-08-23 (loop): id-hops AMBER worked both halves: A/B-gated hqdn3d on the live analysis stream (2 slices, all metrics better: hops -15%, balls/state +12-13%) shipped+enabled; found+fixed silently-failing priority demotions (untyped ctypes, all call sites were no-ops); lint 23->10 baseline; faststart hook live in-app after restart. Camera half (1/250+half ISO) awaits Joe.
 - 2026-08-15: File created. G1 fix shipped (colour reassignment of
   arbitration losers + tests); corpus regression check running. Autonomy
