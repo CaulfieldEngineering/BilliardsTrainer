@@ -278,8 +278,8 @@ def measure_shot(sess: _Session, start: float) -> dict:
         if t_strike is None or not (start - 5.0 <= t_strike <= start + 1.5):
             continue
         good = 0
-        for i, t, fr in _read_window(sess.video, t_strike - 0.3,
-                                     t_strike + 0.5, fps):
+        for i, _t, fr in _read_window(sess.video, t_strike - 0.3,
+                                      t_strike + 0.5, fps):
             if i % 3:
                 continue
             s = sess.stick(fr, rest)

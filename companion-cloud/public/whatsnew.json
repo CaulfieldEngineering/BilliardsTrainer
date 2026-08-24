@@ -1,6 +1,18 @@
 {
  "entries": [
   {
+   "id": 29,
+   "date": "2026-08-24",
+   "title": "New metric: how long you stay down on the shot",
+   "body": "Every shot now gets stroke measurements straight from the camera: how long your cue stays down after contact, your backstroke length, the pause at the top of it, and your practice-stroke count. Misses often come with popping up early - now there's a number for it, and Lifetime Stats compares your average stay-down on makes vs misses.",
+   "details": [
+    "Verified frame-by-frame before shipping: 9 of 9 measured shots matched hand-checked ground truth within 0.1 seconds (a tenth shot, where the balls were moved by hand, correctly measured nothing).",
+    "The shot Details sheet shows a STROKE row: stay-down seconds, an early pop-up warning, pause milliseconds, backstroke length, practice strokes.",
+    "Under the hood the true strike moment is re-detected from the cue ball's disappearance (the tracker's shot clock runs ~2.4s late), and the cue stick is tracked even when your arm overlaps it.",
+    "These field names match your Bluetooth cue sensor's - when it's installed, both sources will measure the same things and check each other."
+   ]
+  },
+  {
    "id": 28,
    "date": "2026-08-23",
    "title": "Tracking sees through the grain now",
