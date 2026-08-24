@@ -1343,8 +1343,9 @@ function markDot(ctx, x, y, col, r, dpr) {
 }
 
 //: HiDPI backing store, sized once per frame in ONE place
-function fitCanvas(cv, box) {
-  const dpr = window.devicePixelRatio || 1;
+function fitCanvas(cv, box, maxDpr) {
+  let dpr = window.devicePixelRatio || 1;
+  if (maxDpr) dpr = Math.min(dpr, maxDpr);
   const w = Math.round(box.width * dpr), h = Math.round(box.height * dpr);
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   return dpr;
@@ -1355,7 +1356,11 @@ function fitCanvas(cv, box) {
 //: device pixels. All three overlays computed this separately.
 function videoBox(cv, v) {
   const box = cv.parentElement.getBoundingClientRect();
-  const dpr = fitCanvas(cv, box);
+  // derive dpr from the canvas's CURRENT backing store instead of
+  // re-fitting: a caller that sized the canvas with a dpr cap (drawTrails
+  // caps at 2 on phones) must not get thrashed back to full dpr here
+  const dpr = box.width > 0 ? cv.width / box.width
+                            : (window.devicePixelRatio || 1);
   const sc = Math.min(box.width / v.videoWidth, box.height / v.videoHeight);
   const cw = v.videoWidth * sc, ch = v.videoHeight * sc;
   const ox = (box.width - cw) / 2, oy = (box.height - ch) / 2;
@@ -1532,37 +1537,78 @@ function drawAim() {
   strokeLine(ctx, smoothPath([P(a), P(b)]), "#F0B429", 1.2, dpr);
 }
 
+// Per-trail render cache: the trail BODY (all samples up to the cutoff)
+// only changes when the cutoff index advances (~every 150ms of video —
+// exports sample at 0.15s), so its Path2D + gradient are rebuilt only
+// then, not every rAF. The LIVE tip segment is interpolated between the
+// cutoff sample and the next one every frame — this is what makes the
+// line grow smoothly instead of hopping a whole 0.15s step at a time
+// (Joe: "blocky/choppy"), and it costs a 2-point path per frame.
+let _trailCache = { key: "", trails: [] };
 function drawTrails() {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   const box = cv.parentElement.getBoundingClientRect();
-  const dpr = fitCanvas(cv, box);
+  // cap the backing store at 2x: at iPhone dpr=3 the trails layer was
+  // 2.25x the pixels for no visible gain on glow lines — stroke cost is
+  // the frame budget here
+  const dpr = fitCanvas(cv, box, 2);
   const ctx = cv.getContext("2d");
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (!s || !s.trails || !v.videoWidth) return;
   const { P } = videoBox(cv, v);
   const t = playheadTime(v);
-  const Q = q => P([q[1], q[2]]);      // trail points are [t, x, y]
-  s.trails.forEach(tr => {
+  const key = `${cur}|${cv.width}x${cv.height}`;
+  if (_trailCache.key !== key) _trailCache = { key, trails: s.trails.map(() => ({ k: -1 })) };
+  s.trails.forEach((tr, ti) => {
     // WHOLE SHOT, not a 4s tail (Joe: "should persist through the
     // entire duration of the shot") — the path is the record of what
     // happened, and it disappearing mid-review defeated the point.
-    const pts = tr.p.filter(p => p[0] <= t).map(Q);
-    if (pts.length < 2) return;
-    const col = BALL_COL[tr.n] || "#9AA4B2";
-    // The fade from faint-at-the-start to solid-at-the-ball used to be a
-    // separate stroke PER SEGMENT, which beaded at every vertex. A single
-    // gradient along the path gives the same read, smoothly.
-    const a = pts[0], b = pts[pts.length - 1];
-    let grad = col;
-    if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 1) {
-      grad = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
-      grad.addColorStop(0, col + "38");
-      grad.addColorStop(0.55, col + "9E");
-      grad.addColorStop(1, col + "FF");
+    const p = tr.p;
+    if (p.length < 2) return;
+    // binary search for the cutoff (last sample <= t)
+    let lo = 0, hi = p.length - 1, k = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (p[mid][0] <= t) { k = mid; lo = mid + 1; } else hi = mid - 1;
     }
-    strokeLine(ctx, smoothPath(pts), col, 1.5, dpr, { grad: grad, alpha: 1 });
-    markDot(ctx, b[0], b[1], col, 2.6, dpr);   // where the ball is now
+    if (k < 1) return;
+    const col = BALL_COL[tr.n] || "#9AA4B2";
+    const Q = q => P([q[1], q[2]]);    // trail points are [t, x, y]
+    const c = _trailCache.trails[ti] || (_trailCache.trails[ti] = { k: -1 });
+    if (c.k !== k) {
+      const pts = [];
+      for (let i = 0; i <= k; i++) pts.push(Q(p[i]));
+      const a = pts[0], b = pts[pts.length - 1];
+      let grad = col;
+      // The fade from faint-at-the-start to solid-at-the-ball used to be
+      // a separate stroke PER SEGMENT, which beaded at every vertex. A
+      // single gradient along the path gives the same read, smoothly.
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 1) {
+        grad = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+        grad.addColorStop(0, col + "38");
+        grad.addColorStop(0.55, col + "9E");
+        grad.addColorStop(1, col + "FF");
+      }
+      c.k = k; c.path = smoothPath(pts); c.grad = grad; c.end = pts[pts.length - 1];
+    }
+    strokeLine(ctx, c.path, col, 1.5, dpr, { grad: c.grad, alpha: 1 });
+    // live tip: interpolate toward the NEXT sample so the line advances
+    // every displayed frame, not once per 0.15s sample
+    let tip = c.end;
+    if (k < p.length - 1) {
+      const t0 = p[k][0], t1 = p[k + 1][0];
+      const f = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+      if (f > 0) {
+        const n = Q(p[k + 1]);
+        tip = [c.end[0] + (n[0] - c.end[0]) * f, c.end[1] + (n[1] - c.end[1]) * f];
+        const seg = new Path2D();
+        seg.moveTo(c.end[0], c.end[1]);
+        seg.lineTo(tip[0], tip[1]);
+        strokeLine(ctx, seg, col, 1.5, dpr, { alpha: 1 });
+      }
+    }
+    markDot(ctx, tip[0], tip[1], col, 2.6, dpr);   // where the ball is now
   });
   ctx.globalAlpha = 1;
 }
@@ -1581,10 +1627,19 @@ if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
     if (meta) { vfcT = meta.mediaTime; vfcWall = performance.now(); }
     $("video").requestVideoFrameCallback(ovClock);
   })();
+let _ctLast = -1, _ctWall = 0;
 function playheadTime(v) {
-  if (vfcT >= 0 && !v.paused && performance.now() - vfcWall < 300)
-    return vfcT + (performance.now() - vfcWall) / 1000 * (v.playbackRate || 1);
-  return v.currentTime;
+  const now = performance.now();
+  if (vfcT >= 0 && !v.paused && now - vfcWall < 300)
+    return vfcT + (now - vfcWall) / 1000 * (v.playbackRate || 1);
+  // rVFC stale or unsupported: currentTime itself only updates ~4x/s on
+  // iOS — extrapolate from its last observed CHANGE so the clock still
+  // advances every frame instead of stepping quarter-second chunks
+  const ct = v.currentTime;
+  if (ct !== _ctLast) { _ctLast = ct; _ctWall = now; }
+  if (!v.paused && now - _ctWall < 400)
+    return ct + (now - _ctWall) / 1000 * (v.playbackRate || 1);
+  return ct;
 }
 
 // A render loop, not timeupdate: iOS fires timeupdate ~4x/s and the
@@ -1593,6 +1648,10 @@ function playheadTime(v) {
   requestAnimationFrame(tick);
   const v = $("video");
   if (!$("player").classList.contains("open")) return;
+  // size the shared overlay canvas ONCE per tick (dpr capped at 2 —
+  // see drawTrails) so every drawer, in any toggle combination, gets a
+  // correctly sized store; videoBox no longer resizes
+  fitCanvas($("trails"), $("trails").parentElement.getBoundingClientRect(), 2);
   // trails paused per Joe ("I don't want the animated trails on here
   // yet") — data still exports; flip TRAILS_ON to re-enable
   if (OV.paths || window.TRAILS_ON) drawTrails();
@@ -1648,6 +1707,7 @@ let seekBusy = false, seekPending = null, seekFastMode = false;
 function requestSeek(t, fast) {
   const v = $("video");
   vfcT = -1;   // a pre-seek frame stamp must never bridge the jump
+  _ctLast = -1;   // ...nor a pre-seek currentTime extrapolation
   if (seekBusy) { seekPending = t; return; }
   seekBusy = true;
   seekFastMode = !!fast;
