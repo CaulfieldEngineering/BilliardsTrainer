@@ -129,6 +129,7 @@ Rounds continue with Joe's visual feedback as the gate.
 ---
 
 ## Progress log
+- 2026-08-23 (loop 3): G3 data block RE-PROBED on tonight's crisp 1/500 footage: 0 layouts at density >=10 across 3 sessions (floors 12 and 10) — block CONFIRMED, full-rack minute stays Joe's cheapest unblock. NEW finding: montage_00 shows ~10 balls, single-class miner detected 4 — cluster/rail recall suppresses mined density; mining ceiling is partly DETECTOR recall, not just layout truth. Labelled 6 layouts anyway (+18 labels: cue/3/4/5/7/9; heuristic agreed 10/18 = 55.6% on crisp+grainy footage — worth a look). Lint 10->7.
 - 2026-08-23 (loop 2): Joe's colour-filter ask answered with evidence — 5 candidates A/B'd on 104 labelled frames, ALL hurt or flat (saturation kills stripes 79.5->54.7%); DECLINED, detection stays raw. Snapshot: overall 94.7%, dark cluster 99.3%, stripes 79.5% (G2b path = c5+labels). Lint 10->8. id-hops AMBER awaits post-denoise footage + Joe's camera change.
 - 2026-08-23 (loop): id-hops AMBER worked both halves: A/B-gated hqdn3d on the live analysis stream (2 slices, all metrics better: hops -15%, balls/state +12-13%) shipped+enabled; found+fixed silently-failing priority demotions (untyped ctypes, all call sites were no-ops); lint 23->10 baseline; faststart hook live in-app after restart. Camera half (1/250+half ISO) awaits Joe.
 - 2026-08-15: File created. G1 fix shipped (colour reassignment of
