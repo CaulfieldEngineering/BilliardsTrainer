@@ -15,7 +15,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-
 from _lowprio import demote
 
 demote()
@@ -76,6 +75,14 @@ def load_labels(lbl: Path, w: int, h: int):
     return out
 
 
+def _make_acc(right, wrong):
+    """Bind the per-filter counters explicitly (B023: no loop-var closure)."""
+    def acc(nums):
+        t = sum(right[n] + wrong[n] for n in nums)
+        return 100.0 * sum(right[n] for n in nums) / t if t else 0.0
+    return acc
+
+
 def main() -> int:
     strat = discover().get("ensemble_findid")
     if strat is None:
@@ -113,10 +120,8 @@ def main() -> int:
                     continue
                 used.add(best)
                 (right if dets[best].number == n else wrong)[n] += 1
-        def acc(nums):
-            t = sum(right[n] + wrong[n] for n in nums)
-            return 100.0 * sum(right[n] for n in nums) / t if t else 0.0
         allc = list(range(16))
+        acc = _make_acc(right, wrong)
         print(f"{name:>10s} {acc(allc):>8.1f}% {acc(STRIPES):>8.1f}% "
               f"{acc(DARK):>6.1f}% {sum(missed.values()):>7d}")
     print("\nGate to ship: overall AND stripes above baseline, dark not "

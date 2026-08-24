@@ -115,7 +115,7 @@ def main() -> None:
 
     def report(name, rows):
         rows.sort(key=lambda r: -r[0])
-        print("\n%s (top 5 of %d):" % (name, len(rows)))
+        print(f"\n{name} (top 5 of {len(rows)}):")
         for smear, t, _c, major, minor in rows[:5]:
             print(f"  t={t:7.1f}s  {major:3.0f} x {minor:3.0f}   smear {smear:3.0f}px")
         return rows[:5]
