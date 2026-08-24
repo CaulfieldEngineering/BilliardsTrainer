@@ -33,6 +33,17 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "billiards_trainer"
 PHONE = ROOT / "companion-cloud" / "public" / "index.html"
 
+
+def _phone_text() -> str:
+    """The phone surface is index.html PLUS its extracted scripts — the
+    2026-08-24 app.js split made a html-only scan report every phone
+    feature as absent (3 false parity gaps)."""
+    if not PHONE.is_file():
+        return ""
+    return "".join(f.read_text(encoding="utf-8", errors="ignore")
+                   for f in sorted(PHONE.parent.glob("*.html"))
+                   + sorted(PHONE.parent.glob("*.js")))
+
 #: The architectural intent: each concept has ONE owning module. Anything
 #: else that implements it is drift, not necessarily a bug — the audit
 #: reports, a human decides.
@@ -119,7 +130,7 @@ def check_contract() -> dict:
     written.discard("shots")
     readers = ""
     if PHONE.is_file():
-        readers += PHONE.read_text(encoding="utf-8")
+        readers += _phone_text()
     for p in (SRC / "ui").rglob("*.py"):
         readers += p.read_text(encoding="utf-8")
     for p in (SRC / "workers").rglob("*.py"):
@@ -128,8 +139,7 @@ def check_contract() -> dict:
                     if not re.search(rf"[\.\[]\"?{f}\"?[\]\s\.\),]", readers))
     # fields surfaces read out of a shot object that the exporter never writes
     phone_reads = set(re.findall(r"\bs(?:h|hot)?\.(\w+)\b",
-                                 PHONE.read_text(encoding="utf-8")
-                                 if PHONE.is_file() else ""))
+                                 _phone_text()))
     ghost = sorted(f for f in phone_reads
                    if f not in written and f not in
                    {"length", "name", "start", "end", "map", "filter",
@@ -146,7 +156,7 @@ def check_contract() -> dict:
 
 def check_parity() -> dict:
     """Capabilities on one surface only (Joe's rule: they must agree)."""
-    phone = PHONE.read_text(encoding="utf-8") if PHONE.is_file() else ""
+    phone = _phone_text()
     desktop = ""
     for sub in ("ui", "workers"):
         for p in (SRC / sub).rglob("*.py"):
