@@ -35,7 +35,8 @@ def newest_session() -> str:
 
 
 def main() -> None:
-    from _lowprio import demote as _demote; _demote()
+    from _lowprio import demote
+    demote()
     ap = argparse.ArgumentParser()
     ap.add_argument("clip", nargs="?", default=None)
     ap.add_argument("--ball-diam", type=float, default=28.0,
@@ -68,8 +69,9 @@ def main() -> None:
     felt = cv2.erode(felt, np.ones((25, 25), np.uint8))
     g = cv2.cvtColor(bg, cv2.COLOR_BGR2GRAY)
     fm = g[felt > 0]
-    print("exposure: felt_mean %d (target 133-201)   clipped(>=250) %.2f%%"
-          % (fm.mean() if fm.size else -1, 100.0 * (g >= 250).mean()))
+    fmv = fm.mean() if fm.size else -1
+    print(f"exposure: felt_mean {fmv:.0f} (target 133-201)   "
+          f"clipped(>=250) {100.0 * (g >= 250).mean():.2f}%")
 
     d = args.ball_diam
     balls, others = [], []   # (smear, t, crop, w, h)

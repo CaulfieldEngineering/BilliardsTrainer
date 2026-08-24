@@ -59,7 +59,8 @@ def recording_active() -> bool:
 
 
 def main() -> None:
-    from _lowprio import demote as _demote; _demote()
+    from _lowprio import demote
+    demote()
     ff = find_ffmpeg()
     if not ff:
         sys.exit("no ffmpeg")
@@ -100,8 +101,7 @@ def main() -> None:
                     os.remove(tmp)
                 except OSError:
                     pass
-    print("backfill: %d remuxed, %d already fine, %d failed"
-          % (done, skipped, failed))
+    print(f"backfill: {done} remuxed, {skipped} already fine, {failed} failed")
 
 
 if __name__ == "__main__":
