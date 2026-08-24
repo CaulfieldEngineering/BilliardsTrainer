@@ -275,6 +275,13 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             entry["reviewed"] = True
         if s.get("note"):
             entry["note"] = s["note"]
+        sv = s.get("_stroke")
+        if sv and sv.get("confidence") != "none":
+            # camera-measured stroke metrics; field names align with the
+            # BLE cue sensor (back_depth, pause, finish) for later fusion
+            entry["stroke"] = {k: sv[k] for k in (
+                "stay_down_s", "popped_early", "back_depth_px", "pause_ms",
+                "delivery_ms", "practice_strokes", "confidence") if k in sv}
         desc = None
         try:
             from .describe import compose_text, describe_shot
@@ -407,6 +414,10 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
     clips = {}
     trusted = gated = 0
     makes = misses = scratches = 0
+    # stay-down by outcome (Joe: misses come with popping up early) —
+    # high-confidence camera measurements only
+    stay: dict[str, list] = {"make": [], "miss": []}
+    pops: dict[str, int] = {"make": 0, "miss": 0}
     for sp in sorted(d.glob("session-*.mp4.shots.json")):
         try:
             doc = _json.loads(sp.read_text(encoding="utf-8"))
@@ -421,6 +432,12 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
                     misses += 1
                 elif oc == "scratch":
                     scratches += 1
+                sv = sh.get("stroke") or {}
+                if (oc in stay and sv.get("confidence") == "high"
+                        and sv.get("stay_down_s") is not None):
+                    stay[oc].append(float(sv["stay_down_s"]))
+                    if sv.get("popped_early"):
+                        pops[oc] += 1
             t = sh.get("tags")
             if not t or not t.get("miss_side"):
                 if sh.get("outcome") == "miss" and sh.get("action") in (
@@ -446,6 +463,12 @@ def export_lifetime_stats(recordings_dir) -> Path | None:
            "clips": clips,
            "makes": makes, "misses": misses, "scratches": scratches,
            "total": makes + misses + scratches}
+    if stay["make"] or stay["miss"]:
+        out["stay_down"] = {
+            oc: {"n": len(v),
+                 "avg_s": round(sum(v) / len(v), 2) if v else None,
+                 "popped_early": pops[oc]}
+            for oc, v in stay.items()}
     fp = d / "lifetime_stats.json"
     fp.write_text(_json.dumps(out, indent=1), encoding="utf-8")
     return fp

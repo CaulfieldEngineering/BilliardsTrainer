@@ -92,6 +92,8 @@ def build(video: Path, force: bool = False) -> bool:
     from billiards_trainer.vision.outcomes import derive_and_correct
     n = derive_and_correct(video)
     counts = classify_and_mark(video)
+    from billiards_trainer.vision.stroke_vision import annotate_session
+    annotate_session(video)
     from billiards_trainer.vision.shots_export import export_library_index, export_shots_summary
     export_shots_summary(video)
     export_library_index(Path(video).parent)

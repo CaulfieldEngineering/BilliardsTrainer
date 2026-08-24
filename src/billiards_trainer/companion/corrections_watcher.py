@@ -63,6 +63,13 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
                                   "at": round(float(d["split"]), 3)}) + "\n")
         derive_and_correct(video)
         classify_and_mark(video)
+        # a split changes shot boundaries — remeasure stroke metrics for
+        # the new shots (idempotent per-version; only new starts recompute)
+        try:
+            from ..vision.stroke_vision import annotate_session
+            annotate_session(video)
+        except Exception:  # noqa: BLE001 - metrics are enrichment
+            log.exception("stroke_vision after split failed")
         export_shots_summary(video)
         export_library_index(recordings)
         export_lifetime_stats(recordings)

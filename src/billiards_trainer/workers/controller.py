@@ -839,6 +839,15 @@ class PipelineController(QObject):
                 if non:
                     log.info("session close: actions labeled for %s: %s",
                              video, counts)
+                # Camera-measured stroke metrics (stay-down / backstroke /
+                # pause) — before export so shots.json carries them. The
+                # pass streams video and costs ~real-time per shot window;
+                # it runs on this daemon thread, never the recording path.
+                try:
+                    from ..vision.stroke_vision import annotate_session
+                    annotate_session(video)
+                except Exception:  # noqa: BLE001 - metrics are enrichment
+                    log.exception("stroke_vision pass failed")
                 # Phone summary rides Dropbox sync to the cloud review app.
                 from ..vision.shots_export import export_library_index, export_shots_summary
                 export_shots_summary(video)

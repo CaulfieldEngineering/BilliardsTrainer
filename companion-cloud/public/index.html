@@ -349,6 +349,12 @@
         <button id="rife-req">✨ Slo-mo</button>
       </div>
       <div id="pl-pick" style="display:none"></div>
+      <div class="row" id="sh-stroke" style="display:none">
+        <span style="align-self:center;color:var(--dim);font-size:12px;
+              min-width:52px">STROKE</span>
+        <span id="sh-stroke-txt" style="align-self:center;font-size:13px;
+              font-variant-numeric:tabular-nums"></span>
+      </div>
       <div class="row" id="sh-cut">
         <span style="align-self:center;color:var(--dim);font-size:12px;
               min-width:52px">CUT</span>
@@ -698,6 +704,15 @@ async function openStats() {
     html += line("Total Shots", d.total ?? "–");
     html += line("Makes", d.makes ?? "–");
     html += line("Misses", d.misses ?? "–");
+    if (d.stay_down) {
+      const sd = d.stay_down;
+      const f = o => (o && o.avg_s != null)
+        ? `${o.avg_s.toFixed(2)}s (${o.n})` : "–";
+      html += line("Stay-down avg — Makes", f(sd.make), true);
+      html += line("Stay-down avg — Misses", f(sd.miss), true);
+      const pops = (sd.make?.popped_early || 0) + (sd.miss?.popped_early || 0);
+      if (pops) html += line("Popped up early", pops, true);
+    }
     html += line("Cut Left / Miss Left (Overcut)", g("left|left"), true, false, "left|left");
     html += line("Cut Left / Miss Right (Undercut)", g("left|right"), true, false, "left|right");
     html += line("Cut Right / Miss Right (Overcut)", g("right|right"), true, false, "right|right");
@@ -2526,6 +2541,22 @@ function _syncTagRows() {
     b.classList.toggle("on", b.dataset.c === t.cut));
   [...$("sh-miss").querySelectorAll("button")].forEach(b =>
     b.classList.toggle("on", b.dataset.m === t.miss_side));
+  // camera-measured stroke metrics (read-only row)
+  const sv = (shots[cur] && shots[cur].stroke) || null;
+  const row = $("sh-stroke");
+  if (sv && sv.stay_down_s != null) {
+    const bits = [`stayed down ${sv.stay_down_s.toFixed(1)}s`];
+    if (sv.popped_early) bits.push("⚠ popped up early");
+    if (sv.pause_ms != null) bits.push(`pause ${sv.pause_ms}ms`);
+    if (sv.back_depth_px != null)
+      bits.push(`backstroke ${Math.round(sv.back_depth_px)}px`);
+    if (sv.practice_strokes != null)
+      bits.push(`${sv.practice_strokes} practice`);
+    $("sh-stroke-txt").textContent = bits.join(" · ");
+    row.style.display = "";
+  } else {
+    row.style.display = "none";
+  }
 }
 [...document.querySelectorAll("#sh-cut button")].forEach(b => b.onclick = async () => {
   const s0 = shots[cur]; if (!s0) return;

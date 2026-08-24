@@ -181,6 +181,14 @@ class SidecarReader:
                         for k in ("cut", "miss_side"):
                             if d.get(k):
                                 tr[k] = d[k]
+                elif d.get("type") == "stroke_vision":
+                    # camera-measured stroke metrics (stay-down, backstroke,
+                    # pause — vision/stroke_vision.py). Machine-derived and
+                    # recomputable; last record per shot wins (version bumps
+                    # re-append). Attached, never merged into verdict slots.
+                    s2 = _shot_for(self.shots, float(d["start"]))
+                    if s2 is not None:
+                        s2["_stroke"] = d
                 elif d.get("type") == "correction":
                     # last-wins WITHIN a rank, but a human verdict is FINAL:
                     # once a review-source correction lands, derived re-runs
