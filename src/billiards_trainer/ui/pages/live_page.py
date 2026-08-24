@@ -1355,6 +1355,24 @@ class LivePage(QWidget):
         except AttributeError:
             pass
 
+    def on_stroke_measured(self, rec: dict) -> None:
+        """Live stroke metrics landing ~20-40s after the shot's row appeared
+        (Joe: "populate as soon as the shot is complete"). rec carries the
+        REBASED start — the same clock the rows were added on."""
+        if not isinstance(rec, dict) or rec.get("confidence") == "none":
+            return
+        keys = ("stay_down_s", "popped_early", "back_depth_px", "pause_ms",
+                "delivery_ms", "practice_strokes", "confidence")
+        stroke = {k: rec[k] for k in keys if k in rec}
+        if not stroke:
+            return
+        start = float(rec.get("start", -1.0))
+        try:
+            self._timeline.set_shot_stroke(start, stroke)
+            self._shot_list.set_shot_stroke(start, stroke)
+        except AttributeError:
+            pass
+
     def on_cached_shots(self, shots) -> None:
         """A session opened with an analysis sidecar: the whole timeline
         lands at once — no waiting for re-detection."""

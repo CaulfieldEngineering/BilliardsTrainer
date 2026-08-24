@@ -85,6 +85,8 @@ class PipelineController(QObject):
     source_is_video = Signal(bool, int, float)  # (seekable video?, frame_count, fps)
     video_state = Signal(int, int, bool)  # (current frame, total frames, playing)
     _detections_ready = Signal(object, object)  # (raw_dets, frame_shape) worker -> this thread
+    stroke_measured = Signal(object)    # live stroke metrics record (rebased start) -> UI
+    _stroke_ready = Signal(object)      # stroke worker -> this thread (the sidecar owner)
 
     def __init__(self, settings: Settings, repository: Repository):
         super().__init__()
@@ -160,6 +162,7 @@ class PipelineController(QObject):
         self._det_queue: queue.Queue = queue.Queue(maxsize=1)
         self._det_thread: threading.Thread | None = None
         self._detections_ready.connect(self._on_detections_ready, Qt.QueuedConnection)
+        self._stroke_ready.connect(self._on_stroke_ready, Qt.QueuedConnection)
         # video transport state (only meaningful for a video-file source)
         self._video_paused = False
         self._speed = 1.0
@@ -800,6 +803,23 @@ class PipelineController(QObject):
 
     def _finalize_recording_file(self) -> None:
         """Move the finished in-progress file into the recordings folder."""
+        # Stop the live stroke worker FIRST: an open cv2 handle on the
+        # .part fails the replace() below (Windows). The abort() hook
+        # kills an in-flight measurement within ~1s; unmeasured shots are
+        # exactly what the close-time annotate_session pass computes.
+        stop = getattr(self, "_stroke_stop", None)
+        if stop is not None:
+            stop.set()
+            q = getattr(self, "_stroke_queue", None)
+            while q is not None and not q.empty():
+                try:
+                    q.get_nowait()
+                except queue.Empty:
+                    break
+            th = getattr(self, "_stroke_thread", None)
+            if (th is not None and th.is_alive()
+                    and getattr(self, "_stroke_busy", False)):
+                th.join(timeout=8.0)   # abort() lands within ~1s of decode
         sc = getattr(self, "_sidecar", None)
         if sc is not None:
             sc.close()
@@ -810,7 +830,14 @@ class PipelineController(QObject):
         try:
             if _P(self._recording_tmp).is_file():
                 self._remux_faststart(self._recording_tmp)
-                _P(self._recording_tmp).replace(self._recording_path)
+                for attempt in range(4):
+                    try:
+                        _P(self._recording_tmp).replace(self._recording_path)
+                        break
+                    except PermissionError:
+                        if attempt == 3:
+                            raise
+                        time.sleep(1.0)  # straggler read handle draining
         except OSError:
             log.exception("finalizing recording failed")
         self.replay_saved.emit(self._recording_path)
@@ -1095,6 +1122,103 @@ class PipelineController(QObject):
             log.exception("orphan-recording recovery failed")
 
     # --- async vision (live camera) ------------------------------------- #
+    # --- live stroke metrics (Joe: "populate as soon as the shot is
+    # complete") ------------------------------------------------------- #
+    def _submit_stroke(self, start: float) -> None:
+        """Queue a completed shot (REBASED start) for stroke measurement
+        from the growing .part. Same lazy-spawn + self-heal shape as the
+        detect worker."""
+        if getattr(self, "_stroke_queue", None) is None:
+            self._stroke_queue = queue.Queue()
+            self._stroke_stop = threading.Event()
+            self._stroke_thread = None
+        if self._stroke_thread is None or not self._stroke_thread.is_alive():
+            if self._stroke_thread is not None:
+                log.warning("stroke worker was dead — respawning")
+            self._stroke_thread = threading.Thread(
+                target=self._stroke_worker, daemon=True, name="stroke-vision")
+            self._stroke_thread.start()
+        self._stroke_stop.clear()
+        self._stroke_queue.put((str(self._recording_tmp), float(start)))
+
+    def _stroke_worker(self) -> None:
+        """Measure stroke metrics for completed shots from the in-progress
+        recording. Feasibility measured 2026-08-24: a fresh VideoCapture
+        indexes every flushed ~8s fragment (a persistent handle dies at
+        EOF forever); frame-accurate seeks; [start-6, start+9] becomes
+        decodable by strike+18s worst case. Readiness is gated on an
+        actual seek+grab at start+POST (CAP_PROP_FRAME_COUNT overstates
+        the decodable end by up to ~4s)."""
+        try:
+            import ctypes
+            k = ctypes.WinDLL("kernel32", use_last_error=True)
+            k.GetCurrentThread.restype = ctypes.c_void_p
+            k.SetThreadPriority.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            # LOWEST, one notch under the detect worker: metrics must never
+            # steal cadence from live detection
+            k.SetThreadPriority(k.GetCurrentThread(), -2)
+        except Exception:  # noqa: BLE001 - priority is best-effort
+            pass
+        from ..vision.stroke_vision import (
+            POST_S,
+            STROKE_VISION_VERSION,
+            AbortMeasurement,
+            _Session,
+            measure_shot,
+        )
+        sess = None
+        sess_path = None
+        while True:
+            video, start = self._stroke_queue.get()
+            stop = self._stroke_stop
+            if stop.is_set():
+                continue        # session over — close-time pass covers it
+            self._stroke_busy = True
+            # readiness: poll a fresh open + seek + grab at start+POST
+            ready = False
+            for _ in range(12):
+                if stop.is_set():
+                    break
+                cap = cv2.VideoCapture(video)
+                cap.set(cv2.CAP_PROP_POS_MSEC, (start + POST_S) * 1000.0)
+                ok = cap.grab()
+                cap.release()
+                if ok:
+                    ready = True
+                    break
+                stop.wait(2.0)
+            if not ready or stop.is_set():
+                self._stroke_busy = False
+                continue
+            try:
+                if sess_path != video:
+                    sess = _Session(video)
+                    sess_path = video
+                rec = measure_shot(sess, start, abort=stop.is_set)
+            except AbortMeasurement:
+                self._stroke_busy = False
+                continue
+            except Exception:  # noqa: BLE001 - one bad shot never kills the worker
+                self._stroke_busy = False
+                log.exception("live stroke measurement failed @%.1fs", start)
+                continue
+            rec.update({"type": "stroke_vision", "v": STROKE_VISION_VERSION,
+                        "start": round(start, 3)})
+            self._stroke_busy = False
+            self._stroke_ready.emit(rec)
+
+    def _on_stroke_ready(self, rec: dict) -> None:
+        """Controller thread: the ONLY safe place to append to the live
+        sidecar (its 'w'-mode buffered handle would overwrite any external
+        'a'-mode append on its next flush)."""
+        sc = getattr(self, "_sidecar", None)
+        if sc is not None:
+            try:
+                sc.add_stroke(rec)
+            except OSError:
+                log.exception("live stroke sidecar append failed")
+        self.stroke_measured.emit(rec)
+
     def _submit_detection(self, frame: np.ndarray) -> None:
         """Offer a frame to the detection worker. Non-blocking: if the worker
         is mid-inference the frame is simply display-only."""
@@ -1534,6 +1658,16 @@ class PipelineController(QObject):
             except TypeError:
                 ui_event = event
         self.shot_recorded.emit(ui_event)
+        # Live stroke metrics (Joe: "populate as soon as the shot is
+        # complete"): enqueue the REBASED start — same rounding as
+        # add_shot, so the close-time annotate_session pass recognises
+        # live-measured shots and skips them.
+        if sc is not None and getattr(sc, "_t0", None) is not None \
+                and self._recording_tmp:
+            try:
+                self._submit_stroke(round(max(0.0, event.start_t - sc._t0), 3))
+            except Exception:  # noqa: BLE001 - metrics are enrichment
+                log.exception("stroke enqueue failed")
         self.stats_updated.emit(self._repo.session_summary(self._session_id))
 
     def _log_shot(self, event: ShotEvent, shot_seconds: float) -> None:

@@ -219,23 +219,33 @@ class _Session:
                 "length": length, "dir": dvec}
 
 
-def _read_window(video: Path, t0: float, t1: float, fps: float):
+class AbortMeasurement(Exception):
+    """Raised mid-measurement when the caller's abort() goes true — the
+    live worker uses it so no cv2 handle on the growing .part survives
+    into the session-stop rename (an open handle fails the replace)."""
+
+
+def _read_window(video: Path, t0: float, t1: float, fps: float, abort=None):
     """Stream frames [t0, t1] as (frame_index, time, frame) without holding
     the decoded window in memory (a 15s window of this footage is ~2.4GB)."""
     cap = cv2.VideoCapture(str(video))
     f0 = max(0, int(t0 * fps))
     cap.set(cv2.CAP_PROP_POS_FRAMES, f0)
     i = f0
-    while True:
-        ok, fr = cap.read()
-        if not ok or i / fps > t1:
-            break
-        yield i, i / fps, fr
-        i += 1
-    cap.release()
+    try:
+        while True:
+            if abort is not None and i % 30 == 0 and abort():
+                raise AbortMeasurement
+            ok, fr = cap.read()
+            if not ok or i / fps > t1:
+                break
+            yield i, i / fps, fr
+            i += 1
+    finally:
+        cap.release()
 
 
-def measure_shot(sess: _Session, start: float) -> dict:
+def measure_shot(sess: _Session, start: float, abort=None) -> dict:
     """All stroke metrics for the shot whose sidecar start is ``start``."""
     fps = sess.fps
     t_lo, t_hi = max(0.0, start - PRE_S), start + POST_S
@@ -243,7 +253,7 @@ def measure_shot(sess: _Session, start: float) -> dict:
     # pass 1: track resting white blobs (every 3rd frame) to find vanish
     # candidates; keep only light state, never frames.
     tracks: list[dict] = []
-    for i, t, fr in _read_window(sess.video, t_lo, t_hi, fps):
+    for i, t, fr in _read_window(sess.video, t_lo, t_hi, fps, abort):
         if i % 3:
             continue
         m = sess.fg_mask(fr)
@@ -268,7 +278,7 @@ def measure_shot(sess: _Session, start: float) -> dict:
         rest = tr["pos"]
         pres = [(t, sess.ball_presence(fr, rest))
                 for _, t, fr in _read_window(sess.video, tr["last"] - 0.4,
-                                             tr["last"] + 1.0, fps)]
+                                             tr["last"] + 1.0, fps, abort)]
         t_strike = None
         for k in range(len(pres) - 5):
             t, p = pres[k]
@@ -279,7 +289,7 @@ def measure_shot(sess: _Session, start: float) -> dict:
             continue
         good = 0
         for i, _t, fr in _read_window(sess.video, t_strike - 0.3,
-                                      t_strike + 0.5, fps):
+                                      t_strike + 0.5, fps, abort):
             if i % 3:
                 continue
             s = sess.stick(fr, rest)
@@ -296,7 +306,7 @@ def measure_shot(sess: _Session, start: float) -> dict:
 
     # pass 3: tip timeline, pre-strike through the window end
     tl = []   # (t, stick-or-None)
-    for _, t, fr in _read_window(sess.video, t_strike - 4.0, t_hi, fps):
+    for _, t, fr in _read_window(sess.video, t_strike - 4.0, t_hi, fps, abort):
         tl.append((t, sess.stick(fr, rest)))
 
     out = {"strike": round(t_strike, 2), "rest": [round(float(rest[0])),

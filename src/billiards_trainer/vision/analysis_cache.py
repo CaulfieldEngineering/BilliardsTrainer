@@ -105,6 +105,17 @@ class SidecarWriter:
             "pocketed": int(event.num_pocketed)}) + "\n")
         self._f.flush()
 
+    def add_stroke(self, rec: dict) -> None:
+        """Append a live-measured {type:'stroke_vision'} record.
+
+        MUST be called on the thread that owns this writer (the controller):
+        the handle is 'w'-mode and buffered — an external 'a'-mode append
+        mid-session would be silently overwritten by the next buffered
+        flush. rec must already carry the REBASED 'start' (same rounding as
+        add_shot) so annotate_session's idempotence key matches at close."""
+        self._f.write(json.dumps(rec) + "\n")
+        self._f.flush()
+
     def close(self) -> None:
         try:
             self._f.flush()

@@ -237,6 +237,10 @@ class ShotListPanel(QWidget):
                    + (" — outcome corrected by you" if corrected else "")
                    + (" — confirmed correct by you" if s.get("reviewed_ok")
                       else ""))
+            from .stroke_text import stroke_text
+            sline = stroke_text(s)
+            if sline:
+                tip += "\n" + sline
             if s.get("note"):
                 tip += "\nYour note: " + str(s["note"])
             item.setToolTip(tip)
@@ -253,6 +257,19 @@ class ShotListPanel(QWidget):
             self._all_shots = []
         self._all_shots.append(shot)
         self._render()
+
+    def set_shot_stroke(self, start: float, stroke: dict) -> None:
+        """Late-arriving live stroke metrics: attach to the row nearest
+        ``start`` and rebuild (tooltips are built at render time)."""
+        best = None
+        for s in getattr(self, "_all_shots", []):
+            d = abs(float(s.get("start", 0.0)) - start)
+            if d <= 2.0 and (best is None
+                             or d < abs(float(best.get("start", 0.0)) - start)):
+                best = s
+        if best is not None:
+            best["stroke"] = dict(stroke)
+            self._render()
 
     def set_thumbnails(self, thumbs: dict) -> None:
         """{shot start s: small BGR array} — swap dot icons for thumbnails.

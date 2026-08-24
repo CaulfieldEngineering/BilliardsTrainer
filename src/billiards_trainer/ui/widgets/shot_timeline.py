@@ -132,6 +132,18 @@ class ShotTimeline(QWidget):
             self._duration = float(end_t)
         self.update()
 
+    def set_shot_stroke(self, start_t: float, stroke: dict) -> None:
+        """Late-arriving stroke metrics for the shot nearest ``start_t``
+        (live measurement lands ~20-40s after the shot row appeared)."""
+        best = None
+        for s in self._shots:
+            d = abs(s["start"] - start_t)
+            if d <= 2.0 and (best is None or d < abs(best["start"] - start_t)):
+                best = s
+        if best is not None:
+            best["stroke"] = dict(stroke)
+            self.update()
+
     def clear(self) -> None:
         self._shots.clear()
         self._playhead = -1.0
@@ -291,10 +303,13 @@ class ShotTimeline(QWidget):
         mm, ss = int(start) // 60, int(start) % 60
         dur = max(0.0, s["end"] - start)
         pot = int(s.get("pocketed", 0))
-        return (f"Shot {no} — {s['outcome'].upper()}"
+        head = (f"Shot {no} — {s['outcome'].upper()}"
                 + (" (corrected)" if s.get("corrected") else "")
                 + f"  ·  {mm}:{ss:02d} · {dur:.1f}s"
                 + (f" · {pot} potted" if pot else ""))
+        from .stroke_text import stroke_text
+        line = stroke_text(s)
+        return head + ("\n" + line if line else "")
 
     def wheelEvent(self, ev):  # noqa: N802 - Qt override
         x = ev.position().x() if hasattr(ev, "position") else ev.pos().x()
