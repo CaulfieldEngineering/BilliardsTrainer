@@ -185,6 +185,15 @@ class FfmpegCameraSource:
         RECORDING is unaffected because it only ever exists in one process.
         """
         self._teardown()
+        # DROP the last frame of the OLD process. Serving it through the
+        # device-reopen window (measured 1.8-3.3s) made the controller
+        # process a stale picture on an advancing wall clock — the sidecar
+        # anchored its t0 seconds BEFORE the recording's first real frame,
+        # which is the ONE-CLOCK skew every overlay inherited (2026-08-25).
+        # read() returns None until the new process delivers; the tick's
+        # empty-read tolerance already covers exactly this window.
+        with self._lock:
+            self._latest = None
         self._start()
 
     def _teardown(self) -> None:

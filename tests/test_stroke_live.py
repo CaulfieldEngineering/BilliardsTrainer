@@ -95,3 +95,22 @@ class TestStrokeText:
     def test_none_when_absent_or_unmeasurable(self):
         assert stroke_text({}) is None
         assert stroke_text({"stroke": {"confidence": "none"}}) is None
+
+
+class TestOneClockOrigin:
+    def test_restart_drops_stale_frame(self):
+        """The one-clock skew's origin: _restart must clear the old
+        process's last frame so the sidecar can't anchor t0 on a stale
+        picture during the device-reopen window."""
+        import threading
+
+        import numpy as np
+
+        from billiards_trainer.capture.ffmpeg_source import FfmpegCameraSource
+        s = FfmpegCameraSource.__new__(FfmpegCameraSource)
+        s._lock = threading.Lock()
+        s._latest = np.zeros((4, 4, 3), np.uint8)
+        s._teardown = lambda: None
+        s._start = lambda: None
+        s._restart()
+        assert s.read() is None, "stale frame served through a restart"
