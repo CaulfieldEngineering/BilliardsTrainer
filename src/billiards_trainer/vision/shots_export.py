@@ -123,6 +123,33 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     return result
 
 
+def _note_missing(entry: dict, s: dict) -> None:
+    """The measured-or-abstained contract (Joe: "Some shots get analyzed.
+    Others don't... I need this reliable"): every absent field on an
+    ATTEMPT carries a stated reason, so a blank overlay reads as an
+    explicit abstention, never a silent failure."""
+    if entry.get("action") not in ("stroke", "break"):
+        return
+    miss = {}
+    if not entry.get("aim"):
+        miss["aim"] = s.get("_aim_abstain", "not computed")
+    trails = entry.get("trails") or []
+    if not any(tr.get("p") for tr in trails):
+        miss["trails"] = "no ball travelled far enough to draw"
+    sv = s.get("_stroke") or {}
+    if not entry.get("stroke"):
+        miss["stroke"] = ((sv.get("reason") or "not measured") if sv
+                          else "not measured (pre-metrics session)")
+    if entry.get("outcome") == "miss" and not entry.get("tags"):
+        try:
+            from . import miss_tags
+            miss["tags"] = miss_tags.LAST_ABSTAIN or "tagger abstained"
+        except Exception:  # noqa: BLE001 - the reason is best-effort
+            miss["tags"] = "tagger abstained"
+    if miss:
+        entry["missing"] = miss
+
+
 def session_time_offset(reader) -> float:
     """How far the sidecar clock runs AHEAD of the video clock (seconds).
 
@@ -164,6 +191,7 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H,
         else None
     rest_v = sv.get("rest")
     Hf = np.linalg.inv(hinv)
+    s.setdefault("_aim_abstain", "no address frame decodable")
     for dt in (0.4, 1.0, 1.8):          # scan the address backwards
         if strike_v is not None:
             frame_t = max(0.0, float(strike_v) - dt)
@@ -180,6 +208,7 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H,
             cue = next((tr for tr in reader.tracks_at(tp)
                         if tr.number == 0), None)
         if cue is None:
+            s["_aim_abstain"] = "cue ball not tracked at address"
             continue
         cap.set(cv2.CAP_PROP_POS_MSEC, frame_t * 1000.0)
         ok, frame = cap.read()
@@ -188,6 +217,8 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H,
         rect = cv2.warpPerspective(frame, H, (700, 1300))
         got = detect_cue_aim(rect, (cue.x, cue.y), cue.radius)
         if got is None or got[1] < 0.35:
+            s["_aim_abstain"] = ("stick not visible at address" if got is None
+                                 else "stick below quality gate (occluded?)")
             continue
         ang, q, (ax, ay) = got
         ex, ey = aim_ray_end(ax, ay, ang, (30.0, 30.0, 670.0, 1270.0))
@@ -427,6 +458,7 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                         entry["tags"] = tg
             except Exception:  # noqa: BLE001 - tagging is enrichment
                 pass
+        _note_missing(entry, s)
         shots.append(entry)
     if aim_cap is not None:
         aim_cap.release()

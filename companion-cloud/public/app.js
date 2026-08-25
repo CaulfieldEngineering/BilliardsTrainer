@@ -2259,6 +2259,20 @@ function _syncTagRows() {
     b.classList.toggle("on", b.dataset.c === t.cut));
   [...$("sh-miss").querySelectorAll("button")].forEach(b =>
     b.classList.toggle("on", b.dataset.m === t.miss_side));
+  // the measured-or-abstained contract: absent fields say WHY, so a
+  // blank overlay is an explicit abstention, never a silent failure
+  const mm = (shots[cur] && shots[cur].missing) || null;
+  const mEl = $("sh-missing");
+  if (mm && Object.keys(mm).length) {
+    const label = { aim: "Aim line", trails: "Ball paths",
+                    stroke: "Stroke metrics", tags: "Miss analysis" };
+    mEl.textContent = Object.entries(mm)
+      .map(([k, v]) => `${label[k] || k}: not shown — ${v}`).join("\n");
+    mEl.style.whiteSpace = "pre-line";
+    mEl.style.display = "";
+  } else {
+    mEl.style.display = "none";
+  }
   // camera-measured stroke metrics (read-only row)
   const sv = (shots[cur] && shots[cur].stroke) || null;
   const row = $("sh-stroke");
