@@ -2237,7 +2237,8 @@ let target = null;    // the clip being corrected, FROZEN at sheet-open —
                       // which used to save the verdict to the wrong clip
 let prevMode = null;  // mode to restore when Details closes
 function setSheet(open) {
-  $("sheet").style.display = open ? "block" : "none";
+  $("sheet").style.display = open ? "flex" : "none";
+  $("sh-backdrop").style.display = open ? "block" : "none";
   $("nav").style.display = open ? "none" : "flex";
   $("lower").style.display = open ? "none" : "block";
   if (!open) {
@@ -2276,6 +2277,16 @@ function _syncTagRows() {
   // camera-measured stroke metrics (read-only row)
   const sv = (shots[cur] && shots[cur].stroke) || null;
   const row = $("sh-stroke");
+  const stay = $("sh-stay");
+  if (sv && sv.stay_down_s != null) {
+    stay.innerHTML = sv.stay_down_s.toFixed(1) + "s"
+      + "<small>STAYED DOWN" + (sv.popped_early ? " · POPPED EARLY" : "")
+      + "</small>";
+    stay.style.color = sv.popped_early ? "var(--scratch)" : "var(--text)";
+    stay.style.display = "";
+  } else {
+    stay.style.display = "none";
+  }
   if (sv && sv.stay_down_s != null) {
     const bits = [`stayed down ${sv.stay_down_s.toFixed(1)}s`];
     if (sv.popped_early) bits.push("⚠ popped up early");
@@ -2329,6 +2340,7 @@ $("correct").onclick = () => {
   setSheet(true);
   syncSheet();
 };
+$("sh-backdrop").onclick = () => $("sh-cancel").click();
 $("sh-cancel").onclick = () => setSheet(false);
 function syncSheet() {
   const s = target || {};

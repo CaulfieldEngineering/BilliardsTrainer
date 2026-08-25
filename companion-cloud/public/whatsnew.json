@@ -1,6 +1,18 @@
 {
  "entries": [
   {
+   "id": 34,
+   "date": "2026-08-25",
+   "title": "The shot Details sheet got a real design",
+   "body": "You called it the worst UI you'd ever seen - fair. It's now a proper bottom sheet: slides over the player instead of shoving the page under the clock, groups MEASURED data apart from YOUR CALL verdicts, shrinks the utility buttons to an icon row, and pins Cancel / Looks right / Save to a fixed footer. Your stay-down time shows as a big readout at the top of MEASURED - with a POPPED EARLY flag when it applies.",
+   "details": [
+    "Selected verdict buttons now fill solid green instead of a thin outline tint.",
+    "The abstention notes (why an aim line or metric is absent) sit inside the MEASURED group where they belong.",
+    "Tap the dimmed backdrop to close - same as Cancel.",
+    "This is the first slice of the phase-3 UI pass; the player itself is next."
+   ]
+  },
+  {
    "id": 33,
    "date": "2026-08-25",
    "title": "New ball-ID model promoted: 18% fewer misreads",
