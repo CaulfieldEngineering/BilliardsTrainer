@@ -31,11 +31,6 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
     False = transient failure, retry later."""
     from ..vision.actions import append_action
     from ..vision.analysis_cache import append_correction, sidecar_path
-    from ..vision.shots_export import (
-        export_library_index,
-        export_lifetime_stats,
-        export_shots_summary,
-    )
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -54,25 +49,13 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
     if isinstance(d.get("split"), (int, float)):
         import json as _json
 
-        from ..vision.actions import classify_and_mark
         from ..vision.analysis_cache import sidecar_path as _sp
-        from ..vision.outcomes import derive_and_correct
         with open(_sp(video), "a", encoding="utf-8") as fh:
             fh.write(_json.dumps({"type": "split",
                                   "start": round(start, 3),
                                   "at": round(float(d["split"]), 3)}) + "\n")
-        derive_and_correct(video)
-        classify_and_mark(video)
-        # a split changes shot boundaries — remeasure stroke metrics for
-        # the new shots (idempotent per-version; only new starts recompute)
-        try:
-            from ..vision.stroke_vision import annotate_session
-            annotate_session(video)
-        except Exception:  # noqa: BLE001 - metrics are enrichment
-            log.exception("stroke_vision after split failed")
-        export_shots_summary(video)
-        export_library_index(recordings)
-        export_lifetime_stats(recordings)
+        from ..vision.shot_pass import run_close_pass
+        run_close_pass(video)
         log.info("shot SPLIT: %s @ %.1fs at t=%.1fs", name, start,
                  float(d["split"]))
         return True
@@ -113,27 +96,21 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
         with open(_sp(video), "a", encoding="utf-8") as fh:
             fh.write(_json.dumps({"type": "reviewed",
                                   "start": round(start, 3)}) + chr(10))
-        export_shots_summary(video)
-        export_library_index(recordings)
-        export_lifetime_stats(recordings)
+        from ..vision.shot_pass import run_close_pass
+        run_close_pass(video)
         log.info("shot CONFIRMED reviewed: %s @ %.1fs", name, start)
         return True
     if d.get("clear"):
         import json as _json
 
-        from ..vision.actions import classify_and_mark
         from ..vision.analysis_cache import sidecar_path as _sp
-        from ..vision.outcomes import derive_and_correct
         with open(_sp(video), "a", encoding="utf-8") as fh:
             fh.write(_json.dumps({"type": "correction_clear",
                                   "start": round(start, 3)}) + "\n")
-        # re-derive right away so the cleared shot converges to the
+        # re-run the canonical pass so the cleared shot converges to the
         # machine's best answer instead of sitting on stale originals
-        derive_and_correct(video)
-        classify_and_mark(video)
-        export_shots_summary(video)
-        export_library_index(recordings)
-        export_lifetime_stats(recordings)
+        from ..vision.shot_pass import run_close_pass
+        run_close_pass(video)
         log.info("verdict CLEARED: %s @ %.1fs", name, start)
         return True
     did = False
@@ -164,9 +141,8 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
                                   "text": note, "src": "review"}) + "\n")
         did = True
     if did:
-        export_shots_summary(video)
-        export_library_index(recordings)
-        export_lifetime_stats(recordings)
+        from ..vision.shot_pass import run_close_pass
+        run_close_pass(video)
         log.info("phone verdict applied: %s @ %.1fs %s", name, start,
                  {k: d[k] for k in ("outcome", "action") if d.get(k)})
     return True

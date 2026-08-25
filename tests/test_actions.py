@@ -155,21 +155,35 @@ class TestActionAwareSurfaces:
 
 
 class TestClosePassWiring:
-    def test_controller_close_pass_classifies_actions(self):
-        """The post-recording daemon must run BOTH passes: outcomes and
-        action labels — a new recording is born fully labeled."""
+    """The close sequence lives in ONE place (vision/shot_pass.py) and
+    every finisher delegates to it — the three hand-copied variants had
+    already drifted once (the stroke pass reached session close weeks
+    after the others)."""
+
+    def test_canonical_pass_contains_every_stage(self):
         from pathlib import Path
 
-        import billiards_trainer.workers.controller as m
+        import billiards_trainer.vision.shot_pass as m
         src = Path(m.__file__).read_text(encoding="utf-8")
-        i = src.find("def _derive")
-        assert i > 0 and "classify_and_mark" in src[i:i + 1200], \
-            "session-close pass lost action classification"
+        for stage in ("derive_and_correct", "classify_and_mark",
+                      "annotate_session", "export_shots_summary",
+                      "export_lifetime_stats"):
+            assert stage in src, f"canonical close pass lost {stage}"
 
-    def test_backfill_runs_both_passes(self):
+    def test_all_finishers_delegate(self):
         from pathlib import Path
+
+        import billiards_trainer.companion.corrections_watcher as w
+        import billiards_trainer.workers.controller as c
+        for mod, where in ((c, "session close"), (w, "verdict watcher")):
+            src = Path(mod.__file__).read_text(encoding="utf-8")
+            assert "run_close_pass" in src, f"{where} bypasses shot_pass"
+        i = Path(c.__file__).read_text(encoding="utf-8").find("def _derive")
+        body = Path(c.__file__).read_text(encoding="utf-8")[i:i + 800]
+        assert "classify_and_mark" not in body, \
+            "session close re-grew a hand copy of the pass"
         src = Path("tools/build_analysis_cache.py").read_text(encoding="utf-8")
-        assert "derive_and_correct" in src and "classify_and_mark" in src
+        assert "run_close_pass" in src, "backfill bypasses shot_pass"
 
 
 class TestQuietShuffle:

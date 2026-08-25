@@ -859,36 +859,15 @@ class PipelineController(QObject):
         video = self._recording_path
 
         def _derive() -> None:
+            # ONE canonical close pass (vision/shot_pass.py) — this body
+            # was one of three hand-copied variants that had already
+            # drifted once. Stage details/order live there now.
             try:
-                from ..vision.outcomes import derive_and_correct
-                n = derive_and_correct(video)
-                if n:
-                    log.info("session close: %d outcome(s) re-derived for %s",
-                             n, video)
-                # Joe's hierarchy #1 rides the same close pass: label every
-                # event stroke/break/ball_in_hand/nothing so relocations
-                # never pollute the finished session's shots.
-                from ..vision.actions import classify_and_mark
-                counts = classify_and_mark(video)
-                non = {k: v for k, v in counts.items() if k != "stroke"}
-                if non:
-                    log.info("session close: actions labeled for %s: %s",
-                             video, counts)
-                # Camera-measured stroke metrics (stay-down / backstroke /
-                # pause) — before export so shots.json carries them. The
-                # pass streams video and costs ~real-time per shot window;
-                # it runs on this daemon thread, never the recording path.
-                try:
-                    from ..vision.stroke_vision import annotate_session
-                    annotate_session(video)
-                except Exception:  # noqa: BLE001 - metrics are enrichment
-                    log.exception("stroke_vision pass failed")
-                # Phone summary rides Dropbox sync to the cloud review app.
-                from ..vision.shots_export import export_library_index, export_shots_summary
-                export_shots_summary(video)
-                export_library_index(_P(video).parent)
+                from ..vision.shot_pass import run_close_pass
+                out = run_close_pass(video)
+                log.info("session close pass for %s: %s", video, out)
             except Exception:  # noqa: BLE001 - never disturb the app
-                log.exception("post-recording outcome derivation failed")
+                log.exception("session close pass failed")
 
         threading.Thread(target=_derive, name="derive-outcomes",
                          daemon=True).start()

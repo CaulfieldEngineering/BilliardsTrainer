@@ -88,16 +88,9 @@ def build(video: Path, force: bool = False) -> bool:
     # Post-passes, same as a live session close: identity-derived outcomes
     # (11/11 vs frame truth) and action labels (stroke / break /
     # ball_in_hand / nothing), so a backfilled sidecar is born complete.
-    from billiards_trainer.vision.actions import classify_and_mark
-    from billiards_trainer.vision.outcomes import derive_and_correct
-    n = derive_and_correct(video)
-    counts = classify_and_mark(video)
-    from billiards_trainer.vision.stroke_vision import annotate_session
-    annotate_session(video)
-    from billiards_trainer.vision.shots_export import export_library_index, export_shots_summary
-    export_shots_summary(video)
-    export_library_index(Path(video).parent)
-    print(f"    outcomes re-derived: {n}; actions: {counts}")
+    from billiards_trainer.vision.shot_pass import run_close_pass
+    out = run_close_pass(video)
+    print(f"    close pass: {out}")
     return True
 
 
