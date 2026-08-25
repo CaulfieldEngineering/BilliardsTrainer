@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 33,
+   "date": "2026-08-25",
+   "title": "New ball-ID model promoted: 18% fewer misreads",
+   "body": "The challenger trained on the newly-mined layouts beat the champion on strictly held-out sessions - 18% fewer out-of-game number claims with coverage unchanged - and is now live. It's the first promotion since c5, and the first payoff from unblocking the layout miner.",
+   "details": [
+    "Judged fairly: identical 24 sessions for both models, every session that contributed training data excluded, so the win can't be memorization.",
+    "The old champion is archived one copy away for instant rollback.",
+    "Next accuracy lever: the starved stripe balls (10 and 12 still have one training example each) - one minute of a racked 8-ball game on camera feeds them automatically now."
+   ]
+  },
+  {
    "id": 32,
    "date": "2026-08-25",
    "title": "Found it: one clock bug behind everything tonight",

@@ -307,6 +307,10 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
     shots = []
     for s in reader.shots:
         entry = {
+            # the PROTOCOL KEY: sidecar-clock start, stable across the
+            # one-clock display shift (phone normalizes start/end into
+            # video time at load; corrections/splits/slow-mo post this)
+            "key": round(float(s.get("start", 0.0)), 2),
             "start": round(float(s.get("start", 0.0)), 2),
             "end": round(float(s.get("end", 0.0)), 2),
             "outcome": s.get("outcome", "miss"),
