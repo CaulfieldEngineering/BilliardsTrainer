@@ -140,3 +140,47 @@ class TestVideoTimeOffset:
                              start_t=5.0, end_t=6.0))
         w.close()
         assert SidecarReader(video).video_time_offset() == 0.0
+
+
+class TestStripeRepairPromotionOnly:
+    """The stripe->solid demotion flipped true 9s to 1s on corrected-
+    exposure footage (raw c7: 15/15 gameplay 9s right; ensemble with
+    demotion: 9 of them returned as 1). The repair may only PROMOTE."""
+
+    def test_no_demotion_path_remains(self):
+        import inspect
+
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        src = inspect.getsource(FindIdEnsemble._fix_stripe_bit)
+        assert "n - 8" not in src, "stripe->solid demotion re-grew"
+
+    def test_promotes_clear_stripe(self):
+        import numpy as np
+
+        from billiards_trainer.core.types import BallClass
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+
+        class F:
+            x, y, radius = 30.0, 30.0, 14.0
+            number, cls, bgr = 1, BallClass.SOLID, (0, 0, 0)
+        # synthetic 9: white band across a yellow ball
+        img = np.zeros((60, 60, 3), np.uint8)
+        img[:] = (200, 120, 30)                     # felt-ish
+        import cv2
+        cv2.circle(img, (30, 30), 14, (40, 200, 235), -1)   # yellow ball
+        img[22:38, 16:45] = (250, 250, 250)                 # white band
+        FindIdEnsemble._fix_stripe_bit(img, F)
+        assert F.number == 9 and F.cls == BallClass.STRIPE
+
+    def test_never_demotes_a_stripe_claim(self):
+        import numpy as np
+
+        from billiards_trainer.core.types import BallClass
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+
+        class F:
+            x, y, radius = 30.0, 30.0, 14.0
+            number, cls, bgr = 9, BallClass.STRIPE, (0, 0, 0)
+        img = np.zeros((60, 60, 3), np.uint8)       # all-dark crop: zero white
+        FindIdEnsemble._fix_stripe_bit(img, F)
+        assert F.number == 9, "a model stripe answer must never be demoted"

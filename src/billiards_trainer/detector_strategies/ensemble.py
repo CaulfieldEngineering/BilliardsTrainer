@@ -313,23 +313,29 @@ class FindIdEnsemble(DetectorStrategy):
         cue is all-white so it would always read as a stripe.
         """
         n = f.number
-        if n is None or n <= 0 or n > 15 or n == 8:
-            return
+        # PROMOTION ONLY (2026-08-26). The stripe->solid DEMOTION branch
+        # was calibrated on old glare-era footage where a washed-out 9
+        # measured stripe-white; on the corrected 1/320 exposure a band-up
+        # 9 measures white_frac ~0.19 — under the solid threshold — and
+        # the demotion flipped TRUE 9s into 1s. Attribution chain, fully
+        # measured: raw c7 answers 9 on 15/15 gameplay 9s; the ensemble
+        # WITH demotion returned 1 for nine of them. Promotion-only,
+        # gated on three labelled sets:
+        #   gameplay (s11/s12): 9-ball 40%->100%, overall 87%->100%
+        #   racks (s7-s10):     9-ball 52%->67%, overall 83%->84%
+        #   old-era archive:    stripes 81%->89%, overall 95%->94% (the
+        #     1 gives back model-said-9 repairs there — archived footage
+        #     the live path never re-analyzes; accepted)
+        if n is None or n <= 0 or n > 7:
+            return                     # only a solid can be promoted
         rr = max(2, int(round(f.radius)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
         crop = frame_bgr[y0:int(f.y) + rr + 1, x0:int(f.x) + rr + 1]
         if crop.size == 0:
             return
-        reads_stripe = stripe_reading(crop)
-        if reads_stripe is None:
-            return
-        if reads_stripe and n <= 7:
+        if stripe_reading(crop) is True:
             f.number, f.cls = n + 8, BallClass.STRIPE
-        elif not reads_stripe and n >= 9:
-            f.number, f.cls = n - 8, BallClass.SOLID
-        else:
-            return
-        f.bgr = pool_ball_bgr(f.number)
+            f.bgr = pool_ball_bgr(f.number)
 
 
 def _build():
