@@ -309,6 +309,24 @@ class SidecarReader:
         return len(self._times)
 
     # ------------------------------------------------------------------ #
+    def video_time_offset(self) -> float:
+        """How far this sidecar's clock runs AHEAD of its video (seconds).
+
+        Sessions recorded before the 2026-08-25 origin fix anchored their
+        t0 on a stale frame during the recording restart, so sidecar times
+        sit ~1.8-3.3s later than the same events on the video. Measured
+        per shot by the stroke pass (strike = video clock); the session
+        median is robust to the odd late detection. Sessions born after
+        the origin fix (and sessions without stroke records) return 0."""
+        if not hasattr(self, "_vt_off"):
+            ds = sorted(
+                float(s["start"]) - float(s["_stroke"]["strike"])
+                for s in self.shots
+                if s.get("_stroke") and s["_stroke"].get("strike") is not None
+                and s["_stroke"].get("confidence") == "high")
+            self._vt_off = round(ds[len(ds) // 2], 2) if len(ds) >= 3 else 0.0
+        return self._vt_off
+
     def tracks_at(self, t: float) -> list[Track]:
         """Interpolated track list for media time ``t`` (seconds)."""
         if not self._times:

@@ -280,7 +280,15 @@ class PipelineController(QObject):
                     reader = SidecarReader(source_spec)
                     if self._pipeline is not None:
                         self._pipeline.playback_cache = reader
-                    self.cached_shots.emit(list(reader.shots))
+                    off = reader.video_time_offset()
+                    # rows in VIDEO time (seeks/lane/hover align with the
+                    # picture); 'key' keeps the sidecar clock for the
+                    # correction channel
+                    self.cached_shots.emit([
+                        {**s, "key": s.get("start", 0.0),
+                         "start": max(0.0, float(s.get("start", 0.0)) - off),
+                         "end": max(0.0, float(s.get("end", 0.0)) - off)}
+                        for s in reader.shots])
                     # the compute-once overlay geometry (aim lines, ball
                     # paths) rides the SAME summary the phone reads — the
                     # two surfaces can never disagree (Joe's requirement)

@@ -240,7 +240,11 @@ class Pipeline:
         perspective overlay is cheap enough for every frame."""
         calib = self.calib.calib
         ui = self.settings.ui
-        tracks = self.playback_cache.tracks_at(t)
+        # ONE CLOCK: t is VIDEO time; pre-origin-fix sidecars run ahead of
+        # it — query in the sidecar's own clock or the drawn state trails
+        # the picture by the session's offset (2026-08-25)
+        tracks = self.playback_cache.tracks_at(
+            t + self.playback_cache.video_time_offset())
         res.status = "tracking"
         res.tracks = tracks
         res.n_balls = len(tracks)

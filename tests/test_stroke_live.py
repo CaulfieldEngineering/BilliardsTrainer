@@ -114,3 +114,29 @@ class TestOneClockOrigin:
         s._start = lambda: None
         s._restart()
         assert s.read() is None, "stale frame served through a restart"
+
+
+class TestVideoTimeOffset:
+    def test_median_of_high_confidence_strikes(self, tmp_path):
+        video = tmp_path / "session-off.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_frame(0.0, [_track(1, 100.0, 200.0)])
+        for i, (start, strike, conf) in enumerate([
+                (10.0, 7.6, "high"), (20.0, 17.5, "high"),
+                (30.0, 27.4, "high"), (40.0, 20.0, "low")]):  # low ignored
+            w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=0,
+                                 start_t=start, end_t=start + 1.0))
+            w.add_stroke({"type": "stroke_vision", "v": 1, "start": start,
+                          "strike": strike, "confidence": conf})
+        w.close()
+        r = SidecarReader(video)
+        assert abs(r.video_time_offset() - 2.5) < 0.11   # median of 2.4/2.5/2.6
+
+    def test_zero_without_enough_records(self, tmp_path):
+        video = tmp_path / "session-none.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_frame(0.0, [_track(1, 100.0, 200.0)])
+        w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=0,
+                             start_t=5.0, end_t=6.0))
+        w.close()
+        assert SidecarReader(video).video_time_offset() == 0.0

@@ -136,12 +136,8 @@ def session_time_offset(reader) -> float:
     each strike ON THE VIDEO (cue-ball vanish), so sidecar_start - strike
     measures the offset per shot; the session's median is robust to the
     handful of genuinely late shot detections."""
-    ds = sorted(
-        float(s["start"]) - float(s["_stroke"]["strike"])
-        for s in getattr(reader, "shots", [])
-        if s.get("_stroke") and s["_stroke"].get("strike") is not None
-        and s["_stroke"].get("confidence") == "high")
-    return round(ds[len(ds) // 2], 2) if len(ds) >= 3 else 0.0
+    fn = getattr(reader, "video_time_offset", None)
+    return fn() if callable(fn) else 0.0
 
 
 def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H,

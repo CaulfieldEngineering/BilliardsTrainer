@@ -343,7 +343,7 @@ class ShotListPanel(QWidget):
         shot = self._shots[row]          # shared dict: flows to every view
         shot["outcome"] = outcome
         shot["corrected"] = True
-        self.outcome_corrected.emit(float(shot.get("start", 0.0)), outcome)
+        self.outcome_corrected.emit(float(shot.get("key", shot.get("start", 0.0))), outcome)
         self._render()                   # NOT set_shots: keep the full list
 
     def _step(self, delta: int) -> None:
