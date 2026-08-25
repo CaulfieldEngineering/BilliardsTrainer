@@ -1,6 +1,18 @@
 {
  "entries": [
   {
+   "id": 32,
+   "date": "2026-08-25",
+   "title": "Found it: one clock bug behind everything tonight",
+   "body": "The analysis clock ran ~3 seconds behind the video - every symptom you hit inherited it. Trails animated seconds after the balls had stopped. Aim lines were computed on mid-shot frames (wrong line, or no line at all). Slow-mo clips cut at the skewed time and started mid-shot. All timestamps are now anchored to the video itself, per shot, using each shot's frame-verified strike moment.",
+   "details": [
+    "Your @58 shot now has its aim line. Tonight's session re-verified server-side: shot 3's line lies exactly along the stick, through the cue ball, stopping at the 4.",
+    "The jittery move-stop-move tail is fixed too (the overlay clock could step backwards between frames; it can't now).",
+    "Tonight's session is fully corrected; the rest of the library retrofits overnight.",
+    "This is phase 1 of the cleanup you called for. Phase 2 makes every shot go through ONE identical pipeline the moment it completes - no more some-shots-analyzed-some-not. Phase 3 is the UI redesign."
+   ]
+  },
+  {
    "id": 31,
    "date": "2026-08-25",
    "title": "Trails and aim lines stay glued to the right shot",

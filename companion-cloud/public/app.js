@@ -1,5 +1,33 @@
 const BUILD = "__BUILD_ID__";
 const PRE_ROLL = 5.0;
+// ONE CLOCK (2026-08-24): shots.json carries doc.t_offset = how far the
+// analysis clock ran AHEAD of the video for that session. Normalize every
+// time field into VIDEO time once at load; keep the original sidecar time
+// as s.key for everything protocol-facing (corrections, splits, slow-mo,
+// playlists, shot IDs) so server-side records stay stable.
+function K(s) { return s.key != null ? s.key : s.start; }
+function normalizeShots(doc) {
+  const off = doc.t_offset || 0;
+  const list = doc.shots || [];
+  list.forEach(s => {
+    if (s.key == null) {
+      s.key = s.start;
+      // per-shot beats the session median: detection lag varies by shot,
+      // and this shot's own video-verified strike pins its offset exactly
+      const strike = s.stroke && s.stroke.strike;
+      const o = (strike != null && Math.abs(s.start - strike) < 8)
+        ? (s.start - strike) : off;
+      if (o) {
+        s.start = Math.max(0, s.start - o);
+        s.end = Math.max(0, (s.end || s.start) - o);
+        (s.trails || []).forEach(tr => (tr.p || []).forEach(pt => {
+          pt[0] = Math.max(0, pt[0] - o);
+        }));
+      }
+    }
+  });
+  return list;
+}
 const $ = id => document.getElementById(id);
 $("build").textContent = BUILD.slice(0, 10);
 
@@ -411,10 +439,12 @@ async function openPlaylist(pl) {
   for (const [sess, clips] of Object.entries(bySess)) {
     try {
       const d = await api("/api/shots?name=" + encodeURIComponent(sess));
+      const list = normalizeShots(d);   // playlists store sidecar keys
       clips.forEach(c => {
-        const m = (d.shots || []).find(x =>
-          Math.abs(x.start - c.start) < 1.5
-          || (x.start - 1 <= c.start && c.start <= (x.end || x.start) + 1));
+        const m = list.find(x =>
+          Math.abs(K(x) - c.start) < 1.5
+          || (K(x) - 1 <= c.start
+              && c.start <= K(x) + Math.max(0, (x.end || 0) - x.start) + 1));
         if (m) c._resolved = { ...m, _session: sess };
       });
     } catch (e) { /* session summary unreachable: clips stay unresolved */ }
@@ -445,14 +475,14 @@ async function openSession(s) {
                  : Promise.resolve({ shots: [] }),
     ]);
     $("video").src = linkD.link;
-    shots = shotsD.shots || [];
+    shots = normalizeShots(shotsD);
     // verdicts saved from THIS phone survive the summary round-trip lag:
     // overlay them until the server copy carries the corrected flag
     try {
       const ov = JSON.parse(localStorage.getItem("verdicts") || "{}");
       let dirty = false;
       shots.forEach(s => {
-        const k = curSession + "@" + s.start;
+        const k = curSession + "@" + K(s);
         if (ov[k]) {
           if (s.corrected) { delete ov[k]; dirty = true; }
           else Object.assign(s, ov[k]);
@@ -1193,7 +1223,7 @@ if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
     if (meta && !$("video").seeking) { vfcT = meta.mediaTime; vfcWall = performance.now(); }
     $("video").requestVideoFrameCallback(ovClock);
   })();
-let _ctLast = -1, _ctWall = 0;
+let _ctLast = -1, _ctWall = 0, _phMono = -1;
 // Invalidate BOTH clock stamps on every seek and on src swaps, from any
 // source (gotoShot assigns currentTime directly and never went through
 // requestSeek's reset): a still-fresh pre-seek frame stamp made
@@ -1201,24 +1231,39 @@ let _ctLast = -1, _ctWall = 0;
 // of a slow seek — the previous shot's trails animated across the
 // screen while the new shot buffered (Joe: "trails that have absolutely
 // nothing to do with the current shots. Super lag?").
-$("video").addEventListener("seeking", () => { vfcT = -1; _ctLast = -1; });
+$("video").addEventListener("seeking", () => { vfcT = -1; _ctLast = -1; _phMono = -1; });
 $("video").addEventListener("loadstart", () => {
-  vfcT = -1; _ctLast = -1;
+  vfcT = -1; _ctLast = -1; _phMono = -1;
   _trailCache = { key: "", trails: [] };   // stamps AND cache die with the src
   seekBusy = false; seekPending = null;    // a pending seek must not replay on a new src
 });
 function playheadTime(v) {
   const now = performance.now();
-  if (vfcT >= 0 && !v.paused && now - vfcWall < 300)
-    return vfcT + (now - vfcWall) / 1000 * (v.playbackRate || 1);
-  // rVFC stale or unsupported: currentTime itself only updates ~4x/s on
-  // iOS — extrapolate from its last observed CHANGE so the clock still
-  // advances every frame instead of stepping quarter-second chunks
-  const ct = v.currentTime;
-  if (ct !== _ctLast) { _ctLast = ct; _ctWall = now; }
-  if (!v.paused && now - _ctWall < 400)
-    return ct + (now - _ctWall) / 1000 * (v.playbackRate || 1);
-  return ct;
+  let out;
+  if (vfcT >= 0 && !v.paused && now - vfcWall < 300) {
+    out = vfcT + (now - vfcWall) / 1000 * (v.playbackRate || 1);
+  } else {
+    // rVFC stale or unsupported: currentTime itself only updates ~4x/s on
+    // iOS — extrapolate from its last observed CHANGE so the clock still
+    // advances every frame instead of stepping quarter-second chunks
+    const ct = v.currentTime;
+    if (ct !== _ctLast) { _ctLast = ct; _ctWall = now; }
+    out = (!v.paused && now - _ctWall < 400)
+      ? ct + (now - _ctWall) / 1000 * (v.playbackRate || 1)
+      : ct;
+  }
+  // MONOTONIC while playing: extrapolation can land AHEAD of the next
+  // real stamp, and returning the smaller value made the trail tip
+  // advance-freeze-advance (Joe: "moves, stops, moves, stops"). Hold the
+  // high-water mark for sub-second corrections; real jumps (seeks) reset
+  // via the seeking/loadstart listeners.
+  if (!v.paused) {
+    if (_phMono >= 0 && out < _phMono && _phMono - out < 1.0) out = _phMono;
+    else _phMono = out;
+  } else {
+    _phMono = -1;
+  }
+  return out;
 }
 
 // A render loop, not timeupdate: iOS fires timeupdate ~4x/s and the
@@ -1830,7 +1875,7 @@ function ovOpen(open) {
 // re-requesting.
 function rifeNameFor(s2) {
   const sess = (s2._session || curSession || "").replace(/\.mp4$/, "");
-  return `slowmo-${sess}-${Math.round(s2.start)}.mp4`;
+  return `slowmo-${sess}-${Math.round(K(s2))}.mp4`;
 }
 function findSlowmo(s2) {
   if (!s2 || s2._slowmo) return null;
@@ -1859,8 +1904,8 @@ $("pl-save").onclick = () => {
     const t = ls.find(p => p.id === pl.id) || pl;
     const sess = s._session || curSession;
     if (!t.clips.some(c => c.session === sess
-        && Math.abs(c.start - s.start) < 0.5))
-      t.clips.push({ session: sess, start: s.start });
+        && Math.abs(c.start - K(s)) < 0.5))
+      t.clips.push({ session: sess, start: K(s) });
     t.mod = Date.now();
     if (!ls.some(p => p.id === t.id)) ls.push(t);
     PL.save(ls);
@@ -1901,7 +1946,9 @@ $("rife-req").onclick = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session: s2._session || curSession,
-                             start: s2.start, end: s2.end, rife: true }),
+                             start: K(s2),
+                             end: K(s2) + Math.max(0, s2.end - s2.start),
+                             rife: true }),
     });
     $("rife-req").textContent = "✓ Queued";
   } catch (e) {
@@ -2143,7 +2190,7 @@ function shotId(s2) {
   // small re-segmentation drift via the reader's containment matching.
   const sess = ((s2 && s2._session) || curSession || "")
     .replace(/^session-/, "").replace(/\.mp4$/, "");
-  return `${sess}@${Math.round((s2 && s2.start) || 0)}`;
+  return `${sess}@${Math.round((s2 && K(s2)) || 0)}`;  // sidecar key: IDs stay stable
 }
 $("sh-split").onclick = async () => {
   if (!target) return;
@@ -2160,8 +2207,9 @@ $("sh-split").onclick = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session: target._session || curSession,
-                             start: target.start,
-                             split: Math.round(t * 100) / 100 }),
+                             start: K(target),
+                             split: Math.round((t + (K(target) - target.start))
+                                               * 100) / 100 }),
     });
     $("sh-split").textContent = "✓ Split queued";
   } catch (e) {
@@ -2234,7 +2282,7 @@ function _syncTagRows() {
   s0.tags.cut = b.dataset.c; s0.tags.confidence = "review";
   _syncTagRows();
   await api("/api/correct", { method: "POST", body: {
-    session: curSession, start: s0.start, cut: b.dataset.c } });
+    session: curSession, start: K(s0), cut: b.dataset.c } });
 });
 [...document.querySelectorAll("#sh-miss button")].forEach(b => b.onclick = async () => {
   const s0 = shots[cur]; if (!s0) return;
@@ -2242,7 +2290,7 @@ function _syncTagRows() {
   s0.tags.miss_side = b.dataset.m; s0.tags.confidence = "review";
   _syncTagRows();
   await api("/api/correct", { method: "POST", body: {
-    session: curSession, start: s0.start, miss_side: b.dataset.m } });
+    session: curSession, start: K(s0), miss_side: b.dataset.m } });
 });
 
 $("correct").onclick = () => {
@@ -2285,7 +2333,7 @@ async function postVerdict(s, body, optimistic) {
   Object.assign(s, optimistic);
   try {   // survive refetch until the server copy reflects it
     const ov = JSON.parse(localStorage.getItem("verdicts") || "{}");
-    const k = curSession + "@" + s.start;
+    const k = curSession + "@" + K(s);
     if (body.clear) delete ov[k]; else ov[k] = optimistic;
     localStorage.setItem("verdicts", JSON.stringify(ov));
   } catch (e) { /* best-effort */ }
@@ -2295,7 +2343,7 @@ async function postVerdict(s, body, optimistic) {
     const r = await fetch("/api/correct", {
       method: "POST",
       headers: { "x-key": KEY || "", "Content-Type": "application/json" },
-      body: JSON.stringify({ session: curSession, start: s.start, ...body }),
+      body: JSON.stringify({ session: curSession, start: K(s), ...body }),
     });
     if (!r.ok) throw new Error(r.status);
     $("correct").textContent = "✓ saved — syncs to the PC via Dropbox";

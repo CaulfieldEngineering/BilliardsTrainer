@@ -28,7 +28,8 @@ import numpy as np
 #:   2 = full-shaft robust total-least-squares (Joe: "use as much of the
 #:       visible cue as possible")
 #:   3 = ray stops at the first ball it would hit, instead of the rail
-AIM_VERSION = 3
+AIM_VERSION = 5   # v5: anchored from the stroke record's own strike time +
+                  # verified cue rest position (v3 mid-flight; v4 median-offset)
 
 #: minimum Hough segment length (rect px) — arms produce short curly
 #: edges at this threshold; the stick produces 100-400px runs

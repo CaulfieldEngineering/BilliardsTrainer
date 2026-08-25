@@ -123,7 +123,29 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     return result
 
 
-def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
+def session_time_offset(reader) -> float:
+    """How far the sidecar clock runs AHEAD of the video clock (seconds).
+
+    Measured 2026-08-24 (Joe's night of 'timings are all wrong'): the
+    sidecar's t0 rebase lags the recording start, so sidecar times sit
+    ~1.8-3.0s LATER than the same events on the video. Every consumer
+    that maps sidecar times onto video frames inherited it: trails
+    animated after the balls had stopped, aim lines were computed on
+    mid-flight frames (wrong anchor, or no stick found = missing line),
+    slow-mo clips started mid-shot. The stroke-vision pass re-detects
+    each strike ON THE VIDEO (cue-ball vanish), so sidecar_start - strike
+    measures the offset per shot; the session's median is robust to the
+    handful of genuinely late shot detections."""
+    ds = sorted(
+        float(s["start"]) - float(s["_stroke"]["strike"])
+        for s in getattr(reader, "shots", [])
+        if s.get("_stroke") and s["_stroke"].get("strike") is not None
+        and s["_stroke"].get("confidence") == "high")
+    return round(ds[len(ds) // 2], 2) if len(ds) >= 3 else 0.0
+
+
+def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H,
+              t_off: float = 0.0) -> dict | None:
     """Where the cue STICK pointed at address, as a video-normalized
     segment. Computed ONCE here — desktop and phone draw this same
     stored geometry, so the two can never disagree (Joe's requirement).
@@ -136,13 +158,34 @@ def _shot_aim(cap, reader: SidecarReader, s: dict, tf: dict, H) -> dict | None:
     t0 = float(s.get("start", 0.0))
     hinv = np.asarray(tf["hinv"], dtype=float)
     w, h = float(tf["w"]), float(tf["h"])
+    # PER-SHOT truth beats the session median: the stroke pass verified
+    # this shot's strike time (video clock) and the cue's resting position
+    # (video px) frame-by-frame. Detection lag varies shot to shot, so a
+    # median-offset scan can still land mid-flight; the stroke record
+    # cannot. Fall back to the median path when no stroke record exists.
+    sv = s.get("_stroke") or {}
+    strike_v = sv.get("strike") if sv.get("confidence") in ("high", "low") \
+        else None
+    rest_v = sv.get("rest")
+    Hf = np.linalg.inv(hinv)
     for dt in (0.4, 1.0, 1.8):          # scan the address backwards
-        tp = max(0.0, t0 - dt)
-        cue = next((tr for tr in reader.tracks_at(tp) if tr.number == 0),
-                   None)
+        if strike_v is not None:
+            frame_t = max(0.0, float(strike_v) - dt)
+        else:
+            frame_t = max(0.0, t0 - dt - t_off)
+        tp = max(0.0, t0 - dt)          # sidecar clock, for track lookups
+        if rest_v is not None:
+            rv = Hf @ np.array([float(rest_v[0]), float(rest_v[1]), 1.0])
+            cue_r = next((tr.radius for tr in reader.tracks_at(tp)
+                          if tr.number == 0), 16.0)
+            cue = type("C", (), {"x": rv[0] / rv[2], "y": rv[1] / rv[2],
+                                 "radius": float(cue_r)})()
+        else:
+            cue = next((tr for tr in reader.tracks_at(tp)
+                        if tr.number == 0), None)
         if cue is None:
             continue
-        cap.set(cv2.CAP_PROP_POS_MSEC, tp * 1000.0)
+        cap.set(cv2.CAP_PROP_POS_MSEC, frame_t * 1000.0)
         ok, frame = cap.read()
         if not ok:
             continue
@@ -260,6 +303,7 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             space = space_for_video(video_path, reader)
     except Exception:  # noqa: BLE001 - tagging is enrichment
         space = None
+    t_off = session_time_offset(reader)
     shots = []
     for s in reader.shots:
         entry = {
@@ -281,7 +325,8 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             # BLE cue sensor (back_depth, pause, finish) for later fusion
             entry["stroke"] = {k: sv[k] for k in (
                 "stay_down_s", "popped_early", "back_depth_px", "pause_ms",
-                "delivery_ms", "practice_strokes", "confidence") if k in sv}
+                "delivery_ms", "practice_strokes", "confidence",
+                "strike") if k in sv}
         desc = None
         try:
             from .describe import compose_text, describe_shot
@@ -324,7 +369,7 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
                             aim_cap = cv2.VideoCapture(str(video_path))
                             aim_H = np.linalg.inv(
                                 np.asarray(tf["hinv"], dtype=float))
-                        aim = _shot_aim(aim_cap, reader, s, tf, aim_H)
+                        aim = _shot_aim(aim_cap, reader, s, tf, aim_H, t_off)
                         if aim:
                             entry["aim"] = aim
             except Exception:  # noqa: BLE001 - aim is enrichment
@@ -387,6 +432,7 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
         aim_cap.release()
     doc = {
         "v": 2 if tf is not None else 1,
+        "t_offset": t_off,
         "transform": tf,
         "session": Path(video_path).name,
         "duration_s": round(reader._times[-1], 1) if reader._times else 0.0,

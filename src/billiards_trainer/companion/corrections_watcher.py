@@ -90,7 +90,17 @@ def apply_correction_file(path: Path, recordings: Path) -> bool:
             return False
         from .rife_render import add_to_slowmo_playlist, render_slowmo
         end = float(d.get("end", start + 8.0))
-        out = render_slowmo(video, start, end)
+        # start/end arrive in SIDECAR clock (the correction key); the video
+        # runs t_off behind it — uncorrected cuts started mid-shot (Joe:
+        # "the slow mo ... starts halfway through the shot I requested")
+        try:
+            from ..vision.analysis_cache import SidecarReader
+            from ..vision.shots_export import session_time_offset
+            t_off = session_time_offset(SidecarReader(video))
+        except Exception:  # noqa: BLE001 - offset is best-effort
+            t_off = 0.0
+        out = render_slowmo(video, max(0.0, start - t_off),
+                            max(0.0, end - t_off))
         if out is not None:
             label = f"{name.replace('.mp4', '')} @{int(start)}s"
             add_to_slowmo_playlist(recordings, out.name, label)
