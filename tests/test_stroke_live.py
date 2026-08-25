@@ -121,9 +121,9 @@ class TestVideoTimeOffset:
         video = tmp_path / "session-off.mp4"
         w = SidecarWriter(video, {"fps": 30.0})
         w.add_frame(0.0, [_track(1, 100.0, 200.0)])
-        for i, (start, strike, conf) in enumerate([
+        for start, strike, conf in [
                 (10.0, 7.6, "high"), (20.0, 17.5, "high"),
-                (30.0, 27.4, "high"), (40.0, 20.0, "low")]):  # low ignored
+                (30.0, 27.4, "high"), (40.0, 20.0, "low")]:  # low ignored
             w.add_shot(ShotEvent(outcome=ShotOutcome.MAKE, num_pocketed=0,
                                  start_t=start, end_t=start + 1.0))
             w.add_stroke({"type": "stroke_vision", "v": 1, "start": start,
