@@ -1,6 +1,18 @@
 {
  "entries": [
   {
+   "id": 31,
+   "date": "2026-08-25",
+   "title": "Trails and aim lines stay glued to the right shot",
+   "body": "You caught it exactly: during laggy loads, the overlay clock kept running from the previous position, so the previous shot's (perfectly drawn) trail animated over the wrong footage - and aim lines could show for a shot the picture hadn't reached yet. The player now refuses to draw any overlay while the picture can't match it, and every navigation resets the overlay clock.",
+   "details": [
+    "Root cause 1: jumping between shots bypassed the overlay clock's reset, so during a slow seek it extrapolated from the old position - the old trail kept animating until the new shot's first frame arrived.",
+    "Root cause 2: in playlists that hop between session videos, a cached trail from the same shot NUMBER in the previous session could be reused. The cache now knows which session it belongs to.",
+    "New rule everywhere: mid-seek, mid-load, or mid-swap, the overlay layer goes blank instead of guessing - same philosophy as detection's 'show nothing rather than something wrong'.",
+    "An adversarial review of the whole overlay timing system also caught and fixed: stale scrub seeks replaying after navigation, the frame-scrubber serving another session's cached frames after a playlist hop, and background frame-warming making overlays flicker while paused."
+   ]
+  },
+  {
    "id": 30,
    "date": "2026-08-24",
    "title": "You were right: quick pop-ups go with misses",

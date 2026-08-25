@@ -498,10 +498,20 @@ function buildChips() {
     c.appendChild(el);
   });
 }
+let swapInFlight = false;  // cur names the DESTINATION; picture may lag it
 async function gotoShot(i, play) {
   if (i < 0 || i >= shots.length) return;
   cur = i;
   const s = shots[i];
+  // Until the seek (and any src swap) lands, the picture is the OLD
+  // shot — overlays for shots[cur] over that picture were the "trails
+  // that have nothing to do with the current shot" bug. The tick blanks
+  // overlays and holds auto-advance while this flag is up.
+  swapInFlight = true;
+  Warmer.stop(false);                    // its restore would yank us back
+  seekBusy = false; seekPending = null;  // parked scrub seek must not replay
+  if (s._session && s._session !== curSession && !$("video").paused)
+    $("video").pause();                  // old audio/motion stops during the fetch
   // playlist clips can live in DIFFERENT session videos: swap the src
   // (spinner shows via the existing loading UI) before seeking
   if (s._slowmo) {
@@ -518,12 +528,13 @@ async function gotoShot(i, play) {
         s.end = $("video").duration || 20;
       } catch (e) { /* fall through; play() below will surface it */ }
       $("vwrap").classList.remove("loading");
-      if (cur !== i) return;
+      if (cur !== i) { _clearSwapWhenLanded(); return; }
     }
     const v2 = $("video");
     v2.currentTime = 0;
     if (play) v2.play().catch(() => {});
     buildLane(); updateInfo();
+    _clearSwapWhenLanded();
     return;
   }
   if (s._session && s._session !== curSession) {
@@ -537,7 +548,7 @@ async function gotoShot(i, play) {
         v0.addEventListener("loadedmetadata", res, { once: true }));
     } catch (e) { /* link fetch failed; seek below still tries */ }
     $("vwrap").classList.remove("loading");
-    if (cur !== i) return;        // user navigated on while loading
+    if (cur !== i) { _clearSwapWhenLanded(); return; }  // user navigated on
   }
   const v = $("video");
   v.currentTime = Math.max(0, s.start - PRE_ROLL);
@@ -547,6 +558,20 @@ async function gotoShot(i, play) {
   const chip = $("chips").children[i];
   if (chip) chip.scrollIntoView({ behavior: "smooth", inline: "center",
                                   block: "nearest" });
+  _clearSwapWhenLanded();
+}
+// Clear swapInFlight when the in-flight seek lands (v.seeking is set
+// synchronously by the currentTime writes above); immediately if none.
+// Every gotoShot exit path MUST call this — including the early returns.
+function _clearSwapWhenLanded() {
+  const v = $("video");
+  if (v.seeking) {
+    const done = () => { swapInFlight = false; v.removeEventListener("seeked", done); };
+    v.addEventListener("seeked", done);
+    setTimeout(done, 4000);              // belt: never wedge overlays off
+  } else {
+    swapInFlight = false;
+  }
 }
 $("prev").onclick = () => gotoShot(Math.max(0, cur - 1), true);
 $("next").onclick = () => gotoShot(Math.min(shots.length - 1, cur + 1), true);
@@ -1081,7 +1106,7 @@ function drawAim() {
 // line grow smoothly instead of hopping a whole 0.15s step at a time
 // (Joe: "blocky/choppy"), and it costs a 2-point path per frame.
 let _trailCache = { key: "", trails: [] };
-function drawTrails() {
+function drawTrails(tOverride) {
   const cv = $("trails"), v = $("video");
   const s = shots[cur];
   const box = cv.parentElement.getBoundingClientRect();
@@ -1093,8 +1118,10 @@ function drawTrails() {
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (!s || !s.trails || !v.videoWidth) return;
   const { P } = videoBox(cv, v);
-  const t = playheadTime(v);
-  const key = `${cur}|${cv.width}x${cv.height}`;
+  const t = tOverride != null ? tOverride : playheadTime(v);
+  // curSession in the key: playlists hop between session videos, and a
+  // same-INDEX shot in the new session must never reuse the old cached path
+  const key = `${curSession}|${cur}|${cv.width}x${cv.height}`;
   if (_trailCache.key !== key) _trailCache = { key, trails: s.trails.map(() => ({ k: -1 })) };
   s.trails.forEach((tr, ti) => {
     // WHOLE SHOT, not a 4s tail (Joe: "should persist through the
@@ -1160,10 +1187,26 @@ function drawTrails() {
 let vfcT = -1, vfcWall = 0;
 if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
   (function ovClock(now, meta) {
-    if (meta) { vfcT = meta.mediaTime; vfcWall = performance.now(); }
+    // ignore stamps that arrive with a seek already pending: a queued
+    // callback for a PRE-seek frame would resurrect the stale clock the
+    // 'seeking' listener just cleared
+    if (meta && !$("video").seeking) { vfcT = meta.mediaTime; vfcWall = performance.now(); }
     $("video").requestVideoFrameCallback(ovClock);
   })();
 let _ctLast = -1, _ctWall = 0;
+// Invalidate BOTH clock stamps on every seek and on src swaps, from any
+// source (gotoShot assigns currentTime directly and never went through
+// requestSeek's reset): a still-fresh pre-seek frame stamp made
+// playheadTime extrapolate from the OLD position for the whole duration
+// of a slow seek — the previous shot's trails animated across the
+// screen while the new shot buffered (Joe: "trails that have absolutely
+// nothing to do with the current shots. Super lag?").
+$("video").addEventListener("seeking", () => { vfcT = -1; _ctLast = -1; });
+$("video").addEventListener("loadstart", () => {
+  vfcT = -1; _ctLast = -1;
+  _trailCache = { key: "", trails: [] };   // stamps AND cache die with the src
+  seekBusy = false; seekPending = null;    // a pending seek must not replay on a new src
+});
 function playheadTime(v) {
   const now = performance.now();
   if (vfcT >= 0 && !v.paused && now - vfcWall < 300)
@@ -1188,15 +1231,37 @@ function playheadTime(v) {
   // see drawTrails) so every drawer, in any toggle combination, gets a
   // correctly sized store; videoBox no longer resizes
   fitCanvas($("trails"), $("trails").parentElement.getBoundingClientRect(), 2);
-  // trails paused per Joe ("I don't want the animated trails on here
-  // yet") — data still exports; flip TRAILS_ON to re-enable
-  if (OV.paths || window.TRAILS_ON) drawTrails();
-  else { const c = $("trails");
-         c.getContext("2d").clearRect(0, 0, c.width, c.height); }
-  if (OV.aim) drawAim();
-  if (OV.why) drawWhy(); else hideLegend();
+  // NO overlay while the picture can't match it (the render_floor rule
+  // applied to overlays: a wrong trail/aim line is worse than a blank
+  // layer). Cases: swapInFlight = cur names a shot the picture hasn't
+  // reached (incl. the link-fetch window BEFORE any src change, where
+  // readyState is still happily 4 on the OLD video); scrubActive = the
+  // FrameCache cover owns the picture, swept by the finger, while the
+  // video clock sits parked; seeking/buffering = mid-flight frames.
+  // EXCEPTION: the Warmer's background seeks while PAUSED — the cover
+  // shows the held frame, so draw at the hold time instead of strobing.
+  // Drawers only — the scrub/continuity logic below must keep running.
+  const warmHold = Warmer.holding();
+  const picReady = !swapInFlight && !window.scrubActive
+    && (warmHold != null || (!v.seeking && v.readyState >= 2));
+  if (!picReady) {
+    const c = $("trails");
+    c.getContext("2d").clearRect(0, 0, c.width, c.height);
+    hideLegend();
+  } else {
+    // trails paused per Joe ("I don't want the animated trails on here
+    // yet") — data still exports; flip TRAILS_ON to re-enable
+    if (OV.paths || window.TRAILS_ON) drawTrails(warmHold);
+    else { const c = $("trails");
+           c.getContext("2d").clearRect(0, 0, c.width, c.height); }
+    if (OV.aim) drawAim();
+    if (OV.why) drawWhy(); else hideLegend();
+  }
   Draw.render();
-  if (win) {
+  // hold the playhead/auto-advance while a shot swap is mid-flight:
+  // win still describes the OLD shot and the old video crossing win.t1
+  // during a laggy load double-navigated (reentrant gotoShot)
+  if (win && !swapInFlight) {
     // while the thumb owns the playhead, the video's lagging seek time
     // must NOT fight it (Joe: "still sticky when I drag") — the drag
     // handler positions the playhead; this loop yields until release
@@ -1381,6 +1446,15 @@ const FrameCache = (() => {
     $("video").requestVideoFrameCallback(harvest);
   async function draw(t, tol) {           // true = drawn from cache
     const v = $("video");
+    // src guard: harvest only resets the cache when a NEW src's frame
+    // presents — a drag right after a playlist hop (or after back())
+    // would otherwise serve the previous session's JPEGs, index collision
+    // being likely since all timelines are absolute seconds
+    if (v.currentSrc !== lastSrc) {
+      lastSrc = v.currentSrc;
+      blobs = new Map(); bitmaps = new Map();
+      return false;
+    }
     const T = tol == null ? 2 : tol;
     let i = idx(t), hit = null;
     for (let d = 0; d <= T && hit == null; d++)
@@ -1465,7 +1539,7 @@ const Warmer = (() => {
       requestSeek(t, false);
     }, 45);
   }
-  return { start, stop };
+  return { start, stop, holding: () => (on ? holdT : null) };
 })();
 $("video").addEventListener("pause", () => setTimeout(() => Warmer.start(), 250));
 $("video").addEventListener("loadeddata", () => setTimeout(() => Warmer.start(), 600));
