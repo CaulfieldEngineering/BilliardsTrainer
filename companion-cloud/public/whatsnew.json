@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 35,
+   "date": "2026-08-26",
+   "title": "The 9-ball mixup is fixed — 100% on gameplay footage",
+   "body": "The washed-out-9 problem's last remnant is gone. A correction layer tuned for the OLD camera settings was flipping the 9 into the 1 (nine times out of fifteen on real gameplay frames) even though the AI model itself read every single one correctly. That layer now only upgrades, never downgrades - and ball identification on gameplay frames from your last two sessions measures 100% across every ball on the table.",
+   "details": [
+    "Found by building hand-verified ground truth from your own gameplay (12 layouts across the two Aug-24 evening sessions), then testing each pipeline layer separately: the model scored 15/15 on true 9s; the correction layer was the corruptor.",
+    "The fix was checked on three frame sets before shipping - gameplay (100% overall), dense racks (slightly better), and old-era archives (net neutral).",
+    "Three new tests guard it, including 'a model stripe answer must never be demoted'."
+   ]
+  },
+  {
    "id": 34,
    "date": "2026-08-25",
    "title": "The shot Details sheet got a real design",
