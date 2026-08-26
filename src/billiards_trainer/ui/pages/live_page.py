@@ -188,13 +188,9 @@ class LivePage(QWidget):
         self._build()
 
     # ------------------------------------------------------------------ #
-    def _build(self) -> None:
-        root = QVBoxLayout(self)
-        # Joe: "tighten up the entire UI... a lot of negative space" —
-        # page chrome shrinks so the video views get the pixels.
-        root.setContentsMargins(10, 8, 10, 8)
-        root.setSpacing(8)
-        root.addWidget(self._control_bar())
+    def _timeline_panel(self) -> QWidget:
+        """The shot-timeline lane in its collapsible fold, plus the page's
+        Space play/pause shortcut (it rides with the transport wiring)."""
         from ..widgets.shot_timeline import ShotTimeline
         self._timeline = ShotTimeline(
             pre_roll_s=getattr(self._settings.ui, "pre_shot_s", 5.0))
@@ -213,14 +209,21 @@ class LivePage(QWidget):
         sc = QShortcut(QKeySequence(Qt.Key_Space), self)
         sc.setContext(Qt.WindowShortcut)
         sc.activated.connect(self._on_space)
-        # Labeled panel, same as every other pane (Joe: "at least label
-        # the Shot Timeline window somehow just like we did the others").
         tl_card = Card(padding=6, spacing=2)
         tl_card.add(self._timeline)
         from ..widgets.collapsible import CollapsibleSection
         self._tl_fold = CollapsibleSection(
             "SHOT TIMELINE", tl_card, "shot_timeline_panel", self._settings)
-        root.addWidget(self._tl_fold)
+        return self._tl_fold
+
+    def _build(self) -> None:
+        root = QVBoxLayout(self)
+        # Joe: "tighten up the entire UI... a lot of negative space" —
+        # page chrome shrinks so the video views get the pixels.
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(8)
+        root.addWidget(self._control_bar())
+        root.addWidget(self._timeline_panel())
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(8)
@@ -721,6 +724,59 @@ class LivePage(QWidget):
         btn.setFocusPolicy(Qt.NoFocus)
         return btn
 
+    def _clock_panel(self) -> QWidget:
+        """The SHOT CLOCK fold: readout, on/off + pause (Joe's rail
+        controls), and the per-shot / after-break second dials."""
+        from ..widgets.collapsible import CollapsibleSection
+        clock_lay = QVBoxLayout()
+        clock_lay.setContentsMargins(0, 0, 0, 0)
+        clock_lay.setSpacing(6)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        self._clock = ShotClockWidget()
+        row.addWidget(self._clock)
+        row.addStretch(1)
+        clock_lay.addLayout(row)
+        # On/Off + Pause/Resume (Joe: controls IN the shot clock field)
+        btns = QHBoxLayout()
+        self._clock_on_btn = QPushButton()
+        self._clock_on_btn.setObjectName("Ghost")
+        self._clock_on_btn.setCheckable(True)
+        self._clock_on_btn.setChecked(self._settings.shot_clock.enabled)
+        self._clock_on_btn.toggled.connect(self._on_clock_enabled)
+        self._clock_pause_btn = QPushButton("Pause")
+        self._clock_pause_btn.setObjectName("Ghost")
+        self._clock_pause_btn.setCheckable(True)
+        self._clock_pause_btn.toggled.connect(self._on_clock_pause)
+        btns.addWidget(self._clock_on_btn)
+        btns.addWidget(self._clock_pause_btn)
+        clock_lay.addLayout(btns)
+        # Per-shot and after-break seconds, applied live (shared settings
+        # object; the next countdown picks the new length up)
+        from PySide6.QtWidgets import QSpinBox
+        for label, attr in (("Per shot", "seconds"),
+                            ("After break", "break_seconds")):
+            prow = QHBoxLayout()
+            lab = QLabel(label)
+            lab.setObjectName("StatLabel")
+            spin = QSpinBox()
+            spin.setRange(10, 300)
+            spin.setSuffix(" s")
+            spin.setValue(int(getattr(self._settings.shot_clock, attr)))
+            spin.valueChanged.connect(
+                lambda v, a=attr: (setattr(self._settings.shot_clock, a, int(v)),
+                                   self.tuning_changed.emit()))
+            prow.addWidget(lab)
+            prow.addStretch(1)
+            prow.addWidget(spin)
+            clock_lay.addLayout(prow)
+        self._sync_clock_btn_text()
+        self._clock_holder = QWidget()
+        self._clock_holder.setLayout(clock_lay)
+        self._clock_fold = CollapsibleSection(
+            "SHOT CLOCK", self._clock_holder, "shot_clock", self._settings)
+        return self._clock_fold
+
     def _stats_rail(self) -> QWidget:
         # Compact scoreboard — tight spacing, narrow column; more stats land
         # here later, so the layout leaves the room in the middle, not the edges.
@@ -773,54 +829,7 @@ class LivePage(QWidget):
         rail.layout().addWidget(self._stroke_fold)
 
         # Shot clock — only visible when enabled, so it never crowds sandbox.
-        clock_lay = QVBoxLayout()
-        clock_lay.setContentsMargins(0, 0, 0, 0)
-        clock_lay.setSpacing(6)
-        row = QHBoxLayout()
-        row.addStretch(1)
-        self._clock = ShotClockWidget()
-        row.addWidget(self._clock)
-        row.addStretch(1)
-        clock_lay.addLayout(row)
-        # On/Off + Pause/Resume (Joe: controls IN the shot clock field)
-        btns = QHBoxLayout()
-        self._clock_on_btn = QPushButton()
-        self._clock_on_btn.setObjectName("Ghost")
-        self._clock_on_btn.setCheckable(True)
-        self._clock_on_btn.setChecked(self._settings.shot_clock.enabled)
-        self._clock_on_btn.toggled.connect(self._on_clock_enabled)
-        self._clock_pause_btn = QPushButton("Pause")
-        self._clock_pause_btn.setObjectName("Ghost")
-        self._clock_pause_btn.setCheckable(True)
-        self._clock_pause_btn.toggled.connect(self._on_clock_pause)
-        btns.addWidget(self._clock_on_btn)
-        btns.addWidget(self._clock_pause_btn)
-        clock_lay.addLayout(btns)
-        # Per-shot and after-break seconds, applied live (shared settings
-        # object; the next countdown picks the new length up)
-        from PySide6.QtWidgets import QSpinBox
-        for label, attr in (("Per shot", "seconds"),
-                            ("After break", "break_seconds")):
-            prow = QHBoxLayout()
-            lab = QLabel(label)
-            lab.setObjectName("StatLabel")
-            spin = QSpinBox()
-            spin.setRange(10, 300)
-            spin.setSuffix(" s")
-            spin.setValue(int(getattr(self._settings.shot_clock, attr)))
-            spin.valueChanged.connect(
-                lambda v, a=attr: (setattr(self._settings.shot_clock, a, int(v)),
-                                   self.tuning_changed.emit()))
-            prow.addWidget(lab)
-            prow.addStretch(1)
-            prow.addWidget(spin)
-            clock_lay.addLayout(prow)
-        self._sync_clock_btn_text()
-        self._clock_holder = QWidget()
-        self._clock_holder.setLayout(clock_lay)
-        self._clock_fold = CollapsibleSection(
-            "SHOT CLOCK", self._clock_holder, "shot_clock", self._settings)
-        rail.layout().addWidget(self._clock_fold)
+        rail.layout().addWidget(self._clock_panel())
 
         rail.layout().addStretch(1)
 

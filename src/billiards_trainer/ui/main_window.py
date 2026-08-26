@@ -523,6 +523,11 @@ class MainWindow(QMainWindow):
         self._act_clock.setChecked(self._settings.shot_clock.enabled)
         self._act_clock.toggled.connect(self._toggle_shot_clock)
 
+        m_help = bar.addMenu("&Help")
+        m_help.addAction("Check for &Updates").triggered.connect(
+            self._check_for_updates_forced)
+        m_help.addAction("Send &Feedback…").triggered.connect(self._open_feedback)
+
     def _sync_clock_menu(self, on: bool) -> None:
         if hasattr(self, "_act_clock"):
             self._act_clock.blockSignals(True)
@@ -537,11 +542,6 @@ class MainWindow(QMainWindow):
             f"Shot clock {'ON' if on else 'off'} "
             f"({self._settings.shot_clock.seconds}s, works without recording)",
             4000)
-
-        m_help = bar.addMenu("&Help")
-        m_help.addAction("Check for &Updates").triggered.connect(
-            self._check_for_updates_forced)
-        m_help.addAction("Send &Feedback…").triggered.connect(self._open_feedback)
 
     def _apply_sidebar_visibility(self) -> None:
         # User preference (View menu) AND room for it: below 1000px the
