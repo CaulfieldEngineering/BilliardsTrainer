@@ -154,6 +154,7 @@ def test_shot_clock_beep_cadence():
     3-2-1, buzz at 0 — each edge fires exactly once however often we poll."""
     clock = ShotClock(ShotClockSettings(enabled=True, seconds=30, warn_seconds=10))
     clock.start(0.0)
+    assert clock.poll(0.0) == "start"      # countdown announced (Joe's cue)
     assert clock.poll(19.5) == ""          # 10.5 s left — nothing yet
     assert clock.poll(20.0) == "warn"      # 10 s left — the heads-up beep
     assert clock.poll(20.5) == ""          # warn is one-shot
