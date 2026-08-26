@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 38,
+   "date": "2026-08-26",
+   "title": "Clips load and play much lighter",
+   "body": "Every session now gets a lightweight playback copy made right after it ends - about a fifth the data of the original. Your phone picks it automatically, so clips start faster, scrub smoother, and use far less cellular data. Same video, same overlays, same everything - just easier for the phone to play. This is also the leading fix for the tail stutter: the originals were heavy enough to strain the phone's video decoder.",
+   "details": [
+    "The lightweight copies match the originals frame-for-frame, so trails, aim lines and shot times line up exactly.",
+    "Older sessions are being converted in the background; each one switches over as soon as its copy is ready.",
+    "Recording always comes first: any conversion stops instantly the moment a session starts."
+   ]
+  },
+  {
    "id": 37,
    "date": "2026-08-26",
    "title": "Full-length ball trails, no more circle",

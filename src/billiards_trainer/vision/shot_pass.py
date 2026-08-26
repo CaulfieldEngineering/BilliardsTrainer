@@ -108,6 +108,14 @@ def run_close_pass(video, refresh_library: bool = True) -> dict:
             export_shots_summary(video)
     except Exception:  # noqa: BLE001
         log.exception("close pass: forensic fill failed")
+    # phone proxy LAST (minutes of hardware encode; recording-guarded and
+    # non-blocking for everything above — a killed render retries at the
+    # next close or backfill)
+    try:
+        from .proxy_render import render_proxy
+        out["proxy"] = render_proxy(video)
+    except Exception:  # noqa: BLE001 - proxies are enrichment
+        log.exception("close pass: proxy render failed")
     if refresh_library:
         try:
             from .shots_export import export_library_index, export_lifetime_stats
