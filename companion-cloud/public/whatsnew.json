@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 37,
+   "date": "2026-08-26",
+   "title": "Full-length ball trails, no more circle",
+   "body": "The tails now cover the entire shot - strike to rest - for the cue AND object balls, across the whole library. Two data bugs were cutting them short: the sampling window opened after the ball had already covered most of its travel, and the tracker's number-dropping during fast flight filtered out the flight itself. Both fixed; the circle covering the ball is gone too.",
+   "details": [
+    "Proof case: a marathon-session shot whose tail was the last foot now draws the full 582-pixel strike-to-rest path.",
+    "Unnumbered fast-flight stretches inherit the ball's identity only when the track's numbered segments on both sides agree - the old protection against mid-flight identity mixups stays intact.",
+    "For the remaining lag/stutter: triple-tap the top bar in the player for a live diagnostics readout, and send a screenshot of it during a stutter - it will show whether the phone is dropping video frames on these high-bitrate files."
+   ]
+  },
+  {
    "id": 36,
    "date": "2026-08-26",
    "title": "Miss analysis caught up on every session",
