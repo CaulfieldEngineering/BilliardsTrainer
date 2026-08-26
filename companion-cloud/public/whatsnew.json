@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 40,
+   "date": "2026-08-27",
+   "title": "Shot clock is live, plus a menu bar and a squishable window",
+   "body": "The shot clock now runs off the cue ball itself: the countdown starts the moment your cue ball stops rolling and stops the instant you strike it. Sounds mark every phase - a rising cue when the clock starts (including after every shot), a warning beep, 3-2-1 ticks, and the buzzer. It works with or without recording, and you can flip it on and off from the new Play menu. The desktop window also squishes down to about a third of the screen now, and a File menu keeps everything reachable when it's narrow.",
+   "details": [
+    "Clock settings (seconds, warning time, sounds) are in Settings > Shot clock; the Play menu is just the on/off.",
+    "The countdown starts about a fifth of a second after the cue ball truly rests - that debounce is what stops table jitter from false-starting the clock.",
+    "Next precision step when it matters: using the strike SOUND to stop the clock frame-exactly."
+   ]
+  },
+  {
    "id": 39,
    "date": "2026-08-26",
    "title": "Stay-down timer on the desktop scoreboard",
