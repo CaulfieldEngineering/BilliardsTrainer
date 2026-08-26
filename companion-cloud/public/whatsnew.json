@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 41,
+   "date": "2026-08-27",
+   "title": "Shot clock controls, break time, and tidier panels",
+   "body": "The shot clock panel on the desktop now has its own on/off button, a Pause/Resume button, and dials for per-shot seconds and time after the break - the app spots a break automatically (five or more balls scattering) and gives the next shot the longer countdown. The Stats and Shot Timeline panels now collapse like the others, so you can fold away what you're not using.",
+   "details": [
+    "Pause freezes the countdown and its sounds; Resume continues from the same number.",
+    "The clock panel stays visible even when the clock is off, since that's where the on/off lives now."
+   ]
+  },
+  {
    "id": 40,
    "date": "2026-08-27",
    "title": "Shot clock is live, plus a menu bar and a squishable window",
