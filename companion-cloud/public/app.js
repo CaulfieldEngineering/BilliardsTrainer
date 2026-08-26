@@ -57,7 +57,24 @@ document.addEventListener("DOMContentLoaded", () => {
 async function api(path, opts) {
   const o = opts || {};
   o.headers = Object.assign({ "x-key": KEY || "" }, o.headers || {});
-  const r = await fetch(path, o);
+  // Flaky-cellular rule (Joe, 1 bar of 5G: "Loading sessions…" forever):
+  // a stalled request must FAIL in seconds, not hang for minutes — the
+  // callers all have cached fallbacks or retry paths.
+  let r;
+  if (!o.signal && typeof AbortController !== "undefined") {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 15000);
+    o.signal = ac.signal;
+    try {
+      r = await fetch(path, o);
+    } catch (e) {
+      throw new Error(e && e.name === "AbortError" ? "timeout" : e.message);
+    } finally {
+      clearTimeout(timer);
+    }
+  } else {
+    r = await fetch(path, o);
+  }
   if (r.status === 401) {
     // say exactly which failure this is, so remote debugging isn't a guess
     $("keygate").textContent = KEY
@@ -343,8 +360,24 @@ function renderHome() {
   if (HOME.sess) {
     const wrap = document.createElement("div");
     wrap.className = "indent";
+    if (sessError) {
+      // in-section, never replacing the whole home (What's New and
+      // Playlists must survive a dead connection)
+      const err = document.createElement("div");
+      err.className = "empty";
+      err.textContent = (sessCache.length
+        ? "Couldn't refresh (" + sessError + ") \u2014 showing saved list. "
+        : "Couldn't load sessions (" + sessError + "). ");
+      const retry = document.createElement("a");
+      retry.textContent = "Retry";
+      retry.style.color = "var(--accent)";
+      retry.onclick = () => { sessError = null; renderHome(); loadSessions(); };
+      err.appendChild(retry);
+      wrap.appendChild(err);
+    }
     if (!sessCache.length) {
-      wrap.innerHTML = "<div class='empty'>Loading sessions\u2026</div>";
+      if (!sessError)
+        wrap.innerHTML = "<div class='empty'>Loading sessions\u2026</div>";
     } else {
       const head = document.createElement("div");
       head.className = "sess head";
@@ -395,18 +428,28 @@ function renderHome() {
 }
 
 let _plPulled = false;
+let sessError = null;             // last refresh failure, shown in-section
 async function loadSessions() {
   if (!_plPulled) { _plPulled = true; PL.pull(); }
+  // Render the SAVED list instantly (stale-while-revalidate): on flaky
+  // cellular the fetch below can take seconds or die — Joe's sessions
+  // barely change between opens, so never make him stare at a spinner.
+  if (!sessCache.length) {
+    try { sessCache = JSON.parse(localStorage.getItem("sessCache") || "[]"); }
+    catch (e) { sessCache = []; }
+  }
   renderHome();
   try {
     const resp = await api("/api/sessions");
     sessCache = resp.sessions || [];
-    renderHome();
+    sessError = null;
+    try { localStorage.setItem("sessCache", JSON.stringify(sessCache)); }
+    catch (e) { /* storage full: the live render still works */ }
   } catch (e) {
-    if (String(e.message) !== "401")
-      $("sessions").innerHTML =
-        `<div class='empty'>Couldn't reach Dropbox (${e.message})</div>`;
+    if (String(e.message) === "401") return;   // keygate already shown
+    sessError = String(e.message);
   }
+  renderHome();
 }
 
 // ---- player -------------------------------------------------------------
