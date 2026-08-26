@@ -29,7 +29,12 @@ def table_quiet(rec_dir: Path, quiet_s: float = 600.0) -> bool:
     for f in rec_dir.glob("session-*.mp4"):
         if now - f.stat().st_mtime < quiet_s:
             return False
-    return not list(rec_dir.glob(".session-*.part.mp4"))
+    if list(rec_dir.glob(".session-*.part.mp4")):
+        return False
+    # Joe at the MACHINE counts too (2026-08-26: a backfill starved his
+    # session lists while he was at the desktop)
+    from _presence import joe_present
+    return not joe_present()
 
 
 def main() -> int:

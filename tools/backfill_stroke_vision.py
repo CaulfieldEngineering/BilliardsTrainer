@@ -33,6 +33,15 @@ def recording_active() -> bool:
     return (time.time() - newest) < 600
 
 
+def must_defer() -> bool:
+    """Joe at the table OR at the machine (2026-08-26 incident: this
+    backfill starved his session lists while he was at the desktop)."""
+    if recording_active():
+        return True
+    from _presence import joe_present
+    return joe_present()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
@@ -42,8 +51,8 @@ def main() -> None:
                    key=os.path.getmtime, reverse=True)
     total = sessions = 0
     for p in files:
-        if recording_active():
-            print("recording active - stopping (rerun later)")
+        if must_defer():
+            print("Joe active (table or machine) - stopping (rerun later)")
             break
         if not os.path.isfile(p + ".analysis.jsonl"):
             continue
