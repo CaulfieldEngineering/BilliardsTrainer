@@ -47,7 +47,7 @@ import numpy as np
 
 log = logging.getLogger("vision.stroke")
 
-STROKE_VISION_VERSION = 1
+STROKE_VISION_VERSION = 2   # v2: delivery anchored at forward-swing onset
 
 PRE_S = 6.0          # window opens this long before the sidecar start
 POST_S = 9.0         # ...and closes this long after
@@ -58,6 +58,12 @@ VANISH_RUN = 12      # consecutive no-stick frames = departure
 POP_EARLY_S = 0.30
 PAUSE_V = 60.0       # px/s: tip slower than this at the rearmost = pausing
 BACK_MIN_PX = 25.0   # rearward excursion smaller than this isn't a backstroke
+# Delivery sanity: a real final swing runs ~100-600ms; outside these bounds
+# the onset was mispicked (occlusion, practice-cycle catch) — abstain.
+DELIVER_MIN_MS = 66      # two frames at 30fps
+DELIVER_MAX_MS = 1200
+DELIVER_GAP_S = 0.8  # tip last seen further than this before the strike:
+                     # the delivery happened entirely off-screen — abstain
 
 
 def _cross(a, b):
@@ -399,7 +405,22 @@ def _backstroke(tl, t_strike, rest, fps) -> dict:
     while hi < len(v) - 1 and abs(v[hi + 1]) < PAUSE_V:
         hi += 1
     pause_ms = int(round((ti[hi] - ti[lo]) * 1000))
-    delivery_ms = int(round((t_strike - t_back) * 1000))
+    # DELIVERY: strike minus the FINAL FORWARD SWING's onset — not minus
+    # t_back. The old anchor charged the whole post-rearmost dwell (and,
+    # when argmin landed on a deeper practice stroke, an entire practice
+    # cycle) to the delivery: measured library-wide it put 15.8% of
+    # deliveries over 1500ms and correlated delivery with pause (0.29).
+    # Walk back from the last visible pre-strike sample while the tip
+    # moves forward; the sample before that run is the onset.
+    j = len(v) - 1
+    while j > 0 and v[j] > PAUSE_V:
+        j -= 1
+    delivery_ms = None
+    gap_s = t_strike - ti[-1]        # tip often vanishes in the fast swing
+    if gap_s <= DELIVER_GAP_S:
+        d = int(round((t_strike - ti[j]) * 1000))
+        if DELIVER_MIN_MS <= d <= DELIVER_MAX_MS:
+            delivery_ms = d          # else: mispick/occlusion — abstain
     # practice strokes: rearward excursions > BACK_MIN_PX before the final one
     n_practice = 0
     down = False
@@ -411,9 +432,12 @@ def _backstroke(tl, t_strike, rest, fps) -> dict:
         elif down and val > ref - BACK_MIN_PX / 2:
             down = False
         ref = max(ref, val) if not down else ref
-    return {"back_depth_px": round(depth, 1), "pause_ms": pause_ms,
-            "delivery_ms": delivery_ms, "practice_strokes": n_practice,
-            "backstroke_conf": "high" if len(pre) > fps * 2 else "low"}
+    out = {"back_depth_px": round(depth, 1), "pause_ms": pause_ms,
+           "practice_strokes": n_practice,
+           "backstroke_conf": "high" if len(pre) > fps * 2 else "low"}
+    if delivery_ms is not None:      # measured-or-abstained: no garbage
+        out["delivery_ms"] = delivery_ms
+    return out
 
 
 def annotate_session(video, force: bool = False) -> int:
