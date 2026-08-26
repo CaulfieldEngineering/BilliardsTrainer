@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 36,
+   "date": "2026-08-26",
+   "title": "Miss analysis caught up on every session",
+   "body": "A gap in the pipeline meant new sessions weren't getting the deep second-pass that resolves tricky misses - your marathon session had 51 misses and only 1 categorized. That pass now runs automatically at every session close, and the whole library was swept: 180 verdicts recovered, trusted tags 150 -> 227, uncategorized 203 -> 126. Your Lifetime Stats patterns just got a lot more data behind them.",
+   "details": [
+    "Found via the abstention notes shipped last week: 48 marathon misses stated their reasons, and the reasons pointed at the missing pipeline stage rather than bad tracking.",
+    "The remaining 126 uncategorized are genuine hard cases (each states why) - your grading playlists can settle any of them with two taps.",
+    "The drift tests now require this stage in the close pass, so it can never silently fall out again."
+   ]
+  },
+  {
    "id": 35,
    "date": "2026-08-26",
    "title": "The 9-ball mixup is fixed — 100% on gameplay footage",
