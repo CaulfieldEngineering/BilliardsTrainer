@@ -78,7 +78,7 @@ async function api(path, opts) {
   let r;
   if (!o.signal && typeof AbortController !== "undefined") {
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 15000);
+    const timer = setTimeout(() => ac.abort(), 8000);
     o.signal = ac.signal;
     try {
       r = await fetch(path, o);
