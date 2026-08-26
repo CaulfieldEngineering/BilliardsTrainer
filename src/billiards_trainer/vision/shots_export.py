@@ -64,6 +64,39 @@ def _video_transform(video_path) -> dict | None:
         return None
 
 
+def _bridge_unnumbered(by_id: dict) -> dict:
+    """(track id, number) -> point lists, with unnumbered flight bridged.
+
+    The tracker deliberately sheds a ball's number at speed (identity
+    needs settled reads), so a fast ball's whole flight rides its track
+    id as n=-1 — a number-only filter kept just the slow tail-end (Joe:
+    "1ft of tail"). A -1 run inherits the number of the numbered samples
+    AROUND it on its own track, but only when both sides agree (or only
+    one side exists): the @233 identity-steal bug (cue stole the 4's
+    track at contact) shows as DIFFERENT numbers before/after, and those
+    runs stay dropped."""
+    paths: dict = {}
+    for tid, samples in by_id.items():
+        n_seq = [q[4] for q in samples]
+        for i, q in enumerate(samples):
+            n = q[4]
+            if n < 0:
+                prev_n = next((n_seq[j] for j in range(i - 1, -1, -1)
+                               if n_seq[j] >= 0), None)
+                next_n = next((n_seq[j] for j in range(i + 1, len(n_seq))
+                               if n_seq[j] >= 0), None)
+                if prev_n is not None and next_n is not None:
+                    n = prev_n if prev_n == next_n else -1
+                else:
+                    n = prev_n if prev_n is not None else (
+                        next_n if next_n is not None else -1)
+            if n < 0:
+                continue
+            e = paths.setdefault((tid, n), {"n": n, "pts": []})
+            e["pts"].append((q[0], q[1], q[2], q[3]))
+    return paths
+
+
 def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     """Per-participant polylines in NORMALIZED video coords:
     [{"n": ball, "p": [[t, x, y], ...]}, ...] — a few KB per shot."""
@@ -102,34 +135,7 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
             by_id.setdefault(tr.id, []).append(
                 (t, tr.x, tr.y, tr.radius, tr.number))
         t += 0.15
-    # BRIDGE unnumbered flight (2026-08-26, Joe: "1ft of tail"): the
-    # tracker deliberately sheds a ball's number at speed (identity
-    # needs settled reads), so the cue's whole fast flight rides the
-    # SAME track id as n=-1 and the old number-only filter kept just
-    # the slow tail-end. A -1 run inherits the number of the numbered
-    # samples AROUND it on its own track — but only when both sides
-    # agree (or only one side exists): the @233 identity-steal bug
-    # (cue stole the 4's track at contact) shows as DIFFERENT numbers
-    # before/after, and those runs stay dropped.
-    paths: dict = {}
-    for tid, samples in by_id.items():
-        n_seq = [q[4] for q in samples]
-        for i, q in enumerate(samples):
-            n = q[4]
-            if n < 0:
-                prev_n = next((n_seq[j] for j in range(i - 1, -1, -1)
-                               if n_seq[j] >= 0), None)
-                next_n = next((n_seq[j] for j in range(i + 1, len(n_seq))
-                               if n_seq[j] >= 0), None)
-                if prev_n is not None and next_n is not None:
-                    n = prev_n if prev_n == next_n else -1
-                else:
-                    n = prev_n if prev_n is not None else (
-                        next_n if next_n is not None else -1)
-            if n < 0:
-                continue
-            e = paths.setdefault((tid, n), {"n": n, "pts": []})
-            e["pts"].append((q[0], q[1], q[2], q[3]))
+    paths = _bridge_unnumbered(by_id)
     out = []
     for e in paths.values():
         pts = e["pts"]
