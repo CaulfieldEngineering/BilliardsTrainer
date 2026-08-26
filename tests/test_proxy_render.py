@@ -5,8 +5,6 @@ the one rule that must never regress: a render NEVER runs (and a running
 render dies) while a recording is live. Joe outranks proxies.
 """
 
-import types
-
 import billiards_trainer.capture.audio as audio
 import billiards_trainer.config as config
 from billiards_trainer.vision import proxy_render
