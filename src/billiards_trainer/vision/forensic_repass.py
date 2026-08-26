@@ -174,6 +174,7 @@ def streak_directions(video, t0, t1, contact_vis, reappear_vis, colour_ref,
 def repass_shot(video, start, end, ball=None):
     """Recover the gap for one shot and return the fitted verdict."""
     from billiards_trainer.vision import miss_tags as MT
+
     from .analysis_cache import SidecarReader
     from .tablespace import space_for_video
     from .trajectory import fit_shot
