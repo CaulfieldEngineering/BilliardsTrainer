@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 39,
+   "date": "2026-08-26",
+   "title": "Stay-down timer on the desktop scoreboard",
+   "body": "The timer you asked for: a STAY-DOWN row on the live scoreboard. It starts counting the moment you take the shot (shown with a ~ while it's a live estimate), then locks to the camera-measured number seconds later - green when you stayed down, red POP when you popped up early. If the camera couldn't measure that shot, it shows a dash instead of guessing.",
+   "details": [
+    "Counts only while recording, same as the rest of the scoreboard.",
+    "The live count is an estimate; the locked number is the same measured stay-down you see in shot details."
+   ]
+  },
+  {
    "id": 38,
    "date": "2026-08-26",
    "title": "Clips load and play much lighter",
