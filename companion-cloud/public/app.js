@@ -443,14 +443,21 @@ async function loadSessions() {
     const resp = await api("/api/sessions");
     sessCache = resp.sessions || [];
     sessError = null;
+    _sessRetry = 0;
     try { localStorage.setItem("sessCache", JSON.stringify(sessCache)); }
     catch (e) { /* storage full: the live render still works */ }
   } catch (e) {
     if (String(e.message) === "401") return;   // keygate already shown
     sessError = String(e.message);
+    // weak-signal auto-retry: 3s / 8s / 20s, then the manual Retry link.
+    // One bar of 5G drops requests randomly — the next attempt often lands.
+    _sessRetry = (_sessRetry || 0) + 1;
+    if (_sessRetry <= 3)
+      setTimeout(loadSessions, [3000, 8000, 20000][_sessRetry - 1]);
   }
   renderHome();
 }
+let _sessRetry = 0;
 
 // ---- player -------------------------------------------------------------
 let shots = [], cur = -1;
