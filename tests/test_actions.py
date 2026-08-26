@@ -167,7 +167,7 @@ class TestClosePassWiring:
         src = Path(m.__file__).read_text(encoding="utf-8")
         for stage in ("derive_and_correct", "classify_and_mark",
                       "annotate_session", "export_shots_summary",
-                      "export_lifetime_stats"):
+                      "export_lifetime_stats", "forensic_fill"):
             assert stage in src, f"canonical close pass lost {stage}"
 
     def test_all_finishers_delegate(self):
