@@ -17,6 +17,7 @@ log = logging.getLogger("ui.sounds")
 
 # edge -> [(frequency_hz, duration_ms), ...]
 _CUES = {
+    "start": [(660, 110), (990, 150)],    # rising pair: you're on the clock
     "warn": [(880, 220)],                 # one heads-up beep (10 s left)
     "tick": [(1320, 130)],                # short, urgent: the 3-2-1 cadence
     "expired": [(220, 260), (185, 520)],  # two falling low tones = the buzz

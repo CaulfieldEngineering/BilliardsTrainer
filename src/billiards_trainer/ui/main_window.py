@@ -214,6 +214,7 @@ class MainWindow(QMainWindow):
         self._sidebar.live_selected.connect(self._on_live_selected)
         self._sidebar.session_selected.connect(self._on_session_selected)
         self._sidebar.settings_toggled.connect(self._toggle_settings)
+        self._build_menu()   # Joe: a menu bar so narrow mode never strands anything
         self._live.tuning_changed.connect(self._on_tuning_changed)
         # Training Mode (label/correct ball numbers on the playback)
         self._live.label_mode_toggled.connect(self._controller.set_label_mode, q)
@@ -491,11 +492,61 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
+    def _build_menu(self) -> None:
+        """Menu bar (Joe's ask): every control reachable even when narrow
+        mode hides its usual home. Wired ONLY to existing handlers."""
+        import os
+
+        bar = self.menuBar()
+        m_file = bar.addMenu("&File")
+        act = m_file.addAction("Open Recordings &Folder")
+        act.triggered.connect(
+            lambda: os.startfile(str(self._settings.recording.resolved_dir())))
+        m_file.addAction("&Settings…").triggered.connect(self._toggle_settings)
+        m_file.addSeparator()
+        m_file.addAction("E&xit").triggered.connect(self.close)
+
+        m_view = bar.addMenu("&View")
+        self._act_sidebar = m_view.addAction("Sessions &Sidebar")
+        self._act_sidebar.setCheckable(True)
+        self._act_sidebar.setChecked(True)
+        self._act_sidebar.toggled.connect(self._apply_sidebar_visibility)
+        m_view.addAction("&Mini View").triggered.connect(self._toggle_mini_view)
+
+        # One-tap shot clock (Joe: on/off without the Settings trip, and it
+        # runs whether or not a recording is on — sandbox testing included)
+        m_play = bar.addMenu("&Play")
+        self._act_clock = m_play.addAction("Shot &Clock")
+        self._act_clock.setCheckable(True)
+        self._act_clock.setChecked(self._settings.shot_clock.enabled)
+        self._act_clock.toggled.connect(self._toggle_shot_clock)
+
+    def _toggle_shot_clock(self, on: bool) -> None:
+        self._settings.shot_clock.enabled = bool(on)
+        self._settings.save()
+        self._push_settings()   # controller rebuilds its clock from settings
+        self.statusBar().showMessage(
+            f"Shot clock {'ON' if on else 'off'} "
+            f"({self._settings.shot_clock.seconds}s, works without recording)",
+            4000)
+
+        m_help = bar.addMenu("&Help")
+        m_help.addAction("Check for &Updates").triggered.connect(
+            self._check_for_updates_forced)
+        m_help.addAction("Send &Feedback…").triggered.connect(self._open_feedback)
+
+    def _apply_sidebar_visibility(self) -> None:
+        # User preference (View menu) AND room for it: below 1000px the
+        # sidebar yields regardless, so side-by-side keeps working.
+        wanted = (not hasattr(self, "_act_sidebar")
+                  or self._act_sidebar.isChecked())
+        self._sidebar.setVisible(wanted and self.width() >= 1000)
+
     def resizeEvent(self, ev):  # noqa: N802 - Qt override
         # Narrow-window mode: the sessions sidebar yields below ~1000px so the
         # app can sit side-by-side with another window; it returns with room.
         if hasattr(self, "_sidebar"):
-            self._sidebar.setVisible(self.width() >= 1000)
+            self._apply_sidebar_visibility()
         super().resizeEvent(ev)
 
     def _maybe_check_updates(self) -> None:

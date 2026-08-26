@@ -22,6 +22,7 @@ class ShotClock:
     _warned: bool = False
     _expired: bool = False
     _last_tick: int = 0     # last 3/2/1 second already beeped (0 = none yet)
+    _start_edge: bool = False   # one-shot "countdown began" announcement
 
     @property
     def enabled(self) -> bool:
@@ -42,6 +43,7 @@ class ShotClock:
         self._warned = False
         self._expired = False
         self._last_tick = 0
+        self._start_edge = True   # poll announces the countdown (Joe's ask)
 
     def stop(self) -> None:
         self._running = False
@@ -61,10 +63,14 @@ class ShotClock:
         return self._running and self.remaining(t) <= 0.0
 
     def poll(self, t: float) -> str:
-        """Advance state and return a one-shot edge event: '', 'warn' (single
-        beep at warn_seconds), 'tick' (3-2-1 cadence), or 'expired' (the buzz)."""
+        """Advance state and return a one-shot edge event: '', 'start' (the
+        countdown began), 'warn' (single beep at warn_seconds), 'tick'
+        (3-2-1 cadence), or 'expired' (the buzz)."""
         if not self._running:
             return ""
+        if self._start_edge:
+            self._start_edge = False
+            return "start"
         rem = self.remaining(t)
         if not self._expired and rem <= 0.0:
             self._expired = True

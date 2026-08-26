@@ -172,6 +172,7 @@ def test_shot_clock_warn_inside_cadence_no_double_beep():
     """A warn threshold at/below 3 s must not stack a tick on the same second."""
     clock = ShotClock(ShotClockSettings(enabled=True, seconds=10, warn_seconds=3))
     clock.start(0.0)
+    assert clock.poll(0.0) == "start"      # countdown announced (Joe's cue)
     assert clock.poll(7.2) == "warn"       # 2.8 s left
     assert clock.poll(7.3) == ""           # tick for '3' suppressed
     assert clock.poll(8.1) == "tick"       # 1.9 s -> the '2' tick fires

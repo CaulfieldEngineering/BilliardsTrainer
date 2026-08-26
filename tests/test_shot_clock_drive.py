@@ -108,6 +108,7 @@ class TestClockEdges:
                 edges.append((round(t, 1), e))
             t += 0.1
         kinds = [e for _, e in edges]
-        assert kinds == ["warn", "tick", "tick", "tick", "expired"]
-        assert edges[0][0] == 20.0        # warn at 10s remaining
-        assert [round(30 - x) for x, _ in edges[1:4]] == [3, 2, 1]
+        assert kinds == ["start", "warn", "tick", "tick", "tick", "expired"]
+        assert edges[0][0] == 0.0         # start announced immediately
+        assert edges[1][0] == 20.0        # warn at 10s remaining
+        assert [round(30 - x) for x, _ in edges[2:5]] == [3, 2, 1]
