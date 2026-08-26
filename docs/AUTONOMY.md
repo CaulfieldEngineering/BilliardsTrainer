@@ -127,3 +127,4 @@ validated + library relabelled), notify Joe proactively — he asked to be
 told when it's all fixed.
 
 - INCIDENT 2026-08-24: c7 gate run held loop.lock >5h — the champion same-batch corpus pass blew score_challenger's 4h subprocess timeout (CPU inference is ~4x slower than the DML-era runs the timeout was sized for). Champion restored cleanly by the finally block (verified 12,277,106 bytes, no .bak). Challenger pass completed; champion pass resumed standalone. Lock cleared here.
+- INCIDENT 2026-08-24 (2): Joe started recording mid-gate; per the kill rule the gate was stopped, which landed mid-challenger-swap — c7 was live in MODELS_DIR with the champion in .bak. Restored by file copy immediately (12,277,106 verified); the running app held c5 in memory throughout, no session was scored or recorded on c7. Champion same-batch aggregate COMPLETE (33 sessions); only the challenger corpus pass remains — resume when the table is quiet.
