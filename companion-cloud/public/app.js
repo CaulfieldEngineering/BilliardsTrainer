@@ -75,13 +75,18 @@ async function api(path, opts) {
   // Flaky-cellular rule (Joe, 1 bar of 5G: "Loading sessions…" forever):
   // a stalled request must FAIL in seconds, not hang for minutes — the
   // callers all have cached fallbacks or retry paths.
-  let r;
+  // The deadline covers the WHOLE exchange including the body read:
+  // clearing the timer when headers arrive left r.json() unguarded — a
+  // mid-body stall would hang the await forever with no error and no
+  // retry (verified as the one way api() could never settle).
+  let r, body;
   if (!o.signal && typeof AbortController !== "undefined") {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 8000);
     o.signal = ac.signal;
     try {
       r = await fetch(path, o);
+      if (r.status !== 401 && r.ok) body = await r.json();
     } catch (e) {
       throw new Error(e && e.name === "AbortError" ? "timeout" : e.message);
     } finally {
@@ -89,6 +94,7 @@ async function api(path, opts) {
     }
   } else {
     r = await fetch(path, o);
+    if (r.status !== 401 && r.ok) body = await r.json();
   }
   if (r.status === 401) {
     // say exactly which failure this is, so remote debugging isn't a guess
@@ -104,7 +110,7 @@ async function api(path, opts) {
     throw new Error("401");
   }
   if (!r.ok) throw new Error(path + " -> " + r.status);
-  return r.json();
+  return body;
 }
 
 // ---- self-update: poll version.json, offer one-tap reload --------------
@@ -1280,6 +1286,17 @@ function drawTrails(tOverride) {
 // between stamps we extrapolate by wall clock. Falls back to currentTime
 // when paused, stalled (>300ms without a stamp), or on pre-15.4 iOS.
 let vfcT = -1, vfcWall = 0;
+// HUD state MUST be declared before the ovClock IIFE below: that IIFE runs
+// IMMEDIATELY at load and reads HUD.on — with the const declared after it,
+// the temporal dead zone threw a ReferenceError that killed the whole
+// script at this line for THREE DAYS (sessions list "loading" forever;
+// every later fix edited dead code below the crash). Counts, per second:
+// video frames PRESENTED (rVFC), rAF ticks, clock source in use, and the
+// largest gap between presented frames — the number that separates
+// "overlay problem" from "the phone can't decode this bitrate".
+// Triple-tap the top bar to toggle.
+const HUD = { on: false, vfc: 0, raf: 0, src: "-", maxGap: 0, lastVfc: 0 };
+
 if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
   (function ovClock(now, meta) {
     // ignore stamps that arrive with a seek already pending: a queued
@@ -1297,13 +1314,7 @@ if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
 let _ctLast = -1, _ctWall = 0, _phMono = -1;
 
 // ---- on-phone overlay diagnostics (Joe: tails still lag/stutter) ----
-// Triple-tap the top bar to toggle. Counts, per second: video frames
-// PRESENTED (rVFC), rAF ticks, clock source in use, and the largest
-// gap between presented frames — the number that separates "overlay
-// problem" from "the phone can't decode this bitrate" (16-24 Mbps
-// files drop frames on older iPhones; the tail then stutters WITH the
-// picture, faithfully).
-const HUD = { on: false, vfc: 0, raf: 0, src: "-", maxGap: 0, lastVfc: 0 };
+// (HUD state object is declared above the ovClock IIFE — load-bearing.)
 (function () {
   let taps = [];
   document.addEventListener("click", e => {

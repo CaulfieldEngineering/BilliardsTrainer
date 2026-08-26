@@ -17,6 +17,20 @@ SECRETS = Path("C:/Users/Joe/.billiards-secrets")
 
 
 def main() -> int:
+    # RUNTIME SMOKE GATE (added after the three-day TDZ outage): node
+    # --check only parses; this EXECUTES app.js under stubs and requires
+    # it to reach its tail and request /api/sessions. A page that dies at
+    # the top level must never deploy again.
+    import subprocess
+    smoke = subprocess.run(
+        ["node", str(Path(__file__).parent / "smoke.js")],
+        capture_output=True, text=True, timeout=60)
+    if smoke.returncode != 0:
+        print(smoke.stdout + smoke.stderr)
+        print("DEPLOY BLOCKED: the page fails the runtime smoke test.")
+        return 1
+    print(smoke.stdout.strip())
+
     token = (SECRETS / "vercel_token.txt").read_text().strip()
     build = time.strftime("%Y%m%d-%H%M%S")
 
