@@ -1201,7 +1201,7 @@ function drawTrails(tOverride) {
         strokeLine(ctx, seg, col, 1.5, dpr, { alpha: 1 });
       }
     }
-    markDot(ctx, tip[0], tip[1], col, 2.6, dpr);   // where the ball is now
+    // tip dot removed (Joe: "only the tail and not the circle covering the ball")
   });
   ctx.globalAlpha = 1;
 }
@@ -1221,9 +1221,58 @@ if ("requestVideoFrameCallback" in HTMLVideoElement.prototype)
     // callback for a PRE-seek frame would resurrect the stale clock the
     // 'seeking' listener just cleared
     if (meta && !$("video").seeking) { vfcT = meta.mediaTime; vfcWall = performance.now(); }
+    if (HUD.on && meta) {
+      HUD.vfc++;
+      const w = performance.now();
+      if (HUD.lastVfc) HUD.maxGap = Math.max(HUD.maxGap, w - HUD.lastVfc);
+      HUD.lastVfc = w;
+    }
     $("video").requestVideoFrameCallback(ovClock);
   })();
 let _ctLast = -1, _ctWall = 0, _phMono = -1;
+
+// ---- on-phone overlay diagnostics (Joe: tails still lag/stutter) ----
+// Triple-tap the top bar to toggle. Counts, per second: video frames
+// PRESENTED (rVFC), rAF ticks, clock source in use, and the largest
+// gap between presented frames — the number that separates "overlay
+// problem" from "the phone can't decode this bitrate" (16-24 Mbps
+// files drop frames on older iPhones; the tail then stutters WITH the
+// picture, faithfully).
+const HUD = { on: false, vfc: 0, raf: 0, src: "-", maxGap: 0, lastVfc: 0 };
+(function () {
+  let taps = [];
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#topbar")) return;
+    const now = performance.now();
+    taps = taps.filter(t2 => now - t2 < 600).concat(now);
+    if (taps.length >= 3) {
+      taps = [];
+      HUD.on = !HUD.on;
+      let el = document.getElementById("hud");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "hud";
+        el.style.cssText = "position:fixed;top:calc(env(safe-area-inset-top)"
+          + " + 46px);right:8px;z-index:60;background:rgba(0,0,0,.75);"
+          + "color:#7DF29B;font:11px/1.5 ui-monospace,monospace;"
+          + "padding:6px 8px;border-radius:8px;pointer-events:none;"
+          + "white-space:pre";
+        document.body.appendChild(el);
+      }
+      el.style.display = HUD.on ? "block" : "none";
+    }
+  });
+  let secVfc = 0, secRaf = 0, secGap = 0;
+  setInterval(() => {
+    if (!HUD.on) { HUD.vfc = HUD.raf = HUD.maxGap = 0; return; }
+    const el = document.getElementById("hud");
+    if (el) el.textContent =
+      `video fps ${HUD.vfc}  raf ${HUD.raf}` + String.fromCharCode(10)
+      + `clock ${HUD.src}  worst gap ${HUD.maxGap.toFixed(0)}ms`;
+    HUD.vfc = HUD.raf = 0;
+    HUD.maxGap = 0;
+  }, 1000);
+})();
 // Invalidate BOTH clock stamps on every seek and on src swaps, from any
 // source (gotoShot assigns currentTime directly and never went through
 // requestSeek's reset): a still-fresh pre-seek frame stamp made
@@ -1240,9 +1289,12 @@ $("video").addEventListener("loadstart", () => {
 function playheadTime(v) {
   const now = performance.now();
   let out;
+  if (HUD.on) HUD.raf++;
   if (vfcT >= 0 && !v.paused && now - vfcWall < 300) {
     out = vfcT + (now - vfcWall) / 1000 * (v.playbackRate || 1);
+    if (HUD.on) HUD.src = "rvfc";
   } else {
+    if (HUD.on) HUD.src = (!v.paused && now - _ctWall < 400) ? "extrap" : "raw";
     // rVFC stale or unsupported: currentTime itself only updates ~4x/s on
     // iOS — extrapolate from its last observed CHANGE so the clock still
     // advances every frame instead of stepping quarter-second chunks
