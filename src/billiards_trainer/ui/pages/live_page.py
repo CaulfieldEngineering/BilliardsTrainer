@@ -739,8 +739,13 @@ class LivePage(QWidget):
         self._misses_row = _StatRow("MISSES", PALETTE.danger)
         self._k_pct = _StatRow("MAKE %", PALETTE.accent)
         self._k_streak = _StatRow("STREAK", PALETTE.text)
+        # Joe's timer: counts the stay-down live (~estimate), then locks to
+        # the camera-measured value when the stroke record lands.
+        self._k_stay = _StatRow("STAY-DOWN", PALETTE.accent)
+        from ..widgets.stay_down import StayDownTimer
+        self._stay = StayDownTimer()
         for row in (self._shots_row, self._makes_row, self._misses_row,
-                    self._k_pct, self._k_streak):
+                    self._k_pct, self._k_streak, self._k_stay):
             rail.add(row)
         self._makes_val = self._makes_row.value_label
         self._misses_val = self._misses_row.value_label
@@ -787,6 +792,20 @@ class LivePage(QWidget):
             self._shots_row.set_value("—")
             self._k_pct.set_value("—")
             self._k_streak.set_value("—")
+            self._stay.reset()
+            self._set_stay("—", "idle")
+
+    def _set_stay(self, text: str, kind: str) -> None:
+        """Paint the stay-down row; no-op per frame unless it changed."""
+        if text != getattr(self, "_stay_text", None):
+            self._stay_text = text
+            self._k_stay.set_value(text)
+        if kind != getattr(self, "_stay_kind", None):
+            self._stay_kind = kind
+            color = {"climb": PALETTE.accent, "final": PALETTE.success,
+                     "popped": PALETTE.danger}.get(kind, PALETTE.text_faint)
+            self._k_stay.value_label.setStyleSheet(
+                f"font-size: 18px; font-weight: 700; color: {color};")
 
     # ------------------------------------------------------------------ #
     # Cue-stroke card (Bluetooth IMU on the cue butt)
@@ -1331,6 +1350,13 @@ class LivePage(QWidget):
         else:
             self._alert_badge.clear_status()
 
+        # Stay-down timer (Joe's ask): climbs from the moving edge on live
+        # feeds; new climbs only while recording (stats belong to a session).
+        if not self._is_video:
+            self._set_stay(*self._stay.tick(
+                packet.shot_state, getattr(packet, "pipeline_t", -1.0),
+                counting=self._recording_on))
+
     def on_stats(self, summary: dict) -> None:
         if not self._stats_active:
             return   # idle: keep the greyed dashes
@@ -1346,6 +1372,7 @@ class LivePage(QWidget):
         # start_t/end_t are pipeline media seconds, which match the seek bar
         # in playback; live clips accumulate on the same clock.
         try:
+            self._stay.on_shot(float(event.start_t))   # better strike estimate
             self._timeline.add_shot(event.start_t, event.end_t,
                                     event.outcome.value, event.num_pocketed)
             self._shot_list.add_shot({
@@ -1359,6 +1386,10 @@ class LivePage(QWidget):
         """Live stroke metrics landing ~20-40s after the shot's row appeared
         (Joe: "populate as soon as the shot is complete"). rec carries the
         REBASED start — the same clock the rows were added on."""
+        if isinstance(rec, dict):
+            # the timer hears abstentions too (measured-or-abstained: an
+            # unmeasurable shot shows "—", never a forever-climb)
+            self._set_stay(*self._stay.on_stroke(rec))
         if not isinstance(rec, dict) or rec.get("confidence") == "none":
             return
         keys = ("stay_down_s", "popped_early", "back_depth_px", "pause_ms",
