@@ -35,9 +35,11 @@ class SessionsSidebar(QFrame):
         super().__init__(parent)
         self.setObjectName("Sidebar")
         # Resizable via the main-window splitter (a fixed width clipped the
-        # "Shots" header to "Sho" with no way to widen). The minimum keeps
-        # all four headers legible at the default drag stop.
-        self.setMinimumWidth(252)
+        # "Shots" header to "Sho" with no way to widen). NO hard minimum:
+        # Windows fixes the window's floor at drag START, so a 252px
+        # sidebar minimum stopped Joe's squish at 749px even though the
+        # sidebar auto-hides below 1000px mid-drag (side-by-side ask).
+        # sizeHint keeps the headers legible at the default drag stop.
         self.setMaximumWidth(560)
         # Where recordings are listed from; main_window points this at the
         # configured recordings folder (Settings -> Recording).
@@ -121,6 +123,18 @@ class SessionsSidebar(QFrame):
             if a is not None and b is not None:
                 return a < b
             return self.text(col).lower() < other.text(col).lower()
+
+    def sizeHint(self):  # noqa: N802 - Qt override
+        # Preferred (not enforced) width: all four list headers legible.
+        from PySide6.QtCore import QSize
+        return QSize(252, 480)
+
+    def minimumSizeHint(self):  # noqa: N802 - Qt override
+        # The splitter must never let this widget prop up the WINDOW's
+        # minimum: below 1000px the sidebar auto-hides anyway (main_window
+        # resizeEvent), and Windows locks the floor at drag start.
+        from PySide6.QtCore import QSize
+        return QSize(0, 0)
 
     def refresh(self) -> None:
         """Rebuild the session table (LIVE is its own button above it)."""
