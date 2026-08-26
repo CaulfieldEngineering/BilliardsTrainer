@@ -287,6 +287,9 @@ class ShotClockSettings:
     warn_seconds: int = 10
     audio: bool = True
     auto_reset_on_shot: bool = True
+    # Longer countdown for the shot AFTER a break (league convention: you
+    # get time to survey the spread). Applied when 5+ balls scattered.
+    break_seconds: int = 60
 
 
 @dataclass

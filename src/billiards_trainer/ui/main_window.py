@@ -216,6 +216,8 @@ class MainWindow(QMainWindow):
         self._sidebar.settings_toggled.connect(self._toggle_settings)
         self._build_menu()   # Joe: a menu bar so narrow mode never strands anything
         self._live.tuning_changed.connect(self._on_tuning_changed)
+        self._live.clock_pause_toggled.connect(self._controller.set_clock_paused, q)
+        self._live.clock_enabled_toggled.connect(self._sync_clock_menu)
         # Training Mode (label/correct ball numbers on the playback)
         self._live.label_mode_toggled.connect(self._controller.set_label_mode, q)
         self._live.save_training_frame_requested.connect(self._controller.save_training_frame, q)
@@ -521,10 +523,16 @@ class MainWindow(QMainWindow):
         self._act_clock.setChecked(self._settings.shot_clock.enabled)
         self._act_clock.toggled.connect(self._toggle_shot_clock)
 
+    def _sync_clock_menu(self, on: bool) -> None:
+        if hasattr(self, "_act_clock"):
+            self._act_clock.blockSignals(True)
+            self._act_clock.setChecked(bool(on))
+            self._act_clock.blockSignals(False)
+
     def _toggle_shot_clock(self, on: bool) -> None:
         self._settings.shot_clock.enabled = bool(on)
         self._settings.save()
-        self._push_settings()   # controller rebuilds its clock from settings
+        self._live.set_clock_enabled_ui(bool(on))   # rail button mirrors
         self.statusBar().showMessage(
             f"Shot clock {'ON' if on else 'off'} "
             f"({self._settings.shot_clock.seconds}s, works without recording)",

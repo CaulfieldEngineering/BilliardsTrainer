@@ -31,6 +31,8 @@ def _drive():
     d._cue_still = 0
     d._turn_start_t = 0.0
     d._prev_state = "settled"
+    d._strike_stop_t = -1e9
+    d._break_pending = False
     # the drive's tuning constants live on the controller class
     for k in ("_CUE_MOVE_SPEED", "_CUE_STOP_FRAMES", "_CUE_GAP_S"):
         setattr(d, k, getattr(PipelineController, k))
@@ -112,3 +114,48 @@ class TestClockEdges:
         assert edges[0][0] == 0.0         # start announced immediately
         assert edges[1][0] == 20.0        # warn at 10s remaining
         assert [round(30 - x) for x, _ in edges[2:5]] == [3, 2, 1]
+
+
+class TestPauseResumeAndBreak:
+    def test_pause_freezes_number_and_edges(self):
+        c = ShotClock(ShotClockSettings(enabled=True, seconds=30,
+                                        warn_seconds=10))
+        c.start(0.0)
+        assert c.poll(0.0) == "start"
+        c.pause(5.0)
+        assert c.remaining(50.0) == 25.0      # frozen at the pause point
+        assert c.poll(50.0) == ""             # warn/expire never fire paused
+        c.resume(50.0)
+        # 45s of pause is forgiven; 25s remain from here
+        assert abs(c.remaining(55.0) - 20.0) < 0.01
+        assert c.poll(70.0) == "warn"
+
+    def test_next_seconds_override_is_one_shot(self):
+        c = ShotClock(ShotClockSettings(enabled=True, seconds=30,
+                                        warn_seconds=10))
+        c.set_next_seconds(77)
+        c.start(0.0)
+        assert c.remaining(0.0) == 77.0       # the after-break countdown
+        c.stop()
+        c.start(100.0)
+        assert c.remaining(100.0) == 30.0     # reverts to the normal length
+
+    def test_break_scatter_grants_longer_next_countdown(self):
+        d = _drive()
+        d._settings.shot_clock.break_seconds = 77
+        d._strike_stop_t = -1e9
+        d._break_pending = False
+        t = _rest(d, 100.0)                   # countdown running
+        d.update([_cue(8.0)], t)              # the BREAK strike
+        # 6 balls scattering right after the strike
+        scatter = [_cue(6.0)] + [SimpleNamespace(cls=BallClass.SOLID, speed=6.0)
+                                 for _ in range(5)]
+        d.update(scatter, t + 0.5)
+        assert d._break_pending
+        _rest(d, t + 6.0)                     # balls settle, cue rests
+        assert d._clock.running
+        assert d._clock._run_seconds == 77.0  # the after-break length
+        # the shot after that is back to normal
+        d.update([_cue(8.0)], t + 20.0)
+        _rest(d, t + 26.0)
+        assert d._clock._run_seconds == 30.0

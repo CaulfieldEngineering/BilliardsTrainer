@@ -153,6 +153,8 @@ class PipelineController(QObject):
         self._cue_still = 0            # consecutive at-rest frames
         self._saw_cue_t = -1e9         # last time a cue track existed
         self._clock_armed = True       # a new turn may start the clock
+        self._strike_stop_t = -1e9     # break-detection window anchor
+        self._break_pending = False    # next countdown gets break_seconds
         # Flow rule: a shot clock only makes sense while PLAYING — live camera
         # sources only. Reviewing a recorded video must never run a countdown.
         self._clock_allowed = False
@@ -243,6 +245,8 @@ class PipelineController(QObject):
         self._cue_still = 0
         self._saw_cue_t = -1e9
         self._clock_armed = True
+        self._strike_stop_t = -1e9
+        self._break_pending = False
         self._clock_allowed = bool(getattr(self._source, "is_live", False))
         self._running = True
         self._miss_t0: float | None = None  # first consecutive empty-read time
@@ -358,6 +362,17 @@ class PipelineController(QObject):
             self.error.emit(f"Camera sync: {msg}")
 
     @Slot(object)
+    @Slot(bool)
+    def set_clock_paused(self, paused: bool) -> None:
+        """Joe's rail button. Pause freezes number and edges; resume picks
+        up where it left off (the countdown length is not forgiven)."""
+        import time as _time
+        t = _time.perf_counter() - getattr(self, "_t0", _time.perf_counter())
+        if paused:
+            self._clock.pause(t)
+        else:
+            self._clock.resume(t)
+
     def apply_settings(self, settings: Settings) -> None:
         self._settings = settings
         self.set_detection_enabled(bool(getattr(settings.detection, "enabled", True)))
@@ -1585,6 +1600,16 @@ class PipelineController(QObject):
     def _update_cue_clock(self, tracks, t: float) -> None:
         if not (self._clock.enabled and self._clock_allowed):
             return
+        # Break detection: 5+ balls rolling at once within 4s of a strike =
+        # that was the break; the NEXT countdown gets break_seconds (Joe's
+        # "time after break" - league convention, survey the spread).
+        if t - getattr(self, "_strike_stop_t", -1e9) < 4.0:
+            movers = sum(1 for tr in tracks if tr.speed > self._CUE_MOVE_SPEED)
+            if movers >= 5 and not self._break_pending:
+                self._break_pending = True
+                log.info("shot clock: break detected (%d movers) - next "
+                         "countdown %ds", movers,
+                         self._settings.shot_clock.break_seconds)
         cue = next((tr for tr in tracks if tr.cls == BallClass.CUE), None)
         if cue is None:
             self._cue_still = 0
@@ -1599,6 +1624,7 @@ class PipelineController(QObject):
             if self._clock.running:
                 self._clock.stop()      # the strike — player made it in time
                 log.info("shot clock stopped: cue ball moving (made it)")
+                self._strike_stop_t = t     # break-detection window opens
             self._clock_armed = True    # rolling cue = the next rest is a new turn
             self._cue_still = 0
             return
@@ -1606,6 +1632,10 @@ class PipelineController(QObject):
             self._cue_still += 1
             if (self._cue_still >= self._CUE_STOP_FRAMES
                     and self._clock_armed and not self._clock.running):
+                if self._break_pending:
+                    self._break_pending = False
+                    self._clock.set_next_seconds(
+                        self._settings.shot_clock.break_seconds)
                 self._clock.start(t)    # cue at rest -> you're on the clock
                 self._clock_armed = False  # re-arms on motion/absence, so an
                 self._turn_start_t = t     # expired clock can't restart itself

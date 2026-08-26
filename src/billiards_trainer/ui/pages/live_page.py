@@ -158,6 +158,8 @@ class LivePage(QWidget):
     video_speed = Signal(float)               # playback multiplier
     mini_view_requested = Signal()            # pop out the always-on-top mini view
     tuning_changed = Signal()                 # a live-tuning control changed (settings mutated in place)
+    clock_pause_toggled = Signal(bool)        # shot-clock Pause/Resume (rail button)
+    clock_enabled_toggled = Signal(bool)      # rail on/off - main window syncs the Play menu
     label_mode_toggled = Signal(bool)         # Training Mode on/off
     save_training_frame_requested = Signal(object)  # [(number, cx, cy, w, h) normalised] (object marshals cleanly cross-thread)
     train_balls_requested = Signal()          # fine-tune on collected data
@@ -214,9 +216,11 @@ class LivePage(QWidget):
         # Labeled panel, same as every other pane (Joe: "at least label
         # the Shot Timeline window somehow just like we did the others").
         tl_card = Card(padding=6, spacing=2)
-        tl_card.add(self._caption("SHOT TIMELINE"))
         tl_card.add(self._timeline)
-        root.addWidget(tl_card)
+        from ..widgets.collapsible import CollapsibleSection
+        self._tl_fold = CollapsibleSection(
+            "SHOT TIMELINE", tl_card, "shot_timeline_panel", self._settings)
+        root.addWidget(self._tl_fold)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(8)
@@ -744,13 +748,22 @@ class LivePage(QWidget):
         self._k_stay = _StatRow("STAY-DOWN", PALETTE.accent)
         from ..widgets.stay_down import StayDownTimer
         self._stay = StayDownTimer()
+        stats_holder = QWidget()
+        stats_lay = QVBoxLayout(stats_holder)
+        stats_lay.setContentsMargins(0, 0, 0, 0)
+        stats_lay.setSpacing(6)
         for row in (self._shots_row, self._makes_row, self._misses_row,
                     self._k_pct, self._k_streak, self._k_stay):
-            rail.add(row)
+            stats_lay.addWidget(row)
         self._makes_val = self._makes_row.value_label
         self._misses_val = self._misses_row.value_label
 
         from ..widgets.collapsible import CollapsibleSection
+
+        # Stats fold (Joe: "make the Stats section collapsible")
+        self._stats_fold = CollapsibleSection(
+            "STATS", stats_holder, "stats_panel", self._settings)
+        rail.layout().addWidget(self._stats_fold)
 
         # Cue-stroke stats (Bluetooth IMU) — hidden unless the sensor is enabled.
         self._stroke_holder = self._stroke_section()
@@ -760,16 +773,53 @@ class LivePage(QWidget):
         rail.layout().addWidget(self._stroke_fold)
 
         # Shot clock — only visible when enabled, so it never crowds sandbox.
-        self._clock_row = QHBoxLayout()
-        self._clock_row.addStretch(1)
+        clock_lay = QVBoxLayout()
+        clock_lay.setContentsMargins(0, 0, 0, 0)
+        clock_lay.setSpacing(6)
+        row = QHBoxLayout()
+        row.addStretch(1)
         self._clock = ShotClockWidget()
-        self._clock_row.addWidget(self._clock)
-        self._clock_row.addStretch(1)
+        row.addWidget(self._clock)
+        row.addStretch(1)
+        clock_lay.addLayout(row)
+        # On/Off + Pause/Resume (Joe: controls IN the shot clock field)
+        btns = QHBoxLayout()
+        self._clock_on_btn = QPushButton()
+        self._clock_on_btn.setObjectName("Ghost")
+        self._clock_on_btn.setCheckable(True)
+        self._clock_on_btn.setChecked(self._settings.shot_clock.enabled)
+        self._clock_on_btn.toggled.connect(self._on_clock_enabled)
+        self._clock_pause_btn = QPushButton("Pause")
+        self._clock_pause_btn.setObjectName("Ghost")
+        self._clock_pause_btn.setCheckable(True)
+        self._clock_pause_btn.toggled.connect(self._on_clock_pause)
+        btns.addWidget(self._clock_on_btn)
+        btns.addWidget(self._clock_pause_btn)
+        clock_lay.addLayout(btns)
+        # Per-shot and after-break seconds, applied live (shared settings
+        # object; the next countdown picks the new length up)
+        from PySide6.QtWidgets import QSpinBox
+        for label, attr in (("Per shot", "seconds"),
+                            ("After break", "break_seconds")):
+            prow = QHBoxLayout()
+            lab = QLabel(label)
+            lab.setObjectName("StatLabel")
+            spin = QSpinBox()
+            spin.setRange(10, 300)
+            spin.setSuffix(" s")
+            spin.setValue(int(getattr(self._settings.shot_clock, attr)))
+            spin.valueChanged.connect(
+                lambda v, a=attr: (setattr(self._settings.shot_clock, a, int(v)),
+                                   self.tuning_changed.emit()))
+            prow.addWidget(lab)
+            prow.addStretch(1)
+            prow.addWidget(spin)
+            clock_lay.addLayout(prow)
+        self._sync_clock_btn_text()
         self._clock_holder = QWidget()
-        self._clock_holder.setLayout(self._clock_row)
+        self._clock_holder.setLayout(clock_lay)
         self._clock_fold = CollapsibleSection(
             "SHOT CLOCK", self._clock_holder, "shot_clock", self._settings)
-        self._clock_fold.setVisible(self._settings.shot_clock.enabled)
         rail.layout().addWidget(self._clock_fold)
 
         rail.layout().addStretch(1)
@@ -806,6 +856,29 @@ class LivePage(QWidget):
                      "popped": PALETTE.danger}.get(kind, PALETTE.text_faint)
             self._k_stay.value_label.setStyleSheet(
                 f"font-size: 18px; font-weight: 700; color: {color};")
+
+    def _sync_clock_btn_text(self) -> None:
+        on = self._settings.shot_clock.enabled
+        self._clock_on_btn.setText("Clock ON" if on else "Clock off")
+
+    def _on_clock_enabled(self, on: bool) -> None:
+        self._settings.shot_clock.enabled = bool(on)
+        self._sync_clock_btn_text()
+        self.tuning_changed.emit()          # debounced persist to disk
+        self.clock_enabled_toggled.emit(bool(on))
+        if not on and self._clock_pause_btn.isChecked():
+            self._clock_pause_btn.setChecked(False)
+
+    def _on_clock_pause(self, paused: bool) -> None:
+        self._clock_pause_btn.setText("Resume" if paused else "Pause")
+        self.clock_pause_toggled.emit(bool(paused))
+
+    def set_clock_enabled_ui(self, on: bool) -> None:
+        """Menu-driven sync: reflect without re-emitting."""
+        self._clock_on_btn.blockSignals(True)
+        self._clock_on_btn.setChecked(on)
+        self._clock_on_btn.blockSignals(False)
+        self._sync_clock_btn_text()
 
     # ------------------------------------------------------------------ #
     # Cue-stroke card (Bluetooth IMU on the cue butt)
@@ -1298,7 +1371,6 @@ class LivePage(QWidget):
                      self._ui_ms_acc / self._ui_n, self._ui_n,
                      self._ui_n / (now - getattr(self, "_ui_log_t", now - 5.0)))
             self._ui_log_t, self._ui_ms_acc, self._ui_n = now, 0.0, 0
-        self._clock_fold.setVisible(packet.clock_enabled)
         if packet.clock_enabled:
             self._clock.update_clock(packet.clock_remaining,
                                      max(1.0, self._settings.shot_clock.seconds),

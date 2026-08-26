@@ -23,6 +23,9 @@ class ShotClock:
     _expired: bool = False
     _last_tick: int = 0     # last 3/2/1 second already beeped (0 = none yet)
     _start_edge: bool = False   # one-shot "countdown began" announcement
+    _run_seconds: float = 0.0   # THIS countdown's length (break shots differ)
+    _next_seconds: float = 0.0  # one-shot override for the next start (0 = none)
+    _paused_at: float = -1.0    # pipeline t when paused (-1 = not paused)
 
     @property
     def enabled(self) -> bool:
@@ -44,6 +47,28 @@ class ShotClock:
         self._expired = False
         self._last_tick = 0
         self._start_edge = True   # poll announces the countdown (Joe's ask)
+        self._paused_at = -1.0
+        # a one-shot length override (the shot after a break gets longer)
+        self._run_seconds = self._next_seconds or float(self.settings.seconds)
+        self._next_seconds = 0.0
+
+    def set_next_seconds(self, seconds: float) -> None:
+        """Length for the NEXT countdown only (e.g. time after the break)."""
+        self._next_seconds = max(0.0, float(seconds))
+
+    # -- pause/resume (Joe's rail button): edges freeze with the number --- #
+    @property
+    def paused(self) -> bool:
+        return self._running and self._paused_at >= 0.0
+
+    def pause(self, t: float) -> None:
+        if self._running and self._paused_at < 0.0:
+            self._paused_at = t
+
+    def resume(self, t: float) -> None:
+        if self._running and self._paused_at >= 0.0:
+            self._start_t += t - self._paused_at
+            self._paused_at = -1.0
 
     def stop(self) -> None:
         self._running = False
@@ -54,7 +79,9 @@ class ShotClock:
     def remaining(self, t: float) -> float:
         if not self._running:
             return float(self.settings.seconds)
-        return max(0.0, self.settings.seconds - (t - self._start_t))
+        if self._paused_at >= 0.0:
+            t = self._paused_at           # the number freezes while paused
+        return max(0.0, self._run_seconds - (t - self._start_t))
 
     def is_warning(self, t: float) -> bool:
         return self._running and 0 < self.remaining(t) <= self.settings.warn_seconds
@@ -71,6 +98,8 @@ class ShotClock:
         if self._start_edge:
             self._start_edge = False
             return "start"
+        if self._paused_at >= 0.0:
+            return ""                     # no edges advance while paused
         rem = self.remaining(t)
         if not self._expired and rem <= 0.0:
             self._expired = True
