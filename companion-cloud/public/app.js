@@ -1,4 +1,16 @@
 const BUILD = "__BUILD_ID__";
+// ZOMBIE-CACHE PURGE (2026-08-27): Joe's phone showed week-old behavior on
+// current deploys - sessions stuck at "Loading" on WiFi AND cellular while
+// every server probe passed. A stale service worker or CacheStorage from an
+// old deploy explains exactly that: statics look fresh, the app logic isn't.
+// Unregister/delete everything; harmless when none exist.
+try {
+  if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations)
+    navigator.serviceWorker.getRegistrations()
+      .then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  if (window.caches && caches.keys)
+    caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+} catch (e) { /* diagnostics only */ }
 const PRE_ROLL = 5.0;
 // ONE CLOCK (2026-08-24): shots.json carries doc.t_offset = how far the
 // analysis clock ran AHEAD of the video for that session. Normalize every
@@ -29,7 +41,10 @@ function normalizeShots(doc) {
   return list;
 }
 const $ = id => document.getElementById(id);
-$("build").textContent = BUILD.slice(0, 10);
+// FULL build id (the slice(0,10) truncation hid which app.js was actually
+// running - two days of "sessions don't load" was a stale cached build,
+// and the header couldn't tell us)
+$("build").textContent = BUILD;
 
 // ---- key handling: arrives once as ?k=, lives in localStorage ----------
 const url = new URL(location.href);
@@ -442,7 +457,7 @@ async function loadSessions() {
   try {
     const resp = await api("/api/sessions");
     sessCache = resp.sessions || [];
-    sessError = null;
+    sessError = sessCache.length ? null : "server returned an empty list";
     _sessRetry = 0;
     try { localStorage.setItem("sessCache", JSON.stringify(sessCache)); }
     catch (e) { /* storage full: the live render still works */ }
