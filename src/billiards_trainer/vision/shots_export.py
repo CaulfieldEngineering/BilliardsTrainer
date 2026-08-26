@@ -71,6 +71,21 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     hinv = np.asarray(tf["hinv"], dtype=float)
     w, h = float(tf["w"]), float(tf["h"])
     t0, t1 = float(s["start"]), float(s["end"])
+    # Window opens at the TRUE strike, not the lagged sidecar start
+    # (2026-08-26, Joe: "why is it only like 1ft of tail?... the tails
+    # for the object balls are missing"). The sidecar start trails the
+    # strike by the detection lag, and a fast ball covers MOST of its
+    # travel in that missed first second — the old t0-1.0 window
+    # recorded only the slow tail-end (the cue's last foot) and object
+    # balls whose whole flight fit in the gap failed the travel gate
+    # and got no trail at all. The stroke record's video-time strike
+    # bounds the gap per shot; +0.5s pre-roll shows the address rest.
+    sv = s.get("_stroke") or {}
+    if sv.get("strike") is not None:
+        pre = max(1.0, (t0 - float(sv["strike"])) + 0.5)
+    else:
+        pre = 2.5
+    t0_win = max(0.0, t0 - pre)
     # Attribute every sample to the number the track held AT THAT MOMENT.
     # Stamping a track's FINAL number over its whole path was drawing
     # 005048 @233's object ball as the cue (Joe: "the line the object ball
@@ -78,16 +93,43 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
     # ball stole that track at the contact point, so the track finished the
     # shot riding the cue and the exporter relabelled its entire history --
     # including the stretch where it really was sitting on the 4.
-    paths: dict = {}
-    t = max(0.0, t0 - 1.0)
+    by_id: dict = {}
+    t = t0_win
     while t <= t1 + 1e-9:
         for tr in reader.tracks_at(t):
-            if not tr.active or tr.number < 0:
+            if not tr.active:
                 continue
-            e = paths.setdefault((tr.id, tr.number),
-                                 {"n": tr.number, "pts": []})
-            e["pts"].append((t, tr.x, tr.y, tr.radius))
+            by_id.setdefault(tr.id, []).append(
+                (t, tr.x, tr.y, tr.radius, tr.number))
         t += 0.15
+    # BRIDGE unnumbered flight (2026-08-26, Joe: "1ft of tail"): the
+    # tracker deliberately sheds a ball's number at speed (identity
+    # needs settled reads), so the cue's whole fast flight rides the
+    # SAME track id as n=-1 and the old number-only filter kept just
+    # the slow tail-end. A -1 run inherits the number of the numbered
+    # samples AROUND it on its own track — but only when both sides
+    # agree (or only one side exists): the @233 identity-steal bug
+    # (cue stole the 4's track at contact) shows as DIFFERENT numbers
+    # before/after, and those runs stay dropped.
+    paths: dict = {}
+    for tid, samples in by_id.items():
+        n_seq = [q[4] for q in samples]
+        for i, q in enumerate(samples):
+            n = q[4]
+            if n < 0:
+                prev_n = next((n_seq[j] for j in range(i - 1, -1, -1)
+                               if n_seq[j] >= 0), None)
+                next_n = next((n_seq[j] for j in range(i + 1, len(n_seq))
+                               if n_seq[j] >= 0), None)
+                if prev_n is not None and next_n is not None:
+                    n = prev_n if prev_n == next_n else -1
+                else:
+                    n = prev_n if prev_n is not None else (
+                        next_n if next_n is not None else -1)
+            if n < 0:
+                continue
+            e = paths.setdefault((tid, n), {"n": n, "pts": []})
+            e["pts"].append((q[0], q[1], q[2], q[3]))
     out = []
     for e in paths.values():
         pts = e["pts"]
@@ -99,7 +141,7 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict) -> list:
         if travel < _TRAIL_TRAVEL_R * max(6.0, pts[0][3]):
             continue
         poly = []
-        for (t_, x, y, _r) in pts[:120]:
+        for (t_, x, y, _r) in pts[:200]:
             v = hinv @ np.array([x, y, 1.0])
             px, py = v[0] / v[2] / w, v[1] / v[2] / h
             if -0.2 <= px <= 1.2 and -0.2 <= py <= 1.2:
