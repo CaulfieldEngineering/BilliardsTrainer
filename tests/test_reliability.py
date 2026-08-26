@@ -145,6 +145,7 @@ def test_shot_clock_enabled_counts_down():
     clock.start(0.0)
     assert clock.running
     assert clock.remaining(4.0) == 6.0
+    assert clock.poll(0.0) == "start"      # countdown announced (Joe's cue)
     assert clock.poll(8.0) == "warn"
     assert clock.poll(11.0) == "expired"
 
