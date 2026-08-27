@@ -235,6 +235,11 @@ class MainWindow(QMainWindow):
         # EMITTING (worker) thread — touching widgets there is native-crash
         # territory. Every cross-thread signal must land on a bound method of
         # a UI-thread QObject so the connection auto-queues.
+        self._wire_controller_outputs()
+
+    def _wire_controller_outputs(self) -> None:
+        """Controller -> UI signal fan-out (split from _wire when the
+        audio/narration program pushed it past a page)."""
         self._controller.frame_ready.connect(self._live.on_frame)
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.shot_recorded.connect(self._live.on_shot)
