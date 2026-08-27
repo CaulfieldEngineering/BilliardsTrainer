@@ -46,6 +46,7 @@ ladder holds in Python (`docs/MEASUREMENT_CORE.md`).
 - ✅ Pause / Resume, per-shot seconds, time-after-break — all in the rail panel
 - ✅ On/off from the panel and the Play menu, works with or without recording
 - ✅ Table status readout: ON THE CLOCK / SHOT IN PLAY / TABLE SETTLED / PAUSED
+- ✅ Matchroom-style depleting clock bar under the live picture (hides when no countdown)
 - ✅ Clock transitions recorded to the session sidecar (start/stop/pause/resume + countdown length)
 - 🔜 Shot-clock replay as a video overlay on iOS (data already exported in the dossier)
 - 🔜 Frame-exact strike stop via the strike SOUND (recorder-tee design, tested off-hours)
@@ -68,6 +69,8 @@ ladder holds in Python (`docs/MEASUREMENT_CORE.md`).
 - 🟡 Delivery on live-measured legacy shots: library re-measurement ~70% complete (resumes in quiet windows)
 - 🔜 Cue-sensor (Bluetooth IMU) fusion when Joe installs it — camera remains the fallback
 
+- ✅ Matchroom 9-ball tray: chips 1-9 under the live picture, present vs potted, occlusion-debounced
+
 ## 6. Desktop review
 
 - ✅ Session timeline: hover cards, thumbnails, prev/next, sortable shot list, zoom/pan, one-click clip export
@@ -85,7 +88,8 @@ ladder holds in Python (`docs/MEASUREMENT_CORE.md`).
 - ✅ Details bottom-sheet: measured-or-abstained fields with stated reasons; correction channel (Joe's verdicts are final)
 - ✅ Slow-mo requests, playlists, Lifetime Stats (miss patterns, trusted shots only)
 - ✅ What's New changelog; diagnostics HUD (triple-tap top bar); runtime smoke gate blocks broken deploys
-- 🔜 Shot-clock overlay during playback
+- 🔜 Shot-clock overlay during playback — only for sessions recorded with clock metadata
+- 🔜 Ball-tray overlay during playback (needs ball numbers on pocket events)
 - 🔜 Data-saver 480p tier for weak-signal sessions
 - 🔒 Per-shot clips ("streaming shots") — coverage audit done; cutting waits on dense trails
 
@@ -119,3 +123,4 @@ ladder holds in Python (`docs/MEASUREMENT_CORE.md`).
 - 🔜 VLM shot coaching on the dossier ("you missed left, popped up, cue swerved") — only after measurement is rock solid
 - 🔜 90D camera upgrade path (60 fps HDMI) when hardware lands
 - 🔜 Real-time mobile live view of the table state
+- 🔜 Overlay-baked video EXPORTS (trails, clock bar, tray) — the original recording is always preserved untouched

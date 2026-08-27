@@ -254,6 +254,15 @@ class LivePage(QWidget):
         self._persp_stack.addWidget(self._persp)
         self._persp_stack.addWidget(self._camera_error_panel())
         persp_card.add(self._persp_stack)
+        # Matchroom strip (Joe): depleting shot-clock bar + 9-ball tray
+        # under the live picture; the bar hides itself when no countdown
+        from ..widgets.ball_tray import BallPresence, BallTrayWidget
+        from ..widgets.clock_bar import ClockBarWidget
+        self._clock_bar = ClockBarWidget()
+        persp_card.add(self._clock_bar)
+        self._tray = BallTrayWidget()
+        self._tray_presence = BallPresence()
+        persp_card.add(self._tray)
         splitter.addWidget(persp_card)
 
         # Right rail swaps between the normal tuning/score rail and the Training
@@ -1493,6 +1502,17 @@ class LivePage(QWidget):
             if st != getattr(self, "_clock_status_last", None):
                 self._clock_status_last = st
                 self._clock_status.setText(st)
+            # Matchroom strip: depleting bar + live 9-ball tray
+            self._clock_bar.set_state(
+                getattr(packet, "clock_remaining", 0.0),
+                getattr(packet, "clock_total", 0.0),
+                getattr(packet, "clock_warning", False),
+                getattr(packet, "clock_running", False)
+                and self._settings.shot_clock.enabled)
+            seen = {tr.number for tr in (packet.tracks or [])
+                    if tr.active and 1 <= getattr(tr, "number", -1) <= 9}
+            self._tray.set_presence(self._tray_presence.update(
+                seen, getattr(packet, "pipeline_t", -1.0)))
 
     def on_stats(self, summary: dict) -> None:
         if not self._stats_active:

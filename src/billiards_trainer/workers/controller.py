@@ -62,6 +62,7 @@ class FramePacket:
     pipeline_t: float = -1.0       # the shot detector's clock (live AND video)
     clock_running: bool = False    # countdown active (status label)
     clock_paused: bool = False
+    clock_total: float = 0.0       # THIS countdown's length (break differs)
     tracks: list = field(default_factory=list)
     raw_dets: list = field(default_factory=list)   # camera-coord dets + guessed numbers (labelling)
     feed_sd: bool = False   # camera fell back to the 480p HDMI mode (re-arm ML)
@@ -1469,6 +1470,9 @@ class PipelineController(QObject):
             pipeline_t=t,
             clock_running=self._clock.running,
             clock_paused=getattr(self._clock, "paused", False),
+            clock_total=(getattr(self._clock, "_run_seconds", 0.0)
+                         if self._clock.running
+                         else float(self._settings.shot_clock.seconds)),
         ))
         if getattr(self._source, "is_video", False):
             self.video_state.emit(self._video_pos, self._source.frame_count,
