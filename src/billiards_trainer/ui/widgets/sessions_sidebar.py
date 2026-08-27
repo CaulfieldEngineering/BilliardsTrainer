@@ -149,6 +149,17 @@ class SessionsSidebar(QFrame):
                 key=lambda p: p.stat().st_mtime, reverse=True)
         except OSError:
             clips = []
+        processed: dict = {}
+        try:
+            import json as _json
+            lib = self.recordings_dir / "library.json"
+            if lib.is_file():
+                for e in _json.loads(lib.read_text(encoding="utf-8")).get(
+                        "sessions", []):
+                    if e.get("processed"):
+                        processed[e["name"]] = e["processed"]
+        except (OSError, ValueError):
+            pass
         for p in clips[:60]:
             st = p.stat()
             when = datetime.fromtimestamp(st.st_mtime)
@@ -160,7 +171,14 @@ class SessionsSidebar(QFrame):
             it.setData(2, self._Row.SORT_ROLE, -1)
             it.setTextAlignment(1, Qt.AlignRight | Qt.AlignVCenter)
             it.setTextAlignment(2, Qt.AlignRight | Qt.AlignVCenter)
-            it.setToolTip(0, f"{p.name}  ·  {st.st_size / 1e6:.0f} MB")
+            tip = f"{p.name}  ·  {st.st_size / 1e6:.0f} MB"
+            # "Last processed" (Joe): respins are visible per session. From
+            # library.json (ONE tiny read done in refresh) - never per-row
+            # shots.json parses on the UI thread (the list-stall class).
+            exp = processed.get(p.name)
+            if exp:
+                tip += f"\nprocessed {exp[:16].replace('T', ' ')} UTC"
+            it.setToolTip(0, tip)
             self._list.addTopLevelItem(it)
         self._list.setSortingEnabled(True)
         self._load_summaries([str(p) for p in clips[:60]])

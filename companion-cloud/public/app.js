@@ -417,6 +417,18 @@ function renderHome() {
         const d = document.createElement("span");
         d.className = "d";
         d.textContent = fmtDate(s2.name, s2.modified);
+        // "Last processed" (Joe): respins retroactively update sessions -
+        // a dimmed second line shows WHEN the analysis last ran, so a
+        // fresh re-process is visible at a glance in the list
+        if (s2.processed) {
+          const pr = document.createElement("div");
+          pr.style.cssText = "font-size:10px;color:var(--faint)";
+          const pd = new Date(s2.processed);
+          pr.textContent = isNaN(pd) ? "" : "proc " +
+            pd.toLocaleString([], { month: "short", day: "numeric",
+                                    hour: "numeric", minute: "2-digit" });
+          d.appendChild(pr);
+        }
         const len = document.createElement("span");
         len.className = "num" + (s2.dur_s == null ? " dim" : "");
         len.textContent = fmtDur(s2.dur_s);

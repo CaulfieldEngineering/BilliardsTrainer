@@ -47,6 +47,7 @@ module.exports = async (req, res) => {
         analyzed: summaries.has(e.name + ".shots.json"),
         dur_s: lib[e.name] ? lib[e.name].dur_s : null,
         shots: lib[e.name] ? lib[e.name].shots : null,
+        processed: lib[e.name] ? lib[e.name].processed : null,
       }))
       .sort((a, b) => (a.modified < b.modified ? 1 : -1))
       .slice(0, 100);

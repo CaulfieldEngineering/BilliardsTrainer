@@ -674,7 +674,10 @@ def export_library_index(recordings_dir) -> Path | None:
                        if s.get("action", "stroke") in ("stroke", "break"))
         entries.append({"name": doc.get("session", sj.name[:-11]),
                         "dur_s": doc.get("duration_s", 0.0),
-                        "shots": attempts})
+                        "shots": attempts,
+                        # Joe: "so when we respin algorithms I know if a
+                        # session's been retroactively updated"
+                        "processed": doc.get("exported")})
     out = root / "library.json"
     try:
         out.write_text(json.dumps({"v": 1, "sessions": entries},
