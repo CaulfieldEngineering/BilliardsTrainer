@@ -27,13 +27,16 @@ _wav_cache: dict[tuple, str] = {}
 _SR = 44100
 
 
-def _render_wav(seq) -> str:
-    """Render a tone sequence to a cached mono 16-bit WAV (for afplay)."""
+def _render_wav(seq, volume: int = 100) -> str:
+    """Render a tone sequence to a cached mono 16-bit WAV. `volume` 0-100
+    scales sample amplitude — winsound.Beep has NO volume control, so
+    per-cue volume (Joe's ask) plays rendered files instead of beeps."""
     import tempfile
     import wave
     from pathlib import Path
 
-    key = tuple(seq)
+    amp = 0.35 * max(0, min(100, int(volume))) / 100.0
+    key = (tuple(seq), int(volume))
     cached = _wav_cache.get(key)
     if cached and Path(cached).exists():
         return cached
@@ -43,7 +46,7 @@ def _render_wav(seq) -> str:
         fade = max(1, int(_SR * 0.005))          # 5 ms ramps kill the clicks
         half_period = _SR / (2.0 * freq)
         for i in range(n):
-            v = 0.35 if int(i / half_period) % 2 == 0 else -0.35
+            v = amp if int(i / half_period) % 2 == 0 else -amp
             env = min(1.0, i / fade, (n - i) / fade)
             frames += struct.pack("<h", int(v * env * 32767))
     path = str(Path(tempfile.gettempdir()) / f"bt-cue-{abs(hash(key)):x}.wav")
@@ -56,16 +59,24 @@ def _render_wav(seq) -> str:
     return path
 
 
-def _play_seq(seq) -> None:
+def _play_seq(seq, volume: int = 100) -> None:
+    if volume <= 0:
+        return                            # muted cue
     try:
         if sys.platform == "win32":
             import winsound
-            for freq, ms in seq:
-                winsound.Beep(freq, ms)
-            return
+            try:
+                winsound.PlaySound(_render_wav(seq, volume),
+                                   winsound.SND_FILENAME | winsound.SND_ASYNC
+                                   | winsound.SND_NODEFAULT)
+                return
+            except Exception:  # noqa: BLE001 - render/play failed
+                for freq, ms in seq:      # full-volume beeps beat silence
+                    winsound.Beep(freq, ms)
+                return
         if sys.platform == "darwin":
             import subprocess
-            subprocess.run(["afplay", _render_wav(seq)], check=False,
+            subprocess.run(["afplay", _render_wav(seq, volume)], check=False,
                            capture_output=True, timeout=10)
             return
     except Exception:  # noqa: BLE001 - no audio device / server session
@@ -77,11 +88,12 @@ def _play_seq(seq) -> None:
         pass
 
 
-def play(edge: str) -> None:
-    """Play the cue for a shot-clock edge ('warn' | 'tick' | 'expired').
-    Unknown edges are silently ignored. Returns immediately."""
+def play(edge: str, volume: int = 100) -> None:
+    """Play the cue for a shot-clock edge ('start' | 'warn' | 'tick' |
+    'expired') at 0-100 volume. Unknown edges are silently ignored.
+    Returns immediately."""
     seq = _CUES.get(edge)
     if not seq:
         return
-    threading.Thread(target=_play_seq, args=(seq,), daemon=True,
+    threading.Thread(target=_play_seq, args=(seq, volume), daemon=True,
                      name="shotclock-beep").start()

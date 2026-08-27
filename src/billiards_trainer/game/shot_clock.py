@@ -115,3 +115,18 @@ class ShotClock:
             self._last_tick = sec
             return "tick"
         return ""
+
+
+def status_text(shot_state: str, running: bool, paused: bool,
+                enabled: bool) -> str:
+    """Table status beside the timer (Joe: "'Shot in Play' when no timer
+    running. etc etc"). One source of truth for the rail label."""
+    if not enabled:
+        return "CLOCK OFF"
+    if paused:
+        return "PAUSED"
+    if running:
+        return "ON THE CLOCK"
+    if shot_state == "moving":
+        return "SHOT IN PLAY"
+    return "TABLE SETTLED"

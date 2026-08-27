@@ -411,7 +411,8 @@ class MainWindow(QMainWindow):
             return
         # warn = single beep at 10 s, tick = 3-2-1 cadence, expired = the buzz
         from .sounds import play
-        play(edge)
+        play(edge, volume=int(getattr(self._settings.shot_clock,
+                                      f"vol_{edge}", 100)))
 
     def _push_settings(self) -> None:
         self.apply_settings_requested.emit(self._settings)

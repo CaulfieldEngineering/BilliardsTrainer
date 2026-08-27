@@ -731,6 +731,14 @@ class LivePage(QWidget):
         clock_lay = QVBoxLayout()
         clock_lay.setContentsMargins(0, 0, 0, 0)
         clock_lay.setSpacing(6)
+        # Table status beside the timer (Joe: "'Shot in Play' when no
+        # timer running") - fed per-frame from packet clock state
+        self._clock_status = QLabel("TABLE SETTLED")
+        self._clock_status.setAlignment(Qt.AlignCenter)
+        self._clock_status.setStyleSheet(
+            f"font-size: 11px; font-weight: 700; letter-spacing: 1px;"
+            f"color: {PALETTE.accent};")
+        clock_lay.addWidget(self._clock_status)
         row = QHBoxLayout()
         row.addStretch(1)
         self._clock = ShotClockWidget()
@@ -770,6 +778,28 @@ class LivePage(QWidget):
             prow.addStretch(1)
             prow.addWidget(spin)
             clock_lay.addLayout(prow)
+        # Per-cue volume (Joe: "a volume control for each beep type").
+        # 0 mutes that cue alone; applied on the next play, persisted
+        # via the debounced tuning save.
+        from PySide6.QtWidgets import QSlider
+        for label, attr in (("Start", "vol_start"), ("Warn", "vol_warn"),
+                            ("3-2-1", "vol_tick"), ("Buzzer", "vol_expired")):
+            vrow = QHBoxLayout()
+            lab = QLabel(label)
+            lab.setObjectName("StatLabel")
+            sld = QSlider(Qt.Horizontal)
+            sld.setRange(0, 100)
+            sld.setFixedWidth(110)
+            sld.setValue(int(getattr(self._settings.shot_clock, attr, 100)))
+            sld.valueChanged.connect(
+                lambda v, a=attr: (setattr(self._settings.shot_clock, a, int(v)),
+                                   self.tuning_changed.emit()))
+            sld.sliderReleased.connect(
+                lambda a=attr: self._preview_cue(a))
+            vrow.addWidget(lab)
+            vrow.addStretch(1)
+            vrow.addWidget(sld)
+            clock_lay.addLayout(vrow)
         self._sync_clock_btn_text()
         self._clock_holder = QWidget()
         self._clock_holder.setLayout(clock_lay)
@@ -865,6 +895,13 @@ class LivePage(QWidget):
                      "popped": PALETTE.danger}.get(kind, PALETTE.text_faint)
             self._k_stay.value_label.setStyleSheet(
                 f"font-size: 18px; font-weight: 700; color: {color};")
+
+    def _preview_cue(self, attr: str) -> None:
+        """Releasing a volume slider plays that cue once at the new
+        volume - tuning by ear, not by number."""
+        from ..sounds import play
+        edge = attr.replace("vol_", "")
+        play(edge, volume=int(getattr(self._settings.shot_clock, attr, 100)))
 
     def _sync_clock_btn_text(self) -> None:
         on = self._settings.shot_clock.enabled
@@ -1437,6 +1474,14 @@ class LivePage(QWidget):
             self._set_stay(*self._stay.tick(
                 packet.shot_state, getattr(packet, "pipeline_t", -1.0),
                 counting=self._recording_on))
+            from ...game.shot_clock import status_text
+            st = status_text(packet.shot_state,
+                             getattr(packet, "clock_running", False),
+                             getattr(packet, "clock_paused", False),
+                             self._settings.shot_clock.enabled)
+            if st != getattr(self, "_clock_status_last", None):
+                self._clock_status_last = st
+                self._clock_status.setText(st)
 
     def on_stats(self, summary: dict) -> None:
         if not self._stats_active:

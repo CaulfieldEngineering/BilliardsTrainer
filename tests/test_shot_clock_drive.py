@@ -159,3 +159,35 @@ class TestPauseResumeAndBreak:
         d.update([_cue(8.0)], t + 20.0)
         _rest(d, t + 26.0)
         assert d._clock._run_seconds == 30.0
+
+
+class TestStatusAndVolume:
+    def test_status_ladder(self):
+        from billiards_trainer.game.shot_clock import status_text
+        assert status_text("settled", False, False, False) == "CLOCK OFF"
+        assert status_text("moving", True, True, True) == "PAUSED"
+        assert status_text("settled", True, False, True) == "ON THE CLOCK"
+        assert status_text("moving", False, False, True) == "SHOT IN PLAY"
+        assert status_text("settled", False, False, True) == "TABLE SETTLED"
+
+    def test_volume_scales_wav_amplitude(self):
+        import wave
+
+        import numpy as np
+
+        from billiards_trainer.ui.sounds import _render_wav
+        loud = _render_wav([(660, 60)], volume=100)
+        quiet = _render_wav([(660, 60)], volume=25)
+        def peak(path):
+            with wave.open(path, "rb") as w:
+                d = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+            return int(np.abs(d).max())
+        p_loud, p_quiet = peak(loud), peak(quiet)
+        assert p_loud > 3 * p_quiet          # ~4x amplitude apart
+        assert p_quiet > 0                   # quiet is not silent
+
+    def test_zero_volume_is_distinct_cache_entry(self):
+        from billiards_trainer.ui.sounds import _render_wav
+        a = _render_wav([(660, 40)], volume=100)
+        b = _render_wav([(660, 40)], volume=50)
+        assert a != b                        # cache keyed by volume too

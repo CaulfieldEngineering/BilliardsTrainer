@@ -290,6 +290,12 @@ class ShotClockSettings:
     # Longer countdown for the shot AFTER a break (league convention: you
     # get time to survey the spread). Applied when 5+ balls scattered.
     break_seconds: int = 60
+    # Per-cue volumes 0-100 (Joe: "a volume control for each beep type");
+    # 0 mutes that cue alone.
+    vol_start: int = 70
+    vol_warn: int = 90
+    vol_tick: int = 90
+    vol_expired: int = 100
 
 
 @dataclass
