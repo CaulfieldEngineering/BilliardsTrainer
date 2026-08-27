@@ -27,6 +27,7 @@ FRICTION = 0.88          # per-0.1s velocity retention while coasting
 COAST_S = 0.6            # coast this long without a detection, then inactive
 GATE_R = 3.2             # association gate, in ball radii, around prediction
 VOTE_N = 9               # number votes considered for identity
+HYST_K = 5               # frames a new number must lead before shown
 
 
 @dataclass
@@ -41,6 +42,11 @@ class _Track:
     votes: list = field(default_factory=list)
     misses: float = 0.0          # seconds since last real detection
     active: bool = True
+    emitted: int = -1            # the number this track SHOWS (hysteresis)
+    pend: int = -1               # candidate awaiting confirmation
+    pend_k: int = 0              # consecutive frames the candidate has led
+    ax: float = 0.0              # rest anchor (identity freezes at rest)
+    ay: float = 0.0
 
     @property
     def number(self) -> int:
@@ -171,14 +177,54 @@ class MotionTracker:
                     claims[n] = inc
         for n, tr in claims.items():
             self._holder[n] = tr.id
-        # 6. emit rows for ACTIVE tracks (coasting ones carry predicted pos)
+        # 6. EMIT HYSTERESIS (gate round 2: 163 residual id_flickers were
+        # vote majorities oscillating between two real numbers at rest).
+        # A track's SHOWN number changes n->m only after the new number
+        # has led for HYST_K consecutive frames; dropping to unnumbered
+        # (arbitration loss) stays immediate - duplicate prevention
+        # outranks flicker prevention.
+        emitted_claims: dict[int, int] = {}
         out = []
         for tr in self._tracks.values():
             if not tr.active:
                 continue
-            n = tr.number
-            if n >= 0 and claims.get(n) is not tr:
-                n = -1                      # arbitration loser: unnumbered
+            cand = tr.number
+            if cand >= 0 and claims.get(cand) is not tr:
+                cand = -1                   # arbitration loser
+            # REST-FROZEN IDENTITY (the live tracker's actual bought
+            # rule, gate round 3: 79 residual flickers were sustained
+            # misreads outlasting 5-frame hysteresis). A ball that has
+            # not moved cannot become a different ball: while within
+            # half a radius of its rest anchor, a SHOWN number never
+            # changes to another number.
+            moved = ((tr.x - tr.ax) ** 2 + (tr.y - tr.ay) ** 2) ** 0.5                 > 0.5 * max(tr.radius, 8.0)
+            if moved:
+                tr.ax, tr.ay = tr.x, tr.y
+            at_rest = not moved
+            if cand == -1:
+                tr.emitted, tr.pend, tr.pend_k = -1, -1, 0
+            elif tr.emitted == -1 or cand == tr.emitted:
+                if tr.emitted == -1:
+                    tr.emitted = cand       # first identity: no delay
+                    tr.ax, tr.ay = tr.x, tr.y
+                tr.pend, tr.pend_k = -1, 0
+            elif at_rest and tr.emitted >= 0:
+                tr.pend, tr.pend_k = -1, 0  # frozen: misreads bounce off
+            else:
+                if cand == tr.pend:
+                    tr.pend_k += 1
+                else:
+                    tr.pend, tr.pend_k = cand, 1
+                if tr.pend_k >= HYST_K:
+                    tr.emitted, tr.pend, tr.pend_k = cand, -1, 0
+            n = tr.emitted
+            # final uniqueness belt: hysteresis lag must never show one
+            # number on two tracks in the same frame
+            if n >= 0:
+                if n in emitted_claims:
+                    n = -1
+                else:
+                    emitted_claims[n] = tr.id
             out.append(_Row(tr.id, tr.x, tr.y, tr.radius, n,
                             tr.misses > 0.0))
         return out

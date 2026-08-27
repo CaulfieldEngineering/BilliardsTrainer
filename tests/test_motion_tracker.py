@@ -92,3 +92,50 @@ class TestMotionTracker:
                 flips += 1
             last = who
         assert flips == 0, "the incumbent must hold the number steadily"
+
+    def test_emitted_number_survives_vote_oscillation(self):
+        # gate round 2: majorities flip 5<->3 at rest; the SHOWN number
+        # must hold unless the new read leads 5 straight frames
+        tk = MotionTracker()
+        for i in range(6):
+            rows = _step(tk, [(100, 200, 16, 5)], i / 30)
+        seen = set()
+        for i in range(6, 30):
+            n = 3 if i % 2 == 0 else 5        # alternating misreads
+            rows = _step(tk, [(100, 200, 16, n)], i / 30)
+            seen.add(next(iter(rows.values())).number)
+        assert seen == {5}, f"shown number flickered: {seen}"
+
+    def test_sustained_new_read_flips_only_in_motion(self):
+        # superseded expectation: rest-frozen identity outranks
+        # hysteresis - a RESTING ball never flips (see the frozen test);
+        # a MOVING ball with a sustained new read does re-earn identity
+        tk = MotionTracker()
+        for i in range(6):
+            _step(tk, [(100 + i * 12, 200, 16, 5)], i / 30)
+        rows = {}
+        for i in range(6, 26):                 # rolling on, consistent 3
+            rows = _step(tk, [(100 + i * 12, 200, 16, 3)], i / 30)
+        assert next(iter(rows.values())).number == 3
+
+    def test_resting_ball_identity_is_frozen(self):
+        # the live tracker's bought rule: sustained misreads at rest
+        # (outlasting any hysteresis window) must bounce off
+        tk = MotionTracker()
+        for i in range(6):
+            _step(tk, [(100, 200, 16, 5)], i / 30)
+        rows = {}
+        for i in range(6, 40):                 # 34 frames of consistent 3
+            rows = _step(tk, [(100, 200, 16, 3)], i / 30)
+        assert next(iter(rows.values())).number == 5, "at rest = frozen"
+
+    def test_identity_can_change_after_movement(self):
+        tk = MotionTracker()
+        for i in range(6):
+            _step(tk, [(100, 200, 16, 5)], i / 30)
+        # the ball moves away (occlusion swap scenario), then reads 3
+        rows = {}
+        for i in range(6, 30):
+            x = 100 + (i - 5) * 12             # rolling
+            rows = _step(tk, [(x, 200, 16, 3)], i / 30)
+        assert next(iter(rows.values())).number == 3, "moving balls re-earn identity"
