@@ -236,6 +236,19 @@ The new engine is a **measurement core**: a capture-clocked, every-frame positio
 
 ### M1 measurement log
 
+- 2026-08-27 (post-payoff autopsy): the 47 gate-held shots decomposed:
+  76 shots carry at least one PATH-DIVERGED trail (worst 1.5-6 ball
+  radii), 17 endpoint-off, 3 no-dense-ball. Visual arbitration on the
+  worst case (shot@362 ball 5): the ball physically rests IN the
+  side-pocket jaw; the DENSE trail ends on it, the SPARSE trail stops
+  mid-felt - the agreement gate sided with the wrong witness. M2
+  DESIGN CONSEQUENCE: sparse agreement is a bootstrap gate only;
+  dense-vs-sparse disagreements must be arbitrated against the VIDEO
+  (endpoint-vs-visible-ball checks, pocket-event consistency), and the
+  corpus gates measure dense on its own merits (identity metrics,
+  physics-impossible rate) rather than by sparse conformity.
+
+
 - 2026-08-27: budget split measured (offline, live app concurrently on the
   same GPU): finder 87-138 ms/frame = **2 serial model runs x ~37 ms**
   (two-pass tiling) + only 12.4 ms Python glue; identifier 67 ms (every
