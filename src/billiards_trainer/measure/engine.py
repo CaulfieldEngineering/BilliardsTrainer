@@ -100,6 +100,15 @@ def reprocess(video: str, out_dir: str | None = None,
     strat = discover()["ensemble_findid"]
     strat.inference_provider = "dml"
     finder, ident = strat._finder, strat._identifier
+    # ENGINE-ONLY fp16 finder (1.58x; verified 0/60 count mismatches,
+    # p99 position diff 0.47px on real frames). The LIVE app keeps the
+    # fp32 champion until the corpus gates pass judgement.
+    fp16 = Path(r"C:\Users\Joe\AppData\Local\BilliardsTrainer\models"
+                r"\m1\pool_yolo11.fp16.onnx")
+    if fp16.is_file():
+        finder._path = fp16
+        finder._sess = None
+        log.info("engine finder: fp16 (%s)", fp16.name)
 
     cap = cv2.VideoCapture(str(video))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
