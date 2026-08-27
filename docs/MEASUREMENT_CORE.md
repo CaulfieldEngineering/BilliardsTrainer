@@ -249,6 +249,20 @@ The new engine is a **measurement core**: a capture-clocked, every-frame positio
 
 ## 5. MILESTONES
 
+- 2026-08-27 (overnight): FIRST FULL DENSE RUNS. Small session + the
+  90-min marathon re-processed end-to-end: every frame written, 30.0
+  states/s through the canonical reader. THE HEADLINE: dense cue-ball
+  takeoff response median **-34ms** from the verified strike (n=100
+  shots; sparse era 1600-2200ms) - the blur blindness is solved in
+  data. THE LESSON: 85% duplicate-identity frames - positional
+  exclusivity was ported, NUMBER exclusivity was not (the KEEP table
+  said so). Fixed twice over (one-to-one finder<->identifier pairing;
+  emit-time number arbitration), 2000-frame verify = 0 duplicates,
+  6 tracker contract tests. Marathon re-running on the corrected
+  engine (~5.4h). Next: dense-trail merge exporter -> the marathon's
+  shots.json -> Joe's replay goes pixel-locked.
+
+
 Ordered; each has a measurable exit. Recording always outranks any milestone work (BelowNormal, killed on `.part` appearance).
 
 ### M1 — Offline engine: dense re-processing of recorded sessions
