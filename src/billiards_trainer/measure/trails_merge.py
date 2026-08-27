@@ -53,9 +53,12 @@ def _agrees(dense_pts, sparse_pts) -> bool:
     return ((ex - lx) ** 2 + (ey - ly) ** 2) ** 0.5 < ENDPOINT_TOL
 
 
-def merge_trails(video_path, dense_reader, doc: dict) -> dict:
-    """Returns {'shots_upgraded': n, 'shots_kept_sparse': m, 'skipped': k}.
-    Mutates doc in place (caller writes it)."""
+def merge_trails(video_path, dense_reader, doc: dict,
+                 arbiter=None) -> dict:
+    """Returns upgrade stats; mutates doc in place (caller writes it).
+    arbiter: optional VideoArbiter — when the bootstrap agreement gate
+    refuses a dense trail, the VIDEO decides (the ball's actual resting
+    place at trail end). Ambiguity keeps sparse."""
     meta = dense_reader.meta
     hinv = np.asarray(meta.get("hinv"), dtype=float)
     w, h = float(meta.get("w")), float(meta.get("h"))
@@ -89,10 +92,22 @@ def merge_trails(video_path, dense_reader, doc: dict) -> dict:
                     [round(times[j] + o, 3), round(x, 4), round(y, 4)])
         new_trails = []
         any_upgrade = False
+        pocketed_ns = {int(pb.get("number", -1)) for pb in
+                       (s.get("pocketed_balls") or [])} if isinstance(
+                           s.get("pocketed_balls"), list) else set()
         for tr in s["trails"]:
             n = tr.get("n", -1)
             dp = per_n.get(n)
-            if dp and _agrees(dp, tr.get("p", [])):
+            take = bool(dp and _agrees(dp, tr.get("p", [])))
+            if (dp and not take and arbiter is not None and len(dp) >= 5
+                    and len(tr.get("p", [])) >= 3):
+                # video-truth arbitration: who ends where reality is?
+                t_end_v = dp[-1][0] - o
+                v = arbiter.verdict(t_end_v, (dp[-1][1], dp[-1][2]),
+                                    (tr["p"][-1][1], tr["p"][-1][2]),
+                                    n in pocketed_ns)
+                take = v == "dense"
+            if take:
                 pts = dp[:: max(1, len(dp) // MAX_PTS + 1)][:MAX_PTS]
                 new_trails.append({"n": n, "p": pts, "dense": True})
                 any_upgrade = True
@@ -107,7 +122,8 @@ def merge_trails(video_path, dense_reader, doc: dict) -> dict:
             "skipped_no_coverage": skipped}
 
 
-def merge_into_session(video_path, dense_sidecar_video) -> dict | None:
+def merge_into_session(video_path, dense_sidecar_video,
+                       arbitrate: bool = True) -> dict | None:
     """Load, merge, and WRITE the session's shots.json (bumps the
     processed stamp). Returns the stats dict, or None on failure."""
     from datetime import datetime, timezone
@@ -120,7 +136,27 @@ def merge_into_session(video_path, dense_sidecar_video) -> dict | None:
     if not dense.meta.get("hinv"):
         log.error("dense sidecar lacks meta hinv - refusing to merge")
         return None
-    stats = merge_trails(video_path, dense, doc)
+    arbiter = None
+    if arbitrate:
+        try:
+            from ..config import Settings
+            from ..vision.pipeline import Pipeline
+            from .arbitrate import VideoArbiter
+            from .engine import _acquire_calib
+            pipe = Pipeline(Settings.load())
+            calib = _acquire_calib(video_path, pipe)
+            if calib is not None and dense.meta.get("hinv"):
+                arbiter = VideoArbiter(video_path, calib,
+                                       dense.meta["hinv"],
+                                       dense.meta["w"], dense.meta["h"])
+                arbiter._pipe = pipe
+        except Exception:  # noqa: BLE001 - arbitration is an upgrade path
+            log.exception("arbiter unavailable; bootstrap gate only")
+    try:
+        stats = merge_trails(video_path, dense, doc, arbiter=arbiter)
+    finally:
+        if arbiter is not None:
+            arbiter.close()
     doc["exported"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     doc["trails_engine"] = "m1-dense"
     sj.write_text(json.dumps(doc, separators=(",", ":")), encoding="utf-8")
