@@ -79,11 +79,23 @@ def reprocess(video: str, out_dir: str | None = None,
     cap = cv2.VideoCapture(str(video))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     n_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    w_px = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h_px = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     if start_s > 0:
         cap.set(cv2.CAP_PROP_POS_MSEC, start_s * 1000)
+    # the ENGINE's own rect->video transform rides in the meta, so the
+    # trail exporter normalizes through a SELF-CONSISTENT chain (dense
+    # coords -> this hinv -> video pixels) instead of a second warmup's
+    # slightly different lock
+    import numpy as np
+    hinv = np.linalg.inv(np.asarray(calib.H, dtype=float))
     writer = SidecarWriter(out_video_alias, {"fps": fps, "engine": "m1",
                                              "dense": True,
-                                             "calibrated": calib is not None,
+                                             "calibrated": True,
+                                             "hinv": [[round(float(v), 8)
+                                                       for v in row]
+                                                      for row in hinv],
+                                             "w": w_px, "h": h_px,
                                              "source": video.name})
     tracker = MotionTracker()
     ident_by_pos: list = []      # latest identifier detections (x, y, n)
