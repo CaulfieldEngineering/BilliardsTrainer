@@ -335,10 +335,14 @@ class Pipeline:
         cv2.drawMarker(img, c, (255, 255, 255), cv2.MARKER_CROSS, 40, 1, cv2.LINE_AA)
         res.frame_bgr = img
 
-    def _apply_detections(self, raw_dets, calib, frame_shape, frame=None):
-        """Project raw-frame detections to rect space, run the sanity filters,
-        and update the tracker. Shared by the synchronous path (video replay,
-        seek/step, tests) and ingest_raw_detections (live async worker)."""
+    def prepare_detections(self, raw_dets, calib, frame_shape, frame=None):
+        """Project raw-frame detections to rect space and run EVERY sanity
+        filter (size prior, foreign veto, rigid-body repair, number
+        arbitration, confidence floor, geometry, blur recovery) — the full
+        bought stack, WITHOUT touching the tracker. Shared by the live
+        path (_apply_detections) and the M1 measurement engine, which
+        skipped it once and re-learned why it exists (229px coordinate
+        offset AND every filtered phantom class at once)."""
         detections = self._project_raw_to_rect(raw_dets, calib, frame_shape)
         # Physical-size prior: reject detections whose radius is far from the
         # known ball radius. This used to be skipped for model-based detectors
@@ -529,6 +533,16 @@ class Pipeline:
                         extra, calib, frame_shape)
             except Exception:  # noqa: BLE001 - recovery must never break tracking
                 log.exception("blur recovery failed")
+        return detections
+
+    def _apply_detections(self, raw_dets, calib, frame_shape, frame=None):
+        """Prepared detections -> tracker update + vacancy pruning. The
+        preparation stage lives in prepare_detections (shared with the
+        M1 engine); this tail is the LIVE tracker's path only."""
+        detections = self.prepare_detections(raw_dets, calib, frame_shape,
+                                             frame=frame)
+        tbl = calib.table
+        exp_r = expected_ball_radius_px(tbl, self.settings.table.size)
         tracks = self.tracker.update(
             detections, calib.table.short_side,
             bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),

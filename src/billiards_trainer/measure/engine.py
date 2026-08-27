@@ -25,18 +25,14 @@ IDENT_EVERY = 6          # identifier cadence (votes persist on tracks)
 PROGRESS_EVERY_S = 30.0
 
 
-def _acquire_calib(video):
+def _acquire_calib(video, pipe):
     """The session's own rectification, re-acquired from its frames
     (same warmup shots_export._video_transform uses for hinv)."""
     import cv2
-
-    from ..config import Settings
-    from ..vision.pipeline import Pipeline
     cap = cv2.VideoCapture(str(video))
     if not cap.isOpened():
         return None
     try:
-        pipe = Pipeline(Settings.load())
         for n in range(1, 91):
             ok, fr = cap.read()
             if not ok:
@@ -50,12 +46,13 @@ def _acquire_calib(video):
 
 
 def reprocess(video: str, out_dir: str | None = None,
-              max_frames: int = 0, calib=None) -> dict:
+              max_frames: int = 0, calib=None, start_s: float = 0.0) -> dict:
     import cv2
 
-    from ..config import EXPORTS_DIR
+    from ..config import EXPORTS_DIR, Settings
     from ..detector_strategies import discover
     from ..vision.analysis_cache import SidecarWriter
+    from ..vision.pipeline import Pipeline
     from .tracker import MotionTracker
 
     video = Path(video)
@@ -63,17 +60,17 @@ def reprocess(video: str, out_dir: str | None = None,
     out_root.mkdir(parents=True, exist_ok=True)
     out_video_alias = out_root / video.name    # sidecar naming anchor
 
+    # A Pipeline instance carries BOTH the session-warmup calibration and
+    # prepare_detections - the full bought filter stack (size prior,
+    # foreign veto, rigid-body repair, geometry sanity...). The engine
+    # once bypassed it and got a 229px coordinate offset plus every
+    # phantom class the filters exist for.
+    pipe = Pipeline(Settings.load())
     if calib is None:
-        # Acquire calibration FROM THE VIDEO (the export's own recipe) so
-        # engine coords live in the session's rectified space by
-        # construction. calib=None auto-find drifted per segment on the
-        # first marathon run and no single transform could repair it
-        # (229px median even borrowing a same-dims neighbour lock).
-        calib = _acquire_calib(video)
+        calib = _acquire_calib(video, pipe)
         if calib is None:
-            log.warning("calibration warmup failed for %s - auto-find "
-                        "fallback (coords may not match session space)",
-                        video.name)
+            log.warning("calibration warmup failed for %s", video.name)
+            return {"aborted": True, "reason": "no calibration"}
 
     strat = discover()["ensemble_findid"]
     strat.inference_provider = "dml"
@@ -82,6 +79,8 @@ def reprocess(video: str, out_dir: str | None = None,
     cap = cv2.VideoCapture(str(video))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     n_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if start_s > 0:
+        cap.set(cv2.CAP_PROP_POS_MSEC, start_s * 1000)
     writer = SidecarWriter(out_video_alias, {"fps": fps, "engine": "m1",
                                              "dense": True,
                                              "calibrated": calib is not None,
@@ -101,7 +100,7 @@ def reprocess(video: str, out_dir: str | None = None,
             ok, frame = cap.read()
             if not ok:
                 break
-            t = fi / fps
+            t = start_s + fi / fps
             if fi % 150 == 0 and recording_live():
                 log.warning("recording started - engine run aborted at %.1fs", t)
                 return {"aborted": True, "frames": fi}
@@ -128,13 +127,15 @@ def reprocess(video: str, out_dir: str | None = None,
                     continue
                 num_for[fi_d] = ident_by_pos[ii][2]
                 used_i.add(ii)
-            dets = []
             for fi_d, d in enumerate(found):
                 num = num_for.get(fi_d, -1)
-                if getattr(d, "number", -1) >= 0:
-                    num = d.number       # the finder's own read wins
-                dets.append((float(d.x), float(d.y),
-                             float(d.radius), int(num)))
+                if num >= 0 and getattr(d, "number", -1) < 0:
+                    d.number = num       # carry the identifier's read
+            # THE shared stage: raw-frame -> rect space + every filter
+            prepared = pipe.prepare_detections(found, calib, frame.shape,
+                                               frame=frame)
+            dets = [(float(d.x), float(d.y), float(d.radius),
+                     int(getattr(d, "number", -1))) for d in prepared]
             rows = tracker.update(dets, t)
             writer.add_frame(t, rows)
             written += 1
