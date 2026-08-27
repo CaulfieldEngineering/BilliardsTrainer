@@ -235,6 +235,7 @@ class MainWindow(QMainWindow):
         self._controller.frame_ready.connect(self._live.on_frame)
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.shot_recorded.connect(self._live.on_shot)
+        self._controller.shot_recorded.connect(self._on_shot_sound)
         self._controller.stroke_measured.connect(self._live.on_stroke_measured)
         self._controller.cached_shots.connect(self._live.on_cached_shots)
         self._controller.overlays_loaded.connect(self._live.on_overlays_loaded)
@@ -405,6 +406,19 @@ class MainWindow(QMainWindow):
         log.warning("controller error: %s", msg)
         if any(h in msg.lower() for h in self._CAMERA_ERR_HINTS):
             self._live.show_camera_error(msg)
+
+    def _on_shot_sound(self, event) -> None:
+        """Joe: a sound when I scratch - live validation of the analysis
+        while playing. Fires when the shot FINALIZES (balls settled), the
+        moment the system actually concludes 'cue ball pocketed'."""
+        try:
+            scratched = bool(getattr(event, "cue_scratch", False)) or                 getattr(getattr(event, "outcome", None), "value", "") == "scratch"
+            if scratched:
+                from .sounds import play
+                play("scratch", volume=int(getattr(
+                    self._settings.shot_clock, "vol_scratch", 90)))
+        except Exception:  # noqa: BLE001 - a chime is never worth a crash
+            log.debug("scratch chime failed", exc_info=True)
 
     def _on_clock_event(self, edge: str) -> None:
         if not self._settings.shot_clock.audio:

@@ -296,6 +296,9 @@ class ShotClockSettings:
     vol_warn: int = 90
     vol_tick: int = 90
     vol_expired: int = 100
+    # Scratch chime: live audible validation that the analysis saw the
+    # cue ball drop (plays when the shot finalizes as a scratch).
+    vol_scratch: int = 90
 
 
 @dataclass

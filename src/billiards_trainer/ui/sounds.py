@@ -21,6 +21,9 @@ _CUES = {
     "warn": [(880, 220)],                 # one heads-up beep (10 s left)
     "tick": [(1320, 130)],                # short, urgent: the 3-2-1 cadence
     "expired": [(220, 260), (185, 520)],  # two falling low tones = the buzz
+    # Joe: "validating scratches via a sound... I can validate analysis
+    # while playing" - a falling minor phrase, unmistakably not a clock cue
+    "scratch": [(392, 170), (311, 170), (247, 340)],
 }
 
 _wav_cache: dict[tuple, str] = {}

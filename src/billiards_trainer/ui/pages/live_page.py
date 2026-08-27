@@ -783,7 +783,8 @@ class LivePage(QWidget):
         # via the debounced tuning save.
         from PySide6.QtWidgets import QSlider
         for label, attr in (("Start", "vol_start"), ("Warn", "vol_warn"),
-                            ("3-2-1", "vol_tick"), ("Buzzer", "vol_expired")):
+                            ("3-2-1", "vol_tick"), ("Buzzer", "vol_expired"),
+                            ("Scratch", "vol_scratch")):
             vrow = QHBoxLayout()
             lab = QLabel(label)
             lab.setObjectName("StatLabel")
