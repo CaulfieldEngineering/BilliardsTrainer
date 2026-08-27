@@ -950,6 +950,29 @@ $("ov-why").onclick = () => {
 // soft same-hue bloom under a thin crisp core.
 
 //: build a smooth Path2D through points (quadratic via midpoints)
+// Like smoothPath but STOPS at the midpoint of the final segment, so a
+// newly landed sample only APPENDS geometry - smoothPath's last two curve
+// segments reshaped on every sample and the tail visibly stepped
+// (Joe: "the tail kind of moves in chunks"). The live half-segment from
+// that midpoint to the interpolated tip is drawn per-frame by the caller.
+function stablePrefix(pts) {
+  const path = new Path2D();
+  if (!pts.length) return path;
+  path.moveTo(pts[0][0], pts[0][1]);
+  const n = pts.length - 1;
+  if (n < 1) return path;
+  if (n === 1) {
+    path.lineTo((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2);
+    return path;
+  }
+  for (let i = 1; i < n; i++) {
+    const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+    const my = (pts[i][1] + pts[i + 1][1]) / 2;
+    path.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+  }
+  return path;
+}
+
 function smoothPath(pts) {
   const path = new Path2D();
   if (!pts.length) return path;
@@ -1254,7 +1277,11 @@ function drawTrails(tOverride) {
         grad.addColorStop(0.55, col + "9E");
         grad.addColorStop(1, col + "FF");
       }
-      c.k = k; c.path = smoothPath(pts); c.grad = grad; c.end = pts[pts.length - 1];
+      c.k = k; c.path = stablePrefix(pts); c.grad = grad;
+      c.end = pts[pts.length - 1];
+      c.mid = k >= 1
+        ? [(pts[k - 1][0] + pts[k][0]) / 2, (pts[k - 1][1] + pts[k][1]) / 2]
+        : pts[k];
     }
     strokeLine(ctx, c.path, col, 1.5, dpr, { grad: c.grad, alpha: 1 });
     // live tip: interpolate toward the NEXT sample so the line advances
@@ -1262,16 +1289,37 @@ function drawTrails(tOverride) {
     let tip = c.end;
     if (k < p.length - 1) {
       const t0 = p[k][0], t1 = p[k + 1][0];
-      const f = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+      let f = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+      // TAKEOFF GAP (Joe: tail "kicks in late then catches up"): the
+      // tracker loses the motion-blurred ball for ~2s after the strike,
+      // so this one segment spans the fastest part of the flight. Linear
+      // time-interpolation crawls the chord at AVERAGE speed - always
+      // behind a decelerating ball. Shape it instead: leave fast, ease
+      // toward the re-acquisition speed (estimated from the next samples).
+      if (f > 0 && t1 - t0 > 0.4) {
+        let s1 = 0.6;                       // fraction of avg speed at t1
+        if (k + 2 < p.length && p[k + 2][0] > t1) {
+          const vAvg = Math.hypot(p[k + 1][1] - p[k][1],
+                                  p[k + 1][2] - p[k][2]) / (t1 - t0);
+          const v1 = Math.hypot(p[k + 2][1] - p[k + 1][1],
+                                p[k + 2][2] - p[k + 1][2]) /
+                     (p[k + 2][0] - t1);
+          if (vAvg > 1e-6) s1 = Math.min(1.5, Math.max(0, v1 / vAvg));
+        }
+        const s0 = 2 - s1;                  // f(1)=1 keeps the tip honest
+        f = s0 * f + (s1 - s0) * f * f / 2;
+      }
       if (f > 0) {
         const n = Q(p[k + 1]);
         tip = [c.end[0] + (n[0] - c.end[0]) * f, c.end[1] + (n[1] - c.end[1]) * f];
-        const seg = new Path2D();
-        seg.moveTo(c.end[0], c.end[1]);
-        seg.lineTo(tip[0], tip[1]);
-        strokeLine(ctx, seg, col, 1.5, dpr, { alpha: 1 });
       }
     }
+    // the live tail: frozen-midpoint -> p[k] -> tip, one quadratic drawn
+    // fresh each frame (committed geometry above never changes)
+    const live = new Path2D();
+    live.moveTo(c.mid[0], c.mid[1]);
+    live.quadraticCurveTo(c.end[0], c.end[1], tip[0], tip[1]);
+    strokeLine(ctx, live, col, 1.5, dpr, { alpha: 1 });
     // tip dot removed (Joe: "only the tail and not the circle covering the ball")
   });
   ctx.globalAlpha = 1;
