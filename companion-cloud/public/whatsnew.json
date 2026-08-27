@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 43,
+   "date": "2026-08-27",
+   "title": "Your marathon session: trails re-measured every frame",
+   "body": "The new measurement engine re-processed your full 90-minute session frame by frame - ball positions every 33 milliseconds instead of every 150, with no takeoff blind spot (the cue ball's trail now responds within a frame of the strike instead of 2 seconds late). 78 shots' trails were upgraded; each upgraded trail had to match the old one's path and endpoints to prove itself, and the session's 'proc' stamp shows the update. This is the first session through the engine - the rest of the library follows as it clears its gates.",
+   "details": [
+    "Trails held back on 47 shots where the dense measurement couldn't prove agreement - honest sparse stays until the engine earns full trust via the corpus gates.",
+    "Look for detail the old sampling couldn't see: quick bounce-backs, curve of masse/spin shots, true takeoff direction."
+   ]
+  },
+  {
    "id": 42,
    "date": "2026-08-27",
    "title": "Shot clock: per-beep volume and a table status readout",
