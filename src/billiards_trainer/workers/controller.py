@@ -80,6 +80,7 @@ class PipelineController(QObject):
     replay_saved = Signal(str)          # path to a saved replay clip
     shot_suggested = Signal(object)     # ShotEvent — manual-confirm mode (not recorded)
     recording_changed = Signal(bool)    # recording on/off
+    narration = Signal(str)             # spoken table events (ball_in_hand...)
     detection_changed = Signal(bool)    # auto-detection on/off
     capture_progress = Signal(str)      # analysis-capture status text
     capture_saved = Signal(str)         # path to a finished analysis-capture zip
@@ -157,6 +158,8 @@ class PipelineController(QObject):
         self._clock_armed = True       # a new turn may start the clock
         self._strike_stop_t = -1e9     # break-detection window anchor
         self._break_pending = False    # next countdown gets break_seconds
+        from ..game.narration import Narrator
+        self._narrator = Narrator()
         # Flow rule: a shot clock only makes sense while PLAYING — live camera
         # sources only. Reviewing a recorded video must never run a countdown.
         self._clock_allowed = False
@@ -1341,6 +1344,16 @@ class PipelineController(QObject):
 
         self._diag_pub = len(res.tracks)
         self._handle_state(res.shot_state, t)
+        # narration gate (Joe): "Ball in hand" vs "Table change", live
+        if self._clock_allowed:
+            by_id = {tr.id: tr for tr in res.tracks}
+            carried = [by_id[i] for i in (res.carried_ids or ()) if i in by_id]
+            has_cue = any(tr.cls == BallClass.CUE for tr in carried)
+            has_obj = any(tr.cls != BallClass.CUE for tr in carried)
+            kind = self._narrator.update(has_cue, has_obj,
+                                         res.shot_state == "moving", t)
+            if kind:
+                self.narration.emit(kind)
         # sidecar: record tracking states at ~10Hz while a session records
         sc = getattr(self, "_sidecar", None)
         if sc is not None and res.status == "tracking"                 and t - getattr(self, "_sidecar_last_t", -1.0) >= 0.1:

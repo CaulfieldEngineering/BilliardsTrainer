@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
         self._maybe_check_updates()
         # pre-render spoken cues so the first live utterance is instant
         from .voice import prewarm
-        prewarm(["Ten", "Scratch", "Ball in hand"])
+        prewarm(["Ten", "Scratch", "Ball in hand", "Table change"])
 
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.shot_recorded.connect(self._live.on_shot)
         self._controller.shot_recorded.connect(self._on_shot_sound)
+        self._controller.narration.connect(self._on_narration)
         self._controller.stroke_measured.connect(self._live.on_stroke_measured)
         self._controller.cached_shots.connect(self._live.on_cached_shots)
         self._controller.overlays_loaded.connect(self._live.on_overlays_loaded)
@@ -409,6 +410,16 @@ class MainWindow(QMainWindow):
         log.warning("controller error: %s", msg)
         if any(h in msg.lower() for h in self._CAMERA_ERR_HINTS):
             self._live.show_camera_error(msg)
+
+    def _on_narration(self, kind: str) -> None:
+        """Joe: "Ball in hand" when he grabs the cue ball, "Table change"
+        when object balls move in a non-shot fashion."""
+        phrase = {"ball_in_hand": "Ball in hand",
+                  "table_change": "Table change"}.get(kind)
+        if phrase:
+            from .voice import say
+            say(phrase, volume=int(getattr(self._settings.shot_clock,
+                                           "vol_voice", 100)))
 
     def _on_shot_sound(self, event) -> None:
         """Joe: a sound when I scratch - live validation of the analysis
