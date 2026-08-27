@@ -45,6 +45,31 @@ def _acquire_calib(video, pipe):
         cap.release()
 
 
+def _pair_identities(found, ident_by_pos) -> None:
+    """EXCLUSIVE finder<->identifier pairing, in place: one identifier
+    read feeds ONE finder detection (the first marathon run let
+    neighbours share a read and spread duplicate numbers)."""
+    cand = []
+    for fi_d, d in enumerate(found):
+        lim = 2.5 * max(d.radius, 8.0)
+        for ii, (ix, iy, _n) in enumerate(ident_by_pos):
+            dd = ((d.x - ix) ** 2 + (d.y - iy) ** 2) ** 0.5
+            if dd < lim:
+                cand.append((dd, fi_d, ii))
+    cand.sort()
+    num_for: dict = {}
+    used_i: set = set()
+    for _dd, fi_d, ii in cand:
+        if fi_d in num_for or ii in used_i:
+            continue
+        num_for[fi_d] = ident_by_pos[ii][2]
+        used_i.add(ii)
+    for fi_d, d in enumerate(found):
+        num = num_for.get(fi_d, -1)
+        if num >= 0 and getattr(d, "number", -1) < 0:
+            d.number = num               # carry the identifier's read
+
+
 def reprocess(video: str, out_dir: str | None = None,
               max_frames: int = 0, calib=None, start_s: float = 0.0) -> dict:
     import cv2
@@ -121,28 +146,7 @@ def reprocess(video: str, out_dir: str | None = None,
                 ids = ident.detect(frame, calib) or []
                 ident_by_pos = [(d.x, d.y, d.number) for d in ids
                                 if getattr(d, "number", -1) >= 0]
-            # EXCLUSIVE finder<->identifier pairing (one identifier read
-            # feeds ONE finder detection - the first marathon run let
-            # neighbours share a read and spread duplicate numbers)
-            cand = []
-            for fi_d, d in enumerate(found):
-                lim = 2.5 * max(d.radius, 8.0)
-                for ii, (ix, iy, n) in enumerate(ident_by_pos):
-                    dd = ((d.x - ix) ** 2 + (d.y - iy) ** 2) ** 0.5
-                    if dd < lim:
-                        cand.append((dd, fi_d, ii))
-            cand.sort()
-            num_for: dict = {}
-            used_i: set = set()
-            for _dd, fi_d, ii in cand:
-                if fi_d in num_for or ii in used_i:
-                    continue
-                num_for[fi_d] = ident_by_pos[ii][2]
-                used_i.add(ii)
-            for fi_d, d in enumerate(found):
-                num = num_for.get(fi_d, -1)
-                if num >= 0 and getattr(d, "number", -1) < 0:
-                    d.number = num       # carry the identifier's read
+            _pair_identities(found, ident_by_pos)
             # THE shared stage: raw-frame -> rect space + every filter
             prepared = pipe.prepare_detections(found, calib, frame.shape,
                                                frame=frame)
