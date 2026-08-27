@@ -73,7 +73,7 @@ class MotionTracker:
                 tr.vy *= damp
         # 2. exclusive greedy association by predicted distance
         pairs = []
-        for di, (dx, dy, dr, dn) in enumerate(dets):
+        for di, (dx, dy, dr, _dn) in enumerate(dets):
             for tr in self._tracks.values():
                 gate = GATE_R * max(tr.radius, dr, 8.0)
                 dd = ((tr.x - dx) ** 2 + (tr.y - dy) ** 2) ** 0.5
@@ -82,7 +82,7 @@ class MotionTracker:
         pairs.sort()
         used_d: set = set()
         used_t: set = set()
-        for dd, di, tid in pairs:
+        for _dd, di, tid in pairs:
             if di in used_d or tid in used_t:
                 continue
             used_d.add(di)
