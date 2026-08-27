@@ -217,7 +217,9 @@ def test_shot_clock_wav_render_for_macos():
         assert w.getnchannels() == 1
         assert w.getsampwidth() == 2
         dur_ms = 1000 * w.getnframes() / w.getframerate()
-    assert abs(dur_ms - (260 + 520)) < 5           # the two buzz tones
+    want = sum(ms for _f, ms in sounds._CUES["expired"])
+    assert abs(dur_ms - want) < 5                  # derived, not hardcoded:
+    # the bell-tone retune changed cue lengths and the literal broke
     assert sounds._render_wav(sounds._CUES["expired"]) == path  # cached
 
 

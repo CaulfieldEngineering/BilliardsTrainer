@@ -784,7 +784,8 @@ class LivePage(QWidget):
         from PySide6.QtWidgets import QSlider
         for label, attr in (("Start", "vol_start"), ("Warn", "vol_warn"),
                             ("3-2-1", "vol_tick"), ("Buzzer", "vol_expired"),
-                            ("Scratch", "vol_scratch")):
+                            ("Scratch", "vol_scratch"),
+                            ("Voice", "vol_voice")):
             vrow = QHBoxLayout()
             lab = QLabel(label)
             lab.setObjectName("StatLabel")
@@ -900,9 +901,13 @@ class LivePage(QWidget):
     def _preview_cue(self, attr: str) -> None:
         """Releasing a volume slider plays that cue once at the new
         volume - tuning by ear, not by number."""
+        vol = int(getattr(self._settings.shot_clock, attr, 100))
+        if attr == "vol_voice":
+            from ..voice import say
+            say("Ten", volume=vol)
+            return
         from ..sounds import play
-        edge = attr.replace("vol_", "")
-        play(edge, volume=int(getattr(self._settings.shot_clock, attr, 100)))
+        play(attr.replace("vol_", ""), volume=vol)
 
     def _sync_clock_btn_text(self) -> None:
         on = self._settings.shot_clock.enabled

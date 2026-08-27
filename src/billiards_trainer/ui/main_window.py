@@ -136,6 +136,9 @@ class MainWindow(QMainWindow):
         self._autostart_preview()
         self._maybe_autofetch_model()
         self._maybe_check_updates()
+        # pre-render spoken cues so the first live utterance is instant
+        from .voice import prewarm
+        prewarm(["Ten", "Scratch", "Ball in hand"])
 
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
@@ -423,7 +426,13 @@ class MainWindow(QMainWindow):
     def _on_clock_event(self, edge: str) -> None:
         if not self._settings.shot_clock.audio:
             return
-        # warn = single beep at 10 s, tick = 3-2-1 cadence, expired = the buzz
+        # warn bell at warn_seconds, 3-2-1 ticks, buzz at 0 - and the
+        # spoken "Ten" at 10s remaining (Joe: voice over chirps)
+        if edge == "ten":
+            from .voice import say
+            say("Ten", volume=int(getattr(self._settings.shot_clock,
+                                          "vol_voice", 100)))
+            return
         from .sounds import play
         play(edge, volume=int(getattr(self._settings.shot_clock,
                                       f"vol_{edge}", 100)))

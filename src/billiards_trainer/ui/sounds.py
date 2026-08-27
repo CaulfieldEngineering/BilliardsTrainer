@@ -15,15 +15,15 @@ import threading
 
 log = logging.getLogger("ui.sounds")
 
-# edge -> [(frequency_hz, duration_ms), ...]
+# edge -> [(frequency_hz, duration_ms), ...] rendered as BELL tones
+# (harmonic stack + exponential decay - Joe: "better sounds than the
+# video game chirps"; the old square waves are gone)
 _CUES = {
-    "start": [(660, 110), (990, 150)],    # rising pair: you're on the clock
-    "warn": [(880, 220)],                 # one heads-up beep (10 s left)
-    "tick": [(1320, 130)],                # short, urgent: the 3-2-1 cadence
-    "expired": [(220, 260), (185, 520)],  # two falling low tones = the buzz
-    # Joe: "validating scratches via a sound... I can validate analysis
-    # while playing" - a falling minor phrase, unmistakably not a clock cue
-    "scratch": [(392, 170), (311, 170), (247, 340)],
+    "start": [(659, 260), (988, 420)],    # warm rising bell pair
+    "warn": [(784, 620)],                 # one mellow bell
+    "tick": [(1175, 200)],                # bright woodblock tap: 3-2-1
+    "expired": [(196, 500), (147, 900)],  # low gong pair = time
+    "scratch": [(392, 250), (311, 250), (247, 550)],   # falling minor phrase
 }
 
 _wav_cache: dict[tuple, str] = {}
@@ -43,15 +43,23 @@ def _render_wav(seq, volume: int = 100) -> str:
     cached = _wav_cache.get(key)
     if cached and Path(cached).exists():
         return cached
+    import math
     frames = bytearray()
+    # bell voice: fundamental + soft harmonics, fast attack, exponential
+    # decay - warm and musical where the old square wave was a chirp
+    HARMONICS = ((1.0, 1.0), (2.0, 0.42), (3.0, 0.18), (4.2, 0.07))
     for freq, ms in seq:
         n = int(_SR * ms / 1000)
-        fade = max(1, int(_SR * 0.005))          # 5 ms ramps kill the clicks
-        half_period = _SR / (2.0 * freq)
+        attack = max(1, int(_SR * 0.004))
+        tau = max(0.06, ms / 1000.0 * 0.55)      # decay scaled to note length
         for i in range(n):
-            v = amp if int(i / half_period) % 2 == 0 else -amp
-            env = min(1.0, i / fade, (n - i) / fade)
-            frames += struct.pack("<h", int(v * env * 32767))
+            ts = i / _SR
+            v = sum(a * math.sin(2 * math.pi * freq * k * ts)
+                    for k, a in HARMONICS)
+            env = min(1.0, i / attack) * math.exp(-ts / tau)
+            end_fade = min(1.0, (n - i) / attack)
+            s = amp * 0.62 * v * env * end_fade
+            frames += struct.pack("<h", int(max(-1.0, min(1.0, s)) * 32767))
     path = str(Path(tempfile.gettempdir()) / f"bt-cue-{abs(hash(key)):x}.wav")
     with wave.open(path, "wb") as w:
         w.setnchannels(1)

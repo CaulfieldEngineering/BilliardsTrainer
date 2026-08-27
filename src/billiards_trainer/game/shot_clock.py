@@ -26,6 +26,7 @@ class ShotClock:
     _run_seconds: float = 0.0   # THIS countdown's length (break shots differ)
     _next_seconds: float = 0.0  # one-shot override for the next start (0 = none)
     _paused_at: float = -1.0    # pipeline t when paused (-1 = not paused)
+    _said_ten: bool = False     # one-shot spoken "Ten" at 10s remaining
 
     @property
     def enabled(self) -> bool:
@@ -48,6 +49,7 @@ class ShotClock:
         self._last_tick = 0
         self._start_edge = True   # poll announces the countdown (Joe's ask)
         self._paused_at = -1.0
+        self._said_ten = False
         # a one-shot length override (the shot after a break gets longer)
         self._run_seconds = self._next_seconds or float(self.settings.seconds)
         self._next_seconds = 0.0
@@ -105,6 +107,14 @@ class ShotClock:
             self._expired = True
             self._running = False
             return "expired"
+        # Spoken "Ten" at 10s remaining (Joe) - only when the warn bell
+        # sits elsewhere (warn_seconds != 10) and the countdown began
+        # above 10s (a 10s clock would announce at start, which is noise)
+        if (not self._said_ten and rem <= 10.0
+                and self._run_seconds > 10.5
+                and int(self.settings.warn_seconds) != 10):
+            self._said_ten = True
+            return "ten"
         sec = math.ceil(rem)            # rem in (2, 3] -> 3, so the tick fires
         if not self._warned and rem <= self.settings.warn_seconds:
             self._warned = True

@@ -205,3 +205,31 @@ class TestStatusAndVolume:
         d.update([_cue(0.1), settled], 101.3)
         _rest(d, 101.4)
         assert d._clock.running
+
+    def test_spoken_ten_fires_between_warn_and_ticks(self):
+        # Joe's config shape: warn bell at 13, voice "Ten" at 10
+        c = ShotClock(ShotClockSettings(enabled=True, seconds=30,
+                                        warn_seconds=13))
+        c.start(0.0)
+        edges = []
+        t = 0.0
+        while t < 31.0:
+            e = c.poll(t)
+            if e: edges.append((round(t, 1), e))
+            t += 0.1
+        kinds = [e for _, e in edges]
+        assert kinds == ["start", "warn", "ten", "tick", "tick", "tick",
+                         "expired"]
+        assert edges[2][0] == 20.0           # "Ten" at 10s remaining
+
+    def test_no_spoken_ten_when_warn_is_ten_or_clock_short(self):
+        c = ShotClock(ShotClockSettings(enabled=True, seconds=30,
+                                        warn_seconds=10))
+        c.start(0.0)
+        kinds = {c.poll(t) for t in [x * 0.1 for x in range(320)]}
+        assert "ten" not in kinds            # warn already owns the moment
+        c2 = ShotClock(ShotClockSettings(enabled=True, seconds=10,
+                                         warn_seconds=3))
+        c2.start(0.0)
+        kinds2 = {c2.poll(t) for t in [x * 0.1 for x in range(110)]}
+        assert "ten" not in kinds2           # a 10s clock never announces 10

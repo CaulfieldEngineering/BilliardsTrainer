@@ -299,6 +299,8 @@ class ShotClockSettings:
     # Scratch chime: live audible validation that the analysis saw the
     # cue ball drop (plays when the shot finalizes as a scratch).
     vol_scratch: int = 90
+    # Spoken cues ("Ten" at 10s; narration later): 0 disables the voice.
+    vol_voice: int = 100
 
 
 @dataclass
