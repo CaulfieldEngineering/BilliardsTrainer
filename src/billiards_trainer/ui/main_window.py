@@ -240,6 +240,7 @@ class MainWindow(QMainWindow):
     def _wire_controller_outputs(self) -> None:
         """Controller -> UI signal fan-out (split from _wire when the
         audio/narration program pushed it past a page)."""
+        q = Qt.QueuedConnection
         self._controller.frame_ready.connect(self._live.on_frame)
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.shot_recorded.connect(self._live.on_shot)
