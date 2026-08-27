@@ -58,6 +58,7 @@ class MotionTracker:
     def __init__(self):
         self._tracks: dict[int, _Track] = {}
         self._next_id = 1
+        self._holder: dict[int, int] = {}   # number -> incumbent track id
 
     def update(self, dets, t: float) -> list:
         """dets: iterable of (x, y, radius, number) for one frame at time
@@ -122,6 +123,22 @@ class MotionTracker:
                 tr.vx = tr.vy = 0.0
             else:
                 tr.misses = t - tr.t
+        # 4b. TRACK MERGE (the live tracker's rigid-body rule at TRACK
+        # level, learned from the gate: 7,494 overlapping-ball events =
+        # one physical ball carried by two tracks - a coasted ghost
+        # beside its re-acquired self). Two ACTIVE tracks overlapping
+        # under 0.8 diameters: the weaker (fewer votes, then younger)
+        # dies immediately.
+        live = [tr for tr in self._tracks.values() if tr.active]
+        for i, a in enumerate(live):
+            for b in live[i + 1:]:
+                if not (a.active and b.active):
+                    continue
+                d = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
+                if d < 0.8 * (a.radius + b.radius):
+                    weaker = min(a, b, key=lambda tr: (len(tr.votes), tr.id))
+                    weaker.active = False
+                    weaker.vx = weaker.vy = 0.0
         # 5. NUMBER ARBITRATION (the live system's zero-duplicate rule,
         # re-learned the hard way: the first marathon run emitted the same
         # number on two tracks in 85% of frames). Each number lives on at
@@ -135,9 +152,25 @@ class MotionTracker:
             if n < 0:
                 continue
             cur = claims.get(n)
-            if cur is None or (tr.votes.count(n), tr.t) > (cur.votes.count(n),
-                                                           cur.t):
+            if cur is None:
                 claims[n] = tr
+                continue
+            # STICKY arbitration (gate: 2,032 id-flickers from per-frame
+            # winner oscillation): the incumbent holds the number unless
+            # the challenger leads by MARGIN clear votes.
+            inc = cur if self._holder.get(n) == cur.id else (
+                tr if self._holder.get(n) == tr.id else None)
+            if inc is None:
+                if (tr.votes.count(n), tr.t) > (cur.votes.count(n), cur.t):
+                    claims[n] = tr
+            else:
+                chal = tr if inc is cur else cur
+                if chal.votes.count(n) >= inc.votes.count(n) + 2:
+                    claims[n] = chal
+                else:
+                    claims[n] = inc
+        for n, tr in claims.items():
+            self._holder[n] = tr.id
         # 6. emit rows for ACTIVE tracks (coasting ones carry predicted pos)
         out = []
         for tr in self._tracks.values():
