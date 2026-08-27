@@ -21,11 +21,11 @@ from _lowprio import demote
 
 demote()
 
-from audit_identity_wander import audit as hops_audit
-from audit_render import audit as render_audit
+from audit_identity_wander import audit as hops_audit  # noqa: E402
+from audit_render import audit as render_audit  # noqa: E402
 
-from billiards_trainer.eval.invariants import SequenceScorer
-from billiards_trainer.vision.analysis_cache import SidecarReader
+from billiards_trainer.eval.invariants import SequenceScorer  # noqa: E402
+from billiards_trainer.vision.analysis_cache import SidecarReader  # noqa: E402
 
 SESS_DIR = Path("C:/Users/Joe/Dropbox/Billiards/BilliardsTrainer")
 
