@@ -33,6 +33,35 @@ _AGREE_FRAC = 0.035                # sparse sample must lie this close to the
 _DIFF_THRESH = 26
 
 
+def _ball_blobs(mask, area: float, r_scaled: float) -> list:
+    """Ball-sized moving blobs in a diff mask, rejecting fragments glued
+    to oversized movers (the player's arm/cue shed ball-sized pieces that
+    hijacked tracks)."""
+    n_lbl, _lbl, stats, cents = cv2.connectedComponentsWithStats(mask)
+    # oversized movers as RECTANGLES: an arm is long, so centroid distance
+    # under-vetoes exactly where balls hide (at the fingertips)
+    big = [stats[i] for i in range(1, n_lbl)
+           if stats[i][4] > _AREA_HI * area]
+
+    def near_big(bx, by):
+        for (gx, gy, gw, gh, _a) in big:
+            dx = max(gx - bx, 0, bx - (gx + gw))
+            dy = max(gy - by, 0, by - (gy + gh))
+            if (dx * dx + dy * dy) ** 0.5 < 5.0 * r_scaled:
+                return True
+        return False
+
+    blobs = []
+    for i in range(1, n_lbl):
+        if not (_AREA_LO * area <= stats[i][4] <= _AREA_HI * area):
+            continue
+        bx, by = cents[i][0], cents[i][1]
+        if near_big(bx, by):
+            continue
+        blobs.append((bx, by, stats[i][4]))
+    return blobs
+
+
 def resample_shot(video: str, t0: float, t1: float,
                   seeds: dict, ball_r_px: float) -> dict:
     """seeds: {ball_n: (x_norm, y_norm)} at flight start. Returns
@@ -75,20 +104,7 @@ def resample_shot(video: str, t0: float, t1: float,
             d = cv2.absdiff(g, ref)
             _, m = cv2.threshold(d, _DIFF_THRESH, 255, cv2.THRESH_BINARY)
             m = cv2.dilate(m, np.ones((3, 3), np.uint8))
-            n_lbl, _lbl, stats, cents = cv2.connectedComponentsWithStats(m)
-            big = [(cents[i][0], cents[i][1]) for i in range(1, n_lbl)
-                   if stats[i][4] > _AREA_HI * area]
-            blobs = []
-            for i in range(1, n_lbl):
-                if not (_AREA_LO * area <= stats[i][4] <= _AREA_HI * area):
-                    continue
-                bx, by = cents[i][0], cents[i][1]
-                # a ball-sized blob glued to an oversized one is usually a
-                # fragment of the player's arm/cue - not trustworthy
-                if any(((bx - gx) ** 2 + (by - gy) ** 2) ** 0.5
-                       < 5.0 * ball_r_px * scale for gx, gy in big):
-                    continue
-                blobs.append((bx, by, stats[i][4]))
+            blobs = _ball_blobs(m, area, ball_r_px * scale)
             claimed: dict = {}
             for n, s2 in st.items():
                 if not blobs:

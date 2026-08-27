@@ -169,44 +169,51 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict,
     for m in merged.values():
         m["p"].sort(key=lambda q: q[0])
         result.append(m)
-    # DENSE VIDEO-LOCKED RESAMPLE (Joe: "pixel perfectly in sync"): the
-    # 10Hz tracker samples - with a ~1.5-2s takeoff blindness where
-    # rest-frozen identity holds the old position - can never keep the
-    # drawn tip on the ball. Re-detect the flight from the video itself
-    # (frame diff in the shot window; the shot is the only thing moving)
-    # at full frame rate. The tracker's own sparse samples audit each
-    # dense path; disagreement keeps the sparse trail (abstain, not lie).
-    if video is not None and result:
-        try:
-            from .trail_resample import agrees, resample_shot
-            sv = s.get("_stroke") or {}
-            if sv.get("strike") is None:
-                return result              # no video anchor: sparse only
-            strike_v = float(sv["strike"])
-            # THE per-shot clock bridge, same anchor the phone subtracts
-            # (normalizeShots: o = start - strike). Emitting dense times
-            # as video_t + o makes the phone's own normalization land
-            # them EXACTLY on video time - the global session offset
-            # (which drifts, 3.28s on old sessions) never enters.
-            off = float(s["start"]) - strike_v
-            v_t0 = strike_v - 0.1
-            v_t1 = float(s.get("end", s["start"])) - off + 0.5
-            ball_r = next((float(tr.radius) for tr in
-                           reader.tracks_at(float(s["start"]))
-                           if tr.active), 16.0)
-            seeds = {m["n"]: (m["p"][0][1], m["p"][0][2]) for m in result}
-            dense = resample_shot(str(video), v_t0, v_t1, seeds, ball_r)
-            for m in result:
-                dp = dense.get(m["n"])
-                if not dp:
-                    continue
-                shifted = [[round(qq[0] + off, 3), qq[1], qq[2]] for qq in dp]
-                if agrees(dp, m["p"]):
-                    keep = [q for q in m["p"] if q[0] < shifted[0][0]]
-                    m["p"] = (keep + shifted)[:400]
-                    m["dense"] = True
-        except Exception:  # noqa: BLE001 - resample is enrichment
-            log.exception("trail resample failed; sparse trails kept")
+    return _densify_trails(reader, s, result, video)
+
+
+def _densify_trails(reader: SidecarReader, s: dict, result: list,
+                    video) -> list:
+    """DENSE VIDEO-LOCKED RESAMPLE (Joe: "pixel perfectly in sync"): the
+    10Hz tracker samples - with a ~1.5-2s takeoff blindness where
+    rest-frozen identity holds the old position - can never keep the
+    drawn tip on the ball. Re-detects the flight from the video itself
+    (frame diff; the shot is the only thing moving) at full frame rate.
+    PARKED pending the measurement-core rebuild: the tracker's sparse
+    samples audit each dense path and disagreement keeps the sparse
+    trail (abstain, not lie)."""
+    if video is None or not result:
+        return result
+    try:
+        from .trail_resample import agrees, resample_shot
+        sv = s.get("_stroke") or {}
+        if sv.get("strike") is None:
+            return result                  # no video anchor: sparse only
+        strike_v = float(sv["strike"])
+        # THE per-shot clock bridge, same anchor the phone subtracts
+        # (normalizeShots: o = start - strike). Emitting dense times as
+        # video_t + o makes the phone's own normalization land them
+        # EXACTLY on video time - the global session offset (which
+        # drifts, 3.28s on old sessions) never enters.
+        off = float(s["start"]) - strike_v
+        v_t0 = strike_v - 0.1
+        v_t1 = float(s.get("end", s["start"])) - off + 0.5
+        ball_r = next((float(tr.radius) for tr in
+                       reader.tracks_at(float(s["start"]))
+                       if tr.active), 16.0)
+        seeds = {m["n"]: (m["p"][0][1], m["p"][0][2]) for m in result}
+        dense = resample_shot(str(video), v_t0, v_t1, seeds, ball_r)
+        for m in result:
+            dp = dense.get(m["n"])
+            if not dp:
+                continue
+            shifted = [[round(qq[0] + off, 3), qq[1], qq[2]] for qq in dp]
+            if agrees(dp, m["p"]):
+                keep = [q for q in m["p"] if q[0] < shifted[0][0]]
+                m["p"] = (keep + shifted)[:400]
+                m["dense"] = True
+    except Exception:  # noqa: BLE001 - resample is enrichment
+        log.exception("trail resample failed; sparse trails kept")
     return result
 
 
