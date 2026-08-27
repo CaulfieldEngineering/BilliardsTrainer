@@ -215,7 +215,8 @@ class TestStatusAndVolume:
         t = 0.0
         while t < 31.0:
             e = c.poll(t)
-            if e: edges.append((round(t, 1), e))
+            if e:
+                edges.append((round(t, 1), e))
             t += 0.1
         kinds = [e for _, e in edges]
         assert kinds == ["start", "warn", "ten", "tick", "tick", "tick",

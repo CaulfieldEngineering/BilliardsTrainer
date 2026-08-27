@@ -1445,6 +1445,11 @@ class LivePage(QWidget):
             self._feed_chip.show()
         else:
             self._feed_chip.hide()
+        self._update_indicators(packet)
+
+    def _update_indicators(self, packet) -> None:
+        """Badges, clock, stay-down and table status — the per-frame
+        indicator refresh (split from on_frame when it outgrew a page)."""
         # MODE — what the app is doing. Independent of any condition below, so
         # "LIVE" stays "LIVE" while a shot is in play or the table is relocking.
         if packet.status == "preview":
