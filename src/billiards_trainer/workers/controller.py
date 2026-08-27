@@ -367,6 +367,19 @@ class PipelineController(QObject):
             self.error.emit(f"Camera sync: {msg}")
 
     @Slot(object)
+    def _log_clock(self, ev: str, t: float) -> None:
+        """Record a clock transition into the live sidecar — replay and
+        the iOS overlay reconstruct the displayed countdown from these."""
+        sc = getattr(self, "_sidecar", None)
+        if sc is None:
+            return
+        try:
+            sc.add_clock({"type": "clock", "t": round(t, 3), "ev": ev,
+                          "seconds": round(getattr(self._clock, "_run_seconds",
+                                                   0.0), 1)})
+        except OSError:
+            log.exception("clock sidecar append failed")
+
     @Slot(bool)
     def set_clock_paused(self, paused: bool) -> None:
         """Joe's rail button. Pause freezes number and edges; resume picks
@@ -375,8 +388,10 @@ class PipelineController(QObject):
         t = _time.perf_counter() - getattr(self, "_t0", _time.perf_counter())
         if paused:
             self._clock.pause(t)
+            self._log_clock("pause", t)
         else:
             self._clock.resume(t)
+            self._log_clock("resume", t)
 
     def apply_settings(self, settings: Settings) -> None:
         self._settings = settings
@@ -1605,6 +1620,7 @@ class PipelineController(QObject):
             if self._clock.running:
                 self._clock.stop()      # table-motion strike (fallback stop)
                 log.info("shot clock stopped: table motion (made it)")
+                self._log_clock("stop", t)
         self._prev_state = state
 
     # Cue-ball shot-clock rule (Joe's spec): the countdown starts once the cue
@@ -1641,6 +1657,7 @@ class PipelineController(QObject):
             if self._clock.running:
                 self._clock.stop()      # the strike — player made it in time
                 log.info("shot clock stopped: cue ball moving (made it)")
+                self._log_clock("stop", t)
                 self._strike_stop_t = t     # break-detection window opens
             self._clock_armed = True    # rolling cue = the next rest is a new turn
             self._cue_still = 0
@@ -1664,6 +1681,7 @@ class PipelineController(QObject):
                     self._clock.set_next_seconds(
                         self._settings.shot_clock.break_seconds)
                 self._clock.start(t)    # cue at rest -> you're on the clock
+                self._log_clock("start", t)
                 self._clock_armed = False  # re-arms on motion/absence, so an
                 self._turn_start_t = t     # expired clock can't restart itself
                 log.info("shot clock started: cue ball at rest (%ds)",

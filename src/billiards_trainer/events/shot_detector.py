@@ -48,6 +48,24 @@ class PocketedBall:
     t: float
 
 
+def foul_for(cue_scratch: bool, outcome: "ShotOutcome",
+             object_ball_moved: bool) -> str | None:
+    """Joe's scratch-vs-foul taxonomy. Scratch (cue pocketed) stays its
+    own outcome and is announced as "Scratch". Fouls measurable TODAY:
+      no_contact - the cue ball moved and stopped without any object
+                   ball ever moving freely.
+    Defined but GATED on the measurement core's dense tracking (first
+    contact usually lands in the tracker's takeoff-blind window):
+      wrong_ball_first - 9-ball: lowest ball must be struck first
+      no_rail          - contact made but no ball touched a rail after
+    """
+    if cue_scratch:
+        return None                     # scratch is called scratch
+    if outcome == ShotOutcome.MISS and not object_ball_moved:
+        return "no_contact"
+    return None
+
+
 @dataclass
 class ShotEvent:
     outcome: ShotOutcome
@@ -58,6 +76,7 @@ class ShotEvent:
     num_pocketed: int = 0
     start_t: float = 0.0
     end_t: float = 0.0
+    foul: str | None = None    # no_contact | (gated: wrong_ball_first, no_rail)
     max_travel: float = 0.0
     suggested: bool = False  # set by the controller in manual-confirm mode
 
@@ -455,6 +474,9 @@ class ShotDetector:
         else:
             outcome = ShotOutcome.MISS
 
+        object_ball_moved = any(
+            self._free_frames.get(tid, 0) >= 2 for tid in self._shot_ids
+            if self._shot_cls.get(tid) != BallClass.CUE)
         self._last_shot_t = t
         event = ShotEvent(
             outcome=outcome, pocketed=list(self._pocketed),
@@ -462,6 +484,7 @@ class ShotDetector:
             duration_s=max(0.0, t - self._start_t), cue_scratch=cue_scratch,
             num_pocketed=len(object_pockets), start_t=self._start_t, end_t=t,
             max_travel=self._max_travel,
+            foul=foul_for(cue_scratch, outcome, object_ball_moved),
         )
         self.last_event = event
         self._pocketed = []

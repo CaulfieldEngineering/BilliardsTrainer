@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
         self._maybe_check_updates()
         # pre-render spoken cues so the first live utterance is instant
         from .voice import prewarm
-        prewarm(["Ten", "Scratch", "Ball in hand", "Table change"])
+        prewarm(["Ten", "Scratch", "Ball in hand", "Table change", "Foul"])
 
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
@@ -427,12 +427,16 @@ class MainWindow(QMainWindow):
         moment the system actually concludes 'cue ball pocketed'."""
         try:
             scratched = bool(getattr(event, "cue_scratch", False)) or                 getattr(getattr(event, "outcome", None), "value", "") == "scratch"
+            from .voice import say
             if scratched:
-                from .sounds import play
-                play("scratch", volume=int(getattr(
+                # spoken now (Joe: distinguish scratch vs foul by voice)
+                say("Scratch", volume=int(getattr(
                     self._settings.shot_clock, "vol_scratch", 90)))
-        except Exception:  # noqa: BLE001 - a chime is never worth a crash
-            log.debug("scratch chime failed", exc_info=True)
+            elif getattr(event, "foul", None) == "no_contact":
+                say("Foul", volume=int(getattr(
+                    self._settings.shot_clock, "vol_voice", 100)))
+        except Exception:  # noqa: BLE001 - a call is never worth a crash
+            log.debug("shot narration failed", exc_info=True)
 
     def _on_clock_event(self, edge: str) -> None:
         if not self._settings.shot_clock.audio:

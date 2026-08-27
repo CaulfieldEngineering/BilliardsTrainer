@@ -42,3 +42,51 @@ class TestNarrator:
     def test_silent_during_shot_flight(self):
         n = Narrator()
         assert n.update(False, True, True, 10.0) is None
+
+
+class TestFoulTaxonomy:
+    def test_no_contact_is_a_foul(self):
+        from billiards_trainer.events.shot_detector import (
+            ShotOutcome,
+            foul_for,
+        )
+        assert foul_for(False, ShotOutcome.MISS, False) == "no_contact"
+
+    def test_contact_miss_is_clean(self):
+        from billiards_trainer.events.shot_detector import (
+            ShotOutcome,
+            foul_for,
+        )
+        assert foul_for(False, ShotOutcome.MISS, True) is None
+
+    def test_scratch_is_called_scratch_not_foul(self):
+        from billiards_trainer.events.shot_detector import (
+            ShotOutcome,
+            foul_for,
+        )
+        assert foul_for(True, ShotOutcome.SCRATCH, False) is None
+
+    def test_make_never_fouls_on_this_axis(self):
+        from billiards_trainer.events.shot_detector import (
+            ShotOutcome,
+            foul_for,
+        )
+        assert foul_for(False, ShotOutcome.MAKE, True) is None
+
+
+class TestClockMetadata:
+    def test_clock_events_round_trip_the_sidecar(self, tmp_path):
+        from billiards_trainer.vision.analysis_cache import (
+            SidecarReader,
+            SidecarWriter,
+        )
+        video = tmp_path / "session-c.mp4"
+        w = SidecarWriter(video, {"fps": 30.0})
+        w.add_clock({"type": "clock", "t": 12.5, "ev": "start", "seconds": 60.0})
+        w.add_clock({"type": "clock", "t": 30.1, "ev": "stop", "seconds": 60.0})
+        w.close()
+        r = SidecarReader(video)
+        assert r.clock_events == [
+            {"t": 12.5, "ev": "start", "seconds": 60.0},
+            {"t": 30.1, "ev": "stop", "seconds": 60.0},
+        ]

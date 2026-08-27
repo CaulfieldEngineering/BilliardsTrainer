@@ -64,52 +64,10 @@ jobs:
           name: windows-build
           path: dist/BilliardsTrainer-*.exe
 
-  build-macos:
-    # macos-14 runners are Apple silicon (M-series) — the same architecture as
-    # the billiards-room Mac Mini, so tests here are real ARM verification.
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Bake version into the package
-        run: |
-          v="0.2.${GITHUB_RUN_NUMBER}"
-          echo "Version: $v"
-          sed -i '' "s/__version__ = \".*\"/__version__ = \"$v\"/" src/billiards_trainer/version.py
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-          pip install -e .
-
-      - name: Run tests
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: pytest -q
-
-      - name: Build .app bundle
-        run: pyinstaller packaging/billiards_trainer.spec --noconfirm
-
-      - name: Stage artifact (zip the .app)
-        run: |
-          v="0.2.${GITHUB_RUN_NUMBER}"
-          # ditto preserves bundle metadata; plain zip breaks .app bundles
-          ditto -c -k --keepParent dist/BilliardsTrainer.app "dist/BilliardsTrainer-mac-$v.zip"
-
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-build
-          path: dist/BilliardsTrainer-mac-*.zip
-
   release:
-    needs: [build-windows, build-macos]
+    # macOS job removed 2026-08-27 (Joe: perpetually failing;
+    # nothing consumes the artifact - the rig is Windows)
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

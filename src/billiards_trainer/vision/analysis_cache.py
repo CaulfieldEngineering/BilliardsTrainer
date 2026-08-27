@@ -105,6 +105,14 @@ class SidecarWriter:
             "pocketed": int(event.num_pocketed)}) + "\n")
         self._f.flush()
 
+    def add_clock(self, rec: dict) -> None:
+        """Append a shot-clock transition (start/stop/pause/resume). Same
+        thread rule as add_stroke: controller only. Joe: "I'd like this
+        metadata saved so that I can replay the original shot clock" —
+        transitions reconstruct the displayed number at any video moment."""
+        self._f.write(json.dumps(rec) + "\n")
+        self._f.flush()
+
     def add_stroke(self, rec: dict) -> None:
         """Append a live-measured {type:'stroke_vision'} record.
 
@@ -157,6 +165,7 @@ class SidecarReader:
     def __init__(self, video_path: str | Path):
         self.meta: dict = {}
         self.shots: list[dict] = []
+        self.clock_events: list[dict] = []
         self._times: list[float] = []
         self._frames: list[list] = []
         self._carried: list[list] = []      # v2: hand-adjacent ids per state
@@ -192,6 +201,9 @@ class SidecarReader:
                         for k in ("cut", "miss_side"):
                             if d.get(k):
                                 tr[k] = d[k]
+                elif d.get("type") == "clock":
+                    self.clock_events.append(
+                        {k: d[k] for k in ("t", "ev", "seconds") if k in d})
                 elif d.get("type") == "stroke_vision":
                     # camera-measured stroke metrics (stay-down, backstroke,
                     # pause — vision/stroke_vision.py). Machine-derived and

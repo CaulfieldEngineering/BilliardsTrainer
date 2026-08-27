@@ -559,6 +559,9 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
     doc = {
         "v": 2 if tf is not None else 1,
         "t_offset": t_off,
+        # shot-clock transitions (sidecar time; subtract t_offset for
+        # video time) - Joe: replay the original countdown, iOS overlay
+        "clock": list(getattr(reader, "clock_events", []) or []),
         "transform": tf,
         "session": Path(video_path).name,
         "duration_s": round(reader._times[-1], 1) if reader._times else 0.0,
