@@ -1633,6 +1633,16 @@ class PipelineController(QObject):
             self._cue_still = 0
             return
         if cue.speed < stop_v:
+            # Joe's clarification: the countdown starts when ALL balls come
+            # to rest, not just the cue - an object ball still rolling
+            # resets the stillness run.
+            others_rolling = any(
+                tr.cls != BallClass.CUE and tr.active
+                and tr.speed > max(self._CUE_MOVE_SPEED, 2.0 * stop_v)
+                for tr in tracks)
+            if others_rolling:
+                self._cue_still = 0
+                return
             self._cue_still += 1
             if (self._cue_still >= self._CUE_STOP_FRAMES
                     and self._clock_armed and not self._clock.running):

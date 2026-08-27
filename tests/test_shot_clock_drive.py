@@ -191,3 +191,17 @@ class TestStatusAndVolume:
         a = _render_wav([(660, 40)], volume=100)
         b = _render_wav([(660, 40)], volume=50)
         assert a != b                        # cache keyed by volume too
+
+    def test_countdown_waits_for_all_balls(self):
+        # Joe's clarification: "clock resumes when *all balls* come to a rest"
+        d = _drive()
+        d.update([_cue(8.0)], 99.0)           # strike re-arms
+        roller = SimpleNamespace(cls=BallClass.SOLID, speed=6.0, active=True)
+        for k in range(12):                   # cue rests; the 9 still rolls
+            d.update([_cue(0.1), roller], 100.0 + k / 30)
+        assert not d._clock.running, "a rolling object ball must hold the clock"
+        settled = SimpleNamespace(cls=BallClass.SOLID, speed=0.1, active=True)
+        _rest(d, 101.0, frames=6)
+        d.update([_cue(0.1), settled], 101.3)
+        _rest(d, 101.4)
+        assert d._clock.running
