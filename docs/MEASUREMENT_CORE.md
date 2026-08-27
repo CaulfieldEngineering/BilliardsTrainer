@@ -4,6 +4,34 @@ Status: PLAN OF RECORD for the measurement-engine respin. Companion to `docs/VIS
 
 ---
 
+## 0. END-STATE AND THE RELIABILITY LADDER (Joe, 2026-08-27)
+
+The long-term destination is a ground-up rebuild in **C++**: a rock-solid
+sandbox of real-time data collection with no UI, no layout, no
+interpretation - testable from the mobile app - so no orphaned code
+lingers in the foundation. The Python measurement core built here is the
+**proving ground**: every rule validated in Python becomes the C++ spec;
+nothing unproven gets ported.
+
+Joe's reliability ladder - expected solid in Python BEFORE the rewrite:
+
+1. **Table detection** - achieved.
+2. **Pocket detection** - HALF-ADDRESSED: pockets are placed geometrically
+   from the calibrated rectangle (canonical marks + pocket_radius_frac,
+   `vision/calibration.py:139-157`); drop events are
+   detection-by-disappearance near those regions. No visual localization
+   of the actual pocket mouths; the calibration comment itself notes
+   "pockets off their marks". A visual pocket locator is ladder work.
+3. **Cue ball detection + tracking, real-time trails** - the core of this
+   respin (M1's dense tracker; the takeoff-blur coast).
+4. **Shot detection** - ~95 percent recall today; rides on 3.
+5. **Shot clock** - live, cue-ball driven; proves out 4.
+6. **Object ball detection + tracking, real-time trails** - same engine
+   as 3, multi-target.
+
+Milestones M1-M4 below serve the ladder; the C++ rewrite starts only
+when the ladder holds in Python.
+
 ## 1. WHY
 
 The owner's directive is explicit: "rock solid measurements and tracking before we even think about interpreting misses vs makes." The headroom is already measured: GPU inference runs 94 fps on DirectML vs 20.7 fps CPU, yet live throughput only moved 4.1 → 14.6 results/s when the provider flipped — the remaining 6x gap lives entirely in our own plumbing (the 33 ms Qt tick, the 1-slot drop queue, the serial ensemble, the queued-signal ingest), not in the model. Measuring ball positions on **every** frame at 30 fps during play eliminates the 1.5–2 s takeoff blur blindness, gives real per-frame velocities instead of interpolated fiction between 10 Hz samples, holds identity through flight instead of patching it back afterwards, and makes the sidecar a true record of the table rather than a 100 ms-quantized sketch.
