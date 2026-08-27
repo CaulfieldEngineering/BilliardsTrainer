@@ -1,6 +1,15 @@
 {
  "entries": [
   {
+   "id": 42,
+   "date": "2026-08-27",
+   "title": "Shot clock: per-beep volume and a table status readout",
+   "body": "Each shot clock sound - the start chime, the warning, the 3-2-1 ticks, and the buzzer - now has its own volume slider in the clock panel (zero mutes just that one). Release a slider and it plays that sound once at the new level, so you can tune by ear. Above the timer there's now a live status: ON THE CLOCK, SHOT IN PLAY, TABLE SETTLED, PAUSED.",
+   "details": [
+    "Also under the hood tonight: ball detection moved to the GPU (roughly 3.5x more measurements per second) - the tracking improvement you noticed at the table."
+   ]
+  },
+  {
    "id": 41,
    "date": "2026-08-27",
    "title": "Shot clock controls, break time, and tidier panels",
