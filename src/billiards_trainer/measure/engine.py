@@ -25,8 +25,32 @@ IDENT_EVERY = 6          # identifier cadence (votes persist on tracks)
 PROGRESS_EVERY_S = 30.0
 
 
+def _acquire_calib(video):
+    """The session's own rectification, re-acquired from its frames
+    (same warmup shots_export._video_transform uses for hinv)."""
+    import cv2
+
+    from ..config import Settings
+    from ..vision.pipeline import Pipeline
+    cap = cv2.VideoCapture(str(video))
+    if not cap.isOpened():
+        return None
+    try:
+        pipe = Pipeline(Settings.load())
+        for n in range(1, 91):
+            ok, fr = cap.read()
+            if not ok:
+                break
+            pipe.process(fr, n / 30.0, annotate=False, detect=False)
+            if pipe.calib.calib is not None and n >= 20:
+                break
+        return pipe.calib.calib
+    finally:
+        cap.release()
+
+
 def reprocess(video: str, out_dir: str | None = None,
-              max_frames: int = 0) -> dict:
+              max_frames: int = 0, calib=None) -> dict:
     import cv2
 
     from ..config import EXPORTS_DIR
@@ -39,6 +63,18 @@ def reprocess(video: str, out_dir: str | None = None,
     out_root.mkdir(parents=True, exist_ok=True)
     out_video_alias = out_root / video.name    # sidecar naming anchor
 
+    if calib is None:
+        # Acquire calibration FROM THE VIDEO (the export's own recipe) so
+        # engine coords live in the session's rectified space by
+        # construction. calib=None auto-find drifted per segment on the
+        # first marathon run and no single transform could repair it
+        # (229px median even borrowing a same-dims neighbour lock).
+        calib = _acquire_calib(video)
+        if calib is None:
+            log.warning("calibration warmup failed for %s - auto-find "
+                        "fallback (coords may not match session space)",
+                        video.name)
+
     strat = discover()["ensemble_findid"]
     strat.inference_provider = "dml"
     finder, ident = strat._finder, strat._identifier
@@ -48,6 +84,7 @@ def reprocess(video: str, out_dir: str | None = None,
     n_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     writer = SidecarWriter(out_video_alias, {"fps": fps, "engine": "m1",
                                              "dense": True,
+                                             "calibrated": calib is not None,
                                              "source": video.name})
     tracker = MotionTracker()
     ident_by_pos: list = []      # latest identifier detections (x, y, n)
@@ -68,9 +105,9 @@ def reprocess(video: str, out_dir: str | None = None,
             if fi % 150 == 0 and recording_live():
                 log.warning("recording started - engine run aborted at %.1fs", t)
                 return {"aborted": True, "frames": fi}
-            found = finder.detect(frame, None) or []
+            found = finder.detect(frame, calib) or []
             if fi % IDENT_EVERY == 0:
-                ids = ident.detect(frame, None) or []
+                ids = ident.detect(frame, calib) or []
                 ident_by_pos = [(d.x, d.y, d.number) for d in ids
                                 if getattr(d, "number", -1) >= 0]
             # EXCLUSIVE finder<->identifier pairing (one identifier read
