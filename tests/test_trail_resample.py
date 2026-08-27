@@ -17,7 +17,8 @@ def _line(n=30, y=0.5):
 class TestAgreementGate:
     def test_matching_paths_agree(self):
         dense = _line()
-        sparse = [[t * 4.5 + 99.0, x, y] for (t, x, y) in dense[::6]]
+        sub = dense[::6] + [dense[-1]]   # sparse ends where the ball rests
+        sparse = [[t * 4.5 + 99.0, x, y] for (t, x, y) in sub]
         assert agrees(dense, sparse)     # time bases differ; geometry rules
 
     def test_divergent_path_rejected(self):
