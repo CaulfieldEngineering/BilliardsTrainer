@@ -73,14 +73,27 @@ def reprocess(video: str, out_dir: str | None = None,
                 ids = ident.detect(frame, None) or []
                 ident_by_pos = [(d.x, d.y, d.number) for d in ids
                                 if getattr(d, "number", -1) >= 0]
-            dets = []
-            for d in found:
-                num = -1
-                best = 2.5 * max(d.radius, 8.0)
-                for (ix, iy, n) in ident_by_pos:
+            # EXCLUSIVE finder<->identifier pairing (one identifier read
+            # feeds ONE finder detection - the first marathon run let
+            # neighbours share a read and spread duplicate numbers)
+            cand = []
+            for fi_d, d in enumerate(found):
+                lim = 2.5 * max(d.radius, 8.0)
+                for ii, (ix, iy, n) in enumerate(ident_by_pos):
                     dd = ((d.x - ix) ** 2 + (d.y - iy) ** 2) ** 0.5
-                    if dd < best:
-                        best, num = dd, n
+                    if dd < lim:
+                        cand.append((dd, fi_d, ii))
+            cand.sort()
+            num_for: dict = {}
+            used_i: set = set()
+            for _dd, fi_d, ii in cand:
+                if fi_d in num_for or ii in used_i:
+                    continue
+                num_for[fi_d] = ident_by_pos[ii][2]
+                used_i.add(ii)
+            dets = []
+            for fi_d, d in enumerate(found):
+                num = num_for.get(fi_d, -1)
                 if getattr(d, "number", -1) >= 0:
                     num = d.number       # the finder's own read wins
                 dets.append((float(d.x), float(d.y),

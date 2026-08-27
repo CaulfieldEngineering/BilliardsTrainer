@@ -122,12 +122,31 @@ class MotionTracker:
                 tr.vx = tr.vy = 0.0
             else:
                 tr.misses = t - tr.t
-        # 5. emit rows for ACTIVE tracks (coasting ones carry predicted pos)
+        # 5. NUMBER ARBITRATION (the live system's zero-duplicate rule,
+        # re-learned the hard way: the first marathon run emitted the same
+        # number on two tracks in 85% of frames). Each number lives on at
+        # most ONE active track - the one with the strongest claim (vote
+        # count, then recency); every other claimant emits unnumbered.
+        claims: dict[int, _Track] = {}
+        for tr in self._tracks.values():
+            if not tr.active:
+                continue
+            n = tr.number
+            if n < 0:
+                continue
+            cur = claims.get(n)
+            if cur is None or (tr.votes.count(n), tr.t) > (cur.votes.count(n),
+                                                           cur.t):
+                claims[n] = tr
+        # 6. emit rows for ACTIVE tracks (coasting ones carry predicted pos)
         out = []
         for tr in self._tracks.values():
             if not tr.active:
                 continue
-            out.append(_Row(tr.id, tr.x, tr.y, tr.radius, tr.number,
+            n = tr.number
+            if n >= 0 and claims.get(n) is not tr:
+                n = -1                      # arbitration loser: unnumbered
+            out.append(_Row(tr.id, tr.x, tr.y, tr.radius, n,
                             tr.misses > 0.0))
         return out
 
