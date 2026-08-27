@@ -234,6 +234,19 @@ The new engine is a **measurement core**: a capture-clocked, every-frame positio
 
 ---
 
+### M1 measurement log
+
+- 2026-08-27: budget split measured (offline, live app concurrently on the
+  same GPU): finder 87-138 ms/frame = **2 serial model runs x ~37 ms**
+  (two-pass tiling) + only 12.4 ms Python glue; identifier 67 ms (every
+  2nd tick). Bare 640x640 run benches 10.6 ms - the 37 ms per-run gap is
+  GPU contention with the live pipeline + input-size differences (audit
+  pending). DESIGN CONSEQUENCES: (1) batch the two tiles into one run;
+  (2) batch identifier crops; (3) contention is a first-class constraint -
+  the engine's end-state REPLACES the old worker (M3 shadow is a
+  transition, not a steady state); (4) M1 exit is measured under real
+  concurrent load, not idle-GPU numbers.
+
 ## 5. MILESTONES
 
 Ordered; each has a measurable exit. Recording always outranks any milestone work (BelowNormal, killed on `.part` appearance).
