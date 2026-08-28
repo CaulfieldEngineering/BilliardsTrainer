@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-28T17:58:24Z",
+ "ts": "2026-08-28T22:25:11Z",
  "detected": "9/10",
  "outcome": "8/10",
  "false_strokes": 4,
@@ -16,7 +16,8 @@
    "truth": "pot",
    "ball_truth": 9,
    "ball_engine": 4,
-   "ball_ok": false
+   "ball_ok": false,
+   "img": "journal/evidence/shot_31_7.jpg"
   },
   {
    "strike": 51.5,
@@ -27,7 +28,8 @@
    "truth": "pot",
    "ball_truth": 2,
    "ball_engine": 2,
-   "ball_ok": true
+   "ball_ok": true,
+   "img": "journal/evidence/shot_51_5.jpg"
   },
   {
    "strike": 68.8,
@@ -35,7 +37,8 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot"
+   "truth": "no pot",
+   "img": "journal/evidence/shot_68_8.jpg"
   },
   {
    "strike": 85.1,
@@ -46,7 +49,8 @@
    "truth": "pot",
    "ball_truth": 3,
    "ball_engine": 3,
-   "ball_ok": true
+   "ball_ok": true,
+   "img": "journal/evidence/shot_85_1.jpg"
   },
   {
    "strike": 101.0,
@@ -54,7 +58,8 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot"
+   "truth": "no pot",
+   "img": "journal/evidence/shot_101_0.jpg"
   },
   {
    "strike": 130.2,
@@ -62,13 +67,15 @@
    "found": true,
    "outcome_ok": true,
    "engine": "pot",
-   "truth": "pot"
+   "truth": "pot",
+   "img": "journal/evidence/shot_130_2.jpg"
   },
   {
    "strike": 154.2,
    "what": "1 caught in the bridge hand mid-roll - NO pot",
    "found": false,
-   "outcome_ok": false
+   "outcome_ok": false,
+   "img": "journal/evidence/shot_154_2.jpg"
   },
   {
    "strike": 170.6,
@@ -79,7 +86,8 @@
    "truth": "pot",
    "ball_truth": 5,
    "ball_engine": null,
-   "ball_ok": false
+   "ball_ok": false,
+   "img": "journal/evidence/shot_170_6.jpg"
   },
   {
    "strike": 189.8,
@@ -87,7 +95,8 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot"
+   "truth": "no pot",
+   "img": "journal/evidence/shot_189_8.jpg"
   },
   {
    "strike": 208.0,
@@ -95,7 +104,8 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot"
+   "truth": "no pot",
+   "img": "journal/evidence/shot_208_0.jpg"
   }
  ],
  "caps": {

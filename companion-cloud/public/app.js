@@ -1037,11 +1037,19 @@ function applyRot() {
     art.appendChild(meta);
     const intro = document.createElement("div");
     intro.className = "jbodyp";
+    const prov = document.createElement("div");
+    prov.className = "jbodyp";
+    prov.style.cssText = "font-size:13px;color:var(--faint)";
+    prov.textContent = sc ? ("Source: " + sc.session
+      + " - ten strokes established by frame-by-frame watch; every row "
+      + "below links the actual video frame with the app's own tracking "
+      + "drawn on it (green = named ball, orange = unnamed).") : "";
     intro.textContent = "This is the app scored against what I saw with my own "
       + "eyes on the practice clip - ten real strokes, watched frame by frame. "
       + "It is recomputed after every fix, so it never depends on my opinion of "
       + "how things are going.";
     art.appendChild(intro);
+    art.appendChild(prov);
     if (!sc) {
       const w = document.createElement("div");
       w.className = "jempty";
@@ -1128,6 +1136,16 @@ function applyRot() {
       ds.textContent = s.what + (good ? "" :
         (s.found ? `  - app said ${s.engine}, truth ${s.truth}` : "  - app missed it"));
       row.append(mk, tm, ds);
+      if (s.img) {
+        const cite = document.createElement("a");
+        cite.href = s.img;
+        cite.target = "_blank";
+        cite.rel = "noopener";
+        cite.textContent = "frame ↗";
+        cite.style.cssText = "color:var(--accent,#2F81F7);font-size:12px;"
+          + "text-decoration:none;flex:0 0 auto";
+        row.appendChild(cite);
+      }
       box.appendChild(row);
     });
     art.appendChild(box);

@@ -790,7 +790,10 @@ class LivePage(QWidget):
         # 0 mutes that cue alone; applied on the next play, persisted
         # via the debounced tuning save.
         from PySide6.QtWidgets import QSlider
-        for label, attr in (("Start", "vol_start"), ("Warn", "vol_warn"),
+        # MASTER first (Joe): scales everything below it; the per-cue mix
+        # is preserved, so one control quiets the whole table.
+        for label, attr in (("Master", "vol_master"),
+                            ("Start", "vol_start"), ("Warn", "vol_warn"),
                             ("3-2-1", "vol_tick"), ("Buzzer", "vol_expired"),
                             ("Scratch", "vol_scratch"),
                             ("Voice", "vol_voice")):
@@ -910,6 +913,16 @@ class LivePage(QWidget):
         """Releasing a volume slider plays that cue once at the new
         volume - tuning by ear, not by number."""
         vol = int(getattr(self._settings.shot_clock, attr, 100))
+        if attr == "vol_master":
+            # apply immediately, then demo it with the spoken cue
+            from ..sounds import set_master as snd_master
+            from ..voice import say
+            from ..voice import set_master as voice_master
+            voice_master(vol)
+            snd_master(vol)
+            say("Ten", volume=int(getattr(self._settings.shot_clock,
+                                          "vol_voice", 100)))
+            return
         if attr == "vol_voice":
             from ..voice import say
             say("Ten", volume=vol)

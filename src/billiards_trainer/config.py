@@ -301,6 +301,9 @@ class ShotClockSettings:
     vol_scratch: int = 90
     # Spoken cues ("Ten" at 10s; narration later): 0 disables the voice.
     vol_voice: int = 100
+    # Master volume (Joe): scales every cue and voice line above it, so
+    # one control quiets the whole table without losing the per-cue mix.
+    vol_master: int = 100
 
 
 @dataclass

@@ -26,7 +26,10 @@ log = logging.getLogger("ui.voice")
 
 VOICE_DIR = APP_DIR / "voice"
 # a calm, natural US voice; render-time only (playback is local WAV)
-_EDGE_VOICE = "en-US-GuyNeural"
+# Joe, 2026-08-28: "a more mature, less yippee voice... It's a referee
+# not a cheerleader." Christopher is the deeper, flatter US male voice -
+# announcer cadence rather than an upbeat assistant.
+_EDGE_VOICE = "en-US-ChristopherNeural"
 _render_lock = threading.Lock()
 
 
@@ -98,9 +101,19 @@ def ensure(phrase: str) -> Path | None:
     return None
 
 
+_MASTER = 100
+
+
+def set_master(pct: int) -> None:
+    """Master volume (0-100) scaling every spoken line."""
+    global _MASTER
+    _MASTER = max(0, min(100, int(pct)))
+
+
 def say(phrase: str, volume: int = 100) -> None:
     """Speak a cached phrase; render-and-cache on first request (that
     first call may stay silent rather than stall). Returns immediately."""
+    volume = int(volume * _MASTER / 100)
     if volume <= 0:
         return
 

@@ -136,6 +136,12 @@ class MainWindow(QMainWindow):
         self._autostart_preview()
         self._maybe_autofetch_model()
         self._maybe_check_updates()
+        # master volume (Joe): one control over every cue and voice line
+        from . import sounds as _snd
+        from . import voice as _vc
+        _m = int(getattr(self._settings.shot_clock, "vol_master", 100))
+        _vc.set_master(_m)
+        _snd.set_master(_m)
         # pre-render spoken cues so the first live utterance is instant
         from .voice import prewarm
         prewarm(["Ten", "Scratch", "Ball in hand", "Table change", "Foul",
@@ -590,6 +596,11 @@ class MainWindow(QMainWindow):
         self.apply_settings_requested.emit(self._settings)
 
     def _on_settings_applied(self) -> None:
+        from . import sounds as _snd
+        from . import voice as _vc
+        _m = int(getattr(self._settings.shot_clock, "vol_master", 100))
+        _vc.set_master(_m)
+        _snd.set_master(_m)
         apply_theme(QApplication.instance(), self._settings.ui.accent)
         self._push_settings()
         self._cue.apply_settings(self._settings.cue)

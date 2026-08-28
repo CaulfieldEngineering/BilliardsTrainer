@@ -32,6 +32,35 @@ PUB = ROOT / "companion-cloud" / "public" / "scorecard.json"
 MATCH_S = 2.5
 
 
+def _evidence(name: str, shots: list, out_dir: Path) -> None:
+    """One overlay frame per scored shot: the app's beliefs drawn on the
+    real video at that moment (Joe: "I would like screenshots or some
+    kind of citation for all of this data"). Small JPEGs - this
+    republishes every hour."""
+    import cv2
+    from debug_overlay import render
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for s in shots:
+        t_at = float(s["strike"]) + 0.6
+        try:
+            made = render(REC / name, [t_at], out_dir)
+        except Exception:  # noqa: BLE001 - evidence is never fatal
+            continue
+        if not made:
+            continue
+        img = cv2.imread(str(made[0]))
+        made[0].unlink(missing_ok=True)
+        if img is None:
+            continue
+        h, w = img.shape[:2]
+        sc2 = 720.0 / max(w, 1)
+        small = cv2.resize(img, (720, int(h * sc2)))
+        fn = f"shot_{str(s['strike']).replace('.', '_')}.jpg"
+        cv2.imwrite(str(out_dir / fn), small,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), 72])
+        s["img"] = f"journal/evidence/{fn}"
+
+
 def score(truth_path: Path) -> dict:
     logging.disable(logging.CRITICAL)
     from billiards_trainer.config import Settings
@@ -145,8 +174,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--truth", default=str(ROOT / "docs" / "bench_truth.json"))
     ap.add_argument("--publish", action="store_true")
+    ap.add_argument("--evidence", action="store_true",
+                    help="render one overlay frame per shot as citation")
     a = ap.parse_args()
     sc = score(Path(a.truth))
+    if a.evidence:
+        _evidence(sc["session"], sc["shots"],
+                  ROOT / "companion-cloud" / "public" / "journal" / "evidence")
     print(f"BENCH SCORECARD  {sc['session']}")
     print(f"  strokes found   : {sc['detected']}")
     print(f"  outcomes right  : {sc['outcome']}")

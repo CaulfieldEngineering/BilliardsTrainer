@@ -99,12 +99,22 @@ def _play_seq(seq, volume: int = 100) -> None:
         pass
 
 
+_MASTER = 100
+
+
+def set_master(pct: int) -> None:
+    """Master volume (0-100) scaling every shot-clock cue."""
+    global _MASTER
+    _MASTER = max(0, min(100, int(pct)))
+
+
 def play(edge: str, volume: int = 100) -> None:
     """Play the cue for a shot-clock edge ('start' | 'warn' | 'tick' |
     'expired') at 0-100 volume. Unknown edges are silently ignored.
     Returns immediately."""
     seq = _CUES.get(edge)
-    if not seq:
+    volume = int(volume * _MASTER / 100)
+    if not seq or volume <= 0:
         return
     threading.Thread(target=_play_seq, args=(seq, volume), daemon=True,
                      name="shotclock-beep").start()
