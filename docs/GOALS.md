@@ -1903,3 +1903,21 @@ Rounds continue with Joe's visual feedback as the gate.
   added to the verification habit. All 13 sessions re-merged. Also
   shipped: iOS Session IDs (long-press or ⓘ on a session row →
   Details modal with copyable ID; build 20260828-090913).
+
+- 2026-08-28 midday — BENCH FULL WATCH (Joe: "watch the full thing"):
+  8 frame-truth reviewers over all 238s of 220247. GROUND TRUTH: 10
+  real strokes; the file recorded 5 (2 mislabeled: the hand-caught
+  1-ball scored as MAKE; a real stroke on the 4 labeled rearrange),
+  FABRICATED 2 (hand-setup as strokes), MISSED 5 (incl. two clean
+  pots). All 7 windows open 1.2-4.6s AFTER their own strikes. Joe's
+  three symptoms root-caused: no-trails = never-identified balls (the
+  9 has NO identity all session; the 4 undetected at rest 30s+) + old
+  sparse trails run on a ~1.6s-late live clock; false makes = track
+  exit misread as pot (hand-catch case); off-table trails = a PHANTOM
+  BALL living at the bottom-left pocket mouth (294,1361) all session
+  (leather reads as a ball; spawns ghost tracks/micro-episodes/LOST
+  fictions) + identity-swap teleports. ENCOURAGING: the box's episode
+  detector SAW all 5 missed shots; its 22-vs-10 over-fire is mostly
+  the pocket phantom. Dossier: docs/design/bench-220247-watch-2026-08-28.md.
+  NEXT (bench-gated): kill the pocket-mouth phantom in
+  prepare_detections; hand-context; then regeneration.
