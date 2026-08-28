@@ -247,6 +247,7 @@ class MainWindow(QMainWindow):
         self._controller.stats_updated.connect(self._live.on_stats)
         self._controller.shot_recorded.connect(self._live.on_shot)
         self._controller.shot_recorded.connect(self._on_shot_sound)
+        self._controller.shot_observed.connect(self._on_shot_sound)
         self._controller.narration.connect(self._on_narration)
         self._controller.stroke_measured.connect(self._live.on_stroke_measured)
         self._controller.cached_shots.connect(self._live.on_cached_shots)

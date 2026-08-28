@@ -82,6 +82,9 @@ class PipelineController(QObject):
     shot_suggested = Signal(object)     # ShotEvent — manual-confirm mode (not recorded)
     recording_changed = Signal(bool)    # recording on/off
     narration = Signal(str)             # spoken table events (ball_in_hand...)
+    shot_observed = Signal(object)      # shot resolved OUTSIDE a recording
+                                        # (voice verification only - never
+                                        # stats, repo, sidecar, or timeline)
     detection_changed = Signal(bool)    # auto-detection on/off
     capture_progress = Signal(str)      # analysis-capture status text
     capture_saved = Signal(str)         # path to a finished analysis-capture zip
@@ -1390,6 +1393,11 @@ class PipelineController(QObject):
         # the table continuously, but stats belong to a session.
         if res.shot_event is not None and self._session_id is not None:
             self._record_shot(res.shot_event, t)
+        elif res.shot_event is not None:
+            # Joe: "I've just been using the analysis not during recording"
+            # and heard no make/miss calls - narration must verify the
+            # analysis in sandbox play too, exactly like the shot clock
+            self.shot_observed.emit(res.shot_event)
 
         clock_edge = self._clock.poll(t)
         if clock_edge:
