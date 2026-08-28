@@ -114,6 +114,7 @@ def list_sessions() -> list[dict]:
             "duration_s": s.get("dur_s", 0.0),
             "shots": s.get("shots"),   # null = no sidecar (still playable)
         })
+    ss.prune_cache(cache, (p.name for p in vids))
     if len(cache) != dirty_before:
         ss.save_cache(cache)
     return out

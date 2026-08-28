@@ -76,6 +76,15 @@ def save_cache(cache: dict) -> None:
         pass
 
 
+def prune_cache(cache: dict, existing_names) -> None:
+    """Drop entries for videos that no longer exist (Joe deleted 29
+    sessions; their summaries lingered — 2011 keys for 17 videos). Keys
+    are 'name:size:mtime'; callers pass the names they just listed."""
+    keep = set(existing_names)
+    for k in [k for k in cache if k.split(":", 1)[0] not in keep]:
+        del cache[k]
+
+
 def summarize(path: Path, cache: dict) -> dict:
     """{"dur_s": float, "shots": int|None} — cached by name+size+mtime."""
     st = path.stat()

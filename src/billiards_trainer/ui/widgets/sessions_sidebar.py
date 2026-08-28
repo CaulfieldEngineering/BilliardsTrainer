@@ -223,7 +223,10 @@ class SessionsSidebar(QFrame):
                     # summarizing — a refresh mid-teardown. Nothing to
                     # deliver to; save what we learned and stop quietly.
                     break
-            if dirty:
+            before_prune = len(cache)
+            ss.prune_cache(cache, (Path(sp).name for sp in targets
+                                   if Path(sp).exists()))
+            if dirty or len(cache) != before_prune:
                 ss.save_cache(cache)
 
         threading.Thread(target=work, daemon=True, name="session-summaries").start()
