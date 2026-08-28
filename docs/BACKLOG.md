@@ -13,7 +13,41 @@ presence/recording-guarded, one at a time.
 
 ---
 
-## Tier 0 — Standing automatics (do these the moment they're armed)
+## TIER 0 — THE ENGINE RELIABILITY CAMPAIGN (Joe, 2026-08-28)
+
+**Everything else waits.** Joe: "just get this engine reliability
+going... none of my other features matter if we can't get this right...
+keep churning, ideally 24/7... you have autonomy to keep working at
+your own direction so long as you perpetually use your LLM Vision to
+corroborate the results of the app's analysis and animations."
+
+Loop (repeat forever until the bar is met): pick the top disagreement
+→ instrument it → fix → re-measure the bench (~6 min) → **WATCH the
+frames and compare** → log the agreement score → next. Heavy GPU work
+(marathon, library, retrains) runs overnight. New Joe requests during
+the campaign are APPENDED to Tier 3, never built.
+
+BAR: every real shot detected, windowed at its strike, named,
+classified (stroke vs setup), and scored correctly — verified by
+Claude's vision, not by metrics.
+
+CAMPAIGN STATE (update every round; newest first):
+- Bench = **session-20260824-220247** (pinned). Ground truth: 10 real
+  strokes. Full dossier: docs/design/bench-220247-watch-2026-08-28.md.
+- Round 5 (2026-08-28): outcome agreement **9/10**, zero fabricated
+  makes, all 10 strokes detected as episodes.
+- NEXT: (a) 170.6 naming regression — its ball was named "5" under
+  engine v3, unnamed under v4 (jaw filter thinned its reads);
+  (b) hand-context in engine output → unlocks unnamed pots + kills
+  the glove-fake class + labels setup stretches;
+  (c) window keying at the strike (records open 1.2-4.6s late);
+  (d) ball-4 detection dropout at rest; the 9 never identified;
+  (e) c8 recognition retrain (cue/9, 2/4, 3/5 confusions);
+  (f) THEN: other clips, marathon + library re-run, regeneration
+  (shots.json written wholesale from the box), merge-machinery
+  deletion, M3/M4 live promotion.
+
+## Tier 0b — Standing automatics (do these the moment they're armed)
 
 - [ ] **Marathon 4 landing** (armed ~2026-08-28 00:30): read
   `scratchpad/m1_marathon4.log` FULL-GATE + REMERGE lines. Green ⇒

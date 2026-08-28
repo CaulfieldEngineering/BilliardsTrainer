@@ -1,5 +1,14 @@
 # BilliardsTrainer — session rules
 
+**ACTIVE CAMPAIGN (2026-08-28 →): measurement-engine reliability, and
+nothing else.** Joe granted full autonomy to grind continuously on it;
+every round must be corroborated by Claude's OWN vision (watch frames,
+compare to the analyzer) — metrics alone are not evidence. New feature
+requests go to `docs/BACKLOG.md` Tier 3 unbuilt. Campaign state and
+the next targets live in BACKLOG Tier 0; latest results at the tail of
+`docs/GOALS.md`. The bench is the pinned session; when it is perfect,
+move to other clips.
+
 **Before designing any change, read `docs/ARCHITECTURE.md`** — the
 binding design methodology (Joe, 2026-08-27: read on every effort).
 UI work additionally obeys `docs/DESIGN.md`. The measurement plan of
