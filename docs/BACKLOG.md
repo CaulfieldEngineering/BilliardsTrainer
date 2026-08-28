@@ -43,10 +43,17 @@ its gate holds AND a vision watch agrees.
      STATUS: partially done via ad-hoc rules - dead zones replace them.
   R1 CUE BALL - found, named, and continuously tracked; trail covers
      the real path from the strike. Gate: cue correctly named >=99% of
-     frames, one cue track per shot, no phantom cue.  NOW: 100.0% ✅
+     frames, one cue track per shot, no phantom cue.
+     NOW: the metric reads 100% but it is WEAK - it only checks that
+     exactly one track claims "cue", not that the label sits on the
+     real ball. Evidence frame 154.8s shows the cue label on EMPTY
+     FELT beside an unnamed white ball. R1 is NOT passing until the
+     metric checks correctness (label within a ball radius of a live
+     detection) - fix the metric first, then the failure it exposes.
   R2 SHOT EVENTS - every stroke found and windowed AT the strike; no
      stroke invented during hand setup. Gate: 10/10 found, 0 fake.
-     NOW: 9/10 found, 4 fake.
+     NOW: 10/10 FOUND (round 10: engine writes hand context into the
+     dense stream, so setup can be told from strokes); 3 fake remain.
   R3 NOTE (round 9, FAILED + reverted 2026-08-28): a session-inventory
      prior (reject numbers read far less often than the rest) made every
      line WORSE - it cannot separate a phantom from a real ball the
@@ -109,6 +116,10 @@ CAMPAIGN STATE (update every round; newest first):
   unnamed movers seen but pot-credit gated; pocket furniture dies by
   time; engine made hand/stick-aware offline (refresh_foreign).
 - OPEN, NEXT (round 9+), all bench-verified by vision each round:
+  (a0) NEXT: the dense sidecar marks EVERY row active=True, including
+      coasted ghost tracks (measure/tracker._Row.active is hardcoded).
+      That is how a label drifts onto bare felt and how consumers
+      cannot tell a sighting from an estimate. Write real activity.
   (a) episode layer now over-fires (21 episodes) and mints FALSE POTS
       for named balls that lose/regain names mid-flight - e.g. pots
       credited to "4" at 13.1s/29.5s and to a nonexistent "11".

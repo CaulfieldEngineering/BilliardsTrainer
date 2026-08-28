@@ -1963,3 +1963,16 @@ Rounds continue with Joe's visual feedback as the gate.
   a counting problem for a filter. Also this session: retired the stale
   M1-PUSH cron and replaced it with the campaign grind loop (cf93d5e1,
   :07/:37) carrying the ladder gates and vision rule.
+
+- 2026-08-28 ~19:30 — ROUND 10: HAND CONTEXT IN THE DENSE STREAM. The
+  engine computed the hand/stick mask (round 7) but discarded the
+  answer; it now writes carried-ids + foreign coverage per frame, and
+  the shot stage uses it to separate strokes from ball-placing.
+  Result: shots found 9/10 -> **10/10** (R2 detection gate met),
+  physics 0.14 -> 0.06/1k, invented numbers "11" x318 frames -> "8"
+  x18. Calls stay 8/10, attribution 2/4, naming 72.1%. VISION CHECK
+  caught the metric lying: R1's "cue named 100%" only proves ONE track
+  claims cue, not that it sits on the ball - evidence frame 154.8s has
+  the cue label on empty felt beside the unnamed real cue ball. R1
+  demoted to not-passing; next round fixes the metric and the ghost
+  rows behind it (sidecar writes active=True even for coasted tracks).

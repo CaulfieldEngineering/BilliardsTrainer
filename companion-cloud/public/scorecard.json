@@ -1,11 +1,11 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-28T22:25:11Z",
- "detected": "9/10",
+ "ts": "2026-08-28T23:29:56Z",
+ "detected": "10/10",
  "outcome": "8/10",
- "false_strokes": 4,
- "extra_episodes": 8,
- "episodes": 21,
+ "false_strokes": 3,
+ "extra_episodes": 10,
+ "episodes": 24,
  "shots": [
   {
    "strike": 31.7,
@@ -65,16 +65,18 @@
    "strike": 130.2,
    "what": "ball potted bottom-right",
    "found": true,
-   "outcome_ok": true,
-   "engine": "pot",
+   "outcome_ok": false,
+   "engine": "no pot",
    "truth": "pot",
    "img": "journal/evidence/shot_130_2.jpg"
   },
   {
    "strike": 154.2,
    "what": "1 caught in the bridge hand mid-roll - NO pot",
-   "found": false,
-   "outcome_ok": false,
+   "found": true,
+   "outcome_ok": true,
+   "engine": "no pot",
+   "truth": "no pot",
    "img": "journal/evidence/shot_154_2.jpg"
   },
   {
@@ -110,12 +112,13 @@
  ],
  "caps": {
   "cue_named_pct": 100.0,
-  "named_moving_pct": 74.5,
+  "named_moving_pct": 72.1,
   "invented_numbers": [
-   11
+   8
   ],
-  "invented_frames": 318,
+  "invented_frames": 18,
   "pot_attribution": "2/4"
  },
+ "setup_labelled": 1,
  "perfect": false
 }

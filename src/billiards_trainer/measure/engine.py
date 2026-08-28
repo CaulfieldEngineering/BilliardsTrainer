@@ -29,7 +29,7 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 6   # v6: velocity-aware association gate
+ENGINE_RULES_V = 8   # v8: hand context in the dense stream
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -231,7 +231,19 @@ def reprocess(video: str, out_dir: str | None = None,
             dets = [(float(d.x), float(d.y), float(d.radius),
                      int(getattr(d, "number", -1))) for d in prepared]
             rows = tracker.update(dets, t)
-            writer.add_frame(t, rows)
+            # HAND CONTEXT (bench R2: four strokes invented while Joe was
+            # placing balls by hand). The live path has always recorded
+            # which balls are hand-adjacent; the engine computed the mask
+            # (round 7) but threw the answer away. Now it ships, so the
+            # shot stage can tell a stroke from ball-gathering.
+            try:
+                foreign = pipe._foreign_state(frame, calib)
+                carried = pipe._carried_ids(rows, foreign)
+                ffrac = float(foreign[0]) if foreign else 0.0
+            except Exception:  # noqa: BLE001 - context is a bonus, never fatal
+                carried, ffrac = set(), 0.0
+            writer.add_frame(t, rows, carried_ids=carried,
+                             foreign_frac=ffrac)
             written += 1
             fi += 1
             if max_frames and fi >= max_frames:

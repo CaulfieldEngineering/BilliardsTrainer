@@ -76,7 +76,8 @@ def score(truth_path: Path) -> dict:
     r = SidecarReader(M1 / name)
     eps = analyze(r._times, r._frames,
                   pockets=[(p.x, p.y) for p in calib.table.pockets],
-                  pocket_r=calib.table.pocket_radius)
+                  pocket_r=calib.table.pocket_radius,
+                  carried=getattr(r, "_carried", None))
     rows, used = [], set()
     for s in truth["strokes"]:
         best, bi = None, -1
@@ -106,9 +107,12 @@ def score(truth_path: Path) -> dict:
             row["ball_ok"] = bool(got_balls) and got_balls[0] == s["ball"]
         rows.append(row)
     setup = truth.get("setup_windows", [])
-    false_strokes = extra = 0
+    false_strokes = extra = setup_labelled = 0
     for i, e in enumerate(eps):
         if i in used:
+            continue
+        if getattr(e, "setup", False):
+            setup_labelled += 1      # correctly called hand-work, not a shot
             continue
         if any(a <= e.t_strike <= b for a, b, *_ in setup):
             false_strokes += 1
@@ -166,6 +170,7 @@ def score(truth_path: Path) -> dict:
             "detected": f"{found}/{n}", "outcome": f"{ok}/{n}",
             "false_strokes": false_strokes, "extra_episodes": extra,
             "episodes": len(eps), "shots": rows, "caps": caps,
+            "setup_labelled": setup_labelled,
             "perfect": found == n and ok == n
             and false_strokes == 0 and extra == 0}
 

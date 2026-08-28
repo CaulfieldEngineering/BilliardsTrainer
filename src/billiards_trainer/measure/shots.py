@@ -34,6 +34,7 @@ class Episode:
     t_strike: float
     t_settle: float
     movers: set = field(default_factory=set)
+    setup: bool = False          # hand-driven (placing/gathering), not a stroke
     pocketed: list = field(default_factory=list)   # (number, pocket_x, pocket_y)
     resting: set = field(default_factory=set)
     lost: list = field(default_factory=list)       # (number, last_x, last_y)
@@ -77,8 +78,12 @@ def _series(times, frames):
     return by_n
 
 
+CARRIED_SETUP = 0.5      # this share of moving samples hand-adjacent =
+                         # the hand moved the balls, not a cue
+
+
 def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
-            unnamed_pots: bool = False) -> list[Episode]:
+            unnamed_pots: bool = False, carried=None) -> list[Episode]:
     """Batch shot finding over a dense stream. Pure; no I/O.
 
     pockets: [(x, y), ...] in the stream's coordinate space. A pocket
@@ -125,6 +130,19 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
         t_close = all_moving[k]
         ep = Episode(t_strike=round(t_open - BACKDATE_S, 3),
                      t_settle=round(t_close, 3))
+        if carried:
+            # count moving frames whose movers were hand-adjacent
+            hot = tot = 0
+            for j, ts in enumerate(times):
+                if not (t_open <= ts <= t_close):
+                    continue
+                ids = {tr[0] for tr in frames[j] if tr[6]}
+                if not ids:
+                    continue
+                tot += 1
+                if set(carried[j] if j < len(carried) else ()) & ids:
+                    hot += 1
+            ep.setup = tot > 0 and hot / tot >= CARRIED_SETUP
         _judge(ep, by_n, moving_ts, t_open, t_close, pockets, pocket_r,
                unnamed_pots)
         episodes.append(ep)

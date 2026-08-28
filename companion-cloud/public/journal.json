@@ -1,6 +1,33 @@
 {
  "entries": [
   {
+   "id": 51,
+   "ts": "2026-08-28T23:30:42",
+   "date": "Aug 28, 23:30 UTC",
+   "kind": "finding",
+   "title": "Round 10: all ten shots found - and a metric caught lying",
+   "score": "10/10 shots (was 9), phantom numbers 318 -> 18 frames",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/051-shot_154_2.jpg",
+     "caption": "154.8s: the green '0' cue label sits on empty felt; the real cue ball beside it is unnamed. The app's own tracking, drawn on your video."
+    }
+   ],
+   "html": "<div class='note win'><p><strong>Every shot is now found.</strong>\nThe app writes down which balls your hand is touching, so it can tell a\nstroke from you placing balls - and with that, all ten strokes in the\npractice clip are detected (was nine). The phantom ball number nearly\nvanished too: an invented \"11\" that appeared in 318 frames is down to\nan \"8\" in 18 frames, because most of those bogus reads were your hand\nand cue stick.</p></div>\n<div class='note warn'><p><strong>But I looked at the frames, and one\nnumber is lying to us.</strong> The scorecard says the cue ball is\ncorrectly named 100% of the time. The evidence frame at 154.8s shows\nthe \"cue\" label sitting on <em>empty felt</em> while the real white ball\nright next to it is unnamed. The metric only checks that exactly ONE\ntrack claims to be the cue - not that it is on the actual ball. So R1\nis not really passing; it was passing a weak test.</p>\n<p>Two things follow, and both are now queued: the cue measurement gets\na correctness check, and the app stops writing coasted ghost tracks as\nif they were live sightings - which is what let a label drift onto bare\ncloth in the first place.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
+   "id": 50,
+   "ts": "2026-08-28T23:09:07",
+   "date": "Aug 28, 23:09 UTC",
+   "kind": "finding",
+   "title": "Round 9: a fix that failed, and why",
+   "score": "reverted - back to 9/10 shots, 8/10 calls",
+   "body": "",
+   "images": [],
+   "html": "<div class='note warn'><p><strong>This round FAILED and was\nreverted.</strong> I tried to kill the invented \"11\" with a rule that\nlearns which balls are actually in play during a session and rejects\nnumbers read far less often than the rest. It made everything worse:\nnaming fell from 74.5% to 68.7%, correct calls from 8/10 to 7/10, and\nthe phantom \"11\" nearly doubled.</p>\n<p><strong>Why:</strong> the rule cannot tell a fake ball from a real\nball the detector rarely sees. Your orange 5 is detected in only a\nhandful of frames all session, so the rule suppressed the 5 along with\nthe 11 - and every ball it silenced made the tracking worse elsewhere.\nThe lesson is that the phantom number is not a counting problem, it is\na recognition problem: the model genuinely misreads a ball as \"11\".\nThat belongs in the retraining work, not in a filter.</p>\n<p>Code reverted, bench re-measured, and the numbers below are back to\nexactly where they were before the attempt.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>74.5%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>11</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>9/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>4</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>154.2s</code> 1 caught in the bridge hand mid-roll - NO pot \u2014 <span class='fail'>the app missed this shot entirely</span></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 49,
    "ts": "2026-08-28T19:05:21",
    "date": "Aug 28, 19:05 UTC",
