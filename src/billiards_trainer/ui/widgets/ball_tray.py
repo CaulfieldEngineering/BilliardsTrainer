@@ -52,7 +52,10 @@ class BallTrayWidget(QWidget):
             col = QColor(BALL_COLORS.get(num, "#9AA4B2"))
             if here:
                 p.setBrush(col)
-                p.setPen(QPen(QColor(PALETTE.border), 1))
+                # the 8's near-black fill reads as a greyed ghost (Joe) —
+                # a bright ring says PRESENT louder than the fill can
+                p.setPen(QPen(QColor("#ECEFF1"), 2)
+                         if num == 8 else QPen(QColor(PALETTE.border), 1))
             else:
                 p.setBrush(Qt.NoBrush)   # potted: hollow ghost
                 ghost = QColor(col)

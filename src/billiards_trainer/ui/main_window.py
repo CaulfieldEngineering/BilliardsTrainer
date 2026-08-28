@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
         # pre-render spoken cues so the first live utterance is instant
         from .voice import prewarm
         prewarm(["Ten", "Scratch", "Ball in hand", "Table change", "Foul",
-                 "Make", "Miss"] +
+                 "Time Foul", "Make", "Miss"] +
                 [f"{n} ball" for n in self._BALL_NAMES.values()] +
                 # every 9-ball make call ("N ball in X pocket") rendered
                 # ahead so the first real make speaks, not skips
@@ -503,6 +503,15 @@ class MainWindow(QMainWindow):
         from .sounds import play
         play(edge, volume=int(getattr(self._settings.shot_clock,
                                       f"vol_{edge}", 100)))
+        if edge == "expired":
+            # Joe: announce a "Time Foul" when the clock runs out unshot.
+            # Delayed past the buzz — winsound is one channel, an instant
+            # say() would cut the buzzer off mid-ring.
+            from PySide6.QtCore import QTimer
+            from .voice import say
+            QTimer.singleShot(1100, lambda: say(
+                "Time Foul", volume=int(getattr(self._settings.shot_clock,
+                                                "vol_voice", 100))))
 
     def _push_settings(self) -> None:
         self.apply_settings_requested.emit(self._settings)
