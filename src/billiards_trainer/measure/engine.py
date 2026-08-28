@@ -29,7 +29,7 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 2
+ENGINE_RULES_V = 3   # v3: real-pts stamps + fresh-claim arbitration
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -146,6 +146,7 @@ def reprocess(video: str, out_dir: str | None = None,
     hinv = np.linalg.inv(np.asarray(calib.H, dtype=float))
     writer = SidecarWriter(out_video_alias, {"fps": fps, "engine": "m1",
                                              "rules_v": ENGINE_RULES_V,
+                                             "clock": "pts",
                                              "dense": True,
                                              "calibrated": True,
                                              "hinv": [[round(float(v), 8)
@@ -180,12 +181,23 @@ def reprocess(video: str, out_dir: str | None = None,
     last_file = 0.0
     fi = 0
     written = 0
+    prev_pts = -1.0
     try:
         while True:
             ok, frame = cap.read()
             if not ok:
                 break
-            t = start_s + fi / fps
+            # REAL frame pts, not frame_index/fps (forensics 2026-08-28:
+            # recordings carry a first-frame HOLD of 120-155ms, so the
+            # grid assumption made every trail LEAD the video by ~4
+            # frames on the phone, decaying with an avg-fps drift).
+            # After read(), CAP_PROP_POS_MSEC is the pts of the frame
+            # just returned (verified against ffprobe packet times).
+            pts_s = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            if fi > 0 and pts_s <= prev_pts:      # backend hiccup
+                pts_s = prev_pts + 1.0 / fps
+            prev_pts = pts_s
+            t = start_s + pts_s
             if fi % 150 == 0:
                 if recording_live():
                     log.warning("recording started - engine aborted at %.1fs", t)
