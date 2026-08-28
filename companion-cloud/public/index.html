@@ -300,6 +300,40 @@
                  font-size:11px; }
   .chip.cur { background:#1B2430; outline:2px solid var(--accent); }
   .empty { padding:32px 16px; color:var(--dim); text-align:center; }
+  /* ---- desktop mode (Joe: "see the controls and parameters without
+     the fields covering the video") — pure CSS, phone DOM untouched.
+     Wide window: video owns the left column edge-to-edge; shot info,
+     lane, transport and chips live in a right rail; the overlay menu
+     and correction sheet anchor to the right edge instead of covering
+     the picture. -------------------------------------------------- */
+  @media (min-width: 1100px) {
+    #player.open {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 400px;
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas: "top top" "video side";
+      column-gap: 16px;
+      padding: 0 16px 12px;
+    }
+    #topbar { grid-area: top; }
+    #vwrap  { grid-area: video; }
+    #shotbar {
+      grid-area: side;
+      display: flex; flex-direction: column;
+      overflow-y: auto; min-height: 0;
+      border-left: 1px solid #232B36; padding-left: 16px;
+    }
+    #lane { height: 56px; }
+    #chips { flex-wrap: wrap; overflow-x: visible; }
+    /* overlays hug the right rail instead of the video */
+    #ovmenu { left: auto !important; right: 24px; }
+    #sheet {
+      left: auto !important; right: 0 !important;
+      width: 420px; max-width: 40vw;
+      border-left: 1px solid #232B36;
+    }
+    #sessions { max-width: 760px; margin: 0 auto; }
+  }
 </style>
 </head>
 <body>
