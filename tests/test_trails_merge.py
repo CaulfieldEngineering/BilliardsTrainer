@@ -52,3 +52,59 @@ class TestEndpointVerdict:
                                 False) == "unknown"
         assert endpoint_verdict((0.5, 0.5), (0.51, 0.5),
                                 [(0.505, 0.5)], [], False) == "unknown"
+
+
+class TestEarnedTieBreak:
+    """prefer_dense (Joe: replays looked unchanged because the timid
+    default kept sparse on every ambiguity): unknown goes to dense on
+    gate-green sessions; an ACTIVE sparse verdict still wins."""
+
+    def _setup(self):
+        import numpy as np
+        from types import SimpleNamespace
+        times = [98.0 + i * 0.033 for i in range(160)]
+        frames = [[(1, 0.3 + i * 0.002, 0.5, 0.01, 3, 2, 1)]
+                  for i in range(160)]
+        reader = SimpleNamespace(
+            meta={"hinv": np.eye(3).tolist(), "w": 1.0, "h": 1.0},
+            _times=times, _frames=frames)
+        # sparse trail on a DIFFERENT path -> bootstrap gate refuses
+        sparse = [[107.0 + i * 0.15, 0.3 + i * 0.01, 0.7]
+                  for i in range(8)]
+        doc = {"shots": [{"start": 107.0, "end": 109.0,
+                          "stroke": {"strike": 100.0},
+                          "trails": [{"n": 3, "p": sparse}]}]}
+        return reader, doc
+
+    def _arb(self, verdict):
+        from types import SimpleNamespace
+        return SimpleNamespace(verdict=lambda *a, **k: verdict)
+
+    def test_unknown_keeps_sparse_by_default(self):
+        from billiards_trainer.measure.trails_merge import merge_trails
+        reader, doc = self._setup()
+        stats = merge_trails("x.mp4", reader, doc, arbiter=self._arb("unknown"))
+        assert stats["shots_upgraded"] == 0
+        assert not doc["shots"][0]["trails"][0].get("dense")
+
+    def test_unknown_takes_dense_when_earned(self):
+        from billiards_trainer.measure.trails_merge import merge_trails
+        reader, doc = self._setup()
+        stats = merge_trails("x.mp4", reader, doc,
+                             arbiter=self._arb("unknown"), prefer_dense=True)
+        assert stats["shots_upgraded"] == 1
+        assert doc["shots"][0]["trails"][0]["dense"] is True
+
+    def test_active_sparse_verdict_still_wins(self):
+        from billiards_trainer.measure.trails_merge import merge_trails
+        reader, doc = self._setup()
+        stats = merge_trails("x.mp4", reader, doc,
+                             arbiter=self._arb("sparse"), prefer_dense=True)
+        assert stats["shots_upgraded"] == 0
+        assert not doc["shots"][0]["trails"][0].get("dense")
+
+    def test_no_arbiter_prefers_dense_when_earned(self):
+        from billiards_trainer.measure.trails_merge import merge_trails
+        reader, doc = self._setup()
+        stats = merge_trails("x.mp4", reader, doc, prefer_dense=True)
+        assert stats["shots_upgraded"] == 1

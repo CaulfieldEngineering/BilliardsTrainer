@@ -54,11 +54,18 @@ def _agrees(dense_pts, sparse_pts) -> bool:
 
 
 def merge_trails(video_path, dense_reader, doc: dict,
-                 arbiter=None) -> dict:
+                 arbiter=None, prefer_dense: bool = False) -> dict:
     """Returns upgrade stats; mutates doc in place (caller writes it).
     arbiter: optional VideoArbiter — when the bootstrap agreement gate
     refuses a dense trail, the VIDEO decides (the ball's actual resting
-    place at trail end). Ambiguity keeps sparse."""
+    place at trail end).
+
+    prefer_dense: the tie-break, and it is EARNED, not assumed. False
+    (bootstrap era): ambiguity keeps sparse. True (for sessions whose
+    FULL gate beat the champion): ambiguity takes dense; sparse
+    survives only when the video ACTIVELY sides with it. Joe caught
+    the timid default: 58/125 upgrades left his replays looking
+    unchanged - mixed shots kept the very cue-ball trails he watches."""
     meta = dense_reader.meta
     hinv = np.asarray(meta.get("hinv"), dtype=float)
     w, h = float(meta.get("w")), float(meta.get("h"))
@@ -99,14 +106,18 @@ def merge_trails(video_path, dense_reader, doc: dict,
             n = tr.get("n", -1)
             dp = per_n.get(n)
             take = bool(dp and _agrees(dp, tr.get("p", [])))
-            if (dp and not take and arbiter is not None and len(dp) >= 5
-                    and len(tr.get("p", [])) >= 3):
-                # video-truth arbitration: who ends where reality is?
-                t_end_v = dp[-1][0] - o
-                v = arbiter.verdict(t_end_v, (dp[-1][1], dp[-1][2]),
-                                    (tr["p"][-1][1], tr["p"][-1][2]),
-                                    n in pocketed_ns)
-                take = v == "dense"
+            if dp and not take and len(dp) >= 5:
+                if arbiter is not None and len(tr.get("p", [])) >= 3:
+                    # video-truth arbitration: who ends where reality is?
+                    t_end_v = dp[-1][0] - o
+                    v = arbiter.verdict(t_end_v, (dp[-1][1], dp[-1][2]),
+                                        (tr["p"][-1][1], tr["p"][-1][2]),
+                                        n in pocketed_ns)
+                    # earned tie-break: unknown goes to dense only when
+                    # the session's full gate beat the champion
+                    take = v == "dense" or (prefer_dense and v != "sparse")
+                elif prefer_dense:
+                    take = True
             if take:
                 pts = dp[:: max(1, len(dp) // MAX_PTS + 1)][:MAX_PTS]
                 new_trails.append({"n": n, "p": pts, "dense": True})
@@ -123,7 +134,8 @@ def merge_trails(video_path, dense_reader, doc: dict,
 
 
 def merge_into_session(video_path, dense_sidecar_video,
-                       arbitrate: bool = True) -> dict | None:
+                       arbitrate: bool = True,
+                       prefer_dense: bool = False) -> dict | None:
     """Load, merge, and WRITE the session's shots.json (bumps the
     processed stamp). Returns the stats dict, or None on failure."""
     from datetime import datetime, timezone
@@ -153,7 +165,8 @@ def merge_into_session(video_path, dense_sidecar_video,
         except Exception:  # noqa: BLE001 - arbitration is an upgrade path
             log.exception("arbiter unavailable; bootstrap gate only")
     try:
-        stats = merge_trails(video_path, dense, doc, arbiter=arbiter)
+        stats = merge_trails(video_path, dense, doc, arbiter=arbiter,
+                             prefer_dense=prefer_dense)
     finally:
         if arbiter is not None:
             arbiter.close()
