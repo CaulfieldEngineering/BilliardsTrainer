@@ -1921,3 +1921,15 @@ Rounds continue with Joe's visual feedback as the gate.
   the pocket phantom. Dossier: docs/design/bench-220247-watch-2026-08-28.md.
   NEXT (bench-gated): kill the pocket-mouth phantom in
   prepare_detections; hand-context; then regeneration.
+
+- 2026-08-28 afternoon — BENCH GRIND rounds 1-2 (Joe: "get this pinned
+  session working perfectly"): jaw-phantom filter (pocket leather as
+  0.48-score ball) killed the artifact factory — episodes 22->14 with
+  ALL 10 real strokes individually present (5 previously invisible to
+  the file). Pot credits: 1/5 -> chasing off-bed track death (path-tail
+  + bed-exit rules added, tests green; ball-2 detections themselves go
+  off-bed — round 3 target). Vision verification at every round per
+  the new charter. Marathon re-run DEFERRED until bench outcomes lock
+  (no 3h GPU runs on rules that change daily). Desktop: v1 grid rail
+  shipped; Joe wants all menus as rail dropdown sections — queued UI
+  chunk.
