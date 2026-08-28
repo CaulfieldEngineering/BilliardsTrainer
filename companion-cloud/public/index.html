@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,6 +19,10 @@
       -webkit-user-select:none; user-select:none;
       -webkit-touch-callout:none; }
   body { touch-action:manipulation; }
+  /* nothing may ever exceed the viewport (Joe: "content pushes right up
+     to the right side... even overflows when I make the window wider") */
+  html, body { max-width:100%; overflow-x:hidden; }
+  img, canvas, video { max-width:100%; }
   /* the video area owns ALL its gestures: without this, iOS treats
      two-finger and drag input over the <video> as PAGE gestures — pinch-
      out got stolen and pans scrolled the page (Joe) */
