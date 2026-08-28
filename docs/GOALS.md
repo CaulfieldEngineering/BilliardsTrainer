@@ -1785,3 +1785,23 @@ Rounds continue with Joe's visual feedback as the gate.
   confusion (Joe repro'd) — mine dense sidecars for 3<->5 vote flips,
   harvest crops, retrain c8; false-pos/neg make-miss audit AFTER dense
   rollout per Joe ("detection and measurement first").
+
+- 2026-08-27 late — ARCHITECTURE CONSTITUTION + CORE GOES LIVE. Joe:
+  "one Measurement Core engine handling all the data", "a design
+  methodology doc read on every effort", "layers on layers... skyscraper
+  of shit". Delivered: docs/ARCHITECTURE.md (7 laws w/ case citations,
+  checklist, demolition ledger) bound via repo CLAUDE.md; 5-agent audit
+  inventoried ~40 private opinion-holders (docs/design/state-opinion-
+  map-2026-08-27.md) incl. 4 timebase reconciliations, 3 strike
+  authorities, 4 shot-history copies, phone reader fork;
+  MeasurementCore wired INTO the live pipeline — owns presence, runs
+  hardened MotionTracker as in-process shadow, champion-vs-shadow
+  divergence in the health line (promotion evidence accrues during
+  ordinary play). Controller's standalone TablePresence deleted (lived
+  2 hours — the doc's first enforcement). Marathon 4 relaunched at
+  Joe's explicit say-so with presence-pause overridden for the night
+  (launcher-only patch; repo guard intact), ~19fps, lands ~00:30 then
+  auto full-gate + re-merge. pub=0 since 21:18 investigated: spans
+  builds, no exceptions — table scene (lights/cover), not code. NEXT:
+  migrate consumers per the map (clock snapshot, shot ids, timebase),
+  3/5 flip mining, M2 full gate on marathon output.
