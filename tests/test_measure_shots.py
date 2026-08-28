@@ -164,3 +164,74 @@ class TestChainContinuity:
                                  2: fn}, n_frames=400)
         ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
         assert not ep.pocketed and 2 in ep.resting
+
+
+class TestLipHover:
+    def test_lip_hover_then_chain_death_is_a_pot(self):
+        # bench round 4: the potted ball creeps below the motion
+        # threshold AT the mouth, then its chain dies - that's a drop
+        def fn(k):
+            if k < 60:
+                return (300, 600)
+            if k < 150:
+                f = (k - 60) / 90
+                return (300 - f * 270, 600 + f * 570)   # to (30, 1170)
+            if k < 175:
+                return (30 - (k - 150) * 0.3, 1170 + (k - 150) * 0.8)
+            return None                                  # chain dies at mouth
+        times, frames = _stream({0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+                                 9: fn}, n_frames=400)
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
+        assert [p[0] for p in ep.pocketed] == [9], "lip hover + death = drop"
+
+    def test_lip_hover_surviving_chain_still_resting(self):
+        # the true rattle-and-stay: hovers at the mouth and KEEPS being
+        # tracked - resting, not potted
+        def fn(k):
+            if k < 60:
+                return (300, 600)
+            if k < 150:
+                f = (k - 60) / 90
+                return (300 - f * 270, 600 + f * 570)
+            return (30, 1170)                            # tracked forever
+        times, frames = _stream({0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+                                 9: fn}, n_frames=400)
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
+        assert not ep.pocketed and 9 in ep.resting
+
+
+class TestUnnamedMovers:
+    def test_unnamed_fast_roll_into_pocket_is_a_make(self):
+        # bench: the potted 5 crossed the table as an unnamed track
+        def unnamed(k):
+            if k < 60:
+                return (500, 300)
+            if k >= 170:
+                return None
+            f = (k - 60) / 110
+            return (500 - f * 470, 300 + f * 880)   # long roll to (30,1180)
+        times, frames = [], []
+        for k in range(400):
+            t = 10.0 + k / 30.0
+            rows = [(100, 250.0, 250.0, 14.0, 0, 0, 1)]
+            p = unnamed(k)
+            if p is not None:
+                rows.append((77, p[0], p[1], 14.0, -1, 5, 1))
+            times.append(t)
+            frames.append(rows)
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25,
+                     unnamed_pots=True)[0]
+        assert ep.pocketed and ep.pocketed[0][0] < 0, "unnamed pot must score"
+
+    def test_slow_unnamed_blob_never_counts(self):
+        # glove-like: dwells near the pocket, small span, slow
+        times, frames = [], []
+        for k in range(400):
+            t = 10.0 + k / 30.0
+            rows = [(100, 250.0, 250.0, 14.0, 0, 0, 1)]
+            if 60 <= k < 200:
+                rows.append((88, 40 + (k - 60) * 0.5, 1180, 14.0, -1, 5, 1))
+            times.append(t)
+            frames.append(rows)
+        eps = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)
+        assert all(not e.pocketed for e in eps)

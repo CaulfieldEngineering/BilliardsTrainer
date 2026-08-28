@@ -40,19 +40,45 @@ class Episode:
     scratch: bool = False
 
 
+UNNAMED_MIN_SPAN = 250.0     # px of travel for an unnamed track to count
+UNNAMED_MIN_SPEED = 250.0    # px/s peak - a rolling ball, not a glove
+
+
 def _series(times, frames):
-    """Per-number position/time series from dense frame rows
-    (id, x, y, radius, number, cls, active)."""
+    """Position/time series from dense frame rows (id,x,y,radius,number,
+    cls,active). Named balls key by NUMBER; unnamed tracks key by
+    -track_id (bench round 5: the potted 5 crossed the whole table as an
+    unnamed track - one fifth of real motion has no name yet, and the
+    box must not be blind to it)."""
     by_n: dict[int, list] = {}
     for j, rows in enumerate(frames):
         for tr in rows:
+            if not tr[6]:
+                continue
             n = tr[4]
-            if n >= 0 and tr[6]:
-                by_n.setdefault(n, []).append((times[j], tr[1], tr[2]))
+            key = n if n >= 0 else -int(tr[0])
+            by_n.setdefault(key, []).append((times[j], tr[1], tr[2]))
+    # unnamed tracks must EARN ball status: substantial travel at ball
+    # speed. Gloves/stick blobs dwell and creep; rolling balls cross felt.
+    for key in [k for k in by_n if k < 0]:
+        pts = by_n[key]
+        xs = [p[1] for p in pts]
+        ys = [p[2] for p in pts]
+        span = ((max(xs) - min(xs)) ** 2 + (max(ys) - min(ys)) ** 2) ** 0.5
+        peak = 0.0
+        for k2 in range(1, len(pts)):
+            dt = pts[k2][0] - pts[k2 - 1][0]
+            if 0 < dt < 0.5:
+                v = ((pts[k2][1] - pts[k2 - 1][1]) ** 2
+                     + (pts[k2][2] - pts[k2 - 1][2]) ** 2) ** 0.5 / dt
+                peak = max(peak, v)
+        if span < UNNAMED_MIN_SPAN or peak < UNNAMED_MIN_SPEED:
+            del by_n[key]
     return by_n
 
 
-def analyze(times, frames, pockets=None, pocket_r: float = 40.0) -> list[Episode]:
+def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
+            unnamed_pots: bool = False) -> list[Episode]:
     """Batch shot finding over a dense stream. Pure; no I/O.
 
     pockets: [(x, y), ...] in the stream's coordinate space. A pocket
@@ -99,14 +125,16 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0) -> list[Episode
         t_close = all_moving[k]
         ep = Episode(t_strike=round(t_open - BACKDATE_S, 3),
                      t_settle=round(t_close, 3))
-        _judge(ep, by_n, moving_ts, t_open, t_close, pockets, pocket_r)
+        _judge(ep, by_n, moving_ts, t_open, t_close, pockets, pocket_r,
+               unnamed_pots)
         episodes.append(ep)
         i = k + 1
     return episodes
 
 
 def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
-           pockets=None, pocket_r: float = 40.0) -> None:
+           pockets=None, pocket_r: float = 40.0,
+           unnamed_pots: bool = False) -> None:
     for n, pts in by_n.items():
         # participated? seen in the second before the strike or moved
         pre = [p for p in pts if t_open - 1.0 <= p[0] <= t_close]
@@ -146,8 +174,20 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
         # after it stops — and stays "resting" even if picked up later
         # (the 3-ball case).
         if last[0] - moved[-1] > 0.3:
-            ep.resting.add(n)
-            continue
+            # "resting" needs more than slow samples (bench round 4: both
+            # uncredited pots HOVERED at the lip below the motion
+            # threshold, then their chains DIED at the mouth). A resting
+            # ball stays tracked; rest evidence counts only if the chain
+            # survives the linger window or the rest is away from pockets.
+            alive_through = last[0] >= t_close + LINGER_S - 0.2
+            at_mouth = any(((last[1] - qx) ** 2
+                            + (last[2] - qy) ** 2) ** 0.5 < 2.6 * pocket_r
+                           for (qx, qy) in (pockets or []))
+            if alive_through or not at_mouth:
+                ep.resting.add(n)
+                continue
+            # fell asleep at the mouth, then vanished: fall through to
+            # the pocket-credit path
         # track died with motion: pocket credit iff the FINAL PATH passes
         # through a pocket zone. The death point alone is not enough -
         # a dropping ball's track coasts THROUGH the mouth and dies
@@ -193,5 +233,12 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
             ep.lost.append((n, round(last[1], 1), round(last[2], 1)))
         elif n == 0:
             ep.scratch = True
-        else:
+        elif n >= 1 or unnamed_pots:
+            # n < 0 = an unnamed track's drop. GATED until hand-context
+            # lands: on the bench, the glove carrying balls out of a
+            # pocket passes the span/speed gates and fakes a pot
+            # (round 5's own false make at 25.3s). Real unnamed pots
+            # wait rather than fabricate.
             ep.pocketed.append((n, round(near[0], 1), round(near[1], 1)))
+        else:
+            ep.lost.append((n, round(last[1], 1), round(last[2], 1)))
