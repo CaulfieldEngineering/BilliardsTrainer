@@ -70,9 +70,10 @@ class TestEarnedTieBreak:
             meta={"hinv": np.eye(3).tolist(), "w": 1.0, "h": 1.0},
             _times=times, _frames=frames)
         # sparse trail on a DIFFERENT path -> bootstrap gate refuses
-        sparse = [[107.0 + i * 0.15, 0.3 + i * 0.01, 0.7]
+        # (all times VIDEO clock per the ONE CLOCK export contract)
+        sparse = [[100.9 + i * 0.15, 0.3 + i * 0.01, 0.7]
                   for i in range(8)]
-        doc = {"shots": [{"start": 107.0, "end": 109.0,
+        doc = {"shots": [{"start": 100.9, "end": 102.5,
                           "stroke": {"strike": 100.0},
                           "trails": [{"n": 3, "p": sparse}]}]}
         return reader, doc

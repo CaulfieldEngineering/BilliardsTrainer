@@ -7,9 +7,11 @@ hinv — self-consistent chain to video pixels). Per-shot gates keep it
 honest: a dense trail must geometrically agree with the sparse trail it
 replaces (same path, same endpoints) or the sparse one stays.
 
-Time base: dense t is VIDEO time; trail points must ship in sidecar
-time so the phone's per-shot normalization (o = start - strike) lands
-them back on video time. So: t_out = t_video + o.
+Time base: dense t is VIDEO time and SHIPS RAW. Since the Aug-24 ONE
+CLOCK export contract the shots.json is video time end-to-end and the
+phone does not re-normalize (key present) — the old "+ (start-strike)"
+shift drew every merged trail ~1-3s late (Joe: "the very first clip
+doesn't have trails" — it was outside the visible window).
 """
 
 from __future__ import annotations
@@ -80,14 +82,20 @@ def merge_trails(video_path, dense_reader, doc: dict,
             skipped += 1
             continue
         strike_v = float(sv["strike"])
-        o = float(s["start"]) - strike_v
-        end_v = float(s.get("end", s["start"])) - o
+        end_v = float(s.get("end", s["start"]))
         if strike_v - PRE_S < t_lo or end_v > t_hi:
             skipped += 1                  # dense data doesn't cover it
             continue
         k0 = bisect.bisect_left(times, strike_v - PRE_S)
         k1 = bisect.bisect_right(times, end_v + 0.3)
-        # collect per-number dense points across the window
+        # collect per-number dense points across the window.
+        # ONE CLOCK (caught by Joe's "first clip has no trails",
+        # 2026-08-28): since the Aug-24 export contract the file is
+        # VIDEO time and the phone does NOT re-normalize (key present)
+        # - so trail stamps are the sidecar's video times RAW. The old
+        # "+ (start - strike)" shift wrote every merged trail ~1-3s
+        # late; alignment is now verified against the sidecar, not
+        # assumed (spacing checks alone missed this).
         per_n: dict = {}
         for j in range(k0, min(k1, len(frames))):
             for tr in frames[j]:
@@ -96,7 +104,7 @@ def merge_trails(video_path, dense_reader, doc: dict,
                     continue
                 x, y = _norm(hinv, w, h, tr[1], tr[2])
                 per_n.setdefault(n, []).append(
-                    [round(times[j] + o, 3), round(x, 4), round(y, 4)])
+                    [round(times[j], 3), round(x, 4), round(y, 4)])
         new_trails = []
         any_upgrade = False
         pocketed_ns = {int(pb.get("number", -1)) for pb in
@@ -109,7 +117,7 @@ def merge_trails(video_path, dense_reader, doc: dict,
             if dp and not take and len(dp) >= 5:
                 if arbiter is not None and len(tr.get("p", [])) >= 3:
                     # video-truth arbitration: who ends where reality is?
-                    t_end_v = dp[-1][0] - o
+                    t_end_v = dp[-1][0]
                     v = arbiter.verdict(t_end_v, (dp[-1][1], dp[-1][2]),
                                         (tr["p"][-1][1], tr["p"][-1][2]),
                                         n in pocketed_ns)
