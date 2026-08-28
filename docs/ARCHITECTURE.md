@@ -38,7 +38,13 @@ PRESENTATION   Qt UI, voice, schematic, phone app, overlays
   new work — every merge/graft/repass that exists today is transition
   scaffolding with a scheduled demolition date, and any new
   measurement capability must be built INSIDE the box where both
-  feeds get it.
+  feeds get it. Reprocessing DEFINED (Joe, 2026-08-28): "imagine that
+  video input were live footage being streamed in. We are re-analyzing
+  everything as though it's raw video." A reprocess reads NOTHING from
+  prior analysis — no skeleton, no graft, no reference to the old
+  shots list. The only thing that survives a reprocess is JOE'S OWN
+  input (review verdicts, corrections) re-attached afterward — his
+  data, not the machine's.
 - **Python proves, C++ inherits.** A rule ships to the rewrite only
   after it survives the corpus gates here. Nothing unproven ports.
 
