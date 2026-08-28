@@ -409,6 +409,10 @@ class ShotDetector:
             # ball wobbles for 0-2. Three is the floor between them.
             if self._free_frames.get(tid, 0) < 3:
                 continue
+            veto = self._still_on_table(tid, by_id)
+            if veto:
+                log.debug("Pot veto for track %d: %s", tid, veto)
+                continue
             dist, name = self._min_pdist.get(tid, (1e9, ""))
             if dist < gate and name:
                 cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
@@ -437,6 +441,32 @@ class ShotDetector:
 
     def _already(self, tid: int) -> bool:
         return any(p.track_id == tid for p in self._pocketed)
+
+    def _still_on_table(self, tid: int, by_id: dict) -> str | None:
+        """Measurement-core cross-check (Joe: makes were announced while
+        the schematic showed the ball sitting mid-table). A vanished TRACK
+        is not a vanished BALL — identity churn kills track A and rebirths
+        the same ball as track B, and per-track bookkeeping then reads A as
+        "dropped in". Before crediting a pot, ask the SAME live tracks the
+        schematic draws: if the candidate's number is still actively
+        tracked anywhere, or any active track sits where the candidate was
+        last seen (a re-acquisition, not a drop), it never left the table.
+        Returns the veto reason, or None to allow the credit."""
+        num = self._shot_num.get(tid, -1)
+        prev = self._prev.get(tid)
+        for otid, tr in by_id.items():
+            if otid == tid or not tr.active:
+                continue
+            if num >= 1 and getattr(tr, "number", -1) == num:
+                return (f"ball {num} still actively tracked "
+                        f"at ({tr.x:.0f},{tr.y:.0f})")
+            if prev is not None:
+                r = max(getattr(prev, "radius", 0.0) or 0.0, 12.0)
+                d = ((tr.x - prev.x) ** 2 + (tr.y - prev.y) ** 2) ** 0.5
+                if d < 1.8 * r:
+                    return (f"track {otid} active {d:.0f}px from its last "
+                            f"position (re-acquired, not dropped)")
+        return None
 
     def _resolve(self, t: float, by_id: dict | None = None) -> ShotEvent | None:
         self._state = _State.SETTLED

@@ -140,7 +140,11 @@ class MainWindow(QMainWindow):
         from .voice import prewarm
         prewarm(["Ten", "Scratch", "Ball in hand", "Table change", "Foul",
                  "Make", "Miss"] +
-                [f"{n} ball" for n in self._BALL_NAMES.values()])
+                [f"{n} ball" for n in self._BALL_NAMES.values()] +
+                # every 9-ball make call ("N ball in X pocket") rendered
+                # ahead so the first real make speaks, not skips
+                [self._make_call(n, pk) for n in range(1, 10)
+                 for pk in self._POCKET_SPOKEN])
 
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
@@ -435,6 +439,21 @@ class MainWindow(QMainWindow):
                    11: "Eleven", 12: "Twelve", 13: "Thirteen",
                    14: "Fourteen", 15: "Fifteen"}
 
+    # spoken forms of the geometry.POCKET_* DB keys (rectified-table
+    # orientation; if left/right sound mirrored at the table, flip here)
+    _POCKET_SPOKEN = {
+        "top-left": "top left", "top-right": "top right",
+        "bottom-left": "bottom left", "bottom-right": "bottom right",
+        "left-side": "left side", "right-side": "right side",
+    }
+
+    def _make_call(self, number: int, pocket_key: str) -> str:
+        """Joe's standard: "N ball in X pocket"."""
+        name = self._BALL_NAMES[number]
+        spoken = self._POCKET_SPOKEN.get(pocket_key)
+        return (f"{name} ball in the {spoken} pocket" if spoken
+                else f"{name} ball")
+
     def _on_shot_sound(self, event) -> None:
         """Joe: a sound when I scratch - live validation of the analysis
         while playing. Fires when the shot FINALIZES (balls settled), the
@@ -454,13 +473,16 @@ class MainWindow(QMainWindow):
                 # says which ball"); misses say Miss - live verification
                 outcome = getattr(getattr(event, "outcome", None), "value", "")
                 if outcome == "make":
-                    nums = [getattr(pb, "number", -1)
-                            for pb in (getattr(event, "pocketed", None) or [])
-                            if getattr(getattr(pb, "cls", None), "name", "")
-                            != "CUE"]
-                    named = [n for n in nums if n in self._BALL_NAMES]
+                    calls = [(getattr(pb, "number", -1),
+                              getattr(pb, "pocket", ""))
+                             for pb in (getattr(event, "pocketed", None) or [])
+                             if getattr(getattr(pb, "cls", None), "name", "")
+                             != "CUE"]
+                    named = [(n, pk) for n, pk in calls
+                             if n in self._BALL_NAMES]
                     if named:
-                        say(f"{self._BALL_NAMES[named[0]]} ball", volume=vol)
+                        # "N ball in X pocket" (Joe's standard call)
+                        say(self._make_call(*named[0]), volume=vol)
                     else:
                         say("Make", volume=vol)
                 elif outcome == "miss":

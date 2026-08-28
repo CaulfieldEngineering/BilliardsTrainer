@@ -64,6 +64,7 @@ class FramePacket:
     clock_paused: bool = False
     clock_total: float = 0.0       # THIS countdown's length (break differs)
     tracks: list = field(default_factory=list)
+    present: dict = field(default_factory=dict)    # {ball#: on-table} from THE presence authority
     raw_dets: list = field(default_factory=list)   # camera-coord dets + guessed numbers (labelling)
     feed_sd: bool = False   # camera fell back to the 480p HDMI mode (re-arm ML)
     feed_info: str = ""     # corner stats chip: container/active resolution + fps
@@ -104,6 +105,11 @@ class PipelineController(QObject):
         self._source = None
         self._timer: QTimer | None = None
         self._clock = ShotClock(settings.shot_clock)
+        # THE presence authority (Joe: tray/schematic/announcements "should
+        # all be referencing the same measurement core") — fed from the same
+        # tracks the schematic draws, rendered verbatim by the tray
+        from ..measure.presence import TablePresence
+        self._presence = TablePresence()
         self._t0 = 0.0
         self._fps = 0.0
         self._src_fps = 30.0
@@ -1471,8 +1477,11 @@ class PipelineController(QObject):
                      getattr(self, "_diag_ingest", 0),
                      getattr(self, "_diag_pub", -1))
 
+        present = self._presence.update(
+            {getattr(tr, "number", -1) for tr in (res.tracks or [])
+             if getattr(tr, "active", True)}, t)
         self.frame_ready.emit(FramePacket(
-            feed_sd=self._feed_sd, feed_info=self._feed_info,
+            feed_sd=self._feed_sd, feed_info=self._feed_info, present=present,
             perspective=res.frame_bgr, birdseye=res.rect_bgr, status=res.status,
             fps=self._fps, n_balls=res.n_balls, shot_state=res.shot_state,
             clock_remaining=self._clock.remaining(t),

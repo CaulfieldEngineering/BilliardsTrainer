@@ -63,6 +63,42 @@ def test_make_when_object_approaches_pocket_and_vanishes():
     assert event.max_travel >= 50
 
 
+def test_pot_vetoed_when_number_still_tracked():
+    # Joe: "announcing makes while the animated schematic clearly shows
+    # the missed balls are still on the table." Identity churn killed the
+    # 5-ball's track near a pocket while the SAME number sat mid-table on
+    # a new track — the pot credit must lose to the live tracks.
+    d = det()
+    five = Track(id=2, x=250, y=420, radius=10, cls=BallClass.SOLID, number=5)
+    frames = [([cue(), five], 0.0)] * 3
+    for x, y in [(300, 520), (360, 640), (410, 760), (446, 853)]:
+        frames.append(([cue(), Track(id=2, x=x, y=y, radius=10,
+                                     cls=BallClass.SOLID, number=5)], 1.0))
+    # track 2 dies at the jaw — but number 5 is actively tracked mid-table
+    reborn = Track(id=9, x=300, y=300, radius=10, cls=BallClass.SOLID, number=5)
+    for _ in range(5):
+        frames.append(([cue(), reborn], 0.0))
+    event = feed(d, frames)
+    assert event is not None
+    assert event.num_pocketed == 0
+    assert event.outcome == ShotOutcome.MISS
+
+
+def test_pot_vetoed_when_reacquired_in_place():
+    # a track that dies MID-TABLE and is instantly replaced by a new id at
+    # the same spot is a re-acquisition, not a drop — the old unseen-pot
+    # path credited these to the nearest pocket (paths nowhere near one)
+    d = det()
+    frames = [([cue(), trk(2, 250, 420)], 0.0)] * 3
+    for x, y in [(300, 520), (360, 640)]:
+        frames.append(([cue(), trk(2, x, y)], 1.0))
+    # id 2 dies at (360, 640); id 9 appears 2px away and rests there
+    for _ in range(5):
+        frames.append(([cue(), trk(9, 362, 641)], 0.0))
+    event = feed(d, frames)
+    assert event is None or event.num_pocketed == 0
+
+
 def test_no_shot_when_table_is_idle():
     d = det()
     # balls present but no motion at all (Joe's "counter creeps while I sit") —

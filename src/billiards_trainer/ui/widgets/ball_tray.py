@@ -1,11 +1,11 @@
 """Matchroom-style ball tray (Joe): 9-ball rack chips 1-9, present on
 the table vs potted, live during play.
 
-Presence logic is pure and debounced: a ball is PRESENT until it has
-been unseen for ABSENT_S (occlusion by an arm must not flicker the
-tray), and a never-yet-seen ball is presumed present (a mis-ID at the
-rack must not show a phantom pot). A potted ball that reappears
-(respot, or the tracker recovering) turns present again.
+The tray RENDERS presence; it does not compute it. The one presence
+opinion lives in measure.presence.TablePresence (controller-owned,
+fed by the same tracks the schematic draws) and arrives here as a
+plain dict — Joe caught the tray and the schematic disagreeing when
+this widget kept its own debounced copy.
 """
 
 from __future__ import annotations
@@ -14,9 +14,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
+from ...measure.presence import TablePresence as BallPresence  # noqa: F401 - compat re-export
 from ..theme import PALETTE
-
-ABSENT_S = 3.0
 
 BALL_COLORS = {
     1: "#FDD835", 2: "#1E88E5", 3: "#E53935", 4: "#8E24AA", 5: "#FB8C00",
@@ -24,38 +23,12 @@ BALL_COLORS = {
 }
 
 
-class BallPresence:
-    """Pure presence tracker: update(seen_numbers, t) -> {n: present}."""
-
-    def __init__(self, numbers=tuple(range(1, 10)), absent_s: float = ABSENT_S):
-        self._numbers = tuple(numbers)
-        self._absent_s = absent_s
-        self._last_seen: dict[int, float] = {}
-        self._ever_seen: set[int] = set()
-
-    def update(self, seen, t: float) -> dict[int, bool]:
-        for n in seen:
-            if n in self._numbers:
-                self._last_seen[n] = t
-                self._ever_seen.add(n)
-        out = {}
-        for n in self._numbers:
-            if n not in self._ever_seen:
-                out[n] = True            # presumed racked until proven gone
-            else:
-                out[n] = t - self._last_seen.get(n, -1e9) < self._absent_s
-        return out
-
-    def reset(self) -> None:
-        self._last_seen.clear()
-        self._ever_seen.clear()
-
-
 class BallTrayWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(34)
-        self._present: dict[int, bool] = {n: True for n in range(1, 10)}
+        # ghosts until first detection: the tray shows what's SEEN
+        self._present: dict[int, bool] = {n: False for n in range(1, 10)}
 
     def set_presence(self, present: dict) -> None:
         if present != self._present:
