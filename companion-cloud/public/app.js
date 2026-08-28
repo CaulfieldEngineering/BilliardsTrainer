@@ -350,6 +350,71 @@ $("stats-close") && ($("stats-close").onclick = () => {
   $("sessions").style.display = "";
 });
 
+// ---- session details modal (Joe: press-and-hold -> Details, copy the
+// Session ID for referencing a session in conversation) -----------------
+function copyText(t, btn) {
+  const done = ok => { if (btn) { btn.textContent = ok ? "Copied ✓" : "Copy failed";
+                                  setTimeout(() => { btn.textContent = "Copy ID"; }, 1600); } };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(() => done(true), () => done(false));
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove(); done(ok);
+  }
+}
+function openSessionDetails(s2) {
+  const old = $("sessdetails");
+  if (old) old.remove();
+  const id = String(s2.name || "").replace(/\.mp4$/, "");
+  const ov = document.createElement("div");
+  ov.id = "sessdetails";
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.55);" +
+    "z-index:60;display:flex;align-items:center;justify-content:center";
+  const card = document.createElement("div");
+  card.style.cssText = "background:var(--bg,#0F141A);border:1px solid #232B36;" +
+    "border-radius:2px;padding:16px;width:min(88vw,340px)";
+  const h = document.createElement("div");
+  h.textContent = "SESSION DETAILS";
+  h.style.cssText = "font-size:11px;letter-spacing:1px;color:var(--faint);margin-bottom:10px";
+  const idRow = document.createElement("div");
+  idRow.style.cssText = "font-family:ui-monospace,monospace;font-size:13px;" +
+    "word-break:break-all;color:#C7D0DA;margin-bottom:10px";
+  idRow.textContent = id;               // untrusted filename: textContent only
+  const btn = document.createElement("button");
+  btn.textContent = "Copy ID";
+  btn.style.cssText = "background:var(--accent,#2F81F7);color:#fff;border:0;" +
+    "border-radius:2px;padding:8px 14px;font-size:13px;margin-bottom:12px";
+  btn.onclick = () => copyText(id, btn);
+  const facts = document.createElement("div");
+  facts.style.cssText = "font-size:13px;color:#9AA4B2;line-height:1.7";
+  const pd = s2.processed ? new Date(s2.processed) : null;
+  [["Recorded", fmtDate(s2.name, s2.modified)],
+   ["Length", fmtDur(s2.dur_s)],
+   ["Shots", s2.shots == null ? "–" : String(s2.shots)],
+   ["Size", s2.size_mb ? s2.size_mb + " MB" : "–"],
+   ["Processed", pd && !isNaN(pd) ? pd.toLocaleString() : "–"]]
+    .forEach(([k, v]) => {
+      const row = document.createElement("div");
+      const kk = document.createElement("span");
+      kk.textContent = k + "  ";
+      kk.style.color = "var(--faint)";
+      row.append(kk, document.createTextNode(String(v)));
+      facts.appendChild(row);
+    });
+  const close = document.createElement("button");
+  close.textContent = "Close";
+  close.style.cssText = "background:none;border:1px solid #232B36;color:#9AA4B2;" +
+    "border-radius:2px;padding:7px 14px;font-size:13px;margin-top:12px";
+  close.onclick = () => ov.remove();
+  ov.onclick = ev => { if (ev.target === ov) ov.remove(); };
+  card.append(h, idRow, btn, facts, close);
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+}
+
 function renderHome() {
   const box = $("sessions");
   box.innerHTML = "";
@@ -436,7 +501,29 @@ function renderHome() {
         sh.className = "num" + (s2.shots == null ? " dim" : "");
         sh.textContent = s2.shots == null ? "\u2013" : s2.shots;
         el.append(d, len, sh);
-        el.onclick = () => openSession(s2);
+        el.onclick = () => { if (!el._lpFired) openSession(s2); el._lpFired = false; };
+        // Session ID access (Joe: "copy a session ID when I am
+        // referencing a session to you") — long-press the row, and an
+        // always-visible ⓘ for when long-press fights with scrolling
+        const info = document.createElement("span");
+        info.textContent = "ⓘ";
+        info.style.cssText = "color:var(--faint);padding:0 4px;font-size:14px";
+        info.onclick = (ev) => { ev.stopPropagation(); openSessionDetails(s2); };
+        el.appendChild(info);
+        let lpT = null, lpX = 0, lpY = 0;
+        el.addEventListener("pointerdown", ev => {
+          lpX = ev.clientX; lpY = ev.clientY;
+          lpT = setTimeout(() => {
+            el._lpFired = true;
+            openSessionDetails(s2);
+          }, 550);
+        });
+        ["pointerup", "pointercancel", "pointerleave"].forEach(t =>
+          el.addEventListener(t, () => clearTimeout(lpT)));
+        el.addEventListener("pointermove", ev => {
+          if (Math.abs(ev.clientX - lpX) + Math.abs(ev.clientY - lpY) > 12)
+            clearTimeout(lpT);
+        });
         wrap.appendChild(el);
       });
     }

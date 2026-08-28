@@ -1892,3 +1892,14 @@ Rounds continue with Joe's visual feedback as the gate.
   refuses a second job or a live recording (guards tested); click
   skips the presence pause (the ask is the consent). App restarted
   with it. 651 tests green.
+
+- 2026-08-28 midday — TRAIL CLOCK BUG (Joe: "first clip doesn't have
+  trails") root-caused + fixed: merge wrote pre-ONE-CLOCK times
+  (t_video + start−strike) but the file has been video-time end-to-end
+  since Aug 24 and the phone stopped normalizing — every merged trail
+  drew 1-3s late, sometimes outside the window. Now ships RAW video
+  time; alignment VERIFIED vs sidecar (ball-3 onset 78.935 vs truth
+  78.9) — spacing checks alone provably insufficient, alignment check
+  added to the verification habit. All 13 sessions re-merged. Also
+  shipped: iOS Session IDs (long-press or ⓘ on a session row →
+  Details modal with copyable ID; build 20260828-090913).
