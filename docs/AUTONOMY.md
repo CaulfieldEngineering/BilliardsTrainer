@@ -59,6 +59,15 @@ add sampled shots per session. Parallel watch agents (workflow) make
 a full-session watch a ~15-minute operation. Metrics gates remain
 necessary — they are no longer sufficient.
 
+DEFINITION OF DONE (Joe, 2026-08-28): "never stopping a development
+until the app's vision analysis and your personal vision analysis
+agree." A measurement change is FINISHED when the analyzer's output
+and Claude's own watch of the same footage AGREE — not when tests
+pass, not when the metric gate is green, not when the diff lands.
+Disagreement = the development stays open and at the head of the
+queue. The bench grind loop runs until convergence; work sessions
+resume it automatically if a conversation ends mid-loop.
+
 ## Hygiene pass (every watchdog run — architecture, not just liveness)
 
 Tests measure behavior; nobody was measuring STRUCTURE. This pass is
