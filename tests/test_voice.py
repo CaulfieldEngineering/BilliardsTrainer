@@ -48,3 +48,42 @@ class TestVoice:
         monkeypatch.setattr(voice, "_render_edge", lambda *a: False)
         monkeypatch.setattr(voice, "_render_sapi", lambda *a: False)
         assert voice.ensure("Nope") is None
+
+
+class TestPerceptualVolume:
+    """Joe: 'almost down and voice is still loud' - the voice ignored
+    volume entirely (winsound has no level control), and the cue curve
+    was linear so it stayed loud until the bottom."""
+
+    def test_curve_is_perceptual_not_linear(self):
+        from billiards_trainer.ui.sounds import gain_for
+        assert gain_for(100) == 1.0
+        assert gain_for(0) == 0.0
+        assert gain_for(50) < 0.2, "half the slider must be a quarter as loud"
+        assert gain_for(25) < 0.05
+        assert gain_for(75) < gain_for(90) < gain_for(100)
+
+    def test_voice_writes_a_quieter_copy(self, tmp_path, monkeypatch):
+        import wave
+
+        import numpy as np
+
+        from billiards_trainer.ui import voice
+        src = tmp_path / "phrase.wav"
+        with wave.open(str(src), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(22050)
+            w.writeframes((np.ones(2205, dtype=np.int16) * 8000).tobytes())
+        out = voice._at_volume(src, 40)
+        assert out is not None and out != src
+        with wave.open(str(out), "rb") as w:
+            quiet = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+        assert abs(int(quiet.max())) < 8000 * 0.2
+
+    def test_full_volume_uses_the_original(self, tmp_path):
+        from billiards_trainer.ui import voice
+        src = tmp_path / "x.wav"
+        src.write_bytes(b"RIFF")
+        assert voice._at_volume(src, 100) == src
+        assert voice._at_volume(src, 0) is None

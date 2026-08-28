@@ -30,6 +30,21 @@ _wav_cache: dict[tuple, str] = {}
 _SR = 44100
 
 
+def gain_for(pct: int) -> float:
+    """Slider percent -> amplitude, on a PERCEPTUAL curve.
+
+    Joe, 2026-08-28: "need more logarithmic sliders. almost down and
+    voice is still loud." Loudness is roughly logarithmic, so a linear
+    amplitude slider sounds unchanged until the very bottom. This is a
+    ~-40 dB taper: 75% -> about half as loud, 50% -> a quarter, 25% ->
+    a whisper, 0 -> silent.
+    """
+    p = max(0, min(100, int(pct)))
+    if p <= 0:
+        return 0.0
+    return (p / 100.0) ** 3
+
+
 def _render_wav(seq, volume: int = 100) -> str:
     """Render a tone sequence to a cached mono 16-bit WAV. `volume` 0-100
     scales sample amplitude — winsound.Beep has NO volume control, so
@@ -38,7 +53,7 @@ def _render_wav(seq, volume: int = 100) -> str:
     import wave
     from pathlib import Path
 
-    amp = 0.35 * max(0, min(100, int(volume))) / 100.0
+    amp = 0.35 * gain_for(volume)
     key = (tuple(seq), int(volume))
     cached = _wav_cache.get(key)
     if cached and Path(cached).exists():

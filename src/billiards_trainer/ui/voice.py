@@ -110,6 +110,35 @@ def set_master(pct: int) -> None:
     _MASTER = max(0, min(100, int(pct)))
 
 
+def _at_volume(src: Path, volume: int):
+    """A cached copy of `src` scaled to `volume` on the perceptual curve
+    (bucketed to 5% steps so the cache stays small)."""
+    import wave
+
+    from .sounds import gain_for
+    v = max(0, min(100, int(round(volume / 5.0) * 5)))
+    if v >= 100:
+        return src
+    if v <= 0:
+        return None
+    out = src.with_name(f"{src.stem}-v{v}.wav")
+    if out.is_file():
+        return out
+    try:
+        import numpy as np
+        with wave.open(str(src), "rb") as w:
+            params = w.getparams()
+            data = np.frombuffer(w.readframes(w.getnframes()), np.int16)
+        scaled = (data.astype(np.float32) * gain_for(v)).astype(np.int16)
+        with wave.open(str(out), "wb") as w:
+            w.setparams(params)
+            w.writeframes(scaled.tobytes())
+        return out
+    except Exception:  # noqa: BLE001 - fall back to full level, never silent
+        log.debug("voice volume scaling failed", exc_info=True)
+        return src
+
+
 def say(phrase: str, volume: int = 100) -> None:
     """Speak a cached phrase; render-and-cache on first request (that
     first call may stay silent rather than stall). Returns immediately."""
@@ -119,6 +148,12 @@ def say(phrase: str, volume: int = 100) -> None:
 
     def go():
         out = ensure(phrase)
+        if out is None:
+            return
+        # VOLUME WAS A NO-OP HERE (found 2026-08-28 chasing Joe's "almost
+        # down and voice is still loud"): winsound has no volume control,
+        # so the level must be baked into a cached copy of the WAV.
+        out = _at_volume(out, volume)
         if out is None:
             return
         try:
