@@ -136,15 +136,49 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
         if last[0] - moved[-1] > 0.3:
             ep.resting.add(n)
             continue
-        # track died with motion: pocket credit ONLY at a pocket mouth
-        px, py = last[1], last[2]
+        # track died with motion: pocket credit iff the FINAL PATH passes
+        # through a pocket zone. The death point alone is not enough -
+        # a dropping ball's track coasts THROUGH the mouth and dies
+        # beyond the bed (bench: the potted 2 died at (-54,1380), 200px
+        # past the pocket it fell into), and the jaw filter thins the
+        # blurred entry reads. Any of the last samples inside 2.6 radii
+        # of a pocket = a drop.
+        tail = [p for p in pts
+                if last[0] - 1.0 <= p[0] <= last[0]]
         near = None
         for (qx, qy) in (pockets or []):
-            if ((px - qx) ** 2 + (py - qy) ** 2) ** 0.5 < 2.2 * pocket_r:
-                near = (qx, qy)
+            for (_t, tx, ty) in tail:
+                if ((tx - qx) ** 2 + (ty - qy) ** 2) ** 0.5 < 2.6 * pocket_r:
+                    near = (qx, qy)
+                    break
+            if near:
                 break
+        if near is None and pockets:
+            # BED-EXIT rule (bench: the potted 2's straight-line coast
+            # passed 100px wide of the pocket CENTER, but a ball can only
+            # leave the bed through a pocket). Bed bounds = the pocket
+            # extremes; if the track's last on-bed position (just before
+            # samples go off-bed) sits at a pocket mouth, that's the drop.
+            xs = [q for q, _ in pockets]
+            ys = [q for _, q in pockets]
+            bx0, bx1, by0, by1 = min(xs), max(xs), min(ys), max(ys)
+            exit_p = None
+            seen_off = False
+            for (_t, tx, ty) in reversed(tail):
+                if bx0 <= tx <= bx1 and by0 <= ty <= by1:
+                    if seen_off:
+                        exit_p = (tx, ty)
+                    break
+                seen_off = True
+            if exit_p is not None:
+                for (qx, qy) in pockets:
+                    d = ((exit_p[0] - qx) ** 2
+                         + (exit_p[1] - qy) ** 2) ** 0.5
+                    if d < 3.0 * pocket_r:
+                        near = (qx, qy)
+                        break
         if near is None:
-            ep.lost.append((n, round(px, 1), round(py, 1)))
+            ep.lost.append((n, round(last[1], 1), round(last[2], 1)))
         elif n == 0:
             ep.scratch = True
         else:

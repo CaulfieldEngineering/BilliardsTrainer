@@ -100,3 +100,33 @@ class TestOutcomes:
                                  5: _rest(300, 600)})
         ep = analyze(times, frames, pockets=[(610, 710)])[0]
         assert ep.scratch and not ep.pocketed
+
+
+class TestPathThroughPocket:
+    def test_coast_through_pocket_credited(self):
+        # bench: the potted 2 coasted THROUGH the mouth and died beyond
+        # the bed - the death point misses the zone but the path does not
+        def fn(k):
+            if k < 60:
+                return (300, 600)
+            if k >= 160:
+                return None
+            f = (k - 60) / 100
+            return (300 - f * 340, 600 + f * 660)   # dies at (-40, 1260)
+        times, frames = _stream({0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+                                 2: fn})
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
+        assert [p[0] for p in ep.pocketed] == [2]
+
+    def test_coast_past_far_from_pocket_still_lost(self):
+        def fn(k):
+            if k < 60:
+                return (300, 600)
+            if k >= 160:
+                return None
+            f = (k - 60) / 100
+            return (300 + f * 200, 600)             # dies mid-felt path
+        times, frames = _stream({0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+                                 2: fn})
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
+        assert not ep.pocketed and [p[0] for p in ep.lost] == [2]
