@@ -40,6 +40,25 @@ Two scheduled jobs live in the Claude session attached to this repo:
    tests (Joe, 2026-08-27: "The audit you just did is what the hygiene
    watchdog is supposed to be doing every hour").
 
+## Vision verification (every measurement-affecting change)
+
+Numeric gates only see the invariants they encode: the bench session
+scored a PERFECT 0.00/1k on the physics gate while missing 5 of 10
+real shots, fabricating 2, and scoring a hand-caught ball as a make.
+Joe, 2026-08-28: "start using your LLM's ability to review video in
+order to compare the app's performance to what you actually see. We
+shouldn't have to wait for me to review the video to call out
+issues."
+
+RULE: any change touching detection, tracking, identity, shot
+segmentation, outcomes, trails, or export is verified by a FRAME-TRUTH
+WATCH before it lands or rolls out: dump frames (cv2 → PNG), READ
+them, compare what physically happens against the analyzer's output.
+The pinned bench session is the standing subject; library rollouts
+add sampled shots per session. Parallel watch agents (workflow) make
+a full-session watch a ~15-minute operation. Metrics gates remain
+necessary — they are no longer sufficient.
+
 ## Hygiene pass (every watchdog run — architecture, not just liveness)
 
 Tests measure behavior; nobody was measuring STRUCTURE. This pass is
