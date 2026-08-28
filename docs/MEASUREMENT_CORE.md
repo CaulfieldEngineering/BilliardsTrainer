@@ -292,6 +292,17 @@ The new engine is a **measurement core**: a capture-clocked, every-frame positio
   the engine's end-state REPLACES the old worker (M3 shadow is a
   transition, not a steady state); (4) M1 exit is measured under real
   concurrent load, not idle-GPU numbers.
+- 2026-08-28: **FULL-SESSION GATE, hardened tracker (run 4)**: the
+  complete marathon (198,950 frames, 110 min) at 19.0 fps end-to-end
+  scored **0.21 impossible/1k ball-frames vs champion 0.55** — beats
+  the champion on the M2 scorecard's row 1 at full scale, better than
+  the dev slice (0.25). Violation mix: 100% transient
+  overlapping_balls (192); **id_flicker and class_flicker: ZERO** —
+  rest-frozen identity + sticky arbitration + track merge hold over
+  two hours. Re-merge upgraded 58 further shots (67 kept incumbent,
+  71 no-coverage). Library rollout (16 sessions, guarded, no presence
+  override) launched on this result. Formal M2 exit still requires
+  the full same-batch corpus scorecard (rows 2-9).
 
 ## 5. MILESTONES
 

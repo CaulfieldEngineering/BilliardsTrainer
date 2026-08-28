@@ -1,6 +1,26 @@
 {
  "entries": [
   {
+   "id": 45,
+   "date": "2026-08-28",
+   "title": "The engine passed its full-session exam - the whole library is re-measuring overnight",
+   "body": "The measurement engine re-processed your entire 110-minute marathon session and scored 0.21 physically-impossible states per thousand measurements - beating the current production tracker's 0.55 on the same footage, with identity flicker at zero across all 198,950 frames. 58 more shots' trails upgraded after arbitration. On that result the remaining 16 sessions started re-processing overnight; each session's 'proc' stamp updates as it lands.",
+   "details": [
+    "Also tonight: sessions recorded before August 19 were deleted at Joe's direction (29 videos, 34.5 GB freed). The library and lifetime stats now start at August 19; Dropbox can recover the files for 30 days.",
+    "Every trail upgrade still has to prove agreement with the old path or match the video itself - disagreements keep the honest original."
+   ]
+  },
+  {
+   "id": 44,
+   "date": "2026-08-27",
+   "title": "Make calls name the pocket, a Time Foul voice, and a truth-telling ball tray",
+   "body": "Makes are now announced the way you'd call them: 'Five ball in the top left pocket.' If the shot clock runs out unshot, the buzzer is followed by a spoken 'Time Foul.' And the ball tray now shows exactly what the system detects on the table, updating within a fraction of a second - no more comfort smoothing, so if the tray flickers, that's the detector telling on itself. The tray, the schematic, and the announcer now all read the same measurement source, and a make can no longer be announced while the ball is visibly still sitting on the table.",
+   "details": [
+    "The 8-ball chip wears a bright ring when present so black never looks like the greyed-out 'potted' state.",
+    "Known honest gap: the 3 and 5 ball still get confused under warm light - that's the identifier model, and its retraining data is being mined from the new dense measurements."
+   ]
+  },
+  {
    "id": 43,
    "date": "2026-08-27",
    "title": "Your marathon session: trails re-measured every frame",

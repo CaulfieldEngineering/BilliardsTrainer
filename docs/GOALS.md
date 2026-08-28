@@ -1810,3 +1810,15 @@ Rounds continue with Joe's visual feedback as the gate.
   map-2026-08-27.md) covers everything through 264645e; watchdog hygiene
   pass reviews incrementally from here (AUTONOMY.md charter amended;
   the week-long gap is logged as an incident).
+
+- 2026-08-28 00:45 — MARATHON 4 LANDED GREEN + ROLLOUT LAUNCHED. Full
+  110-min session dense at 19.0fps; FULL-SESSION gate 0.21/1k impossible
+  (champion 0.55) with ZERO id/class flicker over 198,950 frames — the
+  hardened tracker holds at scale. Re-merge: 58 more shots upgraded, 67
+  kept incumbent, 71 no-coverage. Tier 0 executed: measurement log
+  updated, What's New #44/#45 deployed to the phone (build
+  20260828-003445), 16-session library rollout launched guarded (engine
+  presence-pause ACTIVE — the marathon's override was one-night-only);
+  each session gates at <=0.55/1k before its merge, pre-merge shots.json
+  backed up as .pre_dense. Backlog Tier 0 next-on-land: rollout results
+  + stamps; then Tier 1 demolition chunk 1 (shot identity).
