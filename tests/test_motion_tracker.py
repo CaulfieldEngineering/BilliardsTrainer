@@ -139,3 +139,46 @@ class TestMotionTracker:
             x = 100 + (i - 5) * 12             # rolling
             rows = _step(tk, [(x, 200, 16, 3)], i / 30)
         assert next(iter(rows.values())).number == 3, "moving balls re-earn identity"
+
+
+class TestStaleClaimRelease:
+    """The arbitration deadlock (Joe's trail-less 2-ball, 2026-08-28):
+    a saturated-but-stale claim was unbeatable (9 capped votes vs
+    'lead by 2'), so a departed ball's number stayed parked on its old
+    spot forever. Fresh reads now decide; stale ones don't vote."""
+
+    def test_live_ball_reclaims_number_from_stale_holder(self):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        # track A saturates its claim to "2" at (100,100)
+        for _ in range(12):
+            tk.update([(100.0, 100.0, 14.0, 2)], t)
+            t += 1 / 30
+        # A's spot keeps a detection but NO number read (ball gone,
+        # something else there); the real 2 sits at (400,400) being
+        # read as 2 every identifier pass
+        for _ in range(120):                     # 4s > FRESH_S
+            rows = tk.update([(100.0, 100.0, 14.0, -1),
+                              (400.0, 400.0, 14.0, 2)], t)
+            t += 1 / 30
+        by_pos = {round(r.x): r.number for r in rows}
+        assert by_pos[400] == 2, "the freshly-read ball must hold its number"
+        assert by_pos[100] == -1, "the stale holder must release it"
+
+    def test_fresh_incumbent_still_beats_fresh_challenger(self):
+        # two tracks both being read as the same number (true ambiguity,
+        # e.g. neighbor misreads): stickiness must still prevent flicker
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(12):
+            tk.update([(100.0, 100.0, 14.0, 5)], t)
+            t += 1 / 30
+        for _ in range(30):
+            rows = tk.update([(100.0, 100.0, 14.0, 5),
+                              (400.0, 400.0, 14.0, 5)], t)
+            t += 1 / 30
+        by_pos = {round(r.x): r.number for r in rows}
+        assert by_pos[100] == 5, "actively-read incumbent keeps the number"
+        assert by_pos[400] == -1

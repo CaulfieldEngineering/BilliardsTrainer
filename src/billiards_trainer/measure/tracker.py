@@ -28,6 +28,13 @@ COAST_S = 0.6            # coast this long without a detection, then inactive
 GATE_R = 3.2             # association gate, in ball radii, around prediction
 VOTE_N = 9               # number votes considered for identity
 HYST_K = 5               # frames a new number must lead before shown
+FRESH_S = 2.5            # a number-read older than this carries no CLAIM
+                         # weight in arbitration (identity majority still
+                         # uses all votes). Bought 2026-08-28: Joe's
+                         # standard 2-ball shot went trail-less because a
+                         # saturated stale claim was mathematically
+                         # unbeatable (9 capped votes vs "lead by 2") and
+                         # the real ball could never take its number back.
 
 
 @dataclass
@@ -50,14 +57,18 @@ class _Track:
 
     @property
     def number(self) -> int:
+        """Majority over retained votes (votes are (number, t) pairs)."""
         if not self.votes:
             return -1
-        best, n = -1, 0
-        for v in set(self.votes):
-            c = self.votes.count(v)
-            if c > n:
-                best, n = v, c
-        return best
+        counts: dict[int, int] = {}
+        for v, _vt in self.votes:
+            counts[v] = counts.get(v, 0) + 1
+        return max(counts, key=lambda k: (counts[k],))
+
+    def fresh_claim(self, n: int, now: float) -> int:
+        """How many RECENT reads back this track's claim to number n."""
+        return sum(1 for v, vt in self.votes
+                   if v == n and now - vt <= FRESH_S)
 
 
 class MotionTracker:
@@ -108,7 +119,7 @@ class MotionTracker:
             tr.misses = 0.0
             tr.active = True
             if dn >= 0:
-                tr.votes.append(dn)
+                tr.votes.append((dn, t))
                 del tr.votes[:-VOTE_N]
         # 3. unmatched detections found nothing in gate: new tracks
         for di, (dx, dy, dr, dn) in enumerate(dets):
@@ -116,7 +127,7 @@ class MotionTracker:
                 continue
             tr = _Track(self._next_id, dx, dy, radius=dr, t=t)
             if dn >= 0:
-                tr.votes.append(dn)
+                tr.votes.append((dn, t))
             self._tracks[tr.id] = tr
             self._next_id += 1
         # 4. unmatched tracks coast; too long unseen -> inactive
@@ -167,11 +178,17 @@ class MotionTracker:
             inc = cur if self._holder.get(n) == cur.id else (
                 tr if self._holder.get(n) == tr.id else None)
             if inc is None:
-                if (tr.votes.count(n), tr.t) > (cur.votes.count(n), cur.t):
+                if ((tr.fresh_claim(n, t), tr.t)
+                        > (cur.fresh_claim(n, t), cur.t)):
                     claims[n] = tr
             else:
+                # FRESH claims only (the deadlock fix): a saturated but
+                # STALE incumbent no longer outvotes a live challenger -
+                # the ball actually being read as n takes the number
+                # within ~FRESH_S. Two tracks BOTH freshly read as n
+                # (true ambiguity) still favor the incumbent (sticky).
                 chal = tr if inc is cur else cur
-                if chal.votes.count(n) >= inc.votes.count(n) + 2:
+                if chal.fresh_claim(n, t) >= inc.fresh_claim(n, t) + 2:
                     claims[n] = chal
                 else:
                     claims[n] = inc
