@@ -1,0 +1,151 @@
+"""Shot detection + outcome judgment FROM dense tracks — stages of the
+one Input→Output box (Joe, 2026-08-28: nothing happens to replay clips
+that the core doesn't do to the live feed; this module is pure over
+track streams and doesn't know which feed produced them).
+
+Rules, uniform for every shot:
+- An EPISODE opens when any ball sustains motion and closes when all
+  balls are quiet for SETTLE_S.
+- A ball's outcome is judged AT SETTLE: resting on the table = not
+  pocketed, no matter what happens to it later (Joe's 3-ball was
+  picked up seconds after settling mid-table and the old path scored
+  the vanish as a make — case law, session-20260826-002906 @ 80s).
+- POCKETED means the track ended WHILE MOVING and never returned
+  during the episode. Pocket NAMING (which pocket) waits on visual
+  pocket localization; until then the last position rides along.
+- The cue ball pocketing is a SCRATCH.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+MOVE_PX_S = 60.0     # above this a ball is moving (rest jitter ~10)
+SUSTAIN_S = 0.20     # motion must persist this long to open an episode
+BACKDATE_S = 0.30    # strike precedes the first confirmed-motion frame
+SETTLE_S = 0.70      # all-quiet this long closes the episode
+LINGER_S = 2.0       # a vanished ball may reappear this long after
+                     # settle and still cancel its pocket credit
+PRESENT_S = 0.5      # seen within this window of settle = on the table
+
+
+@dataclass
+class Episode:
+    t_strike: float
+    t_settle: float
+    movers: set = field(default_factory=set)
+    pocketed: list = field(default_factory=list)   # (number, pocket_x, pocket_y)
+    resting: set = field(default_factory=set)
+    lost: list = field(default_factory=list)       # (number, last_x, last_y)
+    scratch: bool = False
+
+
+def _series(times, frames):
+    """Per-number position/time series from dense frame rows
+    (id, x, y, radius, number, cls, active)."""
+    by_n: dict[int, list] = {}
+    for j, rows in enumerate(frames):
+        for tr in rows:
+            n = tr[4]
+            if n >= 0 and tr[6]:
+                by_n.setdefault(n, []).append((times[j], tr[1], tr[2]))
+    return by_n
+
+
+def analyze(times, frames, pockets=None, pocket_r: float = 40.0) -> list[Episode]:
+    """Batch shot finding over a dense stream. Pure; no I/O.
+
+    pockets: [(x, y), ...] in the stream's coordinate space. A pocket
+    CREDIT requires the track to die within 2.2 pocket radii of one —
+    a track that dies mid-table is LOST (occlusion, pickup, tracker
+    failure), never scored. Real data taught this within the hour:
+    Joe's 3-ball track died at (126, 442) mid-table during his pickup
+    and the position-blind rule scored it a make all over again.
+    Without pockets, nothing is ever credited as pocketed."""
+    if not times:
+        return []
+    by_n = _series(times, frames)
+    # per-number motion timestamps
+    moving_ts: dict[int, list] = {}
+    for n, pts in by_n.items():
+        out = moving_ts.setdefault(n, [])
+        for k in range(1, len(pts)):
+            (t0, x0, y0), (t1, x1, y1) = pts[k - 1], pts[k]
+            dt = t1 - t0
+            if 0 < dt < 0.5:
+                v = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 / dt
+                if v > MOVE_PX_S:
+                    out.append(t1)
+    all_moving = sorted(t for ts in moving_ts.values() for t in ts)
+    episodes: list[Episode] = []
+    i = 0
+    while i < len(all_moving):
+        # sustained motion: SUSTAIN_S of consecutive moving samples
+        j = i
+        while (j + 1 < len(all_moving)
+               and all_moving[j + 1] - all_moving[j] < 0.2):
+            j += 1
+            if all_moving[j] - all_moving[i] >= SUSTAIN_S:
+                break
+        if all_moving[j] - all_moving[i] < SUSTAIN_S:
+            i = j + 1
+            continue
+        t_open = all_moving[i]
+        # close: all-quiet gap of SETTLE_S in the moving stream
+        k = j
+        while (k + 1 < len(all_moving)
+               and all_moving[k + 1] - all_moving[k] < SETTLE_S):
+            k += 1
+        t_close = all_moving[k]
+        ep = Episode(t_strike=round(t_open - BACKDATE_S, 3),
+                     t_settle=round(t_close, 3))
+        _judge(ep, by_n, moving_ts, t_open, t_close, pockets, pocket_r)
+        episodes.append(ep)
+        i = k + 1
+    return episodes
+
+
+def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
+           pockets=None, pocket_r: float = 40.0) -> None:
+    for n, pts in by_n.items():
+        # participated? seen in the second before the strike or moved
+        pre = [p for p in pts if t_open - 1.0 <= p[0] <= t_close]
+        if not pre:
+            continue
+        moved = [t for t in moving_ts.get(n, []) if t_open <= t <= t_close]
+        if moved:
+            ep.movers.add(n)
+        last = None
+        for p in pts:                      # last sighting up to LINGER
+            if p[0] <= t_close + LINGER_S:
+                last = p
+            else:
+                break
+        if last is None:
+            continue
+        if not moved:
+            # never moved this episode: on-table bystander
+            if last[0] >= t_close - PRESENT_S:
+                ep.resting.add(n)
+            continue
+        # THE discriminator: was the ball ever seen AT REST after its
+        # final motion? A pocketed ball's track dies mid-flight (last
+        # sighting == last motion); a resting ball keeps being tracked
+        # after it stops — and stays "resting" even if picked up later
+        # (the 3-ball case).
+        if last[0] - moved[-1] > 0.3:
+            ep.resting.add(n)
+            continue
+        # track died with motion: pocket credit ONLY at a pocket mouth
+        px, py = last[1], last[2]
+        near = None
+        for (qx, qy) in (pockets or []):
+            if ((px - qx) ** 2 + (py - qy) ** 2) ** 0.5 < 2.2 * pocket_r:
+                near = (qx, qy)
+                break
+        if near is None:
+            ep.lost.append((n, round(px, 1), round(py, 1)))
+        elif n == 0:
+            ep.scratch = True
+        else:
+            ep.pocketed.append((n, round(near[0], 1), round(near[1], 1)))
