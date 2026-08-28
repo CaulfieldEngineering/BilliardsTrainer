@@ -30,6 +30,7 @@ class SessionsSidebar(QFrame):
     live_selected = Signal()
     session_selected = Signal(str)   # absolute path to a session mp4
     settings_toggled = Signal()
+    reprocess_requested = Signal(str)  # re-measure with the latest engine
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -287,9 +288,14 @@ class SessionsSidebar(QFrame):
         menu = QMenu(self)
         from ..reveal import reveal_label
         reveal_act = menu.addAction(reveal_label())
+        # Joe: "reprocess a session with the latest measurement engine,
+        # on demand" — same box the autonomous rollout runs
+        remeasure = menu.addAction("Re-measure (latest engine)")
         delete = menu.addAction("Delete recording…")
         chosen = menu.exec(self._list.mapToGlobal(pos))
-        if chosen is reveal_act:
+        if chosen is remeasure:
+            self.reprocess_requested.emit(path)
+        elif chosen is reveal_act:
             from ..reveal import reveal
             reveal(path)
         elif chosen is delete:

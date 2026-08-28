@@ -60,8 +60,9 @@ class TestEarnedTieBreak:
     gate-green sessions; an ACTIVE sparse verdict still wins."""
 
     def _setup(self):
-        import numpy as np
         from types import SimpleNamespace
+
+        import numpy as np
         times = [98.0 + i * 0.033 for i in range(160)]
         frames = [[(1, 0.3 + i * 0.002, 0.5, 0.01, 3, 2, 1)]
                   for i in range(160)]

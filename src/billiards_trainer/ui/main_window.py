@@ -222,6 +222,7 @@ class MainWindow(QMainWindow):
         self._live.mini_view_requested.connect(self._toggle_mini_view)
         self._sidebar.live_selected.connect(self._on_live_selected)
         self._sidebar.session_selected.connect(self._on_session_selected)
+        self._sidebar.reprocess_requested.connect(self._on_reprocess_requested)
         self._sidebar.settings_toggled.connect(self._toggle_settings)
         self._build_menu()   # Joe: a menu bar so narrow mode never strands anything
         self._live.tuning_changed.connect(self._on_tuning_changed)
@@ -489,6 +490,77 @@ class MainWindow(QMainWindow):
                     say("Miss", volume=vol)
         except Exception:  # noqa: BLE001 - a call is never worth a crash
             log.debug("shot narration failed", exc_info=True)
+
+    # ---------------- on-demand re-measure (Joe: latest engine, ------ #
+    # ---------------- deterministic, progress visible) --------------- #
+    def _on_reprocess_requested(self, path: str) -> None:
+        """Launch the box's job on a session in a SEPARATE process (its
+        own ONNX/DML memory; the app stays smooth) and start the
+        progress poller. One job at a time — job.py enforces via the
+        RUNNING marker; a refusal shows in the status bar."""
+        import subprocess
+        import sys as _sys
+
+        from ..config import APP_DIR
+        if getattr(self, "_reproc", None) and self._reproc.poll() is None:
+            self.statusBar().showMessage("A re-measure is already running", 6000)
+            return
+        py = Path(_sys.executable)
+        pyw = py.with_name("python.exe") if py.name == "pythonw.exe" else py
+        from ..capture.audio import NO_WINDOW
+        self._reproc = subprocess.Popen(
+            [str(pyw), "-m", "billiards_trainer.measure.job", path],
+            creationflags=NO_WINDOW,
+            cwd=str(Path(__file__).resolve().parents[3]))
+        self._reproc_name = Path(path).name
+        (APP_DIR / "m1_result.json").unlink(missing_ok=True)
+        self.statusBar().showMessage(f"Re-measuring {self._reproc_name}…")
+        if getattr(self, "_reproc_timer", None) is None:
+            from PySide6.QtCore import QTimer
+            self._reproc_timer = QTimer(self)
+            self._reproc_timer.setInterval(2500)
+            self._reproc_timer.timeout.connect(self._poll_reprocess)
+        self._reproc_timer.start()
+
+    def _poll_reprocess(self) -> None:
+        import json as _json
+
+        from ..config import APP_DIR
+        prog = APP_DIR / "m1_progress.json"
+        try:
+            if prog.exists():
+                d = _json.loads(prog.read_text())
+                pct = 100.0 * d.get("done", 0) / max(1, d.get("total", 1))
+                eta = d.get("eta_min")
+                self.statusBar().showMessage(
+                    f"Re-measuring {d.get('video', '')}: {pct:.0f}%"
+                    + (f" · eta {eta:.0f} min" if eta else ""))
+                return
+        except (OSError, ValueError):
+            pass
+        proc = getattr(self, "_reproc", None)
+        if proc is not None and proc.poll() is not None:
+            self._reproc_timer.stop()
+            res = APP_DIR / "m1_result.json"
+            msg = f"Re-measure of {self._reproc_name} finished"
+            try:
+                d = _json.loads(res.read_text())
+                if d.get("refused"):
+                    msg = f"Re-measure refused: {d['refused']}"
+                elif d.get("engine", {}).get("aborted"):
+                    msg = (f"Re-measure aborted: "
+                           f"{d['engine'].get('reason', '?')}")
+                elif isinstance(d.get("merged"), dict):
+                    g = d.get("gate", {}).get("impossible_per_1k")
+                    up = d["merged"].get("shots_upgraded")
+                    msg = (f"{self._reproc_name} re-measured: gate {g}/1k, "
+                           f"{up} shots upgraded")
+                elif d.get("merged"):
+                    msg = f"{self._reproc_name}: {d['merged']}"
+            except (OSError, ValueError):
+                pass
+            self.statusBar().showMessage(msg, 30000)
+            self._sidebar.refresh()
 
     def _on_clock_event(self, edge: str) -> None:
         if not self._settings.shot_clock.audio:

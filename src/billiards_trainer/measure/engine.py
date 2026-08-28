@@ -14,6 +14,7 @@ starts (the GPU belongs to the table).
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 import time
@@ -22,7 +23,13 @@ from pathlib import Path
 log = logging.getLogger("measure.engine")
 
 IDENT_EVERY = 6          # identifier cadence (votes persist on tracks)
-PROGRESS_EVERY_S = 30.0
+PROGRESS_EVERY_S = 30.0  # log-line cadence
+PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
+
+#: bump when tracker/filter RULES change - the gate refuses sidecars
+#: from older rules (a stale pre-hardened sidecar once gated at 184/1k
+#: and nearly condemned a good session)
+ENGINE_RULES_V = 2
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -84,7 +91,8 @@ def _pair_identities(found, ident_by_pos) -> None:
 
 
 def reprocess(video: str, out_dir: str | None = None,
-              max_frames: int = 0, calib=None, start_s: float = 0.0) -> dict:
+              max_frames: int = 0, calib=None, start_s: float = 0.0,
+              presence_pause: bool = True) -> dict:
     import cv2
 
     from ..config import EXPORTS_DIR, Settings
@@ -137,6 +145,7 @@ def reprocess(video: str, out_dir: str | None = None,
     import numpy as np
     hinv = np.linalg.inv(np.asarray(calib.H, dtype=float))
     writer = SidecarWriter(out_video_alias, {"fps": fps, "engine": "m1",
+                                             "rules_v": ENGINE_RULES_V,
                                              "dense": True,
                                              "calibrated": True,
                                              "hinv": [[round(float(v), 8)
@@ -150,8 +159,25 @@ def reprocess(video: str, out_dir: str | None = None,
     def recording_live() -> bool:
         return bool(list(EXPORTS_DIR.glob(".session-*.part.mp4")))
 
+    # UI progress (Joe: "see in the UI what percent of progress"):
+    # a tiny JSON the app's status bar polls; deleted on exit. One
+    # engine runs at a time (RUNNING-marker discipline), one file.
+    from ..config import APP_DIR
+    prog_path = APP_DIR / "m1_progress.json"
+
+    def _write_progress(done: int, rate: float) -> None:
+        try:
+            eta_s = (n_total - done) / rate if rate > 0 else None
+            prog_path.write_text(json.dumps(
+                {"video": video.name, "done": done, "total": n_total,
+                 "proc_fps": round(rate, 1),
+                 "eta_min": round(eta_s / 60, 1) if eta_s else None}))
+        except OSError:
+            pass
+
     t0_wall = time.time()
     last_prog = t0_wall
+    last_file = 0.0
     fi = 0
     written = 0
     try:
@@ -168,7 +194,9 @@ def reprocess(video: str, out_dir: str | None = None,
                 # down DAILY - the presence guard deferred STARTING runs
                 # but never paused one he walked in on; 57% GPU from this
                 # engine + 30% from live inference starved the compositor)
-                if _joe_present():
+                # on-demand runs (Joe clicked Re-measure) skip the pause:
+                # his request IS the consent to use the GPU now
+                if presence_pause and _joe_present():
                     log.info("Joe present - engine pausing at %.1fs", t)
                     while _joe_present():
                         if recording_live():
@@ -194,6 +222,9 @@ def reprocess(video: str, out_dir: str | None = None,
             if max_frames and fi >= max_frames:
                 break
             now = time.time()
+            if now - last_file > PROGRESS_FILE_S:
+                _write_progress(fi, fi / max(0.1, now - t0_wall))
+                last_file = now
             if now - last_prog > PROGRESS_EVERY_S:
                 rate = fi / (now - t0_wall)
                 eta = (n_total - fi) / max(0.1, rate) / 60
@@ -203,6 +234,7 @@ def reprocess(video: str, out_dir: str | None = None,
     finally:
         writer.close()
         cap.release()
+        prog_path.unlink(missing_ok=True)
     wall = time.time() - t0_wall
     out = {"frames": fi, "written": written, "wall_s": round(wall, 1),
            "proc_fps": round(fi / max(0.1, wall), 1),
