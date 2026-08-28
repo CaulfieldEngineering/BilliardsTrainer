@@ -1830,3 +1830,16 @@ Rounds continue with Joe's visual feedback as the gate.
   surgery-day session opens on an uncalibratable scene). Script fixed:
   per-session calib failure now SKIPS (only recording halts the
   library) + deep warmup retries at 60/300/900s. Leg 2 running.
+
+- 2026-08-28 ~02:00 — ROLLOUT LEG 2 COMPLETE: library swept. 12/17
+  sessions dense+merged green (gates 0.00-0.23/1k; +99 shots upgraded
+  this leg incl. 012847:33, 220740:25). FOUR honest gate refusals kept
+  sparse: 185550 (0.69), 191319 (3.12), 194542 (1.82) — all Aug-23
+  camera-surgery-day sessions, overlap violations suspected from EOS AF-
+  rectangle contamination in the feed (backlog Tier 2 note) — and
+  012348 (184/1k) which turned out to be a STALE pre-hardened-era
+  sidecar (Aug 26 23:38) the script trusted; deleted, leg 3 reprocessing
+  it fresh. 141038 uncalibratable even at deep warmup (camera-
+  adjustment clip) — skipped. Lesson for the ledger: scratch sidecars
+  need an engine-version stamp so stale ones can't masquerade (added to
+  BACKLOG Tier 2).

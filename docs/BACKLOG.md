@@ -82,6 +82,12 @@ presence/recording-guarded, one at a time.
   write `.analysis.shadow.jsonl`; exit criteria in MEASUREMENT_CORE §M3.
 - [ ] **Pocket visual localization** (ladder rung 2): locate real
   pocket mouths vs geometric marks; feeds pot-credit gates.
+- [ ] **Engine-version stamp in dense sidecars**: leg 2 gated a stale
+  pre-hardened sidecar as if current (184/1k). Meta already carries
+  engine:"m1" — add a rules-version int; the gate refuses version
+  mismatches. Also: Aug-23 sessions (185550/191319/194542) gate red on
+  overlaps — investigate EOS AF-rectangle contamination; they stay
+  honest-sparse until then.
 - [ ] **Shot recall audit**: false-negative hunt on dense output vs
   audio witness; extends the G5 precision work to recall.
 
