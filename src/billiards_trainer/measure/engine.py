@@ -25,6 +25,19 @@ IDENT_EVERY = 6          # identifier cadence (votes persist on tracks)
 PROGRESS_EVERY_S = 30.0
 
 
+def _joe_present(idle_min: float = 10.0) -> bool:
+    """tools/_presence with a fail-toward-present default."""
+    try:
+        import sys as _sys
+        tools = str(Path(__file__).resolve().parents[3] / "tools")
+        if tools not in _sys.path:
+            _sys.path.insert(0, tools)
+        from _presence import joe_present
+        return joe_present(idle_min)
+    except Exception:  # noqa: BLE001 - no presence signal = assume present
+        return True
+
+
 def _acquire_calib(video, pipe):
     """The session's own rectification, re-acquired from its frames
     (same warmup shots_export._video_transform uses for hinv)."""
@@ -147,9 +160,22 @@ def reprocess(video: str, out_dir: str | None = None,
             if not ok:
                 break
             t = start_s + fi / fps
-            if fi % 150 == 0 and recording_live():
-                log.warning("recording started - engine run aborted at %.1fs", t)
-                return {"aborted": True, "frames": fi}
+            if fi % 150 == 0:
+                if recording_live():
+                    log.warning("recording started - engine aborted at %.1fs", t)
+                    return {"aborted": True, "frames": fi, "reason": "recording"}
+                # Joe-presence pauses the GPU (2026-08-28: his mouse bogged
+                # down DAILY - the presence guard deferred STARTING runs
+                # but never paused one he walked in on; 57% GPU from this
+                # engine + 30% from live inference starved the compositor)
+                if _joe_present():
+                    log.info("Joe present - engine pausing at %.1fs", t)
+                    while _joe_present():
+                        if recording_live():
+                            return {"aborted": True, "frames": fi,
+                                    "reason": "recording"}
+                        time.sleep(30)
+                    log.info("Joe idle again - engine resuming")
             found = finder.detect(frame, calib) or []
             if fi % IDENT_EVERY == 0:
                 ids = ident.detect(frame, calib) or []
