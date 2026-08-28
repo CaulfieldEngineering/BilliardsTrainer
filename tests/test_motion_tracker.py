@@ -217,3 +217,35 @@ class TestPocketFurniture:
     def test_mid_table_immortal_is_untouched(self):
         rows = self._run(lambda k: (300.0, 600.0))      # a resting ball
         assert rows, "resting balls away from pockets are not furniture"
+
+
+class TestFastBallStaysOneTrack:
+    """Bench round 8: a struck ball covers ~60px/frame; a track born
+    this frame has no velocity, so the tight gate missed its own next
+    sighting and spawned a new track EVERY frame - the cue ball's path
+    rendered as a dozen simultaneous phantom balls."""
+
+    def test_fast_ball_keeps_one_identity(self):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t, rows = 0.0, []
+        # rest, then a hard stroke: 60px per frame across the table
+        for _ in range(10):
+            tk.update([(150.0, 300.0, 11.0, 0)], t)
+            t += 1 / 30
+        for k in range(12):
+            rows = tk.update([(150.0, 300.0 + 60.0 * (k + 1), 11.0, -1)], t)
+            t += 1 / 30
+        assert len(rows) == 1, f"fast ball fragmented into {len(rows)} tracks"
+        assert rows[0].number == 0, "identity must survive the stroke"
+
+    def test_two_balls_do_not_swap_under_the_wide_gate(self):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(10):
+            tk.update([(150.0, 300.0, 11.0, 1), (150.0, 380.0, 11.0, 2)], t)
+            t += 1 / 30
+        rows = tk.update([(150.0, 300.0, 11.0, -1), (150.0, 380.0, 11.0, -1)], t)
+        by_y = {round(r.y): r.number for r in rows}
+        assert by_y[300] == 1 and by_y[380] == 2, "neighbours swapped"

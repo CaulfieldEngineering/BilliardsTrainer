@@ -26,6 +26,9 @@ from dataclasses import dataclass, field
 FRICTION = 0.88          # per-0.1s velocity retention while coasting
 COAST_S = 0.6            # coast this long without a detection, then inactive
 GATE_R = 3.2             # association gate, in ball radii, around prediction
+ACQUIRE_R = 8.0          # wider gate for a young/still track: a struck
+                         # ball's first frames outrun the tight gate and
+                         # used to fragment into one track per frame
 VOTE_N = 9               # number votes considered for identity
 HYST_K = 5               # frames a new number must lead before shown
 FRESH_S = 2.5            # a number-read older than this carries no CLAIM
@@ -56,6 +59,10 @@ class _Track:
     emitted: int = -1            # the number this track SHOWS (hysteresis)
     pend: int = -1               # candidate awaiting confirmation
     pend_k: int = 0              # consecutive frames the candidate has led
+    age_frames: int = 0          # matched frames (acquisition-gate window)
+    last_v: float = 0.0          # RAW speed of the last match: the
+                                 # smoothed vx/vy lag a fresh strike by
+                                 # ~6x, so gating uses this instead
     ax: float = 0.0              # rest anchor (identity freezes at rest)
     ay: float = 0.0
 
@@ -109,7 +116,27 @@ class MotionTracker:
         pairs = []
         for di, (dx, dy, dr, _dn) in enumerate(dets):
             for tr in self._tracks.values():
-                gate = GATE_R * max(tr.radius, dr, 8.0)
+                # VELOCITY-AWARE GATE (bench round 8, vision-verified
+                # 2026-08-28 - the single biggest defect found so far):
+                # a struck ball covers ~60px per frame, but a track born
+                # this frame has NO velocity, so a fixed 3.2-radius
+                # (~35px) window missed its own next sighting and spawned
+                # a fresh track EVERY frame. The overlay showed the cue
+                # ball's path as nine simultaneous phantom balls with the
+                # "cue" label stranded on the first one - fragmenting
+                # identity, trails, counts and episodes all at once.
+                # A young/still track therefore gets an ACQUISITION gate
+                # wide enough for real ball speed; established tracks keep
+                # the tight predicted gate plus their own travel.
+                speed = max((tr.vx ** 2 + tr.vy ** 2) ** 0.5, tr.last_v)
+                base = GATE_R * max(tr.radius, dr, 8.0)
+                dt_g = max(0.0, t - tr.t)
+                # no usable velocity (at rest, or just born) = nothing to
+                # predict with, so the gate must cover a real first step
+                if speed < 30.0:
+                    gate = max(base, ACQUIRE_R * max(tr.radius, dr, 8.0))
+                else:
+                    gate = base + speed * dt_g
                 dd = ((tr.x - dx) ** 2 + (tr.y - dy) ** 2) ** 0.5
                 if dd <= gate:
                     pairs.append((dd, di, tr.id))
@@ -131,9 +158,11 @@ class MotionTracker:
             else:                           # re-acquired after coasting
                 tr.vx = (dx - tr.x) / dt
                 tr.vy = (dy - tr.y) / dt
+            tr.last_v = (((dx - tr.x) ** 2 + (dy - tr.y) ** 2) ** 0.5) / dt
             tr.x, tr.y, tr.radius, tr.t = dx, dy, dr, t
             tr.misses = 0.0
             tr.active = True
+            tr.age_frames += 1
             if dn >= 0:
                 tr.votes.append((dn, t))
                 del tr.votes[:-VOTE_N]
