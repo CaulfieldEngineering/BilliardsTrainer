@@ -289,6 +289,33 @@
      playhead waits visibly instead of looking stuck */
   #playhead.waiting { opacity:.35; animation:pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity:.1; } }
+  /* ---- Dev Journal: readable at any window size (Joe: text cut off
+     on resize, images too large) ------------------------------------ */
+  #jrnsheet .jwrap { max-width:820px; margin:0 auto; }
+  .jentry { padding:14px 0; border-bottom:1px solid #232B36; }
+  .jentry:last-child { border-bottom:0; }
+  .jtitle { font-weight:700; font-size:15px; line-height:1.35;
+            overflow-wrap:anywhere; }
+  .jmeta { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+           margin:5px 0 8px; }
+  .jdate { color:var(--faint); font-size:12px; }
+  .jscore { font-size:11px; font-weight:700; letter-spacing:.3px;
+            color:#7DF29B; background:rgba(125,242,155,.10);
+            border:1px solid rgba(125,242,155,.28); border-radius:999px;
+            padding:2px 9px; overflow-wrap:anywhere; }
+  .jbodyp { color:#C7D0DA; font-size:14px; line-height:1.55; margin:8px 0;
+            overflow-wrap:anywhere; hyphens:auto; }
+  .jfig { margin:12px 0; }
+  .jfig img { display:block; width:100%; height:auto; max-height:58vh;
+              object-fit:contain; object-position:left top;
+              background:#0B0F14; border:1px solid #232B36;
+              border-radius:4px; cursor:zoom-in; }
+  .jcap { color:var(--faint); font-size:12px; line-height:1.45;
+          margin-top:5px; overflow-wrap:anywhere; }
+  .jempty { color:var(--faint); font-size:14px; padding:14px 0; }
+  #jrnsheet .sheethead { position:sticky; top:0; z-index:2;
+                         background:var(--panel,#12161C);
+                         padding-bottom:8px; }
   .chip .chipdet { display:none; }   /* desktop-only detail span */
   .chip { min-width:42px; height:42px; border-radius:4px; flex:0 0 auto;
           display:flex; align-items:center; justify-content:center;
@@ -495,6 +522,21 @@
           <button id="news-close" style="margin-left:auto;min-width:44px">‹ Home</button>
         </div>
         <div id="news-list" ></div>
+      </div>
+    </div>
+    <div id="jrnsheet" style="display:none;position:fixed;inset:0;z-index:40;
+         background:var(--bg,#0B0F14);overflow-y:auto">
+      <div style="margin:calc(10px + env(safe-area-inset-top)) 12px 20px;
+           background:var(--panel,#12161C);border:1px solid #2A323D;
+           border-radius:16px;padding:18px 16px 12px">
+        <div class="jwrap">
+          <div class="sheethead" style="display:flex;align-items:center;margin-bottom:8px">
+            <h3 style="margin:0;font-size:17px">Dev Journal</h3>
+            <span id="jrn-count" style="color:var(--faint);font-size:12px;margin-left:10px"></span>
+            <button id="jrn-close" style="margin-left:auto;min-width:44px">‹ Home</button>
+          </div>
+          <div id="jrn-list" ></div>
+        </div>
       </div>
     </div>
 

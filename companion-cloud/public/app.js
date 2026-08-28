@@ -447,6 +447,20 @@ function renderHome() {
     nb.onclick = () => window._openNews && window._openNews();
     box.appendChild(nb);
   }
+  // Dev Journal (Joe: "I'd like to pop in and follow along with your
+  // findings" during the engine-reliability campaign) — plain-language
+  // rounds with before/after images
+  {
+    const jb = document.createElement("div");
+    jb.className = "newsbar";
+    const js = window._jrnState || { n: 0, title: "" };
+    jb.innerHTML = `<span style="font-weight:700">Dev Journal</span>
+      <span style="color:var(--faint);font-size:13px;margin-left:10px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${js.title}</span>
+      <span style="color:var(--faint)">›</span>`;
+    jb.onclick = () => window._openJournal && window._openJournal();
+    box.appendChild(jb);
+  }
   // Lifetime Stats (Joe: "a tight stats table so I can start
   // uncovering patterns") — trusted verdicts only
   const sb = document.createElement("div");
@@ -1042,6 +1056,108 @@ const News = (() => {
     $("sessions").style.display = "";
   };
   return {};
+})();
+
+// ---- Dev Journal: the engine-reliability campaign, in plain language
+// with before/after pictures (Joe: "I'd like to pop in and follow along
+// with your findings"). journal.json is appended by tools/journal.py on
+// every round, so the autonomous loop keeps it current. ---------------
+(() => {
+  let entries = [];
+  function render() {
+    const box = $("jrn-list");
+    box.innerHTML = "";
+    $("jrn-count").textContent = entries.length
+      ? `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`
+      : "";
+    if (!entries.length) {
+      const empty = document.createElement("div");
+      empty.className = "jempty";
+      empty.textContent = "No entries yet — the engine work posts here "
+        + "as it happens.";
+      box.appendChild(empty);
+      return;
+    }
+    entries.forEach(e => {
+      const d = document.createElement("div");
+      d.className = "jentry";
+      const head = document.createElement("div");
+      head.className = "jtitle";
+      head.textContent = e.title || "";
+      d.appendChild(head);
+      const meta = document.createElement("div");
+      meta.className = "jmeta";
+      const dt = document.createElement("span");
+      dt.className = "jdate";
+      dt.textContent = e.date || "";
+      meta.appendChild(dt);
+      if (e.score) {
+        const sc = document.createElement("span");
+        sc.className = "jscore";
+        sc.textContent = e.score;
+        meta.appendChild(sc);
+      }
+      d.appendChild(meta);
+      (e.body || "").split("\n").filter(Boolean).forEach(p => {
+        const el = document.createElement("div");
+        el.className = "jbodyp";
+        el.textContent = p;
+        d.appendChild(el);
+      });
+      (e.images || []).forEach(im => {
+        const fig = document.createElement("div");
+        fig.className = "jfig";
+        const img = document.createElement("img");
+        img.src = im.src;
+        img.loading = "lazy";
+        img.alt = im.caption || "";
+        // click to open full-size (these are 1080px frames; the inline
+        // copy is capped so an entry stays readable)
+        img.title = "Click to open full size";
+        img.onclick = () => window.open(im.src, "_blank", "noopener");
+        fig.appendChild(img);
+        if (im.caption) {
+          const cap = document.createElement("div");
+          cap.className = "jcap";
+          cap.textContent = im.caption;
+          fig.appendChild(cap);
+        }
+        d.appendChild(fig);
+      });
+      box.appendChild(d);
+    });
+  }
+  const close = () => {
+    $("jrnsheet").style.display = "none";
+    $("sessions").style.display = "";
+  };
+  window._openJournal = () => {
+    render();
+    $("sessions").style.display = "none";
+    $("jrnsheet").style.display = "block";
+    $("jrnsheet").scrollTop = 0;
+    if (window._jrnPull) window._jrnPull(true);   // catch new rounds
+  };
+  $("jrn-close").onclick = close;
+  // Esc closes (desktop habit), and the journal refetches on open so a
+  // round posted while the tab sat open still shows
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && $("jrnsheet").style.display === "block")
+      close();
+  });
+  function pull(thenRender) {
+    return fetch("journal.json?ts=" + Date.now(), { cache: "no-store" })
+      .then(r => r.json()).then(j => {
+        entries = j.entries || [];
+        window._jrnState = { n: entries.length,
+                             title: entries.length ? entries[0].title : "" };
+        if (thenRender) render();
+        else if (typeof renderHome === "function"
+                 && $("sessions").style.display !== "none") renderHome();
+      }).catch(() => {});
+  }
+  window._jrnPull = pull;
+  pull(false);
 })();
 
 $("ov-rot").onclick = () => {
