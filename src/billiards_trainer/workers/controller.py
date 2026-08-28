@@ -159,8 +159,9 @@ class PipelineController(QObject):
         self._clock_armed = True       # a new turn may start the clock
         self._strike_stop_t = -1e9     # break-detection window anchor
         self._break_pending = False    # next countdown gets break_seconds
-        from ..game.narration import Narrator
+        from ..game.narration import CarryMotion, Narrator
         self._narrator = Narrator()
+        self._carry_motion = CarryMotion()
         # Flow rule: a shot clock only makes sense while PLAYING — live camera
         # sources only. Reviewing a recorded video must never run a countdown.
         self._clock_allowed = False
@@ -1364,9 +1365,13 @@ class PipelineController(QObject):
         if self._clock_allowed:
             by_id = {tr.id: tr for tr in res.tracks}
             carried = [by_id[i] for i in (res.carried_ids or ()) if i in by_id]
-            has_cue = any(tr.cls == BallClass.CUE for tr in carried)
-            has_obj = any(tr.cls != BallClass.CUE for tr in carried)
-            kind = self._narrator.update(has_cue, has_obj,
+            # movement-gated (Joe: false table changes from reaching over
+            # resting balls): hand-adjacency alone announces nothing -
+            # a flagged ball must actually DISPLACE
+            cue_moved, obj_moved = self._carry_motion.update(
+                [(tr.id, tr.x, tr.y, tr.radius,
+                  tr.cls == BallClass.CUE) for tr in carried], t)
+            kind = self._narrator.update(cue_moved, obj_moved,
                                          res.shot_state == "moving", t)
             if kind:
                 self.narration.emit(kind)

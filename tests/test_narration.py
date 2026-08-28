@@ -113,3 +113,34 @@ class TestReappearTrigger:
         for k in range(40):
             n.update(False, False, False, 11.0 + k * 0.1)
         assert n.note_cue_reappeared(15.5) is None   # < 8s cooldown
+
+
+class TestCarryMotion:
+    def test_hovering_over_resting_balls_is_silent(self):
+        from billiards_trainer.game.narration import CarryMotion
+        cm = CarryMotion()
+        for i in range(30):                    # hand hovers 1s, nothing moves
+            cue, obj = cm.update([(5, 300.0, 400.0, 16, False)], 10.0 + i / 30)
+        assert (cue, obj) == (False, False)
+
+    def test_displaced_ball_reports_movement(self):
+        from billiards_trainer.game.narration import CarryMotion
+        cm = CarryMotion()
+        cm.update([(5, 300.0, 400.0, 16, False)], 10.0)
+        cue, obj = cm.update([(5, 340.0, 400.0, 16, False)], 10.5)
+        assert (cue, obj) == (False, True)
+
+    def test_cue_vs_object_distinguished(self):
+        from billiards_trainer.game.narration import CarryMotion
+        cm = CarryMotion()
+        cm.update([(0, 100.0, 100.0, 16, True)], 10.0)
+        cue, obj = cm.update([(0, 160.0, 100.0, 16, True)], 10.4)
+        assert (cue, obj) == (True, False)
+
+    def test_anchor_expires_after_hand_leaves(self):
+        from billiards_trainer.game.narration import CarryMotion
+        cm = CarryMotion()
+        cm.update([(5, 300.0, 400.0, 16, False)], 10.0)
+        cm.update([], 13.0)                    # gone > TTL: anchor pruned
+        cue, obj = cm.update([(5, 500.0, 400.0, 16, False)], 13.5)
+        assert obj is False, "fresh anchor - displacement measured anew"

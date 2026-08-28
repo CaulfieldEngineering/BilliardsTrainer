@@ -19,6 +19,42 @@ from __future__ import annotations
 
 QUIET_S = 2.5       # carried-empty this long = the episode ended
 COOLDOWN_S = 8.0    # same announcement never repeats faster than this
+MOVE_R = 1.2        # a "carried" ball must DISPLACE this many radii to count
+ANCHOR_TTL_S = 2.0  # carry anchors expire this long after the hand leaves
+
+
+class CarryMotion:
+    """Movement gate for hand-adjacency (Joe: "a number of false table
+    changes"): reaching over resting balls to address a shot flags them
+    hand-adjacent, but a table change requires balls that actually MOVED
+    while in hand. Anchors each ball's position when first flagged and
+    reports which classes have displaced past MOVE_R radii."""
+
+    def __init__(self):
+        self._anchors: dict = {}    # tid -> (x, y, last_carried_t)
+
+    def update(self, carried_tracks, t: float) -> tuple[bool, bool]:
+        """carried_tracks: iterable of (tid, x, y, radius, is_cue).
+        Returns (cue_moved_in_hand, object_moved_in_hand)."""
+        cue_moved = obj_moved = False
+        seen = set()
+        for (tid, x, y, r, is_cue) in carried_tracks:
+            seen.add(tid)
+            a = self._anchors.get(tid)
+            if a is None:
+                self._anchors[tid] = (x, y, t)
+                continue
+            ax, ay, _ = a
+            self._anchors[tid] = (ax, ay, t)
+            if ((x - ax) ** 2 + (y - ay) ** 2) ** 0.5 > MOVE_R * max(r, 8.0):
+                if is_cue:
+                    cue_moved = True
+                else:
+                    obj_moved = True
+        for tid in list(self._anchors):
+            if tid not in seen and t - self._anchors[tid][2] > ANCHOR_TTL_S:
+                del self._anchors[tid]
+        return cue_moved, obj_moved
 
 
 class Narrator:
