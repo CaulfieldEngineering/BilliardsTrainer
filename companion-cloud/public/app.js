@@ -984,12 +984,26 @@ function applyRot() {
 // A small blog: fixed header, entry sidebar, article pane. Entries are
 // posted by tools/journal.py on every engine round. -------------------
 (() => {
-  let entries = [], cur = 0;
+  let entries = [], cur = 0, sc = null;   // cur = -1 -> pinned status view
   const seen = () => parseInt(localStorage.getItem("jrn_seen") || "0", 10);
 
   function renderSide() {
     const side = $("jrn-side");
     side.innerHTML = "";
+    const st = document.createElement("button");
+    st.className = "jitem" + (cur === -1 ? " on" : "");
+    const sk = document.createElement("span");
+    sk.className = "k finding";
+    sk.textContent = "STATUS";
+    st.appendChild(sk);
+    st.appendChild(document.createTextNode(
+      sc ? `Bench: ${sc.detected} shots, ${sc.outcome} calls` : "Bench scorecard"));
+    const sd = document.createElement("span");
+    sd.className = "d";
+    sd.textContent = sc ? (sc.ts || "").replace("T", " ").replace("Z", " UTC") : "";
+    st.appendChild(sd);
+    st.onclick = () => { cur = -1; draw(); };
+    side.appendChild(st);
     entries.forEach((e, i) => {
       const b = document.createElement("button");
       b.className = "jitem" + (i === cur ? " on" : "");
@@ -1007,9 +1021,80 @@ function applyRot() {
     });
   }
 
+  function renderStatus(main) {
+    const art = document.createElement("div");
+    art.className = "jart";
+    const h = document.createElement("div");
+    h.className = "jtitle";
+    h.textContent = "Where the engine stands";
+    art.appendChild(h);
+    const meta = document.createElement("div");
+    meta.className = "jmeta";
+    const dt = document.createElement("span");
+    dt.className = "jdate";
+    dt.textContent = sc ? "measured " + (sc.ts || "").replace("T", " ").replace("Z", " UTC") : "";
+    meta.appendChild(dt);
+    art.appendChild(meta);
+    const intro = document.createElement("div");
+    intro.className = "jbodyp";
+    intro.textContent = "This is the app scored against what I saw with my own "
+      + "eyes on the practice clip - ten real strokes, watched frame by frame. "
+      + "It is recomputed after every fix, so it never depends on my opinion of "
+      + "how things are going.";
+    art.appendChild(intro);
+    if (!sc) {
+      const w = document.createElement("div");
+      w.className = "jempty";
+      w.textContent = "No scorecard published yet.";
+      art.appendChild(w);
+      main.appendChild(art);
+      return;
+    }
+    const box = document.createElement("div");
+    box.className = "jstat";
+    const grid = document.createElement("div");
+    grid.className = "jstatgrid";
+    [["Shots found", sc.detected], ["Calls right", sc.outcome],
+     ["Fake shots", String(sc.false_strokes)],
+     ["Unexplained", String(sc.extra_episodes)]].forEach(([l, v]) => {
+      const b = document.createElement("div");
+      b.className = "jstatbox";
+      const vv = document.createElement("div");
+      vv.className = "v";
+      vv.textContent = v;
+      const ll = document.createElement("div");
+      ll.className = "l";
+      ll.textContent = l.toUpperCase();
+      b.append(vv, ll);
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    (sc.shots || []).forEach(s => {
+      const row = document.createElement("div");
+      row.className = "jshotrow";
+      const mk = document.createElement("span");
+      const good = s.found && s.outcome_ok;
+      mk.className = "mk " + (good ? "ok" : "bad");
+      mk.textContent = good ? "OK" : "✕";
+      const tm = document.createElement("span");
+      tm.className = "tm";
+      tm.textContent = s.strike + "s";
+      const ds = document.createElement("span");
+      ds.className = "ds";
+      ds.textContent = s.what + (good ? "" :
+        (s.found ? `  - app said ${s.engine}, truth ${s.truth}` : "  - app missed it"));
+      row.append(mk, tm, ds);
+      box.appendChild(row);
+    });
+    art.appendChild(box);
+    main.appendChild(art);
+    main.scrollTop = 0;
+  }
+
   function renderMain() {
     const main = $("jrn-main");
     main.innerHTML = "";
+    if (cur === -1) { renderStatus(main); return; }
     const e = entries[cur];
     if (!e) {
       const empty = document.createElement("div");
@@ -1112,6 +1197,9 @@ function applyRot() {
   });
 
   function pull(thenDraw) {
+    fetch("scorecard.json?ts=" + Date.now(), { cache: "no-store" })
+      .then(r => r.json()).then(j => { sc = j; if (thenDraw) draw(); })
+      .catch(() => {});
     return fetch("journal.json?ts=" + Date.now(), { cache: "no-store" })
       .then(r => r.json()).then(j => {
         entries = j.entries || [];

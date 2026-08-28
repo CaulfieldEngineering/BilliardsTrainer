@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 48,
+   "ts": "2026-08-28T17:48:30",
+   "date": "Aug 28, 17:48 UTC",
+   "kind": "update",
+   "title": "The plan, in phases you can check yourself",
+   "score": "now: 9/10 found, 8/10 calls",
+   "body": "You are right that 'see you in two weeks' is not good enough. So here is the work broken into five phases, each with a finish line you can verify without asking me.\nThere is now a STATUS entry pinned at the top of this sidebar. It scores the app against what I saw with my own eyes on the practice clip - ten real strokes, watched frame by frame - and it is recomputed after every single fix. Four numbers: shots found, calls right, fake shots invented, and unexplained events. When all four are perfect, phase one is done. Nothing about that depends on my opinion.\nPHASE 1 - the practice clip is perfect. Finish line: 10 of 10 shots found, 10 of 10 make/miss calls right, zero fake shots, zero unexplained. Today it reads 9 found, 8 right, 4 fake, 8 unexplained. Target: 2 days.\nPHASE 2 - a clip I have never touched. I watch a different session by eye FIRST, write down the truth, then run the engine on it cold. Finish line: at least 9 of 10 on both lines with zero fake shots. This is the honest test that phase 1 was not just tuning to one clip. Target: 1 day after phase 1.\nPHASE 3 - the balls get their right names. Today about a fifth of all real ball movement is tracked with no name at all, and the app sometimes invents ball numbers that are not even on your table. Finish line: every moving ball correctly named for at least 95 percent of the time it is moving, on both clips, with zero invented numbers. Target: 2-3 days.\nPHASE 4 - your whole library rebuilt. Every session regenerated from the engine, not patched. Finish line: three sessions picked at random score at least 9 of 10, and your shot lists show the right number of shots. Target: 1-2 days.\nPHASE 5 - live. The same engine runs on the camera while you play, and the old one is deleted. Finish line: a session you play live scores the same as that same session re-processed afterwards. Target: 3-5 days.\nTwo promises about how this gets reported. The scorecard updates after every fix, several times a day, whether the number went up or down - you will see regressions as fast as wins. And if a phase misses its target date, I post that on the date with the reason, rather than letting it slide quietly.",
+   "images": []
+  },
+  {
    "id": 47,
    "date": "Aug 28, 16:53 UTC",
    "title": "Proof you asked for: nine fake balls, and the bug behind them",

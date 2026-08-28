@@ -31,6 +31,30 @@ BAR: every real shot detected, windowed at its strike, named,
 classified (stroke vs setup), and scored correctly — verified by
 Claude's vision, not by metrics.
 
+PHASES + GATES (Joe, 2026-08-28: "We can't just say 'see you in two
+weeks'... break this into intermediate phases and milestones to prove
+we're on the right track"). Gate numbers come from
+`python tools/scorecard.py --publish`, scored against
+docs/bench_truth.json (established by eye, NEVER edited to match the
+app) and published to the phone's pinned STATUS view.
+  P1 BENCH PERFECT (target 2026-08-30): 10/10 found, 10/10 outcomes,
+     0 fake strokes in setup windows, 0 unexplained episodes.
+     Baseline at plan time: 9/10, 8/10, 4 fake, 8 unexplained.
+  P2 COLD CLIP (P1 + 1 day): watch an UNTOUCHED session by eye first,
+     write its truth file, then run the engine cold: >=9/10 both lines,
+     0 fake. Guards against tuning to one clip.
+  P3 NAMES (P2 + 2-3 days): every moving ball correctly named >=95% of
+     its moving time on both clips; ZERO invented ball numbers.
+     (Today ~20% of real motion is unnamed; a nonexistent "11" appears.)
+  P4 LIBRARY REBUILD (P3 + 1-2 days): every session regenerated from
+     the box (not merged); 3 random sessions score >=9/10 on fresh
+     vision watches; shot counts match.
+  P5 LIVE (P4 + 3-5 days): a live-played session scores the same as
+     its own re-process; the old tracker is DELETED.
+REPORTING RULES: scorecard republished after EVERY round (wins and
+regressions alike); a journal entry per round; a missed phase date is
+posted ON the date with the reason - never silent slippage.
+
 CAMPAIGN STATE (update every round; newest first):
 - Bench = **session-20260824-220247** (pinned). Ground truth: 10 real
   strokes. Dossier: docs/design/bench-220247-watch-2026-08-28.md.

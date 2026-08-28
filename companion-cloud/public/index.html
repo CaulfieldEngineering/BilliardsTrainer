@@ -352,6 +352,23 @@
                  cursor:pointer; }
   .jnav button:disabled { opacity:.35; cursor:default; }
   .jempty { color:var(--faint); font-size:14px; padding:14px 0; }
+  /* pinned status view: the bench scorecard, recomputed every round */
+  .jstat { border:1px solid #232B36; border-radius:8px; padding:16px 18px;
+           margin-bottom:18px; background:#0F141A; }
+  .jstatgrid { display:grid; gap:12px; margin:12px 0 4px;
+               grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); }
+  .jstatbox { border:1px solid #232B36; border-radius:6px; padding:10px 12px; }
+  .jstatbox .v { font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .jstatbox .l { color:var(--faint); font-size:11px; letter-spacing:.5px;
+                 margin-top:2px; }
+  .jshotrow { display:flex; gap:10px; align-items:baseline; padding:6px 0;
+              border-bottom:1px solid #171E26; font-size:13px; }
+  .jshotrow:last-child { border-bottom:0; }
+  .jshotrow .mk { flex:0 0 auto; font-weight:800; width:22px; }
+  .jshotrow .tm { flex:0 0 auto; color:var(--faint);
+                  font-variant-numeric:tabular-nums; width:52px; }
+  .jshotrow .ds { flex:1 1 auto; color:#C7D0DA; overflow-wrap:anywhere; }
+  .ok { color:#3FB950; } .bad { color:#E5484D; }
   @media (min-width: 1500px) {
     .jbody { grid-template-columns:340px minmax(0,1fr); }
     .jmain { padding:34px 64px 80px; }

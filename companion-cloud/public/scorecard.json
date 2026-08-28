@@ -1,0 +1,90 @@
+{
+ "session": "session-20260824-220247.mp4",
+ "ts": "2026-08-28T17:47:23Z",
+ "detected": "9/10",
+ "outcome": "8/10",
+ "false_strokes": 4,
+ "extra_episodes": 8,
+ "episodes": 21,
+ "shots": [
+  {
+   "strike": 31.7,
+   "what": "object ball potted, bottom-right",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "pot",
+   "truth": "pot"
+  },
+  {
+   "strike": 51.5,
+   "what": "2 ball potted, bottom-left",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "pot",
+   "truth": "pot"
+  },
+  {
+   "strike": 68.8,
+   "what": "3 rattled the top-left jaws and stayed out",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "no pot",
+   "truth": "no pot"
+  },
+  {
+   "strike": 85.1,
+   "what": "3 potted top-left after multi-rail",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "pot",
+   "truth": "pot"
+  },
+  {
+   "strike": 101.0,
+   "what": "stroke on the 4, nothing fell",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "no pot",
+   "truth": "no pot"
+  },
+  {
+   "strike": 130.2,
+   "what": "ball potted bottom-right",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "pot",
+   "truth": "pot"
+  },
+  {
+   "strike": 154.2,
+   "what": "1 caught in the bridge hand mid-roll - NO pot",
+   "found": false,
+   "outcome_ok": false
+  },
+  {
+   "strike": 170.6,
+   "what": "long pot into the bottom-left",
+   "found": true,
+   "outcome_ok": false,
+   "engine": "no pot",
+   "truth": "pot"
+  },
+  {
+   "strike": 189.8,
+   "what": "2 toured the table and settled",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "no pot",
+   "truth": "no pot"
+  },
+  {
+   "strike": 208.0,
+   "what": "2 rattled the bottom-right and returned",
+   "found": true,
+   "outcome_ok": true,
+   "engine": "no pot",
+   "truth": "no pot"
+  }
+ ],
+ "perfect": false
+}
