@@ -76,6 +76,47 @@ def score(truth_path: Path) -> dict:
             false_strokes += 1
         else:
             extra += 1
+    # ---- capability metrics (Joe's ladder: cue tracking, object-ball
+    # ID, make/miss) - computed from the same dense stream ------------
+    known = set(truth.get("balls_on_table", []))
+    times, frames = r._times, r._frames
+    cue_ok = cue_bad = 0
+    moving_named = moving_unnamed = 0
+    invented: dict = {}
+    prev: dict = {}
+    for j, rows_f in enumerate(frames):
+        cues = [x for x in rows_f if x[6] and x[4] == 0]
+        if len(cues) == 1:
+            cue_ok += 1
+        else:
+            cue_bad += 1
+        for tr in rows_f:
+            if not tr[6]:
+                continue
+            n = tr[4]
+            if n >= 0 and known and n not in known:
+                invented[n] = invented.get(n, 0) + 1
+            key = tr[0]
+            p0 = prev.get(key)
+            prev[key] = (times[j], tr[1], tr[2])
+            if p0 is None:
+                continue
+            dt = times[j] - p0[0]
+            if not (0 < dt < 0.2):
+                continue
+            v = ((tr[1] - p0[1]) ** 2 + (tr[2] - p0[2]) ** 2) ** 0.5 / dt
+            if v > 60.0:
+                if n >= 0:
+                    moving_named += 1
+                else:
+                    moving_unnamed += 1
+    tot_mov = moving_named + moving_unnamed
+    caps = {
+        "cue_named_pct": round(100.0 * cue_ok / max(1, cue_ok + cue_bad), 1),
+        "named_moving_pct": round(100.0 * moving_named / max(1, tot_mov), 1),
+        "invented_numbers": sorted(invented),
+        "invented_frames": sum(invented.values()),
+    }
     found = sum(1 for x in rows if x["found"])
     ok = sum(1 for x in rows if x["outcome_ok"])
     n = len(rows)
@@ -83,7 +124,7 @@ def score(truth_path: Path) -> dict:
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "detected": f"{found}/{n}", "outcome": f"{ok}/{n}",
             "false_strokes": false_strokes, "extra_episodes": extra,
-            "episodes": len(eps), "shots": rows,
+            "episodes": len(eps), "shots": rows, "caps": caps,
             "perfect": found == n and ok == n
             and false_strokes == 0 and extra == 0}
 
@@ -99,6 +140,11 @@ def main() -> None:
     print(f"  outcomes right  : {sc['outcome']}")
     print(f"  fake strokes    : {sc['false_strokes']} (fired during hand setup)")
     print(f"  unexplained     : {sc['extra_episodes']}")
+    c = sc["caps"]
+    print(f"  cue ball named  : {c['cue_named_pct']}% of frames (target 99+)")
+    print(f"  moving balls named: {c['named_moving_pct']}% (target 95+)")
+    print(f"  invented numbers: {c['invented_numbers']} "
+          f"({c['invented_frames']} frames, target none)")
     for row in sc["shots"]:
         mark = "OK " if row["found"] and row["outcome_ok"] else "XX "
         got = row.get("engine", "MISSED")

@@ -1069,6 +1069,47 @@ function applyRot() {
       grid.appendChild(b);
     });
     box.appendChild(grid);
+    // capability ladder (Joe's framing: cue tracking, object-ball ID,
+    // make/miss) - each rung with its own pass mark
+    const caps = sc.caps || {};
+    const ladder = [
+      ["Cue ball tracked + named", caps.cue_named_pct, "99% of frames",
+       (caps.cue_named_pct || 0) >= 99],
+      ["Object balls named while moving", caps.named_moving_pct, "95%",
+       (caps.named_moving_pct || 0) >= 95],
+      ["No invented ball numbers",
+       (caps.invented_numbers || []).length ? caps.invented_numbers.join(", ") : "none",
+       "none", !(caps.invented_numbers || []).length],
+      ["Shots found", sc.detected, "10/10", sc.detected === "10/10"],
+      ["Make/miss calls", sc.outcome, "10/10", sc.outcome === "10/10"],
+      ["No fake shots", String(sc.false_strokes), "0", sc.false_strokes === 0],
+    ];
+    const lt = document.createElement("div");
+    lt.style.cssText = "color:var(--faint);font-size:11px;letter-spacing:1px;"
+      + "margin:16px 0 6px";
+    lt.textContent = "CAPABILITY LADDER";
+    box.appendChild(lt);
+    ladder.forEach(([label, val, target, pass]) => {
+      const row = document.createElement("div");
+      row.className = "jshotrow";
+      const mk = document.createElement("span");
+      mk.className = "mk " + (pass ? "ok" : "bad");
+      mk.textContent = pass ? "OK" : "✕";
+      const ds = document.createElement("span");
+      ds.className = "ds";
+      ds.textContent = label;
+      const vv = document.createElement("span");
+      vv.style.cssText = "color:#C7D0DA;font-variant-numeric:tabular-nums";
+      vv.textContent = (typeof val === "number" ? val + "%" : val)
+        + "  (need " + target + ")";
+      row.append(mk, ds, vv);
+      box.appendChild(row);
+    });
+    const st2 = document.createElement("div");
+    st2.style.cssText = "color:var(--faint);font-size:11px;letter-spacing:1px;"
+      + "margin:18px 0 6px";
+    st2.textContent = "SHOT BY SHOT";
+    box.appendChild(st2);
     (sc.shots || []).forEach(s => {
       const row = document.createElement("div");
       row.className = "jshotrow";

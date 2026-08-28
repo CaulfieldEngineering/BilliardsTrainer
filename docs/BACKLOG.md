@@ -31,6 +31,32 @@ BAR: every real shot detected, windowed at its strike, named,
 classified (stroke vs setup), and scored correctly — verified by
 Claude's vision, not by metrics.
 
+CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
+by feature/requirement"). Rungs are ordered so each depends only on
+the ones below it; every rung is measured by tools/scorecard.py and
+shown in the phone's STATUS view. A rung is DONE on a clip only when
+its gate holds AND a vision watch agrees.
+  R0 GEOMETRY - table + POCKET DEAD ZONES (Joe's design): pockets are
+     explicit zones; anything resting in a zone is never "on the
+     table"; a pot = entered a zone and did not come back out.
+     Gate: zero furniture tracks; zone overlay matches the video.
+     STATUS: partially done via ad-hoc rules - dead zones replace them.
+  R1 CUE BALL - found, named, and continuously tracked; trail covers
+     the real path from the strike. Gate: cue correctly named >=99% of
+     frames, one cue track per shot, no phantom cue.  NOW: 100.0% ✅
+  R2 SHOT EVENTS - every stroke found and windowed AT the strike; no
+     stroke invented during hand setup. Gate: 10/10 found, 0 fake.
+     NOW: 9/10 found, 4 fake.
+  R3 OBJECT BALLS - every moving ball tracked AND correctly numbered;
+     no invented numbers. Gate: >=95% of moving time named, zero
+     invented. NOW: 74.5% named, "11" invented in 318 frames.
+  R4 MAKE/MISS - outcomes correct incl. jaw rattles, hand catches,
+     and pots by unnamed balls. Gate: 10/10 calls. NOW: 8/10.
+  R5 LIVE PARITY - the same box on the camera; a live session scores
+     the same as its own re-process; old tracker DELETED.
+Run the ladder clip by clip: bench first (all rungs), then a cold
+clip, then the library.
+
 PHASES + GATES (Joe, 2026-08-28: "We can't just say 'see you in two
 weeks'... break this into intermediate phases and milestones to prove
 we're on the right track"). Gate numbers come from

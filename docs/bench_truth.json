@@ -3,20 +3,82 @@
  "established": "2026-08-28 by frame-by-frame vision watch (8 reviewers)",
  "note": "GROUND TRUTH for the engine campaign. Every number here was read off the video by eye, not by the app. The app is scored against this; this is never edited to match the app.",
  "strokes": [
-  {"strike": 31.7, "pot": true, "what": "object ball potted, bottom-right"},
-  {"strike": 51.5, "pot": true, "what": "2 ball potted, bottom-left"},
-  {"strike": 68.8, "pot": false, "what": "3 rattled the top-left jaws and stayed out"},
-  {"strike": 85.1, "pot": true, "what": "3 potted top-left after multi-rail"},
-  {"strike": 101.0, "pot": false, "what": "stroke on the 4, nothing fell"},
-  {"strike": 130.2, "pot": true, "what": "ball potted bottom-right"},
-  {"strike": 154.2, "pot": false, "what": "1 caught in the bridge hand mid-roll - NO pot"},
-  {"strike": 170.6, "pot": true, "what": "long pot into the bottom-left"},
-  {"strike": 189.8, "pot": false, "what": "2 toured the table and settled"},
-  {"strike": 208.0, "pot": false, "what": "2 rattled the bottom-right and returned"}
+  {
+   "strike": 31.7,
+   "pot": true,
+   "what": "object ball potted, bottom-right"
+  },
+  {
+   "strike": 51.5,
+   "pot": true,
+   "what": "2 ball potted, bottom-left"
+  },
+  {
+   "strike": 68.8,
+   "pot": false,
+   "what": "3 rattled the top-left jaws and stayed out"
+  },
+  {
+   "strike": 85.1,
+   "pot": true,
+   "what": "3 potted top-left after multi-rail"
+  },
+  {
+   "strike": 101.0,
+   "pot": false,
+   "what": "stroke on the 4, nothing fell"
+  },
+  {
+   "strike": 130.2,
+   "pot": true,
+   "what": "ball potted bottom-right"
+  },
+  {
+   "strike": 154.2,
+   "pot": false,
+   "what": "1 caught in the bridge hand mid-roll - NO pot"
+  },
+  {
+   "strike": 170.6,
+   "pot": true,
+   "what": "long pot into the bottom-left"
+  },
+  {
+   "strike": 189.8,
+   "pot": false,
+   "what": "2 toured the table and settled"
+  },
+  {
+   "strike": 208.0,
+   "pot": false,
+   "what": "2 rattled the bottom-right and returned"
+  }
  ],
  "setup_windows": [
-  [0.0, 25.0, "balls retrieved from a pocket and hand-placed; cue nudged with the stick"],
-  [111.5, 118.6, "yellow ball tossed on; 2 ball hand-placed"],
-  [219.3, 238.0, "walking, re-placing the 5, then sitting at the keyboard"]
- ]
+  [
+   0.0,
+   25.0,
+   "balls retrieved from a pocket and hand-placed; cue nudged with the stick"
+  ],
+  [
+   111.5,
+   118.6,
+   "yellow ball tossed on; 2 ball hand-placed"
+  ],
+  [
+   219.3,
+   238.0,
+   "walking, re-placing the 5, then sitting at the keyboard"
+  ]
+ ],
+ "balls_on_table": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  9
+ ],
+ "balls_note": "cue, yellow 1, blue 2, red 3, purple 4, orange 5, striped 9 (established by eye). Any other number the app reports is invented."
 }

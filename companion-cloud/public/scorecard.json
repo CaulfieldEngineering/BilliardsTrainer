@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-28T17:47:23Z",
+ "ts": "2026-08-28T17:55:16Z",
  "detected": "9/10",
  "outcome": "8/10",
  "false_strokes": 4,
@@ -86,5 +86,13 @@
    "truth": "no pot"
   }
  ],
+ "caps": {
+  "cue_named_pct": 100.0,
+  "named_moving_pct": 74.5,
+  "invented_numbers": [
+   11
+  ],
+  "invented_frames": 318
+ },
  "perfect": false
 }
