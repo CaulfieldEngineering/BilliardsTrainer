@@ -130,3 +130,37 @@ class TestPathThroughPocket:
                                  2: fn})
         ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
         assert not ep.pocketed and [p[0] for p in ep.lost] == [2]
+
+
+class TestChainContinuity:
+    def test_furniture_rebirth_does_not_unmake_a_pot(self):
+        # mover dies in the pocket; 2s later a static read near the
+        # pocket gets the same number - must NOT count as resting
+        def fn(k):
+            if k < 60:
+                return (300, 600)
+            if 60 <= k < 160:
+                f = (k - 60) / 100
+                return (300 - f * 290, 600 + f * 610)   # into (10,1210)
+            if k >= 220:
+                return (95, 1150)                        # furniture rebirth
+            return None                                  # 2s hole
+        times, frames = _stream({0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+                                 2: fn}, n_frames=400)
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
+        assert [p[0] for p in ep.pocketed] == [2], "rebirth faked a rest"
+
+    def test_continuous_jaw_rattle_rest_still_a_miss(self):
+        # ball rattles the jaws and STAYS, continuously tracked into
+        # rest near the mouth - genuinely on-table, not a pot
+        def fn(k):
+            if k < 60:
+                return (300, 600)
+            if k < 160:
+                f = (k - 60) / 100
+                return (300 - f * 230, 600 + f * 560)   # to (70,1160)
+            return (70, 1160)                            # rests at the jaw
+        times, frames = _stream({0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+                                 2: fn}, n_frames=400)
+        ep = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)[0]
+        assert not ep.pocketed and 2 in ep.resting

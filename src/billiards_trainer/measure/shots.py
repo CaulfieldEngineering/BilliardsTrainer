@@ -115,12 +115,24 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
         moved = [t for t in moving_ts.get(n, []) if t_open <= t <= t_close]
         if moved:
             ep.movers.add(n)
-        last = None
-        for p in pts:                      # last sighting up to LINGER
-            if p[0] <= t_close + LINGER_S:
-                last = p
-            else:
-                break
+        win = [p for p in pts if p[0] <= t_close + LINGER_S]
+        if not win:
+            continue
+        if not moved:
+            last = win[-1]
+        else:
+            # CONTIGUOUS chain only (bench round 3: the potted 2's track
+            # died in the pocket, then a jaw-furniture flicker 2s later
+            # was relabeled "2" and read as the ball RESTING on-table -
+            # a make scored as a miss). Rest evidence must share an
+            # unbroken chain with the motion; a >0.5s hole then rebirth
+            # is a new life, not a resting ball.
+            i = next((k for k, p in enumerate(win)
+                      if p[0] >= moved[-1] - 1e-9), len(win) - 1)
+            j = i
+            while j + 1 < len(win) and win[j + 1][0] - win[j][0] <= 0.5:
+                j += 1
+            last = win[j]
         if last is None:
             continue
         if not moved:
