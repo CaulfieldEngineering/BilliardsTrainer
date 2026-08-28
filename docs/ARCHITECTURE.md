@@ -165,6 +165,11 @@ three track sources, four independent timebase reconciliations, three
 strike authorities, four private copies of shot history, and a phone
 API that re-implements correction-merging. Standing demolition
 targets, sequenced by the gates that prove them dead:
+- Unnamed-ball pot credit (`measure/shots.py`, the `unnamed_pots` flag
+  and negative-keyed series) — scaffolding for a naming layer that
+  misses ~25% of moving balls. DIES when ladder rung R3 passes: with
+  object balls named, every pot is attributable by number and an
+  unnamed pot is by definition a bug, not a case to support.
 - Blur-compensator stack (trail_resample, forensic_repass) — dies when
   corpus gates prove dense tracks superseded it.
 - Old live tracker in `vision/pipeline.py` — dies at M4 promotion;

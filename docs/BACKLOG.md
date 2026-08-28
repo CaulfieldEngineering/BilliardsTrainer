@@ -50,8 +50,14 @@ its gate holds AND a vision watch agrees.
   R3 OBJECT BALLS - every moving ball tracked AND correctly numbered;
      no invented numbers. Gate: >=95% of moving time named, zero
      invented. NOW: 74.5% named, "11" invented in 318 frames.
-  R4 MAKE/MISS - outcomes correct incl. jaw rattles, hand catches,
-     and pots by unnamed balls. Gate: 10/10 calls. NOW: 8/10.
+  R4 MAKE/MISS - outcomes correct incl. jaw rattles and hand catches,
+     with EVERY pot attributed to the right ball number. Gate: 10/10
+     calls AND pot attribution 4/4. NOW: 8/10 calls, 2/4 attributed.
+     (Joe, 2026-08-28: "There shouldn't be 'pots by unnamed balls' by
+     the satisfaction of object balls right?" - correct: an unnamed
+     pot is a symptom of R3 failing, never an R4 requirement. The
+     unnamed-pot code path in measure/shots.py is SCAFFOLDING and is
+     DELETED when R3 passes - see ARCHITECTURE.md demolition ledger.)
   R5 LIVE PARITY - the same box on the camera; a live session scores
      the same as its own re-process; old tracker DELETED.
 Run the ladder clip by clip: bench first (all rungs), then a cold

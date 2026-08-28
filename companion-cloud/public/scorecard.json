@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-28T17:55:16Z",
+ "ts": "2026-08-28T17:58:24Z",
  "detected": "9/10",
  "outcome": "8/10",
  "false_strokes": 4,
@@ -13,7 +13,10 @@
    "found": true,
    "outcome_ok": true,
    "engine": "pot",
-   "truth": "pot"
+   "truth": "pot",
+   "ball_truth": 9,
+   "ball_engine": 4,
+   "ball_ok": false
   },
   {
    "strike": 51.5,
@@ -21,7 +24,10 @@
    "found": true,
    "outcome_ok": true,
    "engine": "pot",
-   "truth": "pot"
+   "truth": "pot",
+   "ball_truth": 2,
+   "ball_engine": 2,
+   "ball_ok": true
   },
   {
    "strike": 68.8,
@@ -37,7 +43,10 @@
    "found": true,
    "outcome_ok": true,
    "engine": "pot",
-   "truth": "pot"
+   "truth": "pot",
+   "ball_truth": 3,
+   "ball_engine": 3,
+   "ball_ok": true
   },
   {
    "strike": 101.0,
@@ -67,7 +76,10 @@
    "found": true,
    "outcome_ok": false,
    "engine": "no pot",
-   "truth": "pot"
+   "truth": "pot",
+   "ball_truth": 5,
+   "ball_engine": null,
+   "ball_ok": false
   },
   {
    "strike": 189.8,
@@ -92,7 +104,8 @@
   "invented_numbers": [
    11
   ],
-  "invented_frames": 318
+  "invented_frames": 318,
+  "pot_attribution": "2/4"
  },
  "perfect": false
 }

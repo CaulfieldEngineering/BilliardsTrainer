@@ -62,11 +62,20 @@ def score(truth_path: Path) -> dict:
                          "found": False, "outcome_ok": False})
             continue
         used.add(bi)
-        got = bool(eps[bi].pocketed)
-        rows.append({"strike": s["strike"], "what": s["what"], "found": True,
-                     "outcome_ok": got == s["pot"],
-                     "engine": "pot" if got else "no pot",
-                     "truth": "pot" if s["pot"] else "no pot"})
+        e = eps[bi]
+        got = bool(e.pocketed)
+        got_balls = [b for b, _x, _y in e.pocketed]
+        row = {"strike": s["strike"], "what": s["what"], "found": True,
+               "outcome_ok": got == s["pot"],
+               "engine": "pot" if got else "no pot",
+               "truth": "pot" if s["pot"] else "no pot"}
+        # ATTRIBUTION (Joe: with object balls satisfied there is no such
+        # thing as a pot by an unnamed ball) - a pot must name the ball
+        if s["pot"] and s.get("ball") is not None:
+            row["ball_truth"] = s["ball"]
+            row["ball_engine"] = got_balls[0] if got_balls else None
+            row["ball_ok"] = bool(got_balls) and got_balls[0] == s["ball"]
+        rows.append(row)
     setup = truth.get("setup_windows", [])
     false_strokes = extra = 0
     for i, e in enumerate(eps):
@@ -119,6 +128,9 @@ def score(truth_path: Path) -> dict:
     }
     found = sum(1 for x in rows if x["found"])
     ok = sum(1 for x in rows if x["outcome_ok"])
+    attr_rows = [x for x in rows if "ball_ok" in x]
+    attr_ok = sum(1 for x in attr_rows if x["ball_ok"])
+    caps["pot_attribution"] = f"{attr_ok}/{len(attr_rows)}"
     n = len(rows)
     return {"session": name,
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -145,6 +157,7 @@ def main() -> None:
     print(f"  moving balls named: {c['named_moving_pct']}% (target 95+)")
     print(f"  invented numbers: {c['invented_numbers']} "
           f"({c['invented_frames']} frames, target none)")
+    print(f"  pots attributed : {c['pot_attribution']} (right ball named)")
     for row in sc["shots"]:
         mark = "OK " if row["found"] and row["outcome_ok"] else "XX "
         got = row.get("engine", "MISSED")

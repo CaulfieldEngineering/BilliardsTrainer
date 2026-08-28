@@ -6,12 +6,14 @@
   {
    "strike": 31.7,
    "pot": true,
-   "what": "object ball potted, bottom-right"
+   "what": "object ball potted, bottom-right",
+   "ball": 9
   },
   {
    "strike": 51.5,
    "pot": true,
-   "what": "2 ball potted, bottom-left"
+   "what": "2 ball potted, bottom-left",
+   "ball": 2
   },
   {
    "strike": 68.8,
@@ -21,7 +23,8 @@
   {
    "strike": 85.1,
    "pot": true,
-   "what": "3 potted top-left after multi-rail"
+   "what": "3 potted top-left after multi-rail",
+   "ball": 3
   },
   {
    "strike": 101.0,
@@ -31,7 +34,8 @@
   {
    "strike": 130.2,
    "pot": true,
-   "what": "ball potted bottom-right"
+   "what": "ball potted bottom-right",
+   "ball": null
   },
   {
    "strike": 154.2,
@@ -41,7 +45,8 @@
   {
    "strike": 170.6,
    "pot": true,
-   "what": "long pot into the bottom-left"
+   "what": "long pot into the bottom-left",
+   "ball": 5
   },
   {
    "strike": 189.8,
@@ -80,5 +85,6 @@
   5,
   9
  ],
- "balls_note": "cue, yellow 1, blue 2, red 3, purple 4, orange 5, striped 9 (established by eye). Any other number the app reports is invented."
+ "balls_note": "cue, yellow 1, blue 2, red 3, purple 4, orange 5, striped 9 (established by eye). Any other number the app reports is invented.",
+ "attribution_note": "ball = which ball fell, read by eye. null means the watch could not confirm the number (excluded from attribution scoring rather than guessed)."
 }

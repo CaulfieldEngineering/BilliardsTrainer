@@ -1082,6 +1082,9 @@ function applyRot() {
        "none", !(caps.invented_numbers || []).length],
       ["Shots found", sc.detected, "10/10", sc.detected === "10/10"],
       ["Make/miss calls", sc.outcome, "10/10", sc.outcome === "10/10"],
+      ["Pots attributed to the right ball", caps.pot_attribution || "-",
+       "all", (caps.pot_attribution || "").split("/")[0]
+              === (caps.pot_attribution || "/x").split("/")[1]],
       ["No fake shots", String(sc.false_strokes), "0", sc.false_strokes === 0],
     ];
     const lt = document.createElement("div");
