@@ -1822,3 +1822,11 @@ Rounds continue with Joe's visual feedback as the gate.
   each session gates at <=0.55/1k before its merge, pre-merge shots.json
   backed up as .pre_dense. Backlog Tier 0 next-on-land: rollout results
   + stamps; then Tier 1 demolition chunk 1 (shot identity).
+
+- 2026-08-28 early — ROLLOUT LEG 1: 6 sessions dense+merged, ALL gates
+  green (0.00-0.23/1k vs 0.55 champion), 68 shots upgraded
+  (163313:22, 165930:10, 005048r:3, 005647:33; two 2-second stubs
+  trivially clean). Halted at 20260823-141038 "no calibration" (camera-
+  surgery-day session opens on an uncalibratable scene). Script fixed:
+  per-session calib failure now SKIPS (only recording halts the
+  library) + deep warmup retries at 60/300/900s. Leg 2 running.
