@@ -109,6 +109,37 @@ frozen seams. Extend additively, never fork per-consumer variants.
 
 ## 5. Demolition ledger (subtraction is scheduled work)
 
+**THE INITIATIVE (Joe, 2026-08-27): "We really need an initiative to
+start deleting redundant and conflicting code and beginning to merge
+everything together."** Demolition is now the DEFAULT work-session
+goal — ahead of new features, behind only committed gate/rollout
+tasks. Method is strangler-fig, not big-bang: each chunk migrates the
+consumers onto the core and DELETES the old opinion-holder in the
+same commit, with the suite and corpus gates proving behavior
+survived. The C++ rebuild stays the end state; it ports the
+CONSOLIDATED core, not today's sprawl.
+
+**Scoreboard** (the weekly audit re-counts; this number only shrinks):
+- 2026-08-27: **40 state-opinion sites** (baseline audit).
+
+**Merge order** (from the map, by payoff over risk):
+1. Shot identity: stamp the shot id (Joe's `stem@second` convention)
+   into every sidecar/stroke/correction record; DELETE the four
+   time-proximity joins (±0.2s, ±6s, 25s-wall-clock, 3-tier reader).
+2. One timebase: core-owned recording clock in sidecar meta; DELETE
+   the four independent reconciliations.
+3. Clock snapshot: core.clock {remaining,total,fraction,phase};
+   DELETE the ring/bar denominator split and per-widget status logic.
+4. One reader: phone server calls the core reader; DELETE its private
+   correction-merge (the desktop/phone divergence factory).
+5. Geometry in meta: core writes table/H/corners at sidecar open;
+   DELETE both 3s re-warmup calibration re-derivations.
+6. Shot history: widgets bind one published shot log; DELETE the four
+   private copies and cross-widget dict mutation.
+7. At M4 promotion: DELETE BallTracker + vacancy/ghost bookkeeping —
+   the single biggest demolition, gated by the divergence evidence
+   now accumulating.
+
 The skyscraper gets shorter on purpose, not by accident. The full
 audited inventory of every private opinion-holder (file:line, what it
 holds, its migration) is
