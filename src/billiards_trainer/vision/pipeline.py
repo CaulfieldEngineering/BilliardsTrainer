@@ -340,7 +340,8 @@ class Pipeline:
         cv2.drawMarker(img, c, (255, 255, 255), cv2.MARKER_CROSS, 40, 1, cv2.LINE_AA)
         res.frame_bgr = img
 
-    def prepare_detections(self, raw_dets, calib, frame_shape, frame=None):
+    def prepare_detections(self, raw_dets, calib, frame_shape, frame=None,
+                           refresh_foreign: bool = False):
         """Project raw-frame detections to rect space and run EVERY sanity
         filter (size prior, foreign veto, rigid-body repair, number
         arbitration, confidence floor, geometry, blur recovery) — the full
@@ -348,6 +349,20 @@ class Pipeline:
         path (_apply_detections) and the M1 measurement engine, which
         skipped it once and re-learned why it exists (229px coordinate
         offset AND every filtered phantom class at once)."""
+        # THE ENGINE WAS BLIND TO HANDS AND STICKS (bench round 7,
+        # vision-verified 2026-08-28): the foreign/glove veto below reads
+        # self._foreign_last, which only the LIVE process() loop ever
+        # computed - so in offline re-processing it was always None and
+        # the veto was inert. Overlay proof: at 170.5s the engine drew
+        # NINE phantom balls down the cue stick's shaft and labelled the
+        # stick's tip "the cue ball" while the real cue ball sat
+        # unnamed. Offline callers pass refresh_foreign=True and get the
+        # same protection the live feed has (one box, both feeds).
+        if refresh_foreign and frame is not None:
+            try:
+                self._foreign_state(frame, calib)
+            except Exception:  # noqa: BLE001 - a mask failure must not
+                pass          # kill the frame; the veto just stays off
         detections = self._project_raw_to_rect(raw_dets, calib, frame_shape)
         # Physical-size prior: reject detections whose radius is far from the
         # known ball radius. This used to be skipped for model-based detectors

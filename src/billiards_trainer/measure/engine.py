@@ -29,7 +29,7 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 4   # v4: jaw filter + pocket-furniture death
+ENGINE_RULES_V = 5   # v5: hand-stick mask active offline
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -226,7 +226,8 @@ def reprocess(video: str, out_dir: str | None = None,
             _pair_identities(found, ident_by_pos)
             # THE shared stage: raw-frame -> rect space + every filter
             prepared = pipe.prepare_detections(found, calib, frame.shape,
-                                               frame=frame)
+                                               frame=frame,
+                                               refresh_foreign=True)
             dets = [(float(d.x), float(d.y), float(d.radius),
                      int(getattr(d, "number", -1))) for d in prepared]
             rows = tracker.update(dets, t)
