@@ -357,6 +357,43 @@
                  cursor:pointer; }
   .jnav button:disabled { opacity:.35; cursor:default; }
   .jempty { color:var(--faint); font-size:14px; padding:14px 0; }
+  /* ---- rich entry content (entries may ship HTML) ---------------- */
+  .jc { color:#C7D0DA; font-size:15px; line-height:1.65; }
+  .jc h2 { font-size:15px; letter-spacing:.6px; text-transform:uppercase;
+           color:var(--faint); margin:22px 0 8px; font-weight:700; }
+  .jc h3 { font-size:16px; margin:18px 0 6px; color:#EAF2F3; }
+  .jc p { margin:0 0 12px; overflow-wrap:anywhere; }
+  .jc ul, .jc ol { margin:0 0 12px 20px; }
+  .jc li { margin:4px 0; }
+  .jc strong { color:#EAF2F3; }
+  .jc code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+             font-size:13px; background:#151B23; border:1px solid #232B36;
+             border-radius:3px; padding:1px 5px; overflow-wrap:anywhere; }
+  .jc table { width:100%; border-collapse:collapse; margin:10px 0 16px;
+              font-size:13.5px; }
+  .jc th { text-align:left; color:var(--faint); font-weight:600;
+           font-size:11px; letter-spacing:.6px; text-transform:uppercase;
+           padding:6px 8px; border-bottom:1px solid #232B36; }
+  .jc td { padding:7px 8px; border-bottom:1px solid #171E26;
+           vertical-align:top; overflow-wrap:anywhere; }
+  .jc td.num { text-align:right; font-variant-numeric:tabular-nums;
+               white-space:nowrap; }
+  .jc .pass { color:#3FB950; font-weight:700; }
+  .jc .fail { color:#E5484D; font-weight:700; }
+  .jc .note { border-left:2px solid var(--accent,#2F81F7);
+              background:#0F141A; padding:10px 14px; margin:14px 0;
+              border-radius:0 4px 4px 0; }
+  .jc .win { border-left-color:#3FB950; }
+  .jc .warn { border-left-color:#E3B341; }
+  .jc .grid2 { display:grid; gap:14px; margin:14px 0;
+               grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+  .jc figure { margin:0; }
+  .jc figure img { width:100%; height:auto; max-height:52vh;
+                   object-fit:contain; object-position:left top;
+                   background:#0B0F14; border:1px solid #232B36;
+                   border-radius:6px; cursor:zoom-in; }
+  .jc figcaption { color:var(--faint); font-size:12px; margin-top:5px;
+                   line-height:1.45; }
   /* pinned status view: the bench scorecard, recomputed every round */
   .jstat { border:1px solid #232B36; border-radius:8px; padding:16px 18px;
            margin-bottom:18px; background:#0F141A; }

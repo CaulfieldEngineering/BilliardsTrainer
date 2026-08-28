@@ -1166,12 +1166,26 @@ function applyRot() {
       meta.appendChild(sc);
     }
     art.appendChild(meta);
-    (e.body || "").split(String.fromCharCode(10)).filter(Boolean).forEach(p => {
-      const el = document.createElement("div");
-      el.className = "jbodyp";
-      el.textContent = p;
-      art.appendChild(el);
-    });
+    if (e.html) {
+      // entries may ship formatted HTML (authored by the dev loop, served
+      // from our own origin - never user input)
+      const rich = document.createElement("div");
+      rich.className = "jc";
+      rich.innerHTML = e.html;
+      rich.querySelectorAll("img").forEach(im => {
+        im.loading = "lazy";
+        im.title = "Click to open full size";
+        im.onclick = () => window.open(im.src, "_blank", "noopener");
+      });
+      art.appendChild(rich);
+    } else {
+      (e.body || "").split(String.fromCharCode(10)).filter(Boolean).forEach(p => {
+        const el = document.createElement("div");
+        el.className = "jbodyp";
+        el.textContent = p;
+        art.appendChild(el);
+      });
+    }
     (e.images || []).forEach(im => {
       const fig = document.createElement("div");
       fig.className = "jfig";

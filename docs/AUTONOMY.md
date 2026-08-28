@@ -35,10 +35,27 @@ Two scheduled jobs live in the Claude session attached to this repo:
    after the work (Joe, 2026-08-27).
 2. **Watchdog** — hourly, offset from the work session. Checks the
    heartbeat and the invariants below; recovers and logs an incident if
-   anything is wrong. THEN runs the hygiene pass (below) — the
-   operational checks alone let a week of layering grow under green
-   tests (Joe, 2026-08-27: "The audit you just did is what the hygiene
+   anything is wrong. THEN posts the HOURLY DEV UPDATE (below) and runs
+   the hygiene pass — the operational checks alone let a week of
+   layering grow under green tests (Joe, 2026-08-27: "The audit you just did is what the hygiene
    watchdog is supposed to be doing every hour").
+
+## Hourly dev update (every watchdog run, and after any round)
+
+Joe, 2026-08-28: "let's be sure to include updates hourly or something
+like that so i can actually see what's going on under the hood.
+Remember, formatted, organized, html/css, screenshot/images."
+
+    python tools/scorecard.py --publish        # refresh the numbers
+    python tools/hourly_update.py --deploy         [--image <png> "what this shows"] ...  # post + ship
+
+Posts ONE formatted entry to the phone's Dev Journal: the capability
+ladder as a pass/fail table, every shot the engine still gets wrong,
+the code that landed since the last update, and any evidence images
+(debug overlays via tools/debug_overlay.py). Regressions are posted
+the same as wins — the scorecard is recomputed, never narrated.
+Journal entries may ship HTML (class `jc` styles: h2/h3, tables,
+code, .note/.win/.warn callouts, .grid2 figure pairs).
 
 ## Vision verification (every measurement-affecting change)
 

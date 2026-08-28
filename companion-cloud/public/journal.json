@@ -1,6 +1,26 @@
 {
  "entries": [
   {
+   "id": 49,
+   "ts": "2026-08-28T19:05:21",
+   "date": "Aug 28, 19:05 UTC",
+   "kind": "finding",
+   "title": "Hourly check-in \u2014 Aug 28, 19:05 UTC",
+   "score": "9/10 shots \u00b7 8/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/049-dbg_session-20260824-220247_170_50.png",
+     "caption": "BEFORE: nine phantom balls the app believed in, strung down empty felt"
+    },
+    {
+     "src": "journal/049-dbg_session-20260824-220247_170_50.png",
+     "caption": "AFTER: phantoms gone, cue ball correctly named at its real position"
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>74.5%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>11</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>9/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>4</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>154.2s</code> 1 caught in the bridge hand mid-roll - NO pot \u2014 <span class='fail'>the app missed this shot entirely</span></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Stale-shell fix: HTML served no-store + global overflow guards</li><li>R4 demands pot ATTRIBUTION; unnamed-pot path scheduled for demolition</li><li>Capability ladder: rungs measured per clip, published to the STATUS view</li><li>Phases + a self-serve scorecard: proof instead of &quot;see you in two weeks&quot;</li><li>One channel: What&#x27;s New merged into the Dev Journal, rebuilt as a blog</li></ul><h2>Evidence</h2><div class='grid2'><figure><img src='journal/dbg_session-20260824-220247_170_50.png' alt=''><figcaption>BEFORE: nine phantom balls the app believed in, strung down empty felt</figcaption></figure><figure><img src='journal/dbg_session-20260824-220247_170_50.png' alt=''><figcaption>AFTER: phantoms gone, cue ball correctly named at its real position</figcaption></figure></div>"
+  },
+  {
    "id": 48,
    "ts": "2026-08-28T17:48:30",
    "date": "Aug 28, 17:48 UTC",
