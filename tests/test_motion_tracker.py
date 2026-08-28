@@ -182,3 +182,38 @@ class TestStaleClaimRelease:
         by_pos = {round(r.x): r.number for r in rows}
         assert by_pos[100] == 5, "actively-read incumbent keeps the number"
         assert by_pos[400] == -1
+
+
+class TestPocketFurniture:
+    """Bench round 6, vision-verified: a detection on the pocket
+    leather scored ABOVE the confidence floor and lived the whole
+    session, faking rests and stealing episodes. Confidence can't
+    separate it; time can."""
+
+    def _run(self, pos, frames=400, pockets=((20.0, 1200.0),)):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker(pockets=list(pockets), pocket_r=25.0)
+        t, rows = 0.0, []
+        for k in range(frames):
+            rows = tk.update([(*pos(k), 14.0, -1)], t)
+            t += 1 / 30
+        return rows
+
+    def test_immortal_pocket_blob_dies(self):
+        rows = self._run(lambda k: (30.0, 1195.0))      # never moves
+        assert rows == [] or all(r.number == -1 for r in rows)
+        assert not rows, "pocket furniture must not survive"
+
+    def test_ball_arriving_at_the_jaw_survives(self):
+        # born mid-table, rolls INTO the jaw and stays: a real hanger
+        def pos(k):
+            if k < 100:
+                f = k / 100
+                return (300 - f * 270, 600 + f * 580)
+            return (30.0, 1180.0)
+        rows = self._run(pos)
+        assert rows, "a real ball that rolled into the jaw must live"
+
+    def test_mid_table_immortal_is_untouched(self):
+        rows = self._run(lambda k: (300.0, 600.0))      # a resting ball
+        assert rows, "resting balls away from pockets are not furniture"

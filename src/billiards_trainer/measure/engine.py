@@ -29,7 +29,7 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 3   # v3: real-pts stamps + fresh-claim arbitration
+ENGINE_RULES_V = 4   # v4: jaw filter + pocket-furniture death
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -154,7 +154,9 @@ def reprocess(video: str, out_dir: str | None = None,
                                                       for row in hinv],
                                              "w": w_px, "h": h_px,
                                              "source": video.name})
-    tracker = MotionTracker()
+    tracker = MotionTracker(
+        pockets=[(pk.x, pk.y) for pk in calib.table.pockets],
+        pocket_r=float(calib.table.pocket_radius))
     ident_by_pos: list = []      # latest identifier detections (x, y, n)
 
     def recording_live() -> bool:

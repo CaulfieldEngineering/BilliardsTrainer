@@ -46,6 +46,10 @@ class _Track:
     vy: float = 0.0
     radius: float = 16.0
     t: float = 0.0
+    t0: float = -1.0             # birth time (furniture age test)
+    bx: float = 0.0              # birth position
+    by: float = 0.0
+    ever_moved: bool = False
     votes: list = field(default_factory=list)
     misses: float = 0.0          # seconds since last real detection
     active: bool = True
@@ -71,11 +75,23 @@ class _Track:
                    if v == n and now - vt <= FRESH_S)
 
 
+FURNITURE_S = 8.0        # a pocket-zone track this old that has NEVER
+                         # moved is furniture (leather/shadow), not a ball
+
+
 class MotionTracker:
-    def __init__(self):
+    def __init__(self, pockets=None, pocket_r: float = 0.0):
         self._tracks: dict[int, _Track] = {}
         self._next_id = 1
         self._holder: dict[int, int] = {}   # number -> incumbent track id
+        # POCKET FURNITURE (bench round 6, vision-verified: a detection
+        # on the bottom-left pocket's leather scored ABOVE the
+        # confidence floor and lived the whole session, faking rests
+        # and stealing episodes). Confidence can't separate it; TIME
+        # can - furniture never moves, a jaw-hanging ball arrives and
+        # leaves. Needs geometry, so the engine passes it in.
+        self._pockets = list(pockets or [])
+        self._pocket_r = float(pocket_r)
 
     def update(self, dets, t: float) -> list:
         """dets: iterable of (x, y, radius, number) for one frame at time
@@ -125,7 +141,8 @@ class MotionTracker:
         for di, (dx, dy, dr, dn) in enumerate(dets):
             if di in used_d:
                 continue
-            tr = _Track(self._next_id, dx, dy, radius=dr, t=t)
+            tr = _Track(self._next_id, dx, dy, radius=dr, t=t,
+                        t0=t, bx=dx, by=dy)
             if dn >= 0:
                 tr.votes.append((dn, t))
             self._tracks[tr.id] = tr
@@ -146,6 +163,24 @@ class MotionTracker:
         # beside its re-acquired self). Two ACTIVE tracks overlapping
         # under 0.8 diameters: the weaker (fewer votes, then younger)
         # dies immediately.
+        # 4c. POCKET FURNITURE: a track born in a pocket zone that has
+        # never left its birth spot and is older than FURNITURE_S is
+        # leather, not a ball. A real jaw-hanger either moves in (so it
+        # was born elsewhere) or is knocked out (so it moves).
+        if self._pockets and self._pocket_r > 0:
+            for tr in self._tracks.values():
+                if not tr.active or tr.t0 < 0:
+                    continue
+                if not tr.ever_moved:
+                    d0 = ((tr.x - tr.bx) ** 2 + (tr.y - tr.by) ** 2) ** 0.5
+                    if d0 > max(tr.radius, 8.0):
+                        tr.ever_moved = True
+                if (not tr.ever_moved and t - tr.t0 > FURNITURE_S
+                        and any(((tr.x - px) ** 2 + (tr.y - py) ** 2) ** 0.5
+                                < 2.2 * self._pocket_r
+                                for px, py in self._pockets)):
+                    tr.active = False
+                    tr.vx = tr.vy = 0.0
         live = [tr for tr in self._tracks.values() if tr.active]
         for i, a in enumerate(live):
             for b in live[i + 1:]:
