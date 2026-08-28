@@ -17,6 +17,10 @@ The five-second version of ARCHITECTURE.md:
    blame the environment while our own code is unmeasured.
 
 Operational hard rules:
+- Watchdog/loop sessions: after the liveness checks, run the HYGIENE
+  PASS (`docs/AUTONOMY.md` §Hygiene) — diff since the last `hygiene:`
+  GOALS line, reviewed against the seven laws. Structure is checked
+  hourly, not just uptime.
 - Full test suite green BEFORE every commit (pre-push enforces; don't
   make it catch you).
 - Edit tool only for source edits — scripted heredocs corrupted files

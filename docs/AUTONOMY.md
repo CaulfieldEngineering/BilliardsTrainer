@@ -32,7 +32,34 @@ Two scheduled jobs live in the Claude session attached to this repo:
    progress log, and refreshes the heartbeat.
 2. **Watchdog** — hourly, offset from the work session. Checks the
    heartbeat and the invariants below; recovers and logs an incident if
-   anything is wrong.
+   anything is wrong. THEN runs the hygiene pass (below) — the
+   operational checks alone let a week of layering grow under green
+   tests (Joe, 2026-08-27: "The audit you just did is what the hygiene
+   watchdog is supposed to be doing every hour").
+
+## Hygiene pass (every watchdog run — architecture, not just liveness)
+
+Tests measure behavior; nobody was measuring STRUCTURE. This pass is
+the hourly structural review, kept cheap by being diff-driven:
+
+1. Find the last `hygiene:` line in docs/GOALS.md — it names the last
+   reviewed commit. Diff `<that>..HEAD` (code only; skip docs-only).
+2. Review each commit's diff against docs/ARCHITECTURE.md's seven
+   laws. Hunt specifically:
+   - a new holder of table/session state outside MeasurementCore (L1)
+   - a downstream patch on a measurement symptom (L2)
+   - a pure addition that names nothing it replaces (L3)
+   - a new FramePacket field, time-proximity join, or timebase
+     reconciliation (the map's three worst families)
+   - a change with no pinning test (L4)
+3. Append ONE line to GOALS: `hygiene: clean|N findings through
+   <short-hash>`. Findings that need work become demolition-ledger
+   entries in ARCHITECTURE.md §5 (or BLOCKERS.md if urgent); serious
+   violations of L1-L7 are INCIDENTS (log below), and the fix goes at
+   the head of the work queue — before feature goals.
+4. WEEKLY (or when Joe asks): a fresh full audit in the style of
+   docs/design/state-opinion-map-2026-08-27.md. The site count must
+   SHRINK release over release; growth is an incident, not a trend.
 
 ## Serialization invariants (violations = incident)
 - `_eval/loop.lock` exists only while a work session runs. Stale lock
@@ -61,6 +88,14 @@ session did. Refreshed at the END of each successful work session.
 
 ## Incident log
 (watchdog appends here)
+- 2026-08-27: CHARTER GAP, caught by Joe, not the loop: a week of
+  hourly "hygiene" watchdogs verified liveness only (heartbeat, locks,
+  champion .bak) because that's all this charter listed — meanwhile
+  ~40 private opinion-holders of table state accumulated under green
+  tests (see docs/design/state-opinion-map-2026-08-27.md). Tests
+  measure behavior; nothing was measuring structure. Structural fix:
+  the hygiene pass above is now a standing watchdog duty, diff-driven
+  hourly + full audit weekly, with the site count required to shrink.
 - 2026-08-17: red push slipped through a PIPED pytest exit code for the
   second time (5b877cf; first was the 088ed55 CI incident). Joe got the
   failure email. Structural fix: a local git pre-push hook now runs the

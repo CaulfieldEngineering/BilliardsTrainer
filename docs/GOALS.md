@@ -1805,3 +1805,8 @@ Rounds continue with Joe's visual feedback as the gate.
   builds, no exceptions — table scene (lights/cover), not code. NEXT:
   migrate consumers per the map (clock snapshot, shot ids, timebase),
   3/5 flip mining, M2 full gate on marathon output.
+
+- hygiene: baseline — full 40-site audit (docs/design/state-opinion-
+  map-2026-08-27.md) covers everything through 264645e; watchdog hygiene
+  pass reviews incrementally from here (AUTONOMY.md charter amended;
+  the week-long gap is logged as an incident).
