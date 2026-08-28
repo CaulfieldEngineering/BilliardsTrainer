@@ -513,6 +513,16 @@ class Pipeline:
                     and any((d.x - sx) ** 2 + (d.y - sy) ** 2 <= spot_r2
                             for sx, sy in spots)):
                 continue
+            # JAW PHANTOM (bench 220247, vision-verified 2026-08-28: the
+            # bottom-left pocket leather detected as a 0.48-score SOLID
+            # just inside the bed at the jaw, alive for 60+ seconds -
+            # spawning ghost tracks, phantom episodes and off-table
+            # trails). Near a pocket, a LOW-CONFIDENCE read is the
+            # pocket furniture; real balls - including jaw-hangers -
+            # score like balls on this rig (>=0.85 typical).
+            if (d.score < 0.60
+                    and tbl.pocket_at(d.x, d.y, scale=2.2) is not None):
+                continue
             kept.append(d)
         detections = kept
         # balls the detector lost to motion blur, recovered from the pixels

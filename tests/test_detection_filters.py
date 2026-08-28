@@ -737,3 +737,48 @@ class TestVacancyPruning:
         tracks = self._feed(p, calib, [], 61)
         assert not any(t.number == 0 for t in tracks), \
             "lingerer survived a spot whose pixels are plainly felt"
+
+
+class TestJawPhantom:
+    """Bench 220247, vision-verified: the pocket leather detects as a
+    low-confidence SOLID just inside the bed at the jaw and lives for
+    minutes, spawning ghost tracks/episodes/off-table trails. Near a
+    pocket, a low-confidence read is furniture; real balls (including
+    jaw-hangers) score like balls."""
+
+    def _prep(self, raw):
+        from billiards_trainer.vision.pipeline import Pipeline
+        s = Settings()
+        p = Pipeline(s)
+
+        class FakeStrategy:
+            model_based = True
+        p._strategy = FakeStrategy()
+        calib = _fake_calib()
+        exp = expected_ball_radius_px(calib.table, s.table.size)
+        return p, calib, exp
+
+    def test_low_score_at_jaw_rejected(self):
+        p, calib, exp = self._prep(None)
+        tbl = calib.table
+        jaw = _mk(tbl.x0 + 40, tbl.y1 - 14, exp,
+                  cls=BallClass.SOLID, number=-1, score=0.48)
+        dets, _ = _run_apply(p, calib, [jaw])
+        assert dets == [], "0.48-score jaw detection must die"
+
+    def test_confident_jaw_hanger_kept(self):
+        p, calib, exp = self._prep(None)
+        tbl = calib.table
+        hang = _mk(tbl.x0 + 40, tbl.y1 - 14, exp,
+                   cls=BallClass.SOLID, number=5, score=0.86)
+        dets, _ = _run_apply(p, calib, [hang])
+        assert len(dets) == 1, "a real jaw-hanging ball must survive"
+
+    def test_low_score_mid_table_kept(self):
+        # the floor is jaw-local: a dim ball mid-table is not furniture
+        p, calib, exp = self._prep(None)
+        tbl = calib.table
+        dim = _mk((tbl.x0 + tbl.x1) / 2, (tbl.y0 + tbl.y1) / 2 + 100, exp,
+                  cls=BallClass.SOLID, number=-1, score=0.48)
+        dets, _ = _run_apply(p, calib, [dim])
+        assert len(dets) == 1, "low score alone must not reject mid-table"
