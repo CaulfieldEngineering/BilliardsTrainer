@@ -90,3 +90,26 @@ class TestClockMetadata:
             {"t": 12.5, "ev": "start", "seconds": 60.0},
             {"t": 30.1, "ev": "stop", "seconds": 60.0},
         ]
+
+
+class TestReappearTrigger:
+    def test_cue_reappearance_announces_ball_in_hand(self):
+        n = Narrator()
+        assert n.note_cue_reappeared(10.0) == "ball_in_hand"
+
+    def test_no_double_announce_with_carried_path(self):
+        n = Narrator()
+        assert n.update(True, False, False, 10.0) == "ball_in_hand"
+        assert n.note_cue_reappeared(10.5) is None   # same episode
+
+    def test_rerack_subsumes_the_pickup(self):
+        n = Narrator()
+        assert n.update(True, True, False, 10.0) == "table_change"
+        assert n.note_cue_reappeared(11.0) is None
+
+    def test_reappear_respects_cooldown(self):
+        n = Narrator()
+        assert n.note_cue_reappeared(10.0) == "ball_in_hand"
+        for k in range(40):
+            n.update(False, False, False, 11.0 + k * 0.1)
+        assert n.note_cue_reappeared(15.5) is None   # < 8s cooldown

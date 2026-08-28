@@ -50,3 +50,21 @@ class Narrator:
             return None
         self._last_said[kind] = t
         return kind
+
+    def note_cue_reappeared(self, t: float) -> str | None:
+        """Second ball-in-hand trigger (Joe: "missed some of the ball in
+        hands"): the cue ball vanishing >1s then reappearing at rest is a
+        pickup even when the hand never registered over the felt (a quick
+        clean grab). Same episode/cooldown machinery as the carried path,
+        so the two triggers never double-announce."""
+        if self._episode and self._episode_kind == "table_change":
+            return None                  # a rerack subsumes the pickup
+        self._last_carried_t = t
+        if self._episode and self._episode_kind == "ball_in_hand":
+            return None
+        self._episode = True
+        self._episode_kind = "ball_in_hand"
+        if t - self._last_said.get("ball_in_hand", -1e9) < COOLDOWN_S:
+            return None
+        self._last_said["ball_in_hand"] = t
+        return "ball_in_hand"

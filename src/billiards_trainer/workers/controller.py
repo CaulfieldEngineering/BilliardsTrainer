@@ -1655,6 +1655,12 @@ class PipelineController(QObject):
             # cue reappeared (scratch -> ball-in-hand, or long occlusion): the
             # next time it rests is a fresh turn even if it was placed gently
             self._clock_armed = True
+            # second narration trigger (Joe: missed ball-in-hands) - only
+            # for REAL absences, not startup (-1e9 sentinel)
+            if self._saw_cue_t > -1e8 and t - self._saw_cue_t < 60.0:
+                kind = self._narrator.note_cue_reappeared(t)
+                if kind:
+                    self.narration.emit(kind)
         self._saw_cue_t = t
         stop_v = max(0.4, float(self._settings.balls.stop_speed))
         if cue.speed > max(self._CUE_MOVE_SPEED, 2.0 * stop_v):

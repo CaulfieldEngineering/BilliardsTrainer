@@ -138,7 +138,9 @@ class MainWindow(QMainWindow):
         self._maybe_check_updates()
         # pre-render spoken cues so the first live utterance is instant
         from .voice import prewarm
-        prewarm(["Ten", "Scratch", "Ball in hand", "Table change", "Foul"])
+        prewarm(["Ten", "Scratch", "Ball in hand", "Table change", "Foul",
+                 "Make", "Miss"] +
+                [f"{n} ball" for n in self._BALL_NAMES.values()])
 
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
@@ -427,6 +429,11 @@ class MainWindow(QMainWindow):
             say(phrase, volume=int(getattr(self._settings.shot_clock,
                                            "vol_voice", 100)))
 
+    _BALL_NAMES = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five",
+                   6: "Six", 7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten",
+                   11: "Eleven", 12: "Twelve", 13: "Thirteen",
+                   14: "Fourteen", 15: "Fifteen"}
+
     def _on_shot_sound(self, event) -> None:
         """Joe: a sound when I scratch - live validation of the analysis
         while playing. Fires when the shot FINALIZES (balls settled), the
@@ -434,13 +441,29 @@ class MainWindow(QMainWindow):
         try:
             scratched = bool(getattr(event, "cue_scratch", False)) or                 getattr(getattr(event, "outcome", None), "value", "") == "scratch"
             from .voice import say
+            vol = int(getattr(self._settings.shot_clock, "vol_voice", 100))
             if scratched:
                 # spoken now (Joe: distinguish scratch vs foul by voice)
                 say("Scratch", volume=int(getattr(
                     self._settings.shot_clock, "vol_scratch", 90)))
             elif getattr(event, "foul", None) == "no_contact":
-                say("Foul", volume=int(getattr(
-                    self._settings.shot_clock, "vol_voice", 100)))
+                say("Foul", volume=vol)
+            else:
+                # makes announced by BALL NAME (Joe: "when I make a ball it
+                # says which ball"); misses say Miss - live verification
+                outcome = getattr(getattr(event, "outcome", None), "value", "")
+                if outcome == "make":
+                    nums = [getattr(pb, "number", -1)
+                            for pb in (getattr(event, "pocketed", None) or [])
+                            if getattr(getattr(pb, "cls", None), "name", "")
+                            != "CUE"]
+                    named = [n for n in nums if n in self._BALL_NAMES]
+                    if named:
+                        say(f"{self._BALL_NAMES[named[0]]} ball", volume=vol)
+                    else:
+                        say("Make", volume=vol)
+                elif outcome == "miss":
+                    say("Miss", volume=vol)
         except Exception:  # noqa: BLE001 - a call is never worth a crash
             log.debug("shot narration failed", exc_info=True)
 

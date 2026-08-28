@@ -437,6 +437,7 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
             "outcome": s.get("outcome", "miss"),
             "action": s.get("action", "stroke"),
             "pocketed": int(s.get("pocketed", 0)),
+            "pocketed_balls": s.get("pocketed_balls") or [],
         }
         if s.get("corrected") or s.get("action_corrected"):
             entry["corrected"] = True

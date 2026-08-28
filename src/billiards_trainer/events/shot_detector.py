@@ -46,6 +46,8 @@ class PocketedBall:
     cls: BallClass
     pocket: str
     t: float
+    number: int = -1    # last confident number the track wore (voice calls,
+                        # iOS tray overlay, pocket arbitration)
 
 
 def foul_for(cue_scratch: bool, outcome: "ShotOutcome",
@@ -117,6 +119,7 @@ class ShotDetector:
         self._min_pdist: dict[int, tuple] = {}      # id -> (closest dist, pocket name)
         self._shot_ids: set = set()                 # ids seen during this shot
         self._shot_cls: dict[int, BallClass] = {}   # id -> last class seen
+        self._shot_num: dict[int, int] = {}         # id -> last number seen
         self._prev: dict[int, _Seen] = {}
         self._prev_seen_at: dict[int, int] = {}
         self._pocketed: list[PocketedBall] = []
@@ -354,6 +357,7 @@ class ShotDetector:
         # flight is all blur) is never accumulated and can't be credited.
         self._shot_ids = set(self._pending_free)
         self._shot_cls = {}
+        self._shot_num = {}
         self._quiet_run = 0
         self._shot_frames = 0
         self._arm_frames = 0
@@ -382,6 +386,8 @@ class ShotDetector:
         for tr in by_id.values():
             self._shot_ids.add(tr.id)
             self._shot_cls[tr.id] = tr.cls
+            if getattr(tr, "number", -1) >= 0:
+                self._shot_num[tr.id] = tr.number
             pk, d = table.nearest_pocket(tr.x, tr.y)
             best, _ = self._min_pdist.get(tr.id, (1e9, ""))
             if d < best:
@@ -406,7 +412,8 @@ class ShotDetector:
             dist, name = self._min_pdist.get(tid, (1e9, ""))
             if dist < gate and name:
                 cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
-                self._pocketed.append(PocketedBall(tid, cls, name, t))
+                self._pocketed.append(PocketedBall(
+                    tid, cls, name, t, number=self._shot_num.get(tid, -1)))
                 log.debug("Ball %d dropped into %s (closest %.0fpx)", tid, name, dist)
                 continue
             # UNSEEN POT (Joe's 9-ball audit: scratches recorded as misses):
@@ -422,7 +429,9 @@ class ShotDetector:
                 if prev is not None:
                     pk, pdist = table.nearest_pocket(prev.x, prev.y)
                     cls = self._shot_cls.get(tid, BallClass.UNKNOWN)
-                    self._pocketed.append(PocketedBall(tid, cls, pk.name, t))
+                    self._pocketed.append(PocketedBall(
+                        tid, cls, pk.name, t,
+                        number=self._shot_num.get(tid, -1)))
                     log.debug("Ball %d vanished free mid-shot — credited to "
                               "%s (last seen %.0fpx away)", tid, pk.name, pdist)
 

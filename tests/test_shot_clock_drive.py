@@ -34,6 +34,9 @@ def _drive():
     d._strike_stop_t = -1e9
     d._break_pending = False
     d._log_clock = lambda ev, t: None    # sidecar recording: not under test
+    from billiards_trainer.game.narration import Narrator
+    d._narrator = Narrator()
+    d.narration = SimpleNamespace(emit=lambda kind: None)
     # the drive's tuning constants live on the controller class
     for k in ("_CUE_MOVE_SPEED", "_CUE_STOP_FRAMES", "_CUE_GAP_S"):
         setattr(d, k, getattr(PipelineController, k))
