@@ -47,6 +47,14 @@ its gate holds AND a vision watch agrees.
   R2 SHOT EVENTS - every stroke found and windowed AT the strike; no
      stroke invented during hand setup. Gate: 10/10 found, 0 fake.
      NOW: 9/10 found, 4 fake.
+  R3 NOTE (round 9, FAILED + reverted 2026-08-28): a session-inventory
+     prior (reject numbers read far less often than the rest) made every
+     line WORSE - it cannot separate a phantom from a real ball the
+     detector rarely sees (the orange 5 has ~47 tracked states all
+     session). The invented "11" is a RECOGNITION failure, not a
+     counting one: it belongs to the c8 retrain, not a filter. Next R3
+     attack: measure WHERE naming is lost (never-read vs misread vs
+     outvoted) per ball, then mine crops for those exact cases.
   R3 OBJECT BALLS - every moving ball tracked AND correctly numbered;
      no invented numbers. Gate: >=95% of moving time named, zero
      invented. NOW: 74.5% named, "11" invented in 318 frames.

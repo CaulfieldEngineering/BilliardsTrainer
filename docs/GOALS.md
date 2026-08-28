@@ -1951,3 +1951,15 @@ Rounds continue with Joe's visual feedback as the gate.
   before/after images). NEXT: episode layer over-fires and mints false
   pots from naming churn; then Joe's pocket-DEAD-ZONE design to
   replace the ad-hoc credit heuristics.
+
+- 2026-08-28 late — ROUND 9 NEGATIVE RESULT, published as such. Tried a
+  session ball-inventory prior to kill the invented "11": scorecard got
+  WORSE on every line (naming 74.5->68.7%, calls 8/10->7/10, phantom 11
+  318->598 frames) because the rule cannot distinguish a phantom from a
+  rarely-detected REAL ball (the orange 5 has ~47 tracked states all
+  session). Reverted, bench re-measured, baseline restored exactly
+  (9/10 shots, 8/10 calls, 74.5% naming). Lesson recorded in BACKLOG
+  R3: the phantom number is a RECOGNITION failure for the retrain, not
+  a counting problem for a filter. Also this session: retired the stale
+  M1-PUSH cron and replaced it with the campaign grind loop (cf93d5e1,
+  :07/:37) carrying the ladder gates and vision rule.
