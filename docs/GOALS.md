@@ -1763,3 +1763,25 @@ Rounds continue with Joe's visual feedback as the gate.
   AWB -> fixed to Joe; unmanned sampling impossible (server is read-only
   by design) — a record endpoint is now a queued build. Awaiting his
   true-1/500 hard-shot clip; smear monitor armed.
+
+- 2026-08-27 eve — MOUSE VERDICT + ONE MEASUREMENT AUTHORITY. Joe live
+  at the table all evening. (1) Mouse thief convicted with data: marathon
+  at 57% GPU + app at 30% starved the compositor; killed the run, taught
+  the engine to PAUSE while Joe is present (was only deferring starts).
+  Then with the marathon paused the app ALONE measured 80% — detect
+  worker ran inferences back-to-back at rest. Idle throttle: settled +
+  quiet ~1.5s -> ~3Hz inference, any motion -> full rate next frame.
+  App now averages ~21%. RF-dongle theory demoted to residual (memory
+  updated). (2) Joe caught the tray/schematic/announcer disagreeing —
+  three private opinions of "on the table". Now measure/presence.py
+  TablePresence is THE authority (controller-owned, fed by the same
+  tracks the schematic draws, stamped on every packet, tray renders it
+  verbatim, detection truth w/ 0.6s grace), and pot credits must survive
+  the live tracks: number-still-tracked and re-acquired-in-place vetoes
+  in _finalize_pockets. (3) Joe's call standard: "N ball in X pocket",
+  54 combos prewarmed; "Time Foul" spoken on clock expiry; 8-ball chip
+  ring. Marathon 4 relaunched, self-pausing until he sleeps; full gate +
+  arbitrated re-merge auto-run on landing. NEXT: 3/5 identifier
+  confusion (Joe repro'd) — mine dense sidecars for 3<->5 vote flips,
+  harvest crops, retrain c8; false-pos/neg make-miss audit AFTER dense
+  rollout per Joe ("detection and measurement first").
