@@ -1869,3 +1869,16 @@ Rounds continue with Joe's visual feedback as the gate.
   make named honestly as un-re-judged recording-era outcome — outcome
   re-derivation from dense is now top of BACKLOG Tier 2 (after shot
   ids + one timebase; needs pocket localization for jaw calls).
+
+- 2026-08-28 morning — BOX STAGES 1-2 BUILT + VALIDATED (no detour,
+  Joe): measure/shots.py — episodes + settle-time outcomes, pure over
+  dense streams, feed-agnostic. Joe's 3-ball shot (marathon @78.6s):
+  box says MISS (ball lost mid-table, no pocket credit) vs the
+  recording-era 'make' — test case #1 passes. Real data taught two
+  rules in an hour (settle-boundary vanish ≠ presence; pocket credit
+  requires a pocket-mouth death). Known gap: carried balls can fake a
+  pocket death (Joe's pickup @94.5s) — hand-context in engine output
+  is the next stage input. 8 tests. NEXT: engine emits carried +
+  table/pockets in meta; box vs review-verdicts across all 13 dense
+  sessions; then full shots.json regeneration + merge-machinery
+  deletion.
