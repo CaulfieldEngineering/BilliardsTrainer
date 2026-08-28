@@ -1089,6 +1089,7 @@ class Pipeline:
         else:
             motion = 0.0
         self._prev_gray = roi
+        self.last_motion = motion   # controller's idle throttle reads this
         st["motion"] = (time.perf_counter() - t0) * 1000.0
 
         # extra modalities for evidence fusion: background-subtraction foreground

@@ -1261,6 +1261,25 @@ class PipelineController(QObject):
                 or not self._pipeline.calib.is_calibrated):
             self._diag_blocked = getattr(self, "_diag_blocked", 0) + 1
             return  # calibration/preview paths handle themselves synchronously
+        # IDLE THROTTLE (Joe: mouse stolen daily — this app ALONE held 80%
+        # of the iGPU the desktop compositor shares). The worker runs
+        # inferences back-to-back, so GPU duty is ~100% even with every
+        # ball at rest. A settled table doesn't need re-finding 30x/s:
+        # after ~1.5s of quiet, inferences run at ~3Hz; ANY motion (a
+        # hand entering, a ball rolling — the same frame-diff the shot
+        # detector trusts) restores full rate before a strike is a frame
+        # old. Play is measured at full rate; stillness is not.
+        quiet = (self._prev_state == "settled"
+                 and getattr(self._pipeline, "last_motion", 99.0)
+                 < float(self._settings.detection.motion_quiet))
+        self._quiet_frames = (getattr(self, "_quiet_frames", 0) + 1
+                              if quiet else 0)
+        if self._quiet_frames > 45:
+            now = time.perf_counter()
+            if now - getattr(self, "_last_quiet_submit", 0.0) < 0.33:
+                self._diag_idleskip = getattr(self, "_diag_idleskip", 0) + 1
+                return
+            self._last_quiet_submit = now
         self._diag_submit = getattr(self, "_diag_submit", 0) + 1
         if self._det_thread is None or not self._det_thread.is_alive():
             # SELF-HEAL: a dead worker starved the schematic of balls for an
@@ -1467,10 +1486,12 @@ class PipelineController(QObject):
             # investigation. (submit=frames offered, blocked=gate refusals,
             # raw=last detection count, ingest=results applied, pub=tracks)
             log.info("health: display %.1f fps, pipeline %.0f ms | vision "
-                     "submit=%d blocked=%d worker=%s raw=%d ingest=%d pub=%d",
+                     "submit=%d blocked=%d idleskip=%d worker=%s raw=%d "
+                     "ingest=%d pub=%d",
                      self._fps, getattr(self._pipeline, "_last_ms", 0.0),
                      getattr(self, "_diag_submit", 0),
                      getattr(self, "_diag_blocked", 0),
+                     getattr(self, "_diag_idleskip", 0),
                      "alive" if (self._det_thread is not None
                                  and self._det_thread.is_alive()) else "DEAD",
                      getattr(self, "_diag_raw", -1),
