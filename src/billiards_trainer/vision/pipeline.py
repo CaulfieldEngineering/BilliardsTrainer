@@ -94,6 +94,11 @@ class Pipeline:
         self.calib = CalibrationManager()
         self._strategy = self._load_strategy()  # the single raw-frame detector
         self.tracker = BallTracker()
+        # THE Measurement Core seam (docs/ARCHITECTURE.md L1): presence +
+        # the hardened shadow tracker + divergence counters. Consumers
+        # read core.present / core.tracks — nobody keeps a private copy.
+        from ..measure.core import MeasurementCore
+        self.core = MeasurementCore()
         self.shots = ShotDetector(settings.detection, settings.balls)
         self._frame_idx = 0
         self._deviation_every = 30  # frames between watchdog checks
@@ -692,6 +697,17 @@ class Pipeline:
         self._last_detections = detections
         self._last_raw_dets = list(raw_dets)
         self._frames_since_ingest = 0
+        # Feed the Measurement Core: the SAME prepared detections drive the
+        # hardened shadow tracker, and the champion's emitted tracks drive
+        # presence + divergence scoring. Async ingests land between frames,
+        # so t is the last process() stamp (<=33ms stale — fine for
+        # divergence counting; promoted output plumbs capture stamps, see
+        # MEASUREMENT_CORE.md 0.1).
+        t_now = getattr(self, "_last_t", -1.0)
+        self.core.ingest([(d.x, d.y, d.radius,
+                           int(getattr(d, "number", -1)))
+                          for d in detections], t_now)
+        self.core.observe_tracks(tracks, t_now)
         return tracks, detections
 
     def ingest_raw_detections(self, raw_dets, frame_shape) -> None:
@@ -976,6 +992,7 @@ class Pipeline:
         t_start = time.perf_counter()
         st: dict[str, float] = {}  # per-stage ms — perf HUD + tools/bench_pipeline.py
         self._frame_idx += 1
+        self._last_t = t   # async ingest lands between frames; it borrows this
         res = PipelineResult(frame_bgr=frame)
 
         if not self.detect_enabled:

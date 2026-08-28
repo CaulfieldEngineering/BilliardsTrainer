@@ -105,11 +105,6 @@ class PipelineController(QObject):
         self._source = None
         self._timer: QTimer | None = None
         self._clock = ShotClock(settings.shot_clock)
-        # THE presence authority (Joe: tray/schematic/announcements "should
-        # all be referencing the same measurement core") — fed from the same
-        # tracks the schematic draws, rendered verbatim by the tray
-        from ..measure.presence import TablePresence
-        self._presence = TablePresence()
         self._t0 = 0.0
         self._fps = 0.0
         self._src_fps = 30.0
@@ -1485,9 +1480,13 @@ class PipelineController(QObject):
             # was fine — this line makes "which link is dead" a read, not an
             # investigation. (submit=frames offered, blocked=gate refusals,
             # raw=last detection count, ingest=results applied, pub=tracks)
+            # champion-vs-shadow divergence: the promotion evidence stream
+            # (MEASUREMENT_CORE.md 0.1) — read-and-reset each health beat
+            div = (self._pipeline.core.divergence_summary(reset=True)
+                   if self._pipeline else {})
             log.info("health: display %.1f fps, pipeline %.0f ms | vision "
                      "submit=%d blocked=%d idleskip=%d worker=%s raw=%d "
-                     "ingest=%d pub=%d",
+                     "ingest=%d pub=%d | shadow div %s",
                      self._fps, getattr(self._pipeline, "_last_ms", 0.0),
                      getattr(self, "_diag_submit", 0),
                      getattr(self, "_diag_blocked", 0),
@@ -1496,11 +1495,11 @@ class PipelineController(QObject):
                                  and self._det_thread.is_alive()) else "DEAD",
                      getattr(self, "_diag_raw", -1),
                      getattr(self, "_diag_ingest", 0),
-                     getattr(self, "_diag_pub", -1))
+                     getattr(self, "_diag_pub", -1), div)
 
-        present = self._presence.update(
-            {getattr(tr, "number", -1) for tr in (res.tracks or [])
-             if getattr(tr, "active", True)}, t)
+        # presence comes from THE Measurement Core (docs/ARCHITECTURE.md
+        # L1) — the pipeline feeds it; the packet only carries the read
+        present = self._pipeline.core.present if self._pipeline else {}
         self.frame_ready.emit(FramePacket(
             feed_sd=self._feed_sd, feed_info=self._feed_info, present=present,
             perspective=res.frame_bgr, birdseye=res.rect_bgr, status=res.status,

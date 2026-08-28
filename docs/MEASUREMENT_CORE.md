@@ -32,6 +32,39 @@ Joe's reliability ladder - expected solid in Python BEFORE the rewrite:
 Milestones M1-M4 below serve the ladder; the C++ rewrite starts only
 when the ladder holds in Python.
 
+### 0.1 The consumer seam (Joe, 2026-08-27 evening)
+
+> "We just need the one Measurement Core engine handling all of the
+> data. Any animations, analysis or interpretations should simply be
+> pulling data from this Measurement Core engine."
+
+`measure/core.py` **MeasurementCore** is that seam, live in the app
+from tonight. One instance per pipeline; consumers (schematic, ball
+tray, voice announcements, shot analysis, exports) READ from it and
+hold no private opinion of the table. It was born from a caught
+disagreement: the tray, the schematic, and the make-announcer each
+kept their own derived state and visibly contradicted each other on
+2026-08-27.
+
+What it owns now: presence (detection truth, folded in from the
+short-lived standalone TablePresence), the authoritative track view,
+and a **shadow instance of the hardened M1 MotionTracker** fed the
+same prepared live detections the champion tracker consumes, with
+champion-vs-shadow divergence counters (pos_mismatch /
+shadow_missing / shadow_extra) surfaced in the health log. This
+in-process shadow is a cheap PRECURSOR to M3 — it accumulates
+promotion evidence during ordinary play — it does NOT replace M3's
+full exit criteria (shadow sidecar, latency bars, stall test).
+
+Known prerequisite before promotion: the async ingest path
+(`_on_detections_ready` → `ingest_raw_detections`) carries no capture
+timestamp today; the shadow runs on the pipeline's last-process t
+(≤33 ms stale — fine for divergence counting, not for promoted
+output). Plumbing capture stamps through that path is an M3 task.
+
+The API of MeasurementCore is the working draft of the C++ engine's
+consumer contract.
+
 ## 1. WHY
 
 The owner's directive is explicit: "rock solid measurements and tracking before we even think about interpreting misses vs makes." The headroom is already measured: GPU inference runs 94 fps on DirectML vs 20.7 fps CPU, yet live throughput only moved 4.1 → 14.6 results/s when the provider flipped — the remaining 6x gap lives entirely in our own plumbing (the 33 ms Qt tick, the 1-slot drop queue, the serial ensemble, the queued-signal ingest), not in the model. Measuring ball positions on **every** frame at 30 fps during play eliminates the 1.5–2 s takeoff blur blindness, gives real per-frame velocities instead of interpolated fiction between 10 Hz samples, holds identity through flight instead of patching it back afterwards, and makes the sidecar a true record of the table rather than a 100 ms-quantized sketch.

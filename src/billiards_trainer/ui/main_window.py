@@ -508,6 +508,7 @@ class MainWindow(QMainWindow):
             # Delayed past the buzz — winsound is one channel, an instant
             # say() would cut the buzzer off mid-ring.
             from PySide6.QtCore import QTimer
+
             from .voice import say
             QTimer.singleShot(1100, lambda: say(
                 "Time Foul", volume=int(getattr(self._settings.shot_clock,
