@@ -30,7 +30,10 @@ IMG_DIR = PUB / "journal"
 
 
 def add(title: str, body: str, score: str = "", images=(),
-        deploy: bool = False) -> dict:
+        deploy: bool = False, kind: str = "finding") -> dict:
+    """kind: "finding" (engine-campaign round) or "update" (a change Joe
+    can see in the app). The Dev Journal is the ONE channel - What's New
+    was merged into it 2026-08-28."""
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     doc = {"entries": []}
     if JSON_PATH.is_file():
@@ -50,13 +53,15 @@ def add(title: str, body: str, score: str = "", images=(),
         shutil.copy2(src, IMG_DIR / name)
         imgs.append({"src": f"journal/{name}", "caption": caption})
     entry = {"id": nid,
+             "ts": stamp.strftime("%Y-%m-%dT%H:%M:%S"),
              "date": stamp.strftime("%b %d, %H:%M UTC"),
+             "kind": kind,
              "title": title,
              "score": score,
              "body": body,
              "images": imgs}
     entries.insert(0, entry)
-    doc["entries"] = entries[:60]          # keep the file phone-sized
+    doc["entries"] = entries[:80]          # keep the file phone-sized
     JSON_PATH.write_text(json.dumps(doc, indent=1), encoding="utf-8")
     if deploy:
         subprocess.run([sys.executable, "deploy.py"],
@@ -71,9 +76,11 @@ def main() -> None:
     ap.add_argument("--score", default="")
     ap.add_argument("--image", nargs=2, action="append", default=[],
                     metavar=("PATH", "CAPTION"))
+    ap.add_argument("--kind", default="finding",
+                    choices=("finding", "update"))
     ap.add_argument("--deploy", action="store_true")
     a = ap.parse_args()
-    e = add(a.title, a.body, a.score, a.image, a.deploy)
+    e = add(a.title, a.body, a.score, a.image, a.deploy, a.kind)
     print(f"journal entry #{e['id']} added ({len(e['images'])} images)")
 
 

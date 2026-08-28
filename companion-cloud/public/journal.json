@@ -1,7 +1,7 @@
 {
  "entries": [
   {
-   "id": 3,
+   "id": 47,
    "date": "Aug 28, 16:53 UTC",
    "title": "Proof you asked for: nine fake balls, and the bug behind them",
    "score": "phantoms 14 tracks -> 7",
@@ -15,10 +15,12 @@
      "src": "journal/003-dbg_session-20260824-220247_170_50.png",
      "caption": "AFTER: the phantom chain is gone and the cue ball is correctly identified at its real position."
     }
-   ]
+   ],
+   "ts": "2026-08-28T16:53:00",
+   "kind": "finding"
   },
   {
-   "id": 2,
+   "id": 46,
    "date": "Aug 28, 16:22 UTC",
    "title": "The ghost ball living in your corner pocket",
    "score": "fake shots: gone",
@@ -28,14 +30,458 @@
      "src": "journal/002-r6_pocket.png",
      "caption": "Your orange 5 sits on the felt at 170.5s and is gone by 171.5s - a real pot. The dark shape at the corner is the pocket leather the app had been calling a ball for the entire session."
     }
-   ]
+   ],
+   "ts": "2026-08-28T16:22:00",
+   "kind": "finding"
   },
   {
-   "id": 1,
+   "id": 45,
    "date": "Aug 28, 16:22 UTC",
    "title": "Why the app was missing half your shots",
    "score": "bench: 5 of 10 shots recorded",
    "body": "You asked me to watch your 4-minute practice clip and compare it to what the app saw. I did, frame by frame.\nThe clip contains 10 real strokes. The app had recorded 5 of them, invented 2 shots that never happened (they were you setting balls up by hand), and completely missed 5 - including two clean pots.\nIt also scored a ball you CAUGHT IN YOUR HAND as a make, because the ball's track vanished and the old logic treated 'vanished' as 'pocketed'.\nThe most important part: the app's own quality score for this session was a perfect 0.00. Its numbers only check things it knows to check. That's why we now compare every change against what I can actually see in the video.",
+   "images": [],
+   "ts": "2026-08-28T16:22:00",
+   "kind": "finding"
+  },
+  {
+   "id": 44,
+   "ts": "2026-08-28T12:00:00",
+   "date": "Aug 28, 2026",
+   "kind": "update",
+   "title": "You were right - the replays WERE mostly old trails. Fixed this morning.",
+   "score": "",
+   "body": "The overnight merge was built cautious: on any doubt it kept the old sparse trail, and that caution kept exactly the trails you watch - your first clip's cue ball, your second clip's 3-ball (10 points with a near-second hole). The engine's own gate scores have now earned a bolder rule: on gate-passing sessions dense wins by default, and the old trail survives only when the video itself sides with it. Re-merged everywhere: the marathon went from 58 to 124 of 125 covered shots dense; about 316 shots across the library. Re-watch the same two clips.\nVerified before changing anything: the dense data was in the files, Dropbox cloud matched to the second, and the player was innocent - the timid merge rule was the whole story.\nThe 3-ball wrongly counted as a make is a SEPARATE, real issue: re-measurement upgraded trails but has not yet re-judged outcomes. Make/miss verdicts are still the recording-night detector's. Re-deriving outcomes from the dense measurements is queued next - trails first, judgments second, no shortcuts.",
+   "images": []
+  },
+  {
+   "id": 43,
+   "ts": "2026-08-28T12:00:00",
+   "date": "Aug 28, 2026",
+   "kind": "update",
+   "title": "Library re-measurement complete: 13 of 17 sessions now dense",
+   "score": "",
+   "body": "The overnight rollout finished. Thirteen sessions - including the marathon - now carry frame-by-frame dense trails, every one passing the physics gate with room to spare (worst score 0.23 impossible-states per thousand against the old tracker's 0.55). 137 shots' trails upgraded across the library on top of the marathon's. Each merged session's 'proc' stamp shows today.\nThree August 23 sessions were REFUSED by the gate (scores 0.69-3.12) and keep their honest sparse trails - that was camera-surgery day, and the EOS focus rectangles burned into the feed are the suspected cause. They're queued for investigation, not forced through.\nOne 2-minute camera-adjustment clip couldn't calibrate at all and was skipped.\nA quality gate that refuses its own new engine's output when the numbers aren't there is the whole point - what merged, earned it.",
+   "images": []
+  },
+  {
+   "id": 42,
+   "ts": "2026-08-28T12:00:00",
+   "date": "Aug 28, 2026",
+   "kind": "update",
+   "title": "The engine passed its full-session exam - the whole library is re-measuring overnight",
+   "score": "",
+   "body": "The measurement engine re-processed your entire 110-minute marathon session and scored 0.21 physically-impossible states per thousand measurements - beating the current production tracker's 0.55 on the same footage, with identity flicker at zero across all 198,950 frames. 58 more shots' trails upgraded after arbitration. On that result the remaining 16 sessions started re-processing overnight; each session's 'proc' stamp updates as it lands.\nAlso tonight: sessions recorded before August 19 were deleted at Joe's direction (29 videos, 34.5 GB freed). The library and lifetime stats now start at August 19; Dropbox can recover the files for 30 days.\nEvery trail upgrade still has to prove agreement with the old path or match the video itself - disagreements keep the honest original.",
+   "images": []
+  },
+  {
+   "id": 41,
+   "ts": "2026-08-27T12:00:00",
+   "date": "Aug 27, 2026",
+   "kind": "update",
+   "title": "Make calls name the pocket, a Time Foul voice, and a truth-telling ball tray",
+   "score": "",
+   "body": "Makes are now announced the way you'd call them: 'Five ball in the top left pocket.' If the shot clock runs out unshot, the buzzer is followed by a spoken 'Time Foul.' And the ball tray now shows exactly what the system detects on the table, updating within a fraction of a second - no more comfort smoothing, so if the tray flickers, that's the detector telling on itself. The tray, the schematic, and the announcer now all read the same measurement source, and a make can no longer be announced while the ball is visibly still sitting on the table.\nThe 8-ball chip wears a bright ring when present so black never looks like the greyed-out 'potted' state.\nKnown honest gap: the 3 and 5 ball still get confused under warm light - that's the identifier model, and its retraining data is being mined from the new dense measurements.",
+   "images": []
+  },
+  {
+   "id": 40,
+   "ts": "2026-08-27T12:00:00",
+   "date": "Aug 27, 2026",
+   "kind": "update",
+   "title": "Your marathon session: trails re-measured every frame",
+   "score": "",
+   "body": "The new measurement engine re-processed your full 90-minute session frame by frame - ball positions every 33 milliseconds instead of every 150, with no takeoff blind spot (the cue ball's trail now responds within a frame of the strike instead of 2 seconds late). 78 shots' trails were upgraded; each upgraded trail had to match the old one's path and endpoints to prove itself, and the session's 'proc' stamp shows the update. This is the first session through the engine - the rest of the library follows as it clears its gates.\nTrails held back on 47 shots where the dense measurement couldn't prove agreement - honest sparse stays until the engine earns full trust via the corpus gates.\nLook for detail the old sampling couldn't see: quick bounce-backs, curve of masse/spin shots, true takeoff direction.",
+   "images": []
+  },
+  {
+   "id": 39,
+   "ts": "2026-08-27T12:00:00",
+   "date": "Aug 27, 2026",
+   "kind": "update",
+   "title": "Shot clock: per-beep volume and a table status readout",
+   "score": "",
+   "body": "Each shot clock sound - the start chime, the warning, the 3-2-1 ticks, and the buzzer - now has its own volume slider in the clock panel (zero mutes just that one). Release a slider and it plays that sound once at the new level, so you can tune by ear. Above the timer there's now a live status: ON THE CLOCK, SHOT IN PLAY, TABLE SETTLED, PAUSED.\nAlso under the hood tonight: ball detection moved to the GPU (roughly 3.5x more measurements per second) - the tracking improvement you noticed at the table.",
+   "images": []
+  },
+  {
+   "id": 38,
+   "ts": "2026-08-27T12:00:00",
+   "date": "Aug 27, 2026",
+   "kind": "update",
+   "title": "Shot clock controls, break time, and tidier panels",
+   "score": "",
+   "body": "The shot clock panel on the desktop now has its own on/off button, a Pause/Resume button, and dials for per-shot seconds and time after the break - the app spots a break automatically (five or more balls scattering) and gives the next shot the longer countdown. The Stats and Shot Timeline panels now collapse like the others, so you can fold away what you're not using.\nPause freezes the countdown and its sounds; Resume continues from the same number.\nThe clock panel stays visible even when the clock is off, since that's where the on/off lives now.",
+   "images": []
+  },
+  {
+   "id": 37,
+   "ts": "2026-08-27T12:00:00",
+   "date": "Aug 27, 2026",
+   "kind": "update",
+   "title": "Shot clock is live, plus a menu bar and a squishable window",
+   "score": "",
+   "body": "The shot clock now runs off the cue ball itself: the countdown starts the moment your cue ball stops rolling and stops the instant you strike it. Sounds mark every phase - a rising cue when the clock starts (including after every shot), a warning beep, 3-2-1 ticks, and the buzzer. It works with or without recording, and you can flip it on and off from the new Play menu. The desktop window also squishes down to about a third of the screen now, and a File menu keeps everything reachable when it's narrow.\nClock settings (seconds, warning time, sounds) are in Settings > Shot clock; the Play menu is just the on/off.\nThe countdown starts about a fifth of a second after the cue ball truly rests - that debounce is what stops table jitter from false-starting the clock.\nNext precision step when it matters: using the strike SOUND to stop the clock frame-exactly.",
+   "images": []
+  },
+  {
+   "id": 36,
+   "ts": "2026-08-26T12:00:00",
+   "date": "Aug 26, 2026",
+   "kind": "update",
+   "title": "Stay-down timer on the desktop scoreboard",
+   "score": "",
+   "body": "The timer you asked for: a STAY-DOWN row on the live scoreboard. It starts counting the moment you take the shot (shown with a ~ while it's a live estimate), then locks to the camera-measured number seconds later - green when you stayed down, red POP when you popped up early. If the camera couldn't measure that shot, it shows a dash instead of guessing.\nCounts only while recording, same as the rest of the scoreboard.\nThe live count is an estimate; the locked number is the same measured stay-down you see in shot details.",
+   "images": []
+  },
+  {
+   "id": 35,
+   "ts": "2026-08-26T12:00:00",
+   "date": "Aug 26, 2026",
+   "kind": "update",
+   "title": "Clips load and play much lighter",
+   "score": "",
+   "body": "Every session now gets a lightweight playback copy made right after it ends - about a fifth the data of the original. Your phone picks it automatically, so clips start faster, scrub smoother, and use far less cellular data. Same video, same overlays, same everything - just easier for the phone to play. This is also the leading fix for the tail stutter: the originals were heavy enough to strain the phone's video decoder.\nThe lightweight copies match the originals frame-for-frame, so trails, aim lines and shot times line up exactly.\nOlder sessions are being converted in the background; each one switches over as soon as its copy is ready.\nRecording always comes first: any conversion stops instantly the moment a session starts.",
+   "images": []
+  },
+  {
+   "id": 34,
+   "ts": "2026-08-26T12:00:00",
+   "date": "Aug 26, 2026",
+   "kind": "update",
+   "title": "Full-length ball trails, no more circle",
+   "score": "",
+   "body": "The tails now cover the entire shot - strike to rest - for the cue AND object balls, across the whole library. Two data bugs were cutting them short: the sampling window opened after the ball had already covered most of its travel, and the tracker's number-dropping during fast flight filtered out the flight itself. Both fixed; the circle covering the ball is gone too.\nProof case: a marathon-session shot whose tail was the last foot now draws the full 582-pixel strike-to-rest path.\nUnnumbered fast-flight stretches inherit the ball's identity only when the track's numbered segments on both sides agree - the old protection against mid-flight identity mixups stays intact.\nFor the remaining lag/stutter: triple-tap the top bar in the player for a live diagnostics readout, and send a screenshot of it during a stutter - it will show whether the phone is dropping video frames on these high-bitrate files.",
+   "images": []
+  },
+  {
+   "id": 33,
+   "ts": "2026-08-26T12:00:00",
+   "date": "Aug 26, 2026",
+   "kind": "update",
+   "title": "Miss analysis caught up on every session",
+   "score": "",
+   "body": "A gap in the pipeline meant new sessions weren't getting the deep second-pass that resolves tricky misses - your marathon session had 51 misses and only 1 categorized. That pass now runs automatically at every session close, and the whole library was swept: 180 verdicts recovered, trusted tags 150 -> 227, uncategorized 203 -> 126. Your Lifetime Stats patterns just got a lot more data behind them.\nFound via the abstention notes shipped last week: 48 marathon misses stated their reasons, and the reasons pointed at the missing pipeline stage rather than bad tracking.\nThe remaining 126 uncategorized are genuine hard cases (each states why) - your grading playlists can settle any of them with two taps.\nThe drift tests now require this stage in the close pass, so it can never silently fall out again.",
+   "images": []
+  },
+  {
+   "id": 32,
+   "ts": "2026-08-26T12:00:00",
+   "date": "Aug 26, 2026",
+   "kind": "update",
+   "title": "The 9-ball mixup is fixed \u2014 100% on gameplay footage",
+   "score": "",
+   "body": "The washed-out-9 problem's last remnant is gone. A correction layer tuned for the OLD camera settings was flipping the 9 into the 1 (nine times out of fifteen on real gameplay frames) even though the AI model itself read every single one correctly. That layer now only upgrades, never downgrades - and ball identification on gameplay frames from your last two sessions measures 100% across every ball on the table.\nFound by building hand-verified ground truth from your own gameplay (12 layouts across the two Aug-24 evening sessions), then testing each pipeline layer separately: the model scored 15/15 on true 9s; the correction layer was the corruptor.\nThe fix was checked on three frame sets before shipping - gameplay (100% overall), dense racks (slightly better), and old-era archives (net neutral).\nThree new tests guard it, including 'a model stripe answer must never be demoted'.",
+   "images": []
+  },
+  {
+   "id": 31,
+   "ts": "2026-08-25T12:00:00",
+   "date": "Aug 25, 2026",
+   "kind": "update",
+   "title": "The shot Details sheet got a real design",
+   "score": "",
+   "body": "You called it the worst UI you'd ever seen - fair. It's now a proper bottom sheet: slides over the player instead of shoving the page under the clock, groups MEASURED data apart from YOUR CALL verdicts, shrinks the utility buttons to an icon row, and pins Cancel / Looks right / Save to a fixed footer. Your stay-down time shows as a big readout at the top of MEASURED - with a POPPED EARLY flag when it applies.\nSelected verdict buttons now fill solid green instead of a thin outline tint.\nThe abstention notes (why an aim line or metric is absent) sit inside the MEASURED group where they belong.\nTap the dimmed backdrop to close - same as Cancel.\nThis is the first slice of the phase-3 UI pass; the player itself is next.",
+   "images": []
+  },
+  {
+   "id": 30,
+   "ts": "2026-08-25T12:00:00",
+   "date": "Aug 25, 2026",
+   "kind": "update",
+   "title": "New ball-ID model promoted: 18% fewer misreads",
+   "score": "",
+   "body": "The challenger trained on the newly-mined layouts beat the champion on strictly held-out sessions - 18% fewer out-of-game number claims with coverage unchanged - and is now live. It's the first promotion since c5, and the first payoff from unblocking the layout miner.\nJudged fairly: identical 24 sessions for both models, every session that contributed training data excluded, so the win can't be memorization.\nThe old champion is archived one copy away for instant rollback.\nNext accuracy lever: the starved stripe balls (10 and 12 still have one training example each) - one minute of a racked 8-ball game on camera feeds them automatically now.",
+   "images": []
+  },
+  {
+   "id": 29,
+   "ts": "2026-08-25T12:00:00",
+   "date": "Aug 25, 2026",
+   "kind": "update",
+   "title": "Found it: one clock bug behind everything tonight",
+   "score": "",
+   "body": "The analysis clock ran ~3 seconds behind the video - every symptom you hit inherited it. Trails animated seconds after the balls had stopped. Aim lines were computed on mid-shot frames (wrong line, or no line at all). Slow-mo clips cut at the skewed time and started mid-shot. All timestamps are now anchored to the video itself, per shot, using each shot's frame-verified strike moment.\nYour @58 shot now has its aim line. Tonight's session re-verified server-side: shot 3's line lies exactly along the stick, through the cue ball, stopping at the 4.\nThe jittery move-stop-move tail is fixed too (the overlay clock could step backwards between frames; it can't now).\nTonight's session is fully corrected; the rest of the library retrofits overnight.\nThis is phase 1 of the cleanup you called for. Phase 2 makes every shot go through ONE identical pipeline the moment it completes - no more some-shots-analyzed-some-not. Phase 3 is the UI redesign.",
+   "images": []
+  },
+  {
+   "id": 28,
+   "ts": "2026-08-25T12:00:00",
+   "date": "Aug 25, 2026",
+   "kind": "update",
+   "title": "Trails and aim lines stay glued to the right shot",
+   "score": "",
+   "body": "You caught it exactly: during laggy loads, the overlay clock kept running from the previous position, so the previous shot's (perfectly drawn) trail animated over the wrong footage - and aim lines could show for a shot the picture hadn't reached yet. The player now refuses to draw any overlay while the picture can't match it, and every navigation resets the overlay clock.\nRoot cause 1: jumping between shots bypassed the overlay clock's reset, so during a slow seek it extrapolated from the old position - the old trail kept animating until the new shot's first frame arrived.\nRoot cause 2: in playlists that hop between session videos, a cached trail from the same shot NUMBER in the previous session could be reused. The cache now knows which session it belongs to.\nNew rule everywhere: mid-seek, mid-load, or mid-swap, the overlay layer goes blank instead of guessing - same philosophy as detection's 'show nothing rather than something wrong'.\nAn adversarial review of the whole overlay timing system also caught and fixed: stale scrub seeks replaying after navigation, the frame-scrubber serving another session's cached frames after a playlist hop, and background frame-warming making overlays flicker while paused.",
+   "images": []
+  },
+  {
+   "id": 27,
+   "ts": "2026-08-24T12:00:00",
+   "date": "Aug 24, 2026",
+   "kind": "update",
+   "title": "You were right: quick pop-ups go with misses",
+   "score": "",
+   "body": "Overnight, every shot in the library (1,193 across 35 sessions) got its stroke measured. The pattern you predicted is real: 32% of your misses come with a stay-down under 1 second, versus 16% of your makes - exactly double. Your median hold is also 0.3s shorter on misses (1.27s vs 1.57s). Lifetime Stats now shows medians and quick-exit rates.\nThe averages almost hid this (1.58s vs 1.65s) - the signature is a fat tail of quick exits on misses, so the stats show median and %-under-1-second instead.\nNo shot in the library measured under 0.7s, so your 'pop-ups' are subtle - a 0.9s exit, not a jump. The camera catches what feels invisible.\nEvery shot's Details sheet now carries its own numbers - check a few of your misses against your makes.",
+   "images": []
+  },
+  {
+   "id": 26,
+   "ts": "2026-08-24T12:00:00",
+   "date": "Aug 24, 2026",
+   "kind": "update",
+   "title": "New metric: how long you stay down on the shot",
+   "score": "",
+   "body": "Every shot now gets stroke measurements straight from the camera: how long your cue stays down after contact, your backstroke length, the pause at the top of it, and your practice-stroke count. Misses often come with popping up early - now there's a number for it, and Lifetime Stats compares your average stay-down on makes vs misses.\nVerified frame-by-frame before shipping: 9 of 9 measured shots matched hand-checked ground truth within 0.1 seconds (a tenth shot, where the balls were moved by hand, correctly measured nothing).\nThe shot Details sheet shows a STROKE row: stay-down seconds, an early pop-up warning, pause milliseconds, backstroke length, practice strokes.\nUnder the hood the true strike moment is re-detected from the cue ball's disappearance (the tracker's shot clock runs ~2.4s late), and the cue stick is tracked even when your arm overlaps it.\nThese field names match your Bluetooth cue sensor's - when it's installed, both sources will measure the same things and check each other.",
+   "images": []
+  },
+  {
+   "id": 25,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Tracking sees through the grain now",
+   "score": "",
+   "body": "Tonight's high-ISO footage was confusing the ball tracker (identity mix-ups ran 4x the usual rate). The analysis feed now gets cleaned of grain before the detector looks at it - measured on your grainiest session: fewer identity mix-ups, better ball numbering, and 12-13% more balls held per frame. Your recordings are untouched.\nVerified on two separate 6-minute slices before enabling: identity hops down 15%, ball-number coverage up, track fragmentation down 14-21%, and more balls tracked per frame in both tests with no metric worse.\nThis is the software half of the grain fix. The camera half (1/250 shutter + half the ISO next time you're at the rig) removes grain at the source and roughly halves file sizes too.",
+   "images": []
+  },
+  {
+   "id": 24,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Trail animations keep up with the ball now",
+   "score": "",
+   "body": "The animated trails lagged because the phone's browser reports video time slightly in the past, and three hidden per-frame costs were eating the iPhone's processing budget. The overlay now reads the exact time of each displayed frame, and those costs are gone.\nThe overlay clock now uses frame callbacks (exact presented-frame timestamps, iOS 15.4+) instead of the stale 'official playback position', with a clean fallback when paused or on older devices. This also fixes extra lag in Low Power Mode.\nThe frame cache that makes scrubbing instant was JPEG-encoding every single frame during playback; it now stores every 3rd frame (scrubbing still always hits, and the cache covers 70 seconds instead of 23).\nTwo canvas layers were being reallocated on every animation tick even when nothing was drawn - both now only rebuild when the size actually changes.",
+   "images": []
+  },
+  {
+   "id": 23,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Clips now start instantly on your phone",
+   "score": "",
+   "body": "Every recording had its seek index at the wrong end of the file, so your phone had to download huge chunks (up to ~2 GB for a late shot in a long session) before it could play anything. The index now sits at the front: playing any shot needs ~5-10 MB. All 26 older recordings were fixed tonight, and every new recording fixes itself automatically.\nThe recorder writes 'fragmented' video on purpose - it means a crash can't destroy a recording mid-write. But fragmented files carry an empty index up front; iOS can't even learn the clip's duration from it, let alone jump to a shot, so Safari crawled the file from the beginning.\nThe fix re-containers the finished file (a pure copy, ~1.4 seconds per GB, no quality change) right after recording stops - before it ever reaches Dropbox. Crash safety is unchanged: the file stays fragmented while recording is live.\nAlso found: tonight's high-ISO settings inflate file bitrate 4.6x (16 Mbps vs 3.5), which multiplies every download. The grain recommendation coming separately addresses this too.",
+   "images": []
+  },
+  {
+   "id": 22,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "You were right about the shutter \u2014 blur is fixed",
+   "score": "",
+   "body": "The new camera settings are real and working: a crop of the fastest-moving thing in your latest clip (the cue stick mid-stroke) is tack sharp. My earlier claim that the shutter 'wasn't applying' was my measurement's fault \u2014 it was counting pieces of your cue stick as blurred balls.\nThe smear detector ranks elongated blobs, and a cue stick is naturally elongated \u2014 no motion needed. Once your 1/500 shutter made the balls crisp, stick fragments were the only stretched shapes left, and they topped the list looking like blur.\nThe decisive test: the fastest mover in session 18:55 (inter-frame extent 199px \u2014 full stroke speed) shows zero smear in a single frame. At the old 1/60 exposure it would have smeared ~75px.\nWhat this unlocks: fast shots stop vanishing mid-flight. 39 of the 62 remaining uncategorized misses failed because the ball was never captured between strike and pocket \u2014 that failure class should not exist in new recordings.",
+   "images": []
+  },
+  {
+   "id": 21,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Fixed the laggy mouse and keyboard",
+   "score": "",
+   "body": "The AI was hogging the graphics chip \u2014 the same chip Windows uses to draw your cursor and keystrokes, which is why typing felt broken whenever the app ran. Ball detection now runs on the CPU instead: your desktop got its graphics chip back (app's share: 69% \u2192 0%), and detection barely slows down.\nRoot cause: DirectML inference saturated the Radeon 780M's 3D engine at ~30 inferences/sec. On an integrated GPU that's the exact engine the Windows compositor needs for the cursor, and GPU engines have no preemptive priority \u2014 which is why every process/thread priority fix failed to help.\nMeasured before choosing: CPU at 4 threads does a full tiled detection in 88ms (~11/sec) vs ~15/sec on the GPU. Detections verified identical between the two (6/6 balls matched within 2px, same numbers).\nIt's a setting (detection.inference_provider: auto/gpu/cpu), so a future camera-PC or GPU upgrade flips it back with one word. The CPU session is capped at 4 threads and the app runs below-normal priority, so your input always preempts it.",
+   "images": []
+  },
+  {
+   "id": 20,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "31 more misses solved \u2014 backlog down to 62",
+   "score": "",
+   "body": "A smarter read of rattle-heavy shots (judging only the ball's initial run, not the chaos after it hits the jaws) solved 31 more misses. Trusted verdicts: 116 \u2192 147. Uncategorized: 93 \u2192 62.\nA measurement pass showed most stuck shots weren't missing data \u2014 they were fully observed but their paths bend too much (rattles, rebounds) for a whole-journey fit. The verdict only ever needed the first straight run from contact, so that's what gets judged now, under an even stricter straightness bar.\nOf the 62 remaining: 39 were never captured at all (the shutter-speed change will prevent these going forward), 21 are genuinely too messy to trust, 2 pointed at no pocket. All stay in your grading playlist rather than being guessed.\nYour categorized misses now split about even left/right overall \u2014 with 'cut right, missed right' (overcut) still the single biggest bucket at 28.",
+   "images": []
+  },
+  {
+   "id": 19,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "77 backlog misses solved automatically",
+   "score": "",
+   "body": "The forensic solver you pushed for went through the uncategorized pile: 77 of 171 misses now carry a verdict (Uncategorized 171 \u2192 94, trusted verdicts 38 \u2192 115). Your own corrections still outrank everything.\nIt re-opens only the blurry second of each miss and searches the narrow corridor physics allows, matched against that ball's own colour \u2014 about 8 minutes of compute for the whole pile, versus the 13-hour full rerun that measurably didn't work.\nInteresting early signal: the newly solved misses split 36 left / 41 right \u2014 much more balanced than the first trusted batch suggested. Worth watching as the rest get graded.\nHonestly held back: 54 shots where the fit wasn't trustworthy and 39 where the ball's flight was never captured at all \u2014 those stay in your grading queue rather than being guessed. 49 solved shots know the miss side but not the cut (the cue wasn't tracked); they're listed as 'cut unknown' and count toward totals.",
+   "images": []
+  },
+  {
+   "id": 18,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Miss verdicts now come from physics",
+   "score": "",
+   "body": "Every clip's miss side is now read off a physics fit of the ball's whole path \u2014 the method that got both hand-verified shots right, including one the old approach called confidently wrong. Trusted misses grew 33 \u2192 38 and the table updated.\nThe old approach judged direction from a few samples near the pocket, which a rattle could fool \u2014 your 4-ball shot and one other verified clip proved it. The new approach fits straight rolling legs to every observation of the ball and reads the verdict off the fit, with its own error bar deciding when to trust it.\nYour grading queue (Uncategorized) still works exactly the same \u2014 and every verdict you enter keeps training the system's honesty checks.",
+   "images": []
+  },
+  {
+   "id": 17,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Tap a stats line to grade those clips",
+   "score": "",
+   "body": "Every miss subgenre in Lifetime Stats \u2014 including Uncategorized \u2014 is now a playlist. Tap it, watch the clips, and set Cut/Missed in each shot's Details. Grading an Uncategorized miss moves it into its subgenre and sharpens the table.",
+   "images": []
+  },
+  {
+   "id": 16,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Stats restructured your way",
+   "score": "",
+   "body": "Lifetime Stats now reads top-down: Total Shots, Makes, Misses \u2014 then each miss subgenre with its meaning built in: Cut Left / Miss Left (Overcut), Cut Left / Miss Right (Undercut), and so on.",
+   "images": []
+  },
+  {
+   "id": 15,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "What's New and Stats actually open now",
+   "score": "",
+   "body": "Both are full pages with a \u2039 Home button, not pop-ups \u2014 and the bug where tapping them did nothing until you opened a session is fixed (they were opening inside a hidden layer).",
+   "images": []
+  },
+  {
+   "id": 14,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Lifetime Stats \u2014 and your verdicts now count",
+   "score": "",
+   "body": "New on the home screen: Lifetime Stats, a tight table of your misses \u2014 Cut Left/Straight/Right against Missed Left/Right. And in any shot's Details you can now set Cut and Missed yourself; your word overrides the machine and feeds the table.\nOnly trusted verdicts are counted: shots the analysis saw clearly, plus anything you've corrected by hand. Shots where the ball was lost stay out of the table rather than polluting it.\nYour corrections do double duty: they fix the record, and they become the ground truth that validates the physics-fit work \u2014 every verdict you enter makes the automatic tagging measurably better.",
+   "images": []
+  },
+  {
+   "id": 13,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Player restored",
+   "score": "",
+   "body": "The chrome-free player experiment is rolled back \u2014 the clips screen is exactly as it was. The Instagram-style redesign is shelved for another day.",
+   "images": []
+  },
+  {
+   "id": 12,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Home screen restored",
+   "score": "",
+   "body": "The card list is gone \u2014 the home screen is back to the layout you didn't mind (What's New row stays, pause-fade stays). The real redesign target is the clips player, Instagram-style, coming next.",
+   "images": []
+  },
+  {
+   "id": 11,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Pause button gets out of the way",
+   "score": "",
+   "body": "The play symbol now fades out a moment after you pause, so it no longer sits on top of the frame you paused to study.",
+   "images": []
+  },
+  {
+   "id": 10,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "What's New moved home",
+   "score": "",
+   "body": "This panel now lives at the top of the home screen, where it belongs \u2014 the menu inside the player is back to being just overlays and drawing tools.\nFair catch: the update feed had been tucked into the player's drawing menu, which made no sense. It's now a single row above your sessions \u2014 latest headline visible, dot when there's something unread, tap to read.\nA broader cleanup of the sessions screen is queued next.",
+   "images": []
+  },
+  {
+   "id": 9,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "Your disputed shot now reads correctly",
+   "score": "",
+   "body": "The 4-ball at 3:52 now shows 'missed left, 1.3 inches' with full confidence \u2014 matching what you saw. The same check was applied to every clip.\nWhen you flagged the shot at 3:52 ('this should be a pretty clear miss left'), the app said the opposite. Getting it right ended up fixing four separate problems, and each one is now better for every clip in your library.\nFirst: the camera. When you hit a ball hard, the shutter is open long enough that the ball smears into a faint streak \u2014 and the ball-detector, trained on crisp round balls, sees nothing at all. For about half a second after contact, your 4-ball simply didn't exist to the software.\nSecond: mistaken identity. While the 4-ball was invisible, the cue ball rolled up and stopped where the 4 used to be. The software saw a ball sitting right where it expected the 4 \u2014 and assumed it WAS the 4. So the '4' it tracked afterwards was actually the cue ball, and the miss got called on the wrong side. The fix: a resting ball now refuses to become a different-coloured ball. White can't become purple.\nThird: the ghost. Even after that fix, the old '4' label stayed stuck at the spot the ball had left, so the real 4 \u2014 found again near the pocket \u2014 couldn't get its name back. Now a label lets go when its spot is visibly empty, and the real ball reclaims it.\nFourth: the verdict itself. Even with the ball tracked, the app judged the miss from the blurriest instant of the shot. Now it checks something simpler: every glimpse it DID get of the ball lies on one straight line \u2014 and a rolling ball can't leave its line and sneak back. So the gap hides nothing, and the verdict is trusted: missed left, 1.3 inches.",
+   "images": []
+  },
+  {
+   "id": 8,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "What the pros do, and what we're borrowing",
+   "score": "",
+   "body": "We compared our tracking against published pool-vision systems. Three lessons are now the roadmap.\nYou asked whether fast-ball tracking is a solved problem \u2014 it mostly is, and not with expensive cameras. Systems like POOL-AID and PoolLiveAid ran on ordinary webcams a decade ago.\nTheir trick #1: don't look FOR balls, look for anything that isn't table. A smeared ball doesn't look like a ball, but it never looks like blue felt either. We had this backwards \u2014 our smart detector finds balls brilliantly when they're sharp and goes blind when they move. Their approach never goes blind.\nTheir trick #2: carry uncertainty. When a system loses sight of a ball, it should get less sure about where it is \u2014 and search wider \u2014 automatically. We'd hand-built a dozen special rules that each approximate a piece of that.\nTheir trick #3: fit physics to the whole shot. A ball rolls straight, slows smoothly, and bounces off rails at known angles. Fit that model to every glimpse you got, and it fills the gaps \u2014 with an honest error bar. That's the plan now, in that order, each step measured before it replaces anything.",
+   "images": []
+  },
+  {
+   "id": 7,
+   "ts": "2026-08-23T12:00:00",
+   "date": "Aug 23, 2026",
+   "kind": "update",
+   "title": "A first pattern in your misses",
+   "score": "",
+   "body": "Among misses the app is confident about, you miss RIGHT about 3x as often as left (25 vs 8). Small sample \u2014 a hint, not a diagnosis.\nOnly trusted verdicts are counted \u2014 every miss where the app couldn't clearly see the ball is excluded rather than guessed. That keeps the pattern honest, but it also keeps the sample small for now.\nAs more shots earn trusted verdicts (the physics-fit work in progress), this number firms up. If it holds near 3-to-1, that's the first concrete thing to take to the practice table.",
+   "images": []
+  },
+  {
+   "id": 6,
+   "ts": "2026-08-22T12:00:00",
+   "date": "Aug 22, 2026",
+   "kind": "update",
+   "title": "The red line is now the real path",
+   "score": "",
+   "body": "The 'line it took' overlay draws the ball's entire recorded path \u2014 rail bounces included. Nothing is written on top of the video anymore.\nAfter a few rounds of your feedback the overlay settled on one principle: draw measurements, not conclusions. The red line is the ball's entire recorded path \u2014 rail bounce and all \u2014 not a simplified arrow.\nNothing is written on top of the video anymore; the verdict lives in the bar below. The legend drags anywhere and remembers its spot. And a new rule for future changes: overlays get rendered against real footage before they ship, because two of the earlier misses would have been caught by simply looking.",
+   "images": []
+  },
+  {
+   "id": 5,
+   "ts": "2026-08-22T12:00:00",
+   "date": "Aug 22, 2026",
+   "kind": "update",
+   "title": "Drag the legend out of the way",
+   "score": "",
+   "body": "The overlay legend can be dragged anywhere on the video and remembers where you put it \u2014 even through rotation.",
+   "images": []
+  },
+  {
+   "id": 4,
+   "ts": "2026-08-22T12:00:00",
+   "date": "Aug 22, 2026",
+   "kind": "update",
+   "title": "Fast shots keep their trails",
+   "score": "",
+   "body": "Hard-hit balls used to vanish from the trails mid-flight. The app now recovers them through the motion blur.\nA hard-hit ball crosses four of its own widths between frames and smears into a translucent streak. The detector sees nothing \u2014 but the pixels still hold the ball.\nThe recovery: remember what the empty table looks like (the average of the last second and a half), subtract it, and whatever remains that's ball-sized and matches the missing ball's own colour better than any other ball's \u2014 that's your ball. It's how your trails now follow the ball all the way to the rail.\nOne honest limit: a smeared ball's measured position is the middle of the streak, not the ball. Good enough to draw a trail; not good enough to judge a miss by. So recovery feeds the drawings, and verdicts wait for the physics fit.",
+   "images": []
+  },
+  {
+   "id": 3,
+   "ts": "2026-08-22T12:00:00",
+   "date": "Aug 22, 2026",
+   "kind": "update",
+   "title": "Rotation stays put",
+   "score": "",
+   "body": "Rotating the video no longer flips the legend or play button, and toggling overlays no longer un-rotates the video.",
+   "images": []
+  },
+  {
+   "id": 2,
+   "ts": "2026-08-22T12:00:00",
+   "date": "Aug 22, 2026",
+   "kind": "update",
+   "title": "Honest verdicts",
+   "score": "",
+   "body": "When the app can't actually see which side a miss went, it says 'can't tell' instead of guessing.\nEarly on, the app labelled every miss with a side, even when its data was garbage. That's how your miss-left got called miss-right: it measured a direction across a half-second hole and confidently reported nonsense.\nThe standing rule now: the app only states what it actually measured. When the ball was lost at the decisive moment, the verdict says 'can't tell which side \u2014 ball lost after contact' instead of guessing. When it IS sure, that confidence means something.\nThis matters for the stats. Your miss patterns are only useful if every counted miss is real \u2014 one wrong-side label pollutes the pattern more than ten honest abstentions. Trusted verdicts went from 30 to 33 this week, and each 'can't tell' is a known repair target, not a mystery.",
+   "images": []
+  },
+  {
+   "id": 1,
+   "ts": "2026-08-22T12:00:00",
+   "date": "Aug 22, 2026",
+   "kind": "update",
+   "title": "Sharper shots for free (when you have a minute)",
+   "score": "",
+   "body": "One camera dial change \u2014 shutter to 1/250 \u2014 would make every future recording dramatically easier to analyse. Plain-language walkthrough saved for you.\nMost of this week's problems trace to motion blur, and most of that traces to shutter speed. Your camera is exposing each frame for about 1/75th of a second; at 1/250th, a hard-hit ball stays a crisp dot instead of a streak.\nThe full plain-language walkthrough is saved as CAMERA_SETTINGS.md in the project \u2014 which dial, which direction, what it costs (a bit of grain, which the software barely notices). No new lighting needed. Whenever you get a minute at the table, it's the single highest-value tweak available.",
    "images": []
   }
  ]

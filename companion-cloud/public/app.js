@@ -435,28 +435,14 @@ function renderHome() {
   box.innerHTML = "";
   // What's New lives on the HOME page (Joe: it has no business in the
   // player's drawing menu). One tappable row: latest title, unread dot.
-  const ns = window._newsState;
-  if (ns) {
-    const nb = document.createElement("div");
-    nb.className = "newsbar";
-    nb.innerHTML = `<span style="font-weight:700">What’s New</span>
-      ${ns.unread ? '<span style="color:var(--accent);font-size:12px;margin-left:6px">● new</span>' : ""}
-      <span style="color:var(--faint);font-size:13px;margin-left:10px;
-        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ns.title}</span>
-      <span style="color:var(--faint)">›</span>`;
-    nb.onclick = () => window._openNews && window._openNews();
-    box.appendChild(nb);
-  }
-  // Dev Journal (Joe: "I'd like to pop in and follow along with your
-  // findings" during the engine-reliability campaign) — plain-language
-  // rounds with before/after images
   {
+    const js = window._jrnState || { unread: false, n: 0, title: "" };
     const jb = document.createElement("div");
     jb.className = "newsbar";
-    const js = window._jrnState || { n: 0, title: "" };
     jb.innerHTML = `<span style="font-weight:700">Dev Journal</span>
+      ${js.unread ? '<span style="color:var(--accent);font-size:12px;margin-left:6px">● new</span>' : ""}
       <span style="color:var(--faint);font-size:13px;margin-left:10px;
-        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${js.title}</span>
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${js.title || ""}</span>
       <span style="color:var(--faint)">›</span>`;
     jb.onclick = () => window._openJournal && window._openJournal();
     box.appendChild(jb);
@@ -993,165 +979,146 @@ function applyRot() {
   $("ov-rot-st").textContent = ROT ? "On" : "Off";
   $("ov-rot-st").style.color = ROT ? "var(--make)" : "var(--faint)";
 }
-// ---- What's New (Joe: "I just come back to a wall of text I don't
-// understand" — the loop's summaries are written for the loop; this is
-// the channel written for HIM, in plain language, updated every session
-// that changes something he can see) --------------------------------
-const News = (() => {
-  let entries = [];
-  const seen = () => parseInt(localStorage.getItem("news_seen") || "0", 10);
-  function render() {
-    const box = $("news-list");
-    box.innerHTML = "";
-    entries.forEach(e => {
-      const d = document.createElement("div");
-      d.style.cssText = "padding:10px 2px;border-bottom:1px solid #232B36";
-      d.innerHTML = `<div style="font-weight:700;margin-bottom:3px">${e.title}
-        <span style="color:var(--faint);font-weight:400;font-size:12px;margin-left:6px">${e.date}</span></div>
-        <div style="color:#C7D0DA;font-size:14px;line-height:1.45">${e.body}</div>`;
-      // the technical story, as a second dropdown inside the entry (Joe:
-      // "not even a button, just a second dropdown") — plain summary always
-      // visible, the how-and-why folded underneath for when he wants it
-      if (e.details && e.details.length) {
-        const more = document.createElement("div");
-        more.innerHTML = `
-          <div class="jhead" style="margin-top:7px;color:var(--accent);
-               font-size:13px;cursor:pointer;user-select:none">▸ More details</div>
-          <div class="jbody" style="display:none">${e.details.map(t =>
-            `<p style="color:#9AA4B2;font-size:13px;line-height:1.5;margin:7px 0">${t}</p>`).join("")}</div>`;
-        const head = more.querySelector(".jhead"), body = more.querySelector(".jbody");
-        head.onclick = () => {
-          const open = body.style.display !== "none";
-          body.style.display = open ? "none" : "block";
-          head.textContent = (open ? "▸" : "▾") + " More details";
-        };
-        d.appendChild(more);
-      }
-      box.appendChild(d);
+
+// ---- Dev Journal: THE channel (What's New merged in 2026-08-28).
+// A small blog: fixed header, entry sidebar, article pane. Entries are
+// posted by tools/journal.py on every engine round. -------------------
+(() => {
+  let entries = [], cur = 0;
+  const seen = () => parseInt(localStorage.getItem("jrn_seen") || "0", 10);
+
+  function renderSide() {
+    const side = $("jrn-side");
+    side.innerHTML = "";
+    entries.forEach((e, i) => {
+      const b = document.createElement("button");
+      b.className = "jitem" + (i === cur ? " on" : "");
+      const k = document.createElement("span");
+      k.className = "k " + (e.kind === "finding" ? "finding" : "update");
+      k.textContent = e.kind === "finding" ? "FINDING" : "UPDATE";
+      b.appendChild(k);
+      b.appendChild(document.createTextNode(e.title || ""));
+      const d = document.createElement("span");
+      d.className = "d";
+      d.textContent = e.date || "";
+      b.appendChild(d);
+      b.onclick = () => { cur = i; draw(); };
+      side.appendChild(b);
     });
   }
-  function open() {
-    render();
-    $("sessions").style.display = "none";
-    $("newssheet").style.display = "block";
-    if (entries.length) localStorage.setItem("news_seen", String(entries[0].id));
-    window._newsState = { unread: false,
-                          title: entries.length ? entries[0].title : "" };
-    if (typeof renderHome === "function"
-        && $("sessions").style.display !== "none") renderHome();
-  }
-  window._openNews = open;
-  fetch("whatsnew.json").then(r => r.json()).then(j => {
-    entries = j.entries || [];
-    const latest = entries.length ? entries[0].id : 0;
-    // home-page banner state (Joe: "why is What's New in the painting
-    // hamburger menu? put it on the home page")
-    window._newsState = { unread: latest > seen(),
-                          title: entries.length ? entries[0].title : "" };
-    if (typeof renderHome === "function"
-        && $("sessions").style.display !== "none") renderHome();
-  }).catch(() => {});
-  $("news-close").onclick = () => {
-    $("newssheet").style.display = "none";
-    $("sessions").style.display = "";
-  };
-  return {};
-})();
 
-// ---- Dev Journal: the engine-reliability campaign, in plain language
-// with before/after pictures (Joe: "I'd like to pop in and follow along
-// with your findings"). journal.json is appended by tools/journal.py on
-// every round, so the autonomous loop keeps it current. ---------------
-(() => {
-  let entries = [];
-  function render() {
-    const box = $("jrn-list");
-    box.innerHTML = "";
-    $("jrn-count").textContent = entries.length
-      ? `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`
-      : "";
-    if (!entries.length) {
+  function renderMain() {
+    const main = $("jrn-main");
+    main.innerHTML = "";
+    const e = entries[cur];
+    if (!e) {
       const empty = document.createElement("div");
       empty.className = "jempty";
-      empty.textContent = "No entries yet — the engine work posts here "
-        + "as it happens.";
-      box.appendChild(empty);
+      empty.textContent = "No entries yet.";
+      main.appendChild(empty);
       return;
     }
-    entries.forEach(e => {
-      const d = document.createElement("div");
-      d.className = "jentry";
-      const head = document.createElement("div");
-      head.className = "jtitle";
-      head.textContent = e.title || "";
-      d.appendChild(head);
-      const meta = document.createElement("div");
-      meta.className = "jmeta";
-      const dt = document.createElement("span");
-      dt.className = "jdate";
-      dt.textContent = e.date || "";
-      meta.appendChild(dt);
-      if (e.score) {
-        const sc = document.createElement("span");
-        sc.className = "jscore";
-        sc.textContent = e.score;
-        meta.appendChild(sc);
-      }
-      d.appendChild(meta);
-      (e.body || "").split("\n").filter(Boolean).forEach(p => {
-        const el = document.createElement("div");
-        el.className = "jbodyp";
-        el.textContent = p;
-        d.appendChild(el);
-      });
-      (e.images || []).forEach(im => {
-        const fig = document.createElement("div");
-        fig.className = "jfig";
-        const img = document.createElement("img");
-        img.src = im.src;
-        img.loading = "lazy";
-        img.alt = im.caption || "";
-        // click to open full-size (these are 1080px frames; the inline
-        // copy is capped so an entry stays readable)
-        img.title = "Click to open full size";
-        img.onclick = () => window.open(im.src, "_blank", "noopener");
-        fig.appendChild(img);
-        if (im.caption) {
-          const cap = document.createElement("div");
-          cap.className = "jcap";
-          cap.textContent = im.caption;
-          fig.appendChild(cap);
-        }
-        d.appendChild(fig);
-      });
-      box.appendChild(d);
+    const art = document.createElement("div");
+    art.className = "jart";
+    const h = document.createElement("div");
+    h.className = "jtitle";
+    h.textContent = e.title || "";
+    art.appendChild(h);
+    const meta = document.createElement("div");
+    meta.className = "jmeta";
+    const dt = document.createElement("span");
+    dt.className = "jdate";
+    dt.textContent = e.date || "";
+    meta.appendChild(dt);
+    if (e.score) {
+      const sc = document.createElement("span");
+      sc.className = "jscore";
+      sc.textContent = e.score;
+      meta.appendChild(sc);
+    }
+    art.appendChild(meta);
+    (e.body || "").split(String.fromCharCode(10)).filter(Boolean).forEach(p => {
+      const el = document.createElement("div");
+      el.className = "jbodyp";
+      el.textContent = p;
+      art.appendChild(el);
     });
+    (e.images || []).forEach(im => {
+      const fig = document.createElement("div");
+      fig.className = "jfig";
+      const img = document.createElement("img");
+      img.src = im.src;
+      img.loading = "lazy";
+      img.alt = im.caption || "";
+      img.title = "Click to open full size";
+      img.onclick = () => window.open(im.src, "_blank", "noopener");
+      fig.appendChild(img);
+      if (im.caption) {
+        const cap = document.createElement("div");
+        cap.className = "jcap";
+        cap.textContent = im.caption;
+        fig.appendChild(cap);
+      }
+      art.appendChild(fig);
+    });
+    const nav = document.createElement("div");
+    nav.className = "jnav";
+    const prev = document.createElement("button");
+    prev.textContent = "‹ Newer";
+    prev.disabled = cur === 0;
+    prev.onclick = () => { cur = Math.max(0, cur - 1); draw(); };
+    const next = document.createElement("button");
+    next.textContent = "Older ›";
+    next.disabled = cur >= entries.length - 1;
+    next.onclick = () => { cur = Math.min(entries.length - 1, cur + 1); draw(); };
+    nav.append(prev, next);
+    art.appendChild(nav);
+    main.appendChild(art);
+    main.scrollTop = 0;
   }
+
+  function draw() {
+    $("jrn-count").textContent = entries.length
+      ? `${entries.length} entries` : "";
+    renderSide();
+    renderMain();
+    const el = $("jrn-side").children[cur];
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest",
+                                                    inline: "nearest" });
+  }
+
   const close = () => {
-    $("jrnsheet").style.display = "none";
+    $("jrnsheet").classList.remove("open");
     $("sessions").style.display = "";
   };
   window._openJournal = () => {
-    render();
+    cur = 0;
     $("sessions").style.display = "none";
-    $("jrnsheet").style.display = "block";
-    $("jrnsheet").scrollTop = 0;
-    if (window._jrnPull) window._jrnPull(true);   // catch new rounds
+    $("jrnsheet").classList.add("open");
+    draw();
+    if (entries.length) {
+      localStorage.setItem("jrn_seen", String(entries[0].id));
+      window._jrnState = { unread: false, n: entries.length,
+                           title: entries[0].title };
+    }
+    pull(true);
   };
   $("jrn-close").onclick = close;
-  // Esc closes (desktop habit), and the journal refetches on open so a
-  // round posted while the tab sat open still shows
   document.addEventListener("keydown", ev => {
-    if (ev.key === "Escape" && $("jrnsheet").style.display === "block")
-      close();
+    if (!$("jrnsheet").classList.contains("open")) return;
+    if (ev.key === "Escape") close();
+    if (ev.key === "ArrowRight" && cur < entries.length - 1) { cur++; draw(); }
+    if (ev.key === "ArrowLeft" && cur > 0) { cur--; draw(); }
   });
-  function pull(thenRender) {
+
+  function pull(thenDraw) {
     return fetch("journal.json?ts=" + Date.now(), { cache: "no-store" })
       .then(r => r.json()).then(j => {
         entries = j.entries || [];
-        window._jrnState = { n: entries.length,
+        const latest = entries.length ? entries[0].id : 0;
+        window._jrnState = { unread: latest > seen(), n: entries.length,
                              title: entries.length ? entries[0].title : "" };
-        if (thenRender) render();
+        if (thenDraw) draw();
         else if (typeof renderHome === "function"
                  && $("sessions").style.display !== "none") renderHome();
       }).catch(() => {});
