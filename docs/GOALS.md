@@ -1855,3 +1855,17 @@ Rounds continue with Joe's visual feedback as the gate.
   push notification sent — the accuracy chain Joe asked to be notified
   about is complete. NEXT per BACKLOG: Tier 1 demolition chunk 1
   (shot identity), 3/5 flip mining now that the GPU is free.
+
+- 2026-08-28 morning — JOE'S REPLAY VERDICT ACTED ON. He watched two
+  clips: "exactly the same - delayed, slow, jittery + 3-ball false
+  make." Diagnosis chain (evidence-first): shots.json HAD dense 33ms
+  trails, Dropbox cloud synced to the second, phone renderer rAF-clean
+  — the culprit was the merge's timid tie-break: ambiguity kept sparse,
+  and mixed per-ball results kept HIS most-watched trails (shot0 cue,
+  shot1 3-ball: 10pts/900ms hole). Gates earned the flip:
+  prefer_dense on gate-green sessions (active video veto still wins;
+  4 tests pin both modes). Re-merge: marathon 58 -> 124/125 dense,
+  ~316 shots library-wide. What's New #47 deployed. The 3-ball false
+  make named honestly as un-re-judged recording-era outcome — outcome
+  re-derivation from dense is now top of BACKLOG Tier 2 (after shot
+  ids + one timebase; needs pocket localization for jaw calls).

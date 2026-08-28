@@ -1,6 +1,16 @@
 {
  "entries": [
   {
+   "id": 47,
+   "date": "2026-08-28",
+   "title": "You were right - the replays WERE mostly old trails. Fixed this morning.",
+   "body": "The overnight merge was built cautious: on any doubt it kept the old sparse trail, and that caution kept exactly the trails you watch - your first clip's cue ball, your second clip's 3-ball (10 points with a near-second hole). The engine's own gate scores have now earned a bolder rule: on gate-passing sessions dense wins by default, and the old trail survives only when the video itself sides with it. Re-merged everywhere: the marathon went from 58 to 124 of 125 covered shots dense; about 316 shots across the library. Re-watch the same two clips.",
+   "details": [
+    "Verified before changing anything: the dense data was in the files, Dropbox cloud matched to the second, and the player was innocent - the timid merge rule was the whole story.",
+    "The 3-ball wrongly counted as a make is a SEPARATE, real issue: re-measurement upgraded trails but has not yet re-judged outcomes. Make/miss verdicts are still the recording-night detector's. Re-deriving outcomes from the dense measurements is queued next - trails first, judgments second, no shortcuts."
+   ]
+  },
+  {
    "id": 46,
    "date": "2026-08-28",
    "title": "Library re-measurement complete: 13 of 17 sessions now dense",

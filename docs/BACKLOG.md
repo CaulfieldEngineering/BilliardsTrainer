@@ -74,6 +74,15 @@ presence/recording-guarded, one at a time.
 
 ## Tier 2 — Measurement quality (interleave with Tier 1 when GPU free)
 
+- [ ] **Outcome re-derivation from dense tracks** (Joe caught a 3-ball
+  false make surviving the reprocess): the campaign upgraded TRAILS
+  only; make/miss verdicts are still recording-era. Build the offline
+  outcome judge over dense sidecars (ball gone-into-which-pocket from
+  33ms tracks + pocket regions), compare against Joe's review verdicts
+  (`_eval/review_scoreboard.json` attachment rules), and only then
+  rewrite shots.json outcomes. Depends on pocket localization below
+  for jaw-ball credibility; sequence AFTER Tier 1 items 1-2 (shot ids
+  + one timebase make the rewrite safe).
 - [ ] **3/5 flip mining**: scan dense sidecars for 3↔5 number changes
   on resting tracks; harvest crops at those timestamps; label; add to
   c8 training set. CPU-light scan; crop decode when GPU/disk idle.
