@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 46,
+   "date": "2026-08-28",
+   "title": "Library re-measurement complete: 13 of 17 sessions now dense",
+   "body": "The overnight rollout finished. Thirteen sessions - including the marathon - now carry frame-by-frame dense trails, every one passing the physics gate with room to spare (worst score 0.23 impossible-states per thousand against the old tracker's 0.55). 137 shots' trails upgraded across the library on top of the marathon's. Each merged session's 'proc' stamp shows today.",
+   "details": [
+    "Three August 23 sessions were REFUSED by the gate (scores 0.69-3.12) and keep their honest sparse trails - that was camera-surgery day, and the EOS focus rectangles burned into the feed are the suspected cause. They're queued for investigation, not forced through.",
+    "One 2-minute camera-adjustment clip couldn't calibrate at all and was skipped.",
+    "A quality gate that refuses its own new engine's output when the numbers aren't there is the whole point - what merged, earned it."
+   ]
+  },
+  {
    "id": 45,
    "date": "2026-08-28",
    "title": "The engine passed its full-session exam - the whole library is re-measuring overnight",

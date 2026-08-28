@@ -1843,3 +1843,15 @@ Rounds continue with Joe's visual feedback as the gate.
   adjustment clip) — skipped. Lesson for the ledger: scratch sidecars
   need an engine-version stamp so stale ones can't masquerade (added to
   BACKLOG Tier 2).
+
+- 2026-08-28 ~02:15 — LIBRARY ROLLOUT COMPLETE (Tier 0 done). Leg 3
+  vindicated the stale-sidecar diagnosis: 012348 fresh through the
+  hardened engine scored 0.04/1k (was 184.59 on the Aug-26 sidecar) and
+  merged (+5). FINAL: 13/17 sessions dense-merged green (worst gate
+  0.23/1k vs champion 0.55), ~137 trails upgraded library-wide beyond
+  the marathon's; 3 honest refusals (Aug-23 AF-contamination, queued
+  Tier 2); 1 uncalibratable clip skipped. Stamps verified (m1-dense +
+  fresh exported). What's New #46 deployed (build 20260828-051054),
+  push notification sent — the accuracy chain Joe asked to be notified
+  about is complete. NEXT per BACKLOG: Tier 1 demolition chunk 1
+  (shot identity), 3/5 flip mining now that the GPU is free.
