@@ -1933,3 +1933,21 @@ Rounds continue with Joe's visual feedback as the gate.
   (no 3h GPU runs on rules that change daily). Desktop: v1 grid rail
   shipped; Joe wants all menus as rail dropdown sections — queued UI
   chunk.
+
+- 2026-08-28 evening — BENCH GRIND rounds 6-8 + Dev Journal shipped.
+  Round 8 is the biggest engine defect found to date: the association
+  gate (fixed 3.2 radii) was narrower than a struck ball's per-frame
+  travel (~60px), so every fast ball fragmented into ONE TRACK PER
+  FRAME — the debug overlay showed 9 phantom balls strung down bare
+  felt with the "cue" label stranded on the first, real cue unnamed.
+  Model detected 6; sidecar carried 14. Gate now scales with the RAW
+  observed step (smoothed velocity lags a strike ~6x). Bench: 14->7
+  tracks, cue correctly named, physics 0.49->0.14/1k. Rounds 6-7:
+  pocket furniture dies by TIME (leather scored above the confidence
+  floor); the engine was BLIND to hands/sticks offline (foreign veto
+  read a mask only the live loop computed) — now refreshed offline.
+  Shipped for Joe: tools/debug_overlay.py (app beliefs on real video)
+  + tools/journal.py + a Dev Journal in the phone app (3 entries with
+  before/after images). NEXT: episode layer over-fires and mints false
+  pots from naming churn; then Joe's pocket-DEAD-ZONE design to
+  replace the ad-hoc credit heuristics.

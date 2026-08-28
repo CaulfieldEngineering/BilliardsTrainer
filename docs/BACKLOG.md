@@ -33,19 +33,41 @@ Claude's vision, not by metrics.
 
 CAMPAIGN STATE (update every round; newest first):
 - Bench = **session-20260824-220247** (pinned). Ground truth: 10 real
-  strokes. Full dossier: docs/design/bench-220247-watch-2026-08-28.md.
-- Round 5 (2026-08-28): outcome agreement **9/10**, zero fabricated
-  makes, all 10 strokes detected as episodes.
-- NEXT: (a) 170.6 naming regression — its ball was named "5" under
-  engine v3, unnamed under v4 (jaw filter thinned its reads);
-  (b) hand-context in engine output → unlocks unnamed pots + kills
-  the glove-fake class + labels setup stretches;
-  (c) window keying at the strike (records open 1.2-4.6s late);
-  (d) ball-4 detection dropout at rest; the 9 never identified;
-  (e) c8 recognition retrain (cue/9, 2/4, 3/5 confusions);
+  strokes. Dossier: docs/design/bench-220247-watch-2026-08-28.md.
+- **Round 8 (biggest win so far)**: velocity-aware association gate.
+  The overlay proved the tracker manufactured 8 phantom balls per
+  frame down a struck ball's path (model detected 6, sidecar carried
+  14) and stranded the "cue" label on the first phantom. Fast balls
+  now stay ONE track. Bench: tracks 14->7 at t=170.5, cue correctly
+  named at its real position, physics gate 0.49 -> 0.14/1k.
+- Rounds 1-7: jaw-phantom filter; path-tail + bed-exit pocket credit;
+  chain-continuity (rebirth != resting); lip-hover drops;
+  unnamed movers seen but pot-credit gated; pocket furniture dies by
+  time; engine made hand/stick-aware offline (refresh_foreign).
+- OPEN, NEXT (round 9+), all bench-verified by vision each round:
+  (a) episode layer now over-fires (21 episodes) and mints FALSE POTS
+      for named balls that lose/regain names mid-flight - e.g. pots
+      credited to "4" at 13.1s/29.5s and to a nonexistent "11".
+      Outcome agreement is 6/7 on matched strokes but only 7 of 10
+      strokes now match cleanly. Fix the naming churn before trusting
+      any outcome number again.
+  (b) a nonexistent ball number ("11") appears - identifier misread
+      class; feeds the c8 retrain corpus.
+  (c) Joe's POCKET DEAD ZONES design (his suggestion, 2026-08-28):
+      make pockets explicit zones - a ball is potted when it ENTERS a
+      zone and does not return quickly, and anything sitting in a
+      zone is NEVER "on the table". This should REPLACE the ad-hoc
+      lip-hover/bed-exit/furniture heuristics with one clean rule.
+  (d) hand-context in engine output -> unlocks unnamed-ball pots,
+      kills the glove-carry false pot, labels setup vs stroke.
+  (e) window keying at the strike; ball-4 detection dropout at rest;
+      the 9 never identified; aim-line artifacts.
   (f) THEN: other clips, marathon + library re-run, regeneration
-  (shots.json written wholesale from the box), merge-machinery
-  deletion, M3/M4 live promotion.
+      (shots.json written wholesale from the box), merge-machinery
+      deletion, M3/M4 live promotion.
+- Tools for every round: `tools/debug_overlay.py` (app beliefs drawn
+  on the real video - the proof tool) and `tools/journal.py` (plain-
+  language entry + images to the phone's Dev Journal).
 
 ## Tier 0b — Standing automatics (do these the moment they're armed)
 
