@@ -74,15 +74,24 @@ presence/recording-guarded, one at a time.
 
 ## Tier 2 — Measurement quality (interleave with Tier 1 when GPU free)
 
-- [ ] **Outcome re-derivation from dense tracks** (Joe caught a 3-ball
-  false make surviving the reprocess): the campaign upgraded TRAILS
-  only; make/miss verdicts are still recording-era. Build the offline
-  outcome judge over dense sidecars (ball gone-into-which-pocket from
-  33ms tracks + pocket regions), compare against Joe's review verdicts
-  (`_eval/review_scoreboard.json` attachment rules), and only then
-  rewrite shots.json outcomes. Depends on pocket localization below
-  for jaw-ball credibility; sequence AFTER Tier 1 items 1-2 (shot ids
-  + one timebase make the rewrite safe).
+- [ ] **The one Input→Output box** (Joe, 2026-08-28 — supersedes the
+  "offline outcome judge" framing; NO more replay-only processing):
+  shot detection + outcome judgment become stages INSIDE the
+  measurement engine, one code path consumed by BOTH feeds. A clip's
+  shots.json is simply the box's output for that video — no merge, no
+  graft (that machinery gets DELETED on landing, per §5). Steps:
+  (a) port the shot detector's gates onto dense tracks inside
+  measure/ (the veto logic already reads the same tracks);
+  (b) outcome stage: pocketed-into-which-pocket from 33ms tracks +
+  pocket regions (pocket localization feeds this);
+  (c) validate against Joe's review verdicts
+  (`_eval/review_scoreboard.json` attachment rules) — the 3-ball
+  false make is test case #1;
+  (d) full-regeneration export: shots.json written wholesale from the
+  box's output; delete trails_merge/arbitrate scaffolding;
+  (e) M3/M4 then promote the SAME box onto the live feed.
+  Prereqs: Tier 1 items 1-2 (shot ids + one timebase) so history
+  rewrites can't mis-attach.
 - [ ] **3/5 flip mining**: scan dense sidecars for 3↔5 number changes
   on resting tracks; harvest crops at those timestamps; label; add to
   c8 training set. CPU-light scan; crop decode when GPU/disk idle.

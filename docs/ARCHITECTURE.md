@@ -28,6 +28,17 @@ PRESENTATION   Qt UI, voice, schematic, phone app, overlays
   animation, analysis, or interpretation PULLS from it (Joe's
   directive, verbatim, 2026-08-27). Its API is the working draft of
   the C++ engine's contract (`docs/MEASUREMENT_CORE.md` §0.1).
+- **The core is ONE Input → Output box** (Joe, 2026-08-28: "I don't
+  want to be doing anything to the replay clips that the measurement
+  core isn't doing to the live camera feed. Our measurement core
+  should be an Input > Output box that we simply feed the video clip
+  into."). Frames + timestamps in — tracks, shots, outcomes, trails
+  out. The live camera and a recorded clip are the SAME input type at
+  different speeds. Corollary: replay-only processing is FORBIDDEN as
+  new work — every merge/graft/repass that exists today is transition
+  scaffolding with a scheduled demolition date, and any new
+  measurement capability must be built INSIDE the box where both
+  feeds get it.
 - **Python proves, C++ inherits.** A rule ships to the rewrite only
   after it survives the corpus gates here. Nothing unproven ports.
 
