@@ -44,7 +44,10 @@ its gate holds AND a vision watch agrees.
   R1 CUE BALL - found, named, and continuously tracked; trail covers
      the real path from the strike. Gate: cue correctly named >=99% of
      frames, one cue track per shot, no phantom cue.
-     NOW: the metric reads 100% but it is WEAK - it only checks that
+     NOW: 99.7% on the HONEST metric (round 11 - live sighting
+     required). Residual failures are windows where the label rides a
+     coast while the real ball is seen-but-unnamed: an R3 symptom.
+     PREVIOUSLY: the metric read 100% but it was WEAK - it only checks that
      exactly one track claims "cue", not that the label sits on the
      real ball. Evidence frame 154.8s shows the cue label on EMPTY
      FELT beside an unnamed white ball. R1 is NOT passing until the
@@ -116,10 +119,12 @@ CAMPAIGN STATE (update every round; newest first):
   unnamed movers seen but pot-credit gated; pocket furniture dies by
   time; engine made hand/stick-aware offline (refresh_foreign).
 - OPEN, NEXT (round 9+), all bench-verified by vision each round:
-  (a0) NEXT: the dense sidecar marks EVERY row active=True, including
-      coasted ghost tracks (measure/tracker._Row.active is hardcoded).
-      That is how a label drifts onto bare felt and how consumers
-      cannot tell a sighting from an estimate. Write real activity.
+  (a0) DONE round 11: dense rows carry an 8th field - sighting vs
+      coasted ESTIMATE (additive; every reader indexing 0..6 is
+      unaffected, trails keep their blur coverage). R1's metric now
+      demands a live sighting: honest cue tracking is 99.7%, and the
+      debug overlay tags estimates 'est' so evidence frames never imply
+      the app saw what it inferred.
   (a) episode layer now over-fires (21 episodes) and mints FALSE POTS
       for named balls that lose/regain names mid-flight - e.g. pots
       credited to "4" at 13.1s/29.5s and to a nonexistent "11".

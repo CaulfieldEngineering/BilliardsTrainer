@@ -1976,3 +1976,15 @@ Rounds continue with Joe's visual feedback as the gate.
   the cue label on empty felt beside the unnamed real cue ball. R1
   demoted to not-passing; next round fixes the metric and the ghost
   rows behind it (sidecar writes active=True even for coasted tracks).
+
+- 2026-08-28 ~20:15 — ROUND 11: SIGHTING vs ESTIMATE. The dense stream
+  wrote coasted predictions with the same flag as real detections, so
+  no consumer (or metric) could tell a measurement from a guess - the
+  mechanism behind a cue label sitting on empty felt. Rows now carry an
+  8th field, additively: every reader indexing 0..6 is untouched and
+  trails keep their blur-coasting. R1's gate demands a live sighting:
+  honest cue tracking 99.7% (the weak test said 100%). Debug overlay
+  tags estimates 'est' - verified by eye on the 154.8s frame, where the
+  stranded cue label is now visibly a guess and the real cue ball is a
+  solid unnamed sighting. Bench otherwise steady: 10/10 shots, 8/10
+  calls, 2/4 attribution, 72.1% naming, physics 0.06/1k.

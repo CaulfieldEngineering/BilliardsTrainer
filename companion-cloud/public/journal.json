@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 52,
+   "ts": "2026-08-28T23:58:06",
+   "date": "Aug 28, 23:58 UTC",
+   "kind": "finding",
+   "title": "Round 11: the app now admits what it guessed",
+   "score": "cue tracking 99.7% (honest), shots 10/10",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/052-shot_154_2.jpg",
+     "caption": "154.8s: thin circles tagged 'est' are estimates, solid circles are real sightings. The cue label rides a guess; the real cue ball beside it was seen but unnamed."
+    }
+   ],
+   "html": "<div class='note'><p><strong>Last round I caught a number lying;\nthis round I made lying impossible.</strong> The app keeps following a\nball for a moment after it loses sight of it - a sensible thing to do\nthrough motion blur - but it was writing those guesses down exactly\nlike real sightings. Nothing downstream could tell the difference,\nwhich is how a \"cue ball\" label ended up sitting on bare cloth.</p>\n<p>Now every position the app records says whether it SAW the ball or\nESTIMATED it. In the picture below, the cue label on empty felt is\ndrawn thin and tagged <code>est</code> - a guess, correctly labelled -\nwhile your real cue ball beside it is a solid circle it actually saw.\nThe blobs near your glove are marked as guesses too.</p>\n<p>The honest cue-tracking score is <strong>99.7%</strong>, not the\n100% the weak test reported. Trails keep the estimates (they are what\nsmooth a blurred takeoff), but the scorecard no longer counts a guess\nas proof.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.7%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
    "id": 51,
    "ts": "2026-08-28T23:30:42",
    "date": "Aug 28, 23:30 UTC",

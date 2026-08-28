@@ -80,9 +80,16 @@ class SidecarWriter:
         if self._t0 is None:
             self._t0 = float(t)
         t = max(0.0, t - self._t0)
+        # 8th element (additive, 2026-08-28): True when this row is a
+        # COASTED ESTIMATE rather than a real sighting. Every consumer
+        # indexes 0..6 and is unaffected; the ones that care (metrics,
+        # debug overlay) can finally tell a measurement from a guess -
+        # a cue label was found sitting on empty felt because nothing
+        # downstream could.
         rec = [[int(tr.id), round(float(tr.x), 1), round(float(tr.y), 1),
                 round(float(tr.radius), 1), int(tr.number),
-                tr.cls.value, bool(tr.active)] for tr in tracks]
+                tr.cls.value, bool(tr.active),
+                bool(getattr(tr, "coasting", False))] for tr in tracks]
         d = {"type": "f", "t": round(t, 3), "tracks": rec}
         # v2 hand-context, omitted when absent so quiet states stay tiny:
         # which balls are hand-adjacent, and how much bed the hand covers.

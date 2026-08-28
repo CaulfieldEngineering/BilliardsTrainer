@@ -53,8 +53,16 @@ def render(video: Path, times_wanted, out_dir: Path, crop=None,
             if not active:
                 continue
             px, py = to_vid(x, y)
+            coasting = len(tr) > 7 and bool(tr[7])
             col = (60, 220, 60) if num >= 0 else (60, 160, 255)
-            cv2.circle(fr, (px, py), 26, col, 2)
+            if coasting:
+                # an ESTIMATE, not a sighting: thin + a tick, so evidence
+                # frames never imply the app saw something it inferred
+                cv2.circle(fr, (px, py), 26, col, 1)
+                cv2.putText(fr, "est", (px - 14, py + 44),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, col, 1)
+            else:
+                cv2.circle(fr, (px, py), 26, col, 2)
             cv2.putText(fr, f"{'?' if num < 0 else num}", (px - 34, py - 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2)
             cv2.putText(fr, f"id{tid}", (px + 20, py + 34),

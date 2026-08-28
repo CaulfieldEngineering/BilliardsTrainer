@@ -127,8 +127,12 @@ def score(truth_path: Path) -> dict:
     invented: dict = {}
     prev: dict = {}
     for j, rows_f in enumerate(frames):
+        # R1 correctness (demoted 2026-08-28 after a vision check found
+        # the cue label on empty felt): exactly ONE cue track AND it must
+        # be a real sighting this frame, not a coasted estimate.
         cues = [x for x in rows_f if x[6] and x[4] == 0]
-        if len(cues) == 1:
+        live = [x for x in cues if not (len(x) > 7 and x[7])]
+        if len(cues) == 1 and len(live) == 1:
             cue_ok += 1
         else:
             cue_bad += 1

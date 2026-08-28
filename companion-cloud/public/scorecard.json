@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-28T23:29:56Z",
+ "ts": "2026-08-28T23:57:14Z",
  "detected": "10/10",
  "outcome": "8/10",
  "false_strokes": 3,
@@ -111,7 +111,7 @@
   }
  ],
  "caps": {
-  "cue_named_pct": 100.0,
+  "cue_named_pct": 99.7,
   "named_moving_pct": 72.1,
   "invented_numbers": [
    8

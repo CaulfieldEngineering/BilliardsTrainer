@@ -29,7 +29,7 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 8   # v8: hand context in the dense stream
+ENGINE_RULES_V = 9   # v9: sighting-vs-estimate in the stream
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
