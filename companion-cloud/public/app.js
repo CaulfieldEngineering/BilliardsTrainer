@@ -492,8 +492,11 @@ function renderHome() {
       // pinned sessions float (Joe: pin the current debug session);
       // stored locally per device
       let _pins;
-      try { _pins = new Set(JSON.parse(localStorage.getItem("pins") || "[]")); }
-      catch (e) { _pins = new Set(); }
+      try {
+        _pins = new Set([
+          ...JSON.parse(localStorage.getItem("pins") || "[]"),
+          ...JSON.parse(localStorage.getItem("serverPins") || "[]")]);
+      } catch (e) { _pins = new Set(); }
       const ordered = [...sessCache.filter(s2 => _pins.has(s2.name)),
                        ...sessCache.filter(s2 => !_pins.has(s2.name))];
       ordered.forEach(s2 => {
@@ -589,6 +592,11 @@ async function loadSessions() {
     _sessRetry = 0;
     try { localStorage.setItem("sessCache", JSON.stringify(sessCache)); }
     catch (e) { /* storage full: the live render still works */ }
+    // server-side pins (pins.json beside the recordings) merge with
+    // this device's own pins
+    try { localStorage.setItem("serverPins",
+                               JSON.stringify(resp.pins || [])); }
+    catch (e) { /* optional */ }
   } catch (e) {
     if (String(e.message) === "401") return;   // keygate already shown
     sessError = String(e.message);

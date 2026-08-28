@@ -23,6 +23,22 @@ module.exports = async (req, res) => {
     }
     const summaries = new Set(
       entries.filter(e => e.name.endsWith(".shots.json")).map(e => e.name));
+    // pins.json: server-side pins (Joe: "can you just pin it") — written
+    // beside the recordings; merged with device-local pins in the app
+    let pins = [];
+    try {
+      const pr = await fetch("https://content.dropboxapi.com/2/files/download", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Dropbox-API-Arg": JSON.stringify({ path: `${FOLDER}/pins.json` }),
+        },
+      });
+      if (pr.ok) {
+        const d = await pr.json();
+        if (Array.isArray(d)) pins = d.filter(x => typeof x === "string");
+      }
+    } catch (e) { /* pins optional */ }
     // library.json: one fetch for every session's duration + attempt count
     let lib = {};
     try {
@@ -52,7 +68,7 @@ module.exports = async (req, res) => {
       .sort((a, b) => (a.modified < b.modified ? 1 : -1))
       .slice(0, 100);
     res.setHeader("Cache-Control", "no-store");
-    res.status(200).json({ sessions });
+    res.status(200).json({ sessions, pins });
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
