@@ -3,7 +3,9 @@
 **Before designing any change, read `docs/ARCHITECTURE.md`** — the
 binding design methodology (Joe, 2026-08-27: read on every effort).
 UI work additionally obeys `docs/DESIGN.md`. The measurement plan of
-record is `docs/MEASUREMENT_CORE.md`.
+record is `docs/MEASUREMENT_CORE.md`. The work queue is
+`docs/BACKLOG.md` (topmost unblocked item; Tier 4 exists so "nothing
+to work on" is never true); `docs/GOALS.md` is the append-only log.
 
 The five-second version of ARCHITECTURE.md:
 1. One opinion per fact — table truth lives in `measure/core.py`

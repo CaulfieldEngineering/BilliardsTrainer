@@ -25,16 +25,14 @@ test suite.
 ## How it runs
 Two scheduled jobs live in the Claude session attached to this repo:
 
-1. **Work session** — every 2 hours. Reads docs/GOALS.md, takes the
-   highest-priority unfinished goal, does one bounded chunk of real work
-   (label sessions, train/gate a challenger, build a tool, fix what a
-   metric exposed), verifies it, commits, appends one line to the GOALS
-   progress log, and refreshes the heartbeat.
-   PRIORITY ORDER (Joe, 2026-08-27): committed gate/rollout tasks
-   first, then a DEMOLITION chunk from ARCHITECTURE.md §5 (migrate
-   consumers + delete the old opinion-holder, same commit), then
-   feature goals. Deleting redundant code IS the work, not cleanup
-   after the work.
+1. **Work session** — every 2 hours. Takes the TOPMOST unblocked item
+   from **docs/BACKLOG.md** (THE queue — Tier 0 automatics, then
+   demolition, then measurement quality, then product; Tier 4 means
+   there is never "nothing to work on"), does one bounded chunk,
+   verifies it, commits, appends one line to the GOALS progress log
+   (the LOG — queue and log are separate on purpose), and refreshes
+   the heartbeat. Deleting redundant code IS the work, not cleanup
+   after the work (Joe, 2026-08-27).
 2. **Watchdog** — hourly, offset from the work session. Checks the
    heartbeat and the invariants below; recovers and logs an incident if
    anything is wrong. THEN runs the hygiene pass (below) — the
