@@ -1882,3 +1882,13 @@ Rounds continue with Joe's visual feedback as the gate.
   table/pockets in meta; box vs review-verdicts across all 13 dense
   sessions; then full shots.json regeneration + merge-machinery
   deletion.
+
+- 2026-08-28 late morning — ON-DEMAND RE-MEASURE SHIPPED (Joe's four
+  properties): sidebar right-click "Re-measure (latest engine)" runs
+  measure/job.py (the box by button: engine -> gate -> prefer-dense
+  merge) in its own process; progress % + eta in the status bar
+  (engine publishes m1_progress.json every 2s); deterministic outputs
+  with meta rules_v=2 (stale-era refusal pending in the gate);
+  refuses a second job or a live recording (guards tested); click
+  skips the presence pause (the ask is the consent). App restarted
+  with it. 651 tests green.

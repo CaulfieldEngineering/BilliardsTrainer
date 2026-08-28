@@ -92,6 +92,13 @@ presence/recording-guarded, one at a time.
   (e) M3/M4 then promote the SAME box onto the live feed.
   Prereqs: Tier 1 items 1-2 (shot ids + one timebase) so history
   rewrites can't mis-attach.
+  PROGRESS 2026-08-28: stages 1-2 built + validated (measure/shots.py;
+  the 3-ball case judges MISS); on-demand UI re-measure shipped
+  (sidebar right-click → measure/job.py: engine→gate→merge, progress
+  % in the status bar, deterministic, rules_v stamped, own process,
+  presence-pause skipped on click). NEXT: hand-context + table/pocket
+  geometry in engine output; box-vs-review-verdicts across the 13
+  dense sessions.
 - [ ] **3/5 flip mining**: scan dense sidecars for 3↔5 number changes
   on resting tracks; harvest crops at those timestamps; label; add to
   c8 training set. CPU-light scan; crop decode when GPU/disk idle.
@@ -100,10 +107,8 @@ presence/recording-guarded, one at a time.
   write `.analysis.shadow.jsonl`; exit criteria in MEASUREMENT_CORE §M3.
 - [ ] **Pocket visual localization** (ladder rung 2): locate real
   pocket mouths vs geometric marks; feeds pot-credit gates.
-- [ ] **Engine-version stamp in dense sidecars**: leg 2 gated a stale
-  pre-hardened sidecar as if current (184/1k). Meta already carries
-  engine:"m1" — add a rules-version int; the gate refuses version
-  mismatches. Also: Aug-23 sessions (185550/191319/194542) gate red on
+- [~] **Engine-version stamp**: writing DONE (meta rules_v=2,
+  2026-08-28); REMAINING: gate/scorecard refuses rules_v mismatches. Also: Aug-23 sessions (185550/191319/194542) gate red on
   overlaps — investigate EOS AF-rectangle contamination; they stay
   honest-sparse until then.
 - [ ] **Shot recall audit**: false-negative hunt on dense output vs
