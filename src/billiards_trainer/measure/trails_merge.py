@@ -182,4 +182,12 @@ def merge_into_session(video_path, dense_sidecar_video,
     doc["trails_engine"] = "m1-dense"
     sj.write_text(json.dumps(doc, separators=(",", ":")), encoding="utf-8")
     log.info("dense trails merged into %s: %s", sj.name, stats)
+    # the stamp's OWNER refreshes the index (Joe caught the phone's
+    # "proc" line frozen at Aug 26 while the file said today: the list
+    # reads library.json and nothing rebuilt it after merges)
+    try:
+        from ..vision.shots_export import export_library_index
+        export_library_index(video_path.parent)
+    except Exception:  # noqa: BLE001 - index is a convenience, never fatal
+        log.debug("library index refresh failed", exc_info=True)
     return stats
