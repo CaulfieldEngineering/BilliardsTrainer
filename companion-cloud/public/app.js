@@ -404,13 +404,28 @@ function openSessionDetails(s2) {
       row.append(kk, document.createTextNode(String(v)));
       facts.appendChild(row);
     });
+  let pins;
+  try { pins = new Set(JSON.parse(localStorage.getItem("pins") || "[]")); }
+  catch (e) { pins = new Set(); }
+  const pinBtn = document.createElement("button");
+  const setPinLabel = () =>
+    pinBtn.textContent = pins.has(s2.name) ? "Unpin session" : "Pin session";
+  setPinLabel();
+  pinBtn.style.cssText = "background:none;border:1px solid #232B36;color:#C7D0DA;" +
+    "border-radius:2px;padding:7px 14px;font-size:13px;margin-top:12px;margin-right:8px";
+  pinBtn.onclick = () => {
+    if (pins.has(s2.name)) pins.delete(s2.name); else pins.add(s2.name);
+    try { localStorage.setItem("pins", JSON.stringify([...pins])); } catch (e) { /* private mode */ }
+    setPinLabel();
+    if (typeof renderHome === "function") renderHome();
+  };
   const close = document.createElement("button");
   close.textContent = "Close";
   close.style.cssText = "background:none;border:1px solid #232B36;color:#9AA4B2;" +
     "border-radius:2px;padding:7px 14px;font-size:13px;margin-top:12px";
   close.onclick = () => ov.remove();
   ov.onclick = ev => { if (ev.target === ov) ov.remove(); };
-  card.append(h, idRow, btn, facts, close);
+  card.append(h, idRow, btn, facts, pinBtn, close);
   ov.appendChild(card);
   document.body.appendChild(ov);
 }
@@ -474,14 +489,22 @@ function renderHome() {
         head.appendChild(sp);
       });
       wrap.appendChild(head);
-      sessCache.forEach(s2 => {
+      // pinned sessions float (Joe: pin the current debug session);
+      // stored locally per device
+      let _pins;
+      try { _pins = new Set(JSON.parse(localStorage.getItem("pins") || "[]")); }
+      catch (e) { _pins = new Set(); }
+      const ordered = [...sessCache.filter(s2 => _pins.has(s2.name)),
+                       ...sessCache.filter(s2 => !_pins.has(s2.name))];
+      ordered.forEach(s2 => {
         const el = document.createElement("div");
         el.className = "sess" + (s2.analyzed ? "" : " stub");
         // textContent only — a Dropbox filename is untrusted input and
         // the fmtDate fallback returns it raw (security review).
         const d = document.createElement("span");
         d.className = "d";
-        d.textContent = fmtDate(s2.name, s2.modified);
+        d.textContent = (_pins.has(s2.name) ? "📌 " : "")
+          + fmtDate(s2.name, s2.modified);
         // "Last processed" (Joe): respins retroactively update sessions -
         // a dimmed second line shows WHEN the analysis last ran, so a
         // fresh re-process is visible at a glance in the list
