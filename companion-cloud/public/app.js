@@ -725,6 +725,15 @@ function buildChips() {
     el.textContent = isAttempt(s)
       ? (s.action === "break" ? "BRK" : i + 1)
       : (s.action === "rearrange" ? "⇄" : "✋");
+    // desktop vertical list (Joe): each chip grows a detail span -
+    // time + outcome word; CSS hides it on phones, shows it wide
+    const det = document.createElement("span");
+    det.className = "chipdet";
+    const mm = Math.floor((s.start || 0) / 60);
+    const ss = String(Math.floor((s.start || 0) % 60)).padStart(2, "0");
+    det.textContent = `${mm}:${ss}` + (isAttempt(s)
+      ? ` · ${(s.outcome || "").toUpperCase()}` : " · setup");
+    el.appendChild(det);
     el.onclick = () => gotoShot(i, true);
     c.appendChild(el);
   });

@@ -289,6 +289,7 @@
      playhead waits visibly instead of looking stuck */
   #playhead.waiting { opacity:.35; animation:pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity:.1; } }
+  .chip .chipdet { display:none; }   /* desktop-only detail span */
   .chip { min-width:42px; height:42px; border-radius:4px; flex:0 0 auto;
           display:flex; align-items:center; justify-content:center;
           background:var(--panel); border:2px solid var(--line);
@@ -324,7 +325,17 @@
       border-left: 1px solid #232B36; padding-left: 16px;
     }
     #lane { height: 56px; }
-    #chips { flex-wrap: wrap; overflow-x: visible; }
+    /* shot chips become a VERTICAL LIST on desktop (Joe): one row per
+       shot with time + outcome; the rail scrolls, colors unchanged */
+    #chips { flex-direction: column; flex-wrap: nowrap;
+             overflow-x: visible; gap: 4px; }
+    #chips .chip { width: 100%; min-height: 32px;
+                   display: flex; align-items: center;
+                   justify-content: flex-start; padding: 0 12px;
+                   box-sizing: border-box; }
+    #chips .chip .chipdet { display: inline; margin-left: auto;
+                            font-size: 12px; color: var(--faint);
+                            font-weight: 400; }
     /* overlays hug the right rail instead of the video */
     #ovmenu { left: auto !important; right: 24px; }
     #sheet {
