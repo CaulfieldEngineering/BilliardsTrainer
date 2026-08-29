@@ -1,10 +1,10 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-29T01:56:47Z",
+ "ts": "2026-08-29T10:49:49Z",
  "detected": "10/10",
  "outcome": "8/10",
- "false_strokes": 5,
- "extra_episodes": 8,
+ "false_strokes": 1,
+ "extra_episodes": 0,
  "episodes": 24,
  "shots": [
   {
@@ -119,6 +119,6 @@
   "invented_frames": 18,
   "pot_attribution": "2/4"
  },
- "setup_labelled": 1,
+ "setup_labelled": 13,
  "perfect": false
 }

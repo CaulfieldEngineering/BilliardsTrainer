@@ -2047,3 +2047,13 @@ Rounds continue with Joe's visual feedback as the gate.
   10/10 and calls 8/10. Regression published with it: fake strokes
   3->5, because the hand-setup rule (CARRIED_SETUP=0.5) was tuned when
   ghost tracks diluted the carried fraction - retune next.
+
+- 2026-08-28 ~23:55 EDT — ROUND 16 (R2 nearly closed): looked at the
+  false strokes first (RULE 0) - they are Joe addressing the cue and
+  pushing balls with the stick. Two measured rules landed: a stroke
+  requires CUE MOTION (tossed-in balls roll free and no hand-adjacency
+  test can catch them) and MEANINGFUL cue travel (real >=263px vs
+  nudges 8-29px; gate 150px). Fake strokes 5->1, unexplained 10->0,
+  shots hold 10/10, calls 8/10, naming 75.7%. No engine re-measure
+  needed - the shot stage runs at scoring time. Remaining fake is the
+  13.1s stick-push (210px); needs the cue stick recognised.

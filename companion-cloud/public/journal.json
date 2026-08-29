@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 58,
+   "ts": "2026-08-29T10:50:25",
+   "date": "Aug 29, 06:50 AM EDT",
+   "kind": "finding",
+   "title": "Round 16: no more phantom shots from setting up",
+   "score": "fake shots 5 -> 1, unexplained 10 -> 0",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/058-r16_strip.png",
+     "caption": "The three false 'shots': addressing the cue (left, centre) and pushing balls into place with the stick (right). The cue barely moves in any of them."
+    }
+   ],
+   "html": "<div class='note win'><p><strong>The app stopped inventing shots out of you setting up.</strong> Invented shots are down from five to one, and unexplained events from ten to zero - shots found stays at 10 of 10.</p><p>Two rules, both taken from looking at the frames rather than guessing:</p><p><strong>1. A shot means the cue ball moved.</strong> When you toss a ball onto the table it rolls freely and looks exactly like a shot - no hand is touching it, so nothing about 'is a hand nearby' can catch it. But your cue ball sits still. Every one of the ten real strokes moves the cue; none of the invented ones do.</p><p><strong>2. A shot means the cue ball went somewhere.</strong> The three remaining false shots were you addressing the ball or nudging it with the stick, pictured below. Measured across the clip: real strokes send the cue at least 263 pixels; a nudge is 8 to 29. The line is drawn at 150, with room on both sides.</p><p>One invented shot remains, during the opening setup where you push the cue around with the stick over a longer distance. That one needs the stick itself to be recognised, which is next.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>75.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>1</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Dev Journal timestamps in Joe&#x27;s clock (Eastern), not UTC</li><li>Round 15: coasts stop at the bed edge - the app was chasing nothing</li><li>RULE 0: never assert a physical cause without looking at the pixels</li><li>Round 14: conditional jaw filter failed two ways - reverted</li><li>Round 13: jaw filter hides real pots - but deleting it is worse</li><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
    "id": 57,
    "ts": "2026-08-29T01:57:31",
    "date": "Aug 28, 09:57 PM EDT",

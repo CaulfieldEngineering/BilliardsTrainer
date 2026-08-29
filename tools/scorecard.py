@@ -111,8 +111,12 @@ def score(truth_path: Path) -> dict:
     for i, e in enumerate(eps):
         if i in used:
             continue
-        if getattr(e, "setup", False):
-            setup_labelled += 1      # correctly called hand-work, not a shot
+        if (getattr(e, "setup", False) or not getattr(e, "cue_moved", True)
+                or getattr(e, "cue_travel", 999.0) < 150.0):
+            # hand-work, or table motion with no cue ball involved: not a
+            # stroke by definition (round 16 - every real stroke on the
+            # bench moves the cue; tossed-in balls do not)
+            setup_labelled += 1
             continue
         if any(a <= e.t_strike <= b for a, b, *_ in setup):
             false_strokes += 1

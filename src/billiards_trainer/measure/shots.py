@@ -35,6 +35,14 @@ class Episode:
     t_settle: float
     movers: set = field(default_factory=set)
     setup: bool = False          # hand-driven (placing/gathering), not a stroke
+    cue_travel: float = 0.0      # px the cue ball covered in this episode
+    cue_moved: bool = False      # the cue ball moved: the definition of a
+                                 # stroke. Measured on the bench (round 16):
+                                 # all 10 real strokes have it, and the
+                                 # invented ones - balls TOSSED onto the
+                                 # table, which roll free and look exactly
+                                 # like a shot - do not. Hand-adjacency
+                                 # cannot catch a tossed ball; this can.
     pocketed: list = field(default_factory=list)   # (number, pocket_x, pocket_y)
     resting: set = field(default_factory=set)
     lost: list = field(default_factory=list)       # (number, last_x, last_y)
@@ -78,6 +86,9 @@ def _series(times, frames):
     return by_n
 
 
+MIN_CUE_TRAVEL = 150.0   # px: below this the cue was addressed or nudged
+                         # with the stick, not struck (bench: real strokes
+                         # >=263px, nudges 8-29px)
 CARRIED_SETUP = 0.5      # this share of moving samples hand-adjacent =
                          # the hand moved the balls, not a cue
 
@@ -145,6 +156,17 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
             ep.setup = tot > 0 and hot / tot >= CARRIED_SETUP
         _judge(ep, by_n, moving_ts, t_open, t_close, pockets, pocket_r,
                unnamed_pots)
+        ep.cue_moved = 0 in ep.movers
+        # HOW FAR the cue actually went. Measured on the bench (round 16):
+        # real strokes move it 263px at minimum, while addressing the ball
+        # or pushing it with the stick registers 8-29px. Joe nudges the cue
+        # constantly while setting up; that is not a shot.
+        cue_pts = [p for p in by_n.get(0, [])
+                   if t_open - 0.3 <= p[0] <= t_close]
+        ep.cue_travel = sum(
+            ((cue_pts[k][1] - cue_pts[k - 1][1]) ** 2
+             + (cue_pts[k][2] - cue_pts[k - 1][2]) ** 2) ** 0.5
+            for k in range(1, len(cue_pts)))
         episodes.append(ep)
         i = k + 1
     return episodes

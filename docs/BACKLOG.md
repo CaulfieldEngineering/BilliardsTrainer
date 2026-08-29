@@ -78,6 +78,15 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R2 ROUND 16 (kept): fake strokes 5->1, unexplained 10->0, shots hold
+     10/10. Two measured rules: (a) a stroke means the CUE MOVED - all
+     10 real strokes move it, tossed-in balls never do (and hand-
+     adjacency cannot catch a tossed ball, since no hand touches it
+     once released); (b) a stroke means the cue WENT somewhere - real
+     strokes >=263px, addressing/nudging 8-29px, gate at 150px.
+     REMAINING fake: the 13.1s setup where Joe pushes the cue 210px
+     with the stick - needs the STICK recognised (it is tracked as an
+     unnamed mover); next R2 attempt.
   R3 ROUND 15 (kept): looked at the open-felt losses per RULE 0 - they
      were NOT missed balls. Crops show a ball in the glove, two empty
      pocket corners, and one prediction off the table on the FLOOR. The

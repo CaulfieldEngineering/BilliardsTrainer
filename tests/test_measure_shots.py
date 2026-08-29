@@ -235,3 +235,38 @@ class TestUnnamedMovers:
             frames.append(rows)
         eps = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)
         assert all(not e.pocketed for e in eps)
+
+
+class TestCueDefinesAStroke:
+    """Round 16: a stroke means the cue ball moved. Balls TOSSED onto
+    the table roll free and are indistinguishable from a shot by any
+    hand-adjacency test - but the cue never moves for them."""
+
+    def test_cue_motion_marks_a_stroke(self):
+        times, frames = _stream({0: _roll_then_rest(60, 150, 100, 100, 400, 400),
+                                 3: _rest(300, 600)})
+        ep = analyze(times, frames)[0]
+        assert ep.cue_moved is True
+
+    def test_tossed_ball_alone_is_not_a_stroke(self):
+        # object ball rolls the table; the cue never moves
+        times, frames = _stream({0: _rest(100, 100),
+                                 3: _roll_then_rest(60, 160, 300, 200, 300, 900)})
+        eps = analyze(times, frames)
+        assert eps and eps[0].cue_moved is False
+
+
+class TestCueTravelGate:
+    """Round 16: Joe nudges the cue while addressing; real strokes send
+    it 263px+ on the bench, a nudge 8-29px."""
+
+    def test_stroke_records_real_travel(self):
+        times, frames = _stream({0: _roll_then_rest(60, 150, 100, 100, 500, 500)})
+        ep = analyze(times, frames)[0]
+        assert ep.cue_travel > 150
+
+    def test_nudge_records_tiny_travel(self):
+        times, frames = _stream({0: _roll_then_rest(60, 90, 100, 100, 130, 100),
+                                 3: _roll_then_rest(60, 160, 300, 200, 300, 800)})
+        ep = analyze(times, frames)[0]
+        assert ep.cue_travel < 150
