@@ -29,7 +29,10 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 12  # v12: coasts stop at the bed edge
+ENGINE_RULES_V = 13  # v13: the identifier outranks the finder's colour
+                     # heuristic; a track that left the table is retired
+                     # so its name cannot latch onto another ball; only a
+                     # real sighting proves a track ever moved
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -86,8 +89,20 @@ def _pair_identities(found, ident_by_pos) -> None:
         used_i.add(ii)
     for fi_d, d in enumerate(found):
         num = num_for.get(fi_d, -1)
-        if num >= 0 and getattr(d, "number", -1) < 0:
-            d.number = num               # carry the identifier's read
+        # THE IDENTIFIER WINS. It is the trained 16-class naming model;
+        # any number already on a find is the finder's crude colour
+        # heuristic, which exists only for balls the identifier cannot
+        # see. The old guard (`and d.number < 0`) had that precedence
+        # backwards, so a ball the heuristic had already guessed could
+        # never be corrected - measured on the bench: the heuristic calls
+        # the yellow-STRIPED 9 a "1" in 43 of 43 samples (both are
+        # yellow) while the identifier reads it 9 in 71 of 72, and the
+        # correct read was discarded every frame. The 9 scored 0/221 and
+        # collected the name "1" whenever the real 1 left the table. The
+        # heuristic is also where the invented numbers come from (it
+        # emits 8s and an 11 across this clip).
+        if num >= 0:
+            d.number = num
 
 
 def reprocess(video: str, out_dir: str | None = None,

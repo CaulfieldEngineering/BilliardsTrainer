@@ -82,6 +82,10 @@ class _Track:
                    if v == n and now - vt <= FRESH_S)
 
 
+RETIRE_S = 3.0           # inactive this long AND last seen leaving the
+                         # table = the track is DELETED, so it can neither
+                         # match a new ball nor lend one a dead ball's
+                         # name (round 30/31)
 FURNITURE_S = 8.0        # a pocket-zone track this old that has NEVER
                          # moved is furniture (leather/shadow), not a ball
 
@@ -99,6 +103,24 @@ class MotionTracker:
         # leaves. Needs geometry, so the engine passes it in.
         self._pockets = list(pockets or [])
         self._pocket_r = float(pocket_r)
+
+    def _left_the_table(self, tr) -> bool:
+        """Did this track end where a ball leaves play - a pocket, or
+        past the bed edge? Only then may its identity be retired; a ball
+        that went out of sight mid-felt is occluded, not gone (the bridge
+        hand closing over one at 154.2s costs the whole stroke if that
+        distinction is not made)."""
+        if not self._pockets:
+            return True
+        if self._pocket_r > 0 and any(
+                ((tr.x - px) ** 2 + (tr.y - py) ** 2) ** 0.5 < 2.2 * self._pocket_r
+                for px, py in self._pockets):
+            return True
+        xs = [p[0] for p in self._pockets]
+        ys = [p[1] for p in self._pockets]
+        pad = 2.0 * max(tr.radius, 8.0)
+        return not (min(xs) - pad <= tr.x <= max(xs) + pad
+                    and min(ys) - pad <= tr.y <= max(ys) + pad)
 
     def update(self, dets, t: float) -> list:
         """dets: iterable of (x, y, radius, number) for one frame at time
@@ -213,7 +235,14 @@ class MotionTracker:
             for tr in self._tracks.values():
                 if not tr.active or tr.t0 < 0:
                     continue
-                if not tr.ever_moved:
+                # ONLY A REAL SIGHTING PROVES MOVEMENT (tr.t == t means
+                # this track was matched to a detection this frame; a
+                # coasting track keeps its last sighting time). Coasted
+                # positions are predictions, and the pocket leather's
+                # own coast drifted it ~20px off its birth spot, set
+                # ever_moved, and thereby exempted itself from the
+                # furniture rule that exists to kill it.
+                if not tr.ever_moved and tr.t == t:
                     d0 = ((tr.x - tr.bx) ** 2 + (tr.y - tr.by) ** 2) ** 0.5
                     if d0 > max(tr.radius, 8.0):
                         tr.ever_moved = True
@@ -223,6 +252,33 @@ class MotionTracker:
                                 for px, py in self._pockets)):
                     tr.active = False
                     tr.vx = tr.vy = 0.0
+        # 4d. RETIREMENT - A NAME MUST NOT OUTLIVE ITS BALL. Going
+        # inactive was never the end: step 2 associates against every
+        # track in the dict with no liveness test, and the acquisition
+        # gate widens with time unseen, so a long-dead track could claim
+        # a brand-new ball anywhere on the felt and hand it the dead
+        # ball's identity. Traced on the bench: id3 was genuinely the
+        # yellow 1, followed it into the bottom-right pocket at 32.2s,
+        # re-appeared across the table at 45.4s, then latched onto the
+        # RED 3 at 109.2s - which answered to "1" for the rest of the
+        # clip while every detection under it read 3. The same stale "1"
+        # was what the static 9 wore whenever the real 1 was away.
+        # ...and only for something that was ever actually a BALL. A
+        # track that has never moved is furniture, and 4c above exists to
+        # condemn it after FURNITURE_S. Retiring it first (at RETIRE_S)
+        # deleted it before that verdict could be reached, so the pocket
+        # leather was re-born as a fresh young track over and over; each
+        # cycle of sighting -> coast -> re-snap reads as a ball moving at
+        # 500-1700 px/s, and that fake motion opened the 154.2 episode
+        # 6 seconds early. Never-moved tracks are furniture's business,
+        # not retirement's.
+        for tid in [k for k, tr in self._tracks.items()
+                    if not tr.active and t - tr.t > RETIRE_S
+                    and tr.ever_moved and self._left_the_table(tr)]:
+            del self._tracks[tid]
+            for num, holder in list(self._holder.items()):
+                if holder == tid:
+                    del self._holder[num]      # its claim dies with it
         live = [tr for tr in self._tracks.values() if tr.active]
         for i, a in enumerate(live):
             for b in live[i + 1:]:

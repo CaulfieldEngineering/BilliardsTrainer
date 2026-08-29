@@ -97,6 +97,48 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
+  R3 ROUND 31 - *** SHIPPED *** (ENGINE_RULES_V 12 -> 13). First
+     champion change of the campaign that improved a gate without
+     costing another one.
+     THE BLOCKER FROM ROUND 30, SOLVED: the early episode was not caused
+     by retirement spawning tracks per se. The bottom-left pocket
+     leather flickers (sighting -> coast -> re-snap), and its own
+     COASTED drift (~20px off birth) was setting ever_moved, which
+     exempted it from the FURNITURE_S rule that exists to kill it; my
+     retirement then deleted and re-created it every 3s so it never
+     aged into furniture at all. Each cycle read as 500-1700 px/s of
+     motion and opened the 154.2 window at 147.98.
+     FIX: only a REAL SIGHTING proves movement - guard the ever_moved
+     update with `tr.t == t`. A coast is a prediction, not evidence.
+     SHIPPED TOGETHER (all three, gated on the full scorecard):
+       1. engine._pair_identities: the identifier outranks the finder's
+          colour heuristic (dropped the `and d.number < 0` guard).
+       2. tracker: retire (delete) a track unseen > RETIRE_S=3.0 that
+          EVER MOVED and whose last position says it left the table
+          (pocket zone or off-bed); purge its _holder claim.
+       3. tracker: ever_moved only from real sightings.
+     MEASURED, champion -> new:
+       named correctly     76.0% -> 89.2%
+       moving balls named  75.7% -> 94.7%
+       pot attribution     2/4   -> 3/4
+       invented frames     60    -> 36
+       strokes 10/10, outcomes 9/10, unexplained 0, cue 100% - ALL HELD
+       per ball 0:221/221 1:59/85 2:156/156 3:188/189 4:134/136
+                9:141/221  (was 9:0/221)
+     Pinned by tests/test_identity_continuity.py (7 tests: identifier
+     beats the guess, a potted ball's name cannot latch onto another
+     ball, an OCCLUDED ball mid-felt keeps its identity, a coast is not
+     movement). Vision-checked at t=200s: 3/cue/4/2 correct, no phantom
+     circles, the 9 still labelled 1 - exactly what the metric says.
+  R3 NEXT - THE LAST BIG NAMING ERROR: 9->1 x80, and ONLY while the real
+     1 is off the table. Same root as fix 1: when the identifier skips a
+     frame, the unpaired find keeps the colour heuristic's "yellow = 1"
+     guess and that still votes; with the real 1 gone nothing outvotes
+     it. Candidate: an unpaired find carries NO number into the tracker
+     (the heuristic is measurably bad - 43/43 wrong on the 9, and it is
+     the source of the invented 8s and 10s). Worth ~6 points, which
+     would put naming near the 95% gate. Measure it - naming may drop if
+     the heuristic is carrying balls the identifier cannot see.
   R3 ROUND 30 - BOTH ROOT CAUSES FOUND AND FIXED (not shipped; one
      boundary artifact left). Measured, not theorised:
      CAUSE 1 - PRECEDENCE INVERTED (measure/engine.py _pair_identities):

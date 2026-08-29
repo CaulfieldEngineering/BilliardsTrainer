@@ -2251,3 +2251,20 @@ Rounds continue with Joe's visual feedback as the gate.
   10/10 -> 9/10 because the 154.2 episode opens at 147.98 (6.2s early,
   outside MATCH_S) - retirement spawns new unnamed tracks whose motion
   opens the window early. Champion reverted and re-verified at 76.0%.
+
+- 2026-08-30 ~03:00 EDT - ROUND 31 *** SHIPPED *** (rules_v 12 -> 13).
+  Solved round 30's blocker: the pocket leather's own COASTED drift was
+  setting ever_moved, exempting it from the furniture rule, and my new
+  retirement then re-created it every 3s so it never aged into furniture
+  - each sighting/coast/re-snap cycle read as 500-1700 px/s and opened
+  the 154.2 shot window 6s early. Fix: only a real sighting proves
+  movement (`tr.t == t`). Shipped with the two round-30 fixes (the
+  identifier outranks the finder's colour heuristic; a track that left
+  the table is retired so its name cannot latch onto another ball).
+  MEASURED: named correctly 76.0 -> 89.2%, moving balls named 75.7 ->
+  94.7%, pot attribution 2/4 -> 3/4, invented frames 60 -> 36, while
+  strokes (10/10), outcomes (9/10), unexplained (0) and cue (100%) all
+  HELD. The striped 9 goes 0/221 -> 141/221. Pinned by 7 tests;
+  vision-checked at t=200s. NEXT: the last big naming error is 9->1 x80,
+  only while the real 1 is off the table - the unpaired find still
+  carries the colour heuristic's guess as a vote.

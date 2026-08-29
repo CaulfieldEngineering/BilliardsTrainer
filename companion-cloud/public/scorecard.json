@@ -1,11 +1,11 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-29T18:56:52Z",
+ "ts": "2026-08-29T19:25:38Z",
  "detected": "10/10",
  "outcome": "9/10",
  "false_strokes": 1,
  "extra_episodes": 0,
- "episodes": 24,
+ "episodes": 19,
  "shots": [
   {
    "strike": 31.7,
@@ -15,8 +15,8 @@
    "engine": "pot",
    "truth": "pot",
    "ball_truth": 1,
-   "ball_engine": 4,
-   "ball_ok": false,
+   "ball_engine": 1,
+   "ball_ok": true,
    "img": "journal/evidence/shot_31_7.jpg"
   },
   {
@@ -112,20 +112,19 @@
  ],
  "caps": {
   "cue_named_pct": 100.0,
-  "named_moving_pct": 75.7,
+  "named_moving_pct": 94.7,
   "invented_numbers": [
-   5,
-   8
+   8,
+   10
   ],
-  "invented_frames": 60,
-  "name_right_pct": 76.0,
-  "name_wrong_frames": 156,
-  "name_unnamed_frames": 86,
+  "invented_frames": 36,
+  "name_right_pct": 89.2,
+  "name_wrong_frames": 81,
+  "name_unnamed_frames": 28,
   "name_missing_frames": 88,
   "name_confusions": {
-   "9->1": 154,
-   "9->3": 1,
-   "1->2": 1
+   "9->1": 80,
+   "4->2": 1
   },
   "name_per_ball": {
    "0": {
@@ -135,9 +134,9 @@
     "missing": 0
    },
    "1": {
-    "right": 66,
-    "wrong": 1,
-    "unnamed": 18,
+    "right": 59,
+    "wrong": 0,
+    "unnamed": 26,
     "missing": 1
    },
    "2": {
@@ -147,26 +146,26 @@
     "missing": 0
    },
    "3": {
-    "right": 187,
+    "right": 188,
     "wrong": 0,
-    "unnamed": 2,
+    "unnamed": 1,
     "missing": 6
    },
    "4": {
-    "right": 136,
-    "wrong": 0,
-    "unnamed": 0,
+    "right": 134,
+    "wrong": 1,
+    "unnamed": 1,
     "missing": 81
    },
    "9": {
-    "right": 0,
-    "wrong": 155,
-    "unnamed": 66,
+    "right": 141,
+    "wrong": 80,
+    "unnamed": 0,
     "missing": 0
    }
   },
-  "pot_attribution": "2/4"
+  "pot_attribution": "3/4"
  },
- "setup_labelled": 13,
+ "setup_labelled": 8,
  "perfect": false
 }
