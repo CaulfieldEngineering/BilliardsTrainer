@@ -78,6 +78,20 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R0/R4 ROUND 17 (built + reverted, but it SETTLES the design): the
+     arrival-gated jaw filter works as designed - engine tracker piped
+     into prepare_detections via MotionTracker.live(), pockets marked
+     "ball incoming" for 0.6s - and coverage improved (naming 75.7->76.0,
+     estimates 19.6->18.6). But CALLS DROPPED 8->7: fixed 154.2, broke
+     101.0 (false pot) and 130.2 (lost pot). CAUSE: seeing the ball as it
+     drops keeps its track ALIVE INSIDE the pocket, so the outcome stage
+     reads "resting" instead of "vanished into the pocket". Pot credit is
+     currently built on LOSING sight of the ball - so better sight makes
+     judgement worse. CONCLUSION: implement Joe's POCKET DEAD ZONES (R0)
+     FIRST - a ball that enters a zone and does not come back out is
+     potted regardless of whether it is still detected in the basket.
+     Then the arrival gate is safe to re-enable (the branch is small:
+     tracker.live(), hot_pockets param, HOT_S).
   R2 ROUND 16 (kept): fake strokes 5->1, unexplained 10->0, shots hold
      10/10. Two measured rules: (a) a stroke means the CUE MOVED - all
      10 real strokes move it, tossed-in balls never do (and hand-

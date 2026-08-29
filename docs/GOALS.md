@@ -2057,3 +2057,16 @@ Rounds continue with Joe's visual feedback as the gate.
   shots hold 10/10, calls 8/10, naming 75.7%. No engine re-measure
   needed - the shot stage runs at scoring time. Remaining fake is the
   13.1s stick-push (210px); needs the cue stick recognised.
+
+- 2026-08-29 ~07:20 EDT — ROUND 17 (4th negative, and the most useful):
+  built the arrival-gated jaw filter (engine tracker -> detection stage
+  via MotionTracker.live(); pockets flagged "ball incoming" for 0.6s).
+  Coverage improved as designed (naming 75.7->76.0%, estimates
+  19.6->18.6%) but CALLS FELL 8->7 (fixed 154.2; broke 101.0 false pot
+  and 130.2 lost pot). Root cause is a design flaw, not a bug: pot
+  credit is built on LOSING sight of the ball, so seeing it drop keeps
+  its track alive in the basket and it reads as "resting". Reverted;
+  baseline restored (10/10, 8/10, 1 fake, 0 unexplained, 75.7%).
+  DECISION: Joe's POCKET DEAD ZONES (ladder R0) must land first - enter
+  a zone and stay = potted, regardless of detection - after which the
+  arrival gate is safe. Next round.
