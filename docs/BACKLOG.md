@@ -78,6 +78,21 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 ROUND 22 (corpus started): tools/mine_ballid.py mines the
+     ENGINE'S OWN failure frames (moving-but-unnamed, or a number not in
+     the session inventory), crops every detection, and writes labels
+     into the existing TrainingStore YOLO layout - no new format.
+     First batch: 87 crops from 12 failure moments, 57 labelled BY
+     VISION (RULE 0) -> cue 11, 1:9, 2:9, 3:10, 4:8, 9:10. One frame
+     DROPPED whole rather than labelled partially (two balls ambiguous
+     even to Claude; a half-labelled frame teaches "real ball =
+     background"). GAP: zero examples of the orange 5 - it is absent
+     from these frames and is one of the never-read balls.
+     NEXT: (a) mine frames where the 5 is on the table + a second
+     session for variety; (b) target >=40 examples per ball; (c) train
+     c8 on the combined corpus (tools/finetune_ballid.py); (d) gate
+     same-batch vs c5 per MEASUREMENT_CORE M2 - promote only if the
+     bench naming rises AND held-out sessions do not regress.
   R3 ROUND 21 (CADENCE RULED OUT; ROOT CAUSE IS THE MODEL): ran the
      bench with IDENT_EVERY=1 (6x the identifier passes). Naming was
      BIT-IDENTICAL: 75.7% named, 150 seen-unnamed, 636 estimate-only.

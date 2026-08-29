@@ -2116,3 +2116,15 @@ Rounds continue with Joe's visual feedback as the gate.
   (attribution 2/4 fails on exactly the unnamed/misnamed pots).
   Reverted to IDENT_EVERY=6. NEXT: mine the c8 retrain corpus from
   these exact failure frames, label, train, gate.
+
+- 2026-08-29 ~12:10 EDT — ROUND 22: built tools/mine_ballid.py - it
+  mines the engine's OWN naming failures (moving-but-unnamed, or a
+  number not in the table's inventory), crops every detection in those
+  frames, and writes into the existing TrainingStore YOLO layout.
+  First batch: 87 crops from 12 failure moments; 57 labelled by vision
+  (cue 11, 1:9, 2:9, 3:10, 4:8, 9:10) - the purple 4 and the 1/9 pair
+  are the confusions costing attribution. Dropped one frame entirely
+  rather than label it partially (ambiguous balls; partial labels
+  teach "ball = background"). Gap logged: no examples of the orange 5.
+  Next: widen mining (the 5, a second session), reach ~40/ball, train
+  c8, gate same-batch vs c5.
