@@ -143,7 +143,8 @@ def score(truth_path: Path) -> dict:
     logging.disable(logging.CRITICAL)
     from billiards_trainer.config import Settings
     from billiards_trainer.measure.engine import _acquire_calib
-    from billiards_trainer.measure.shots import analyze
+    from billiards_trainer.measure.shots import (MIN_CUE_PEAK,
+                                             MIN_CUE_TRAVEL, analyze)
     from billiards_trainer.vision.analysis_cache import SidecarReader
     from billiards_trainer.vision.pipeline import Pipeline
 
@@ -190,7 +191,8 @@ def score(truth_path: Path) -> dict:
         if i in used:
             continue
         if (getattr(e, "setup", False) or not getattr(e, "cue_moved", True)
-                or getattr(e, "cue_travel", 999.0) < 150.0):
+                or getattr(e, "cue_travel", 999.0) < MIN_CUE_TRAVEL
+                or getattr(e, "cue_peak", 9e9) < MIN_CUE_PEAK):
             # hand-work, or table motion with no cue ball involved: not a
             # stroke by definition (round 16 - every real stroke on the
             # bench moves the cue; tossed-in balls do not)

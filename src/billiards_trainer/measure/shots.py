@@ -36,6 +36,9 @@ class Episode:
     movers: set = field(default_factory=set)
     setup: bool = False          # hand-driven (placing/gathering), not a stroke
     cue_travel: float = 0.0      # px the cue ball covered in this episode
+    cue_peak: float = 0.0        # px/s, the cue ball's fastest step here -
+                                 # a struck ball reaches 691+ on the bench,
+                                 # a hand-rolled one 213 (round 35)
     cue_moved: bool = False      # the cue ball moved: the definition of a
                                  # stroke. Measured on the bench (round 16):
                                  # all 10 real strokes have it, and the
@@ -89,6 +92,13 @@ def _series(times, frames):
 MIN_CUE_TRAVEL = 150.0   # px: below this the cue was addressed or nudged
                          # with the stick, not struck (bench: real strokes
                          # >=263px, nudges 8-29px)
+MIN_CUE_PEAK = 400.0     # px/s: below this the cue was MOVED, not struck.
+                         # Distance alone cannot tell Joe placing balls
+                         # from a shot - the bench's one surviving fake
+                         # covered 210px, over the 150px bar - but speed
+                         # can: that fake peaks at 213 px/s while every
+                         # one of the ten real strokes peaks at 691+.
+                         # The bar sits in the empty middle of that gap.
 CARRIED_SETUP = 0.5      # this share of moving samples hand-adjacent =
                          # the hand moved the balls, not a cue
 
@@ -167,6 +177,26 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
             ((cue_pts[k][1] - cue_pts[k - 1][1]) ** 2
              + (cue_pts[k][2] - cue_pts[k - 1][2]) ** 2) ** 0.5
             for k in range(1, len(cue_pts)))
+        # HOW FAST, not just how far. A hand cannot roll a ball at stroke
+        # speed, and that is what separates a real shot from Joe placing
+        # balls: measured over the whole bench, the one hand-setup that
+        # beat the distance test peaks at 213 px/s while every real
+        # stroke peaks between 691 and 2063. Distance alone could not
+        # split them - the fake covered 210px against a 150px bar.
+        # NB: `q`, not `k` - the enclosing episode scan uses `k` for the
+        # close index and then advances with `i = k + 1`. A statement-level
+        # loop rebinds it (the cue_travel generator above has its own
+        # scope and does not), which sent the scan back over episodes it
+        # had already emitted and turned analyze() into a ~30-minute
+        # crawl. Cheap to write, expensive to find.
+        peak = 0.0
+        for q in range(1, len(cue_pts)):
+            dt = cue_pts[q][0] - cue_pts[q - 1][0]
+            if 0 < dt < 0.2:
+                v = (((cue_pts[q][1] - cue_pts[q - 1][1]) ** 2
+                      + (cue_pts[q][2] - cue_pts[q - 1][2]) ** 2) ** 0.5) / dt
+                peak = max(peak, v)
+        ep.cue_peak = peak
         episodes.append(ep)
         i = k + 1
     return episodes

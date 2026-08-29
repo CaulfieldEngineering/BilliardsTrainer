@@ -2318,3 +2318,18 @@ Rounds continue with Joe's visual feedback as the gate.
   data only. Vision-checked at t=120s. Remaining on the bench: 1 fake
   stroke (hand setup ~13.1s) and 36 frames of coasting ghost numbers
   during cue/hand activity.
+
+- 2026-08-30 ~12:00 EDT - ROUND 35 *** R2 PASSED ***: killed the last
+  fake stroke. The stroke test asked only how FAR the cue travelled, and
+  Joe retrieving balls at 13.11s pushed it 210px past the 150px bar
+  (hand context could not help - carried fires on 166/7133 frames and
+  that episode scored 0.14 vs a 0.50 bar). Added Episode.cue_peak with
+  MIN_CUE_PEAK=400 px/s: the fake peaks at 213 while all ten real
+  strokes peak 691-2063, a 3x empty gap. Read-time change, so no engine
+  re-run and no rules_v bump. BENCH NOW: strokes 10/10, fake 0,
+  outcomes 10/10, unexplained 0, cue 100%, named correctly 99.5%,
+  pots 4/4. Vision-checked at t=13.4s. Also fixed a bug of my own: the
+  new loop reused `k`, rebinding the episode scan's index and turning
+  analyze() into a ~30-minute rescan - I blamed process contention
+  before reading my own diff. Only defect left on the bench: 36 frames
+  of coasting ghost numbers while the cue stick is on the table.

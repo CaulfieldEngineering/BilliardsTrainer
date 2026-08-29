@@ -265,6 +265,24 @@ class TestCueTravelGate:
         ep = analyze(times, frames)[0]
         assert ep.cue_travel > 150
 
+    def test_hand_rolled_cue_is_slow_even_when_it_travels_far(self):
+        """Round 35: the last fake stroke on the bench. Joe retrieving and
+        placing balls moved the cue 210px - past the 150px distance bar -
+        but at only 213 px/s. Every real stroke peaks at 691+. A hand
+        cannot roll a ball at stroke speed."""
+        # 210px spread over 60 frames (2s) = ~105 px/s
+        times, frames = _stream({0: _roll_then_rest(60, 120, 100, 100, 310, 100),
+                                 3: _rest(300, 600)})
+        ep = analyze(times, frames)[0]
+        assert ep.cue_travel > 150, "this case must clear the distance bar"
+        assert ep.cue_peak < 400, f"hand speed expected, got {ep.cue_peak:.0f}"
+
+    def test_a_struck_cue_is_fast(self):
+        # 500px in 20 frames (0.67s) = ~750 px/s
+        times, frames = _stream({0: _roll_then_rest(60, 80, 100, 100, 600, 100)})
+        ep = analyze(times, frames)[0]
+        assert ep.cue_peak > 400, f"stroke speed expected, got {ep.cue_peak:.0f}"
+
     def test_nudge_records_tiny_travel(self):
         times, frames = _stream({0: _roll_then_rest(60, 90, 100, 100, 130, 100),
                                  3: _roll_then_rest(60, 160, 300, 200, 300, 800)})
