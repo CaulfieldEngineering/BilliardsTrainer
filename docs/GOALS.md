@@ -2217,3 +2217,19 @@ Rounds continue with Joe's visual feedback as the gate.
   No engine change; champion untouched. Next round re-lands round 27's
   five pieces ONE AT A TIME gated on name_right_pct, to find which one
   costs the red 3.
+
+- 2026-08-29 ~23:00 EDT - ROUND 29: bisected round 27's bundle against
+  the new per-ball metric. The red 3 collapses (187/189 -> 67/189) on
+  the FIRST piece alone (engine -> ensemble); measured refs and the
+  score bar do not touch it, though they do restore outcomes to 9/10
+  and cut invented frames 302 -> 38. Chased it home: the ensemble
+  answers 3 for the red every frame (colour distance 14.5 vs 147 to the
+  1) and a FRESH tracker replayed over the same frames also emits 3 -
+  both components are innocent. The bug is HISTORY: the yellow 1 is
+  potted at 33s but its NAME survives, and when the red 3 is hand-placed
+  at 109.2s the stale "1" latches onto it (id3 born already named 1
+  while id4, the static 9, has worn "1" since 86s - two tracks holding
+  one number). Same mechanism explains 9->1 x154. Naming was never a
+  recognition problem. Champion reverted and re-verified at 76.0%.
+  NEXT: identity continuity - release a number when its ball is potted,
+  and make a track born elsewhere EARN a name instead of inheriting it.

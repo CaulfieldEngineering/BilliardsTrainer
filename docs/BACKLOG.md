@@ -97,6 +97,41 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
+  R3 ROUND 29 - BISECTED ROUND 27 ON THE NEW METRIC; ROOT CAUSE IS
+     IDENTITY CONTINUITY, NOT RECOGNITION:
+       champion                              76.0%   3: 187/189
+       + P5 engine->strat.detect             60.6%   3:  67/189  <-- breaks here
+       + measured refs (six balls)           60.0%   3:  67/189
+       + withhold names below 0.70 score     60.4%   3:  67/189
+     Side effects worth keeping when this is re-landed: measured refs
+     restore outcomes to 9/10 and cut invented frames 302 -> 56; the
+     score bar removes the invented 8 entirely (56 -> 38, only 5 left).
+     Neither touches the 3.
+     THE DETECTOR IS INNOCENT: asked directly, the ensemble answers 3
+     for the red on every frame - colour distance 14.5 to the 3's
+     reference vs 147 to the 1's - and answers 9 for the striped ball.
+     THE TRACKER IS INNOCENT: replaying the same frames through a FRESH
+     MotionTracker from t=104 feeds it 3, votes [3]*9, emits 3 correctly
+     all the way to 122s.
+     THE BUG IS HISTORY. The yellow 1 is potted at 33s but its track's
+     NAME survives; when the red 3 is hand-placed at 109.2s the stale
+     "1" latches onto it (sidecar: id3 born 109.2 already named 1, while
+     id4 - the static 9 - has worn "1" since 86s). Two tracks hold "1"
+     at once. From 110s to the end the red answers to 1 while the naming
+     code underneath keeps saying 3 and is ignored. Same mechanism
+     explains 9->1 x154 (the 9 is 0/221).
+  R3 NEXT ROUND - IDENTITY CONTINUITY (the real R3 blocker):
+     a name must not outlive its ball. Two rules to design and gate:
+       (a) when a track dies at a pocket (a pot), RELEASE its number so
+           no successor can inherit it;
+       (b) a track born far from where a name was last seen must EARN
+           that name from fresh reads, not inherit it - the tracker's
+           fresh-claim machinery (FRESH_S) already exists for this and
+           should be checked at BIRTH, not only in arbitration.
+     Gate on name_right_pct per ball; the champion is 76.0% with
+     0:221/221 1:66/85 2:156/156 3:187/189 4:136/136 9:0/221.
+     Only after that re-land P5 + refs + the score bar as one gated
+     bundle - they are correct, they are just downstream of this.
   R3 ROUND 28 - THE INSTRUMENT IS FIXED, AND IT LOCALISED THE DEFECT:
      Added per-ball naming CORRECTNESS to tools/scorecard.py, fed by a
      new pixel-derived truth stream (tools/build_naming_truth.py ->
