@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 65,
+   "ts": "2026-08-29T14:22:49",
+   "date": "Aug 29, 10:22 AM EDT",
+   "kind": "finding",
+   "title": "Round 23: found the orange 5 - and a trap in my own training data",
+   "score": "115 labelled balls; corpus paused for a completeness fix",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/065-labelsheet.png",
+     "caption": "Crops now carry positions. The amber ball at (316,1232) is the 5 - bottom-left, where it drops five seconds later. Colour alone could not tell it from the 1."
+    }
+   ],
+   "html": "<div class='note warn'><p><strong>Round 23 widened the training data and then hit a trap worth stopping for.</strong></p><p>Good news first: the corpus now spans your whole session instead of the opening minute - 115 labelled balls, with the purple 4 (the one the app calls a 7) at 18 examples and the 1-versus-9 pair well covered. I also finally caught your orange 5 by tagging each crop with its position: at 166 seconds an amber ball sits at the bottom-left, exactly where the 5 drops five seconds later. Colour alone could not separate your 1 from your 5; position could.</p><p><strong>The trap:</strong> a training frame teaches the detector about everything in it, including what is NOT marked. Several mined frames show six balls when seven are on the table - the missing one being exactly the ball the app fails to see. Training on those frames would teach it that the ball it already misses is background, making the problem worse.</p><p>So I stopped adding data and wrote only the one frame I could verify complete. Before any training runs, the tool needs a way for me to add the balls the detector missed - otherwise the corpus quietly teaches the opposite of what we want. That is the next round, and it applies to the earlier batches too.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>75.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>1</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 22: mine the engine&#x27;s own naming failures into training data</li><li>Round 21: cadence ruled out - the recogniser reads 4 of 7 balls</li><li>Round 20: stitching built, no effect - the blocker is recognition</li><li>Round 19: three-clause pot rule built - and identity is what blocks it</li><li>Round 18: dead zones built and reverted - measurement produced the spec</li><li>Round 17: arrival gate works, and proves pot credit needs dead zones</li><li>Round 16: a shot means the cue ball moved, and went somewhere</li><li>Dev Journal timestamps in Joe&#x27;s clock (Eastern), not UTC</li><li>Round 15: coasts stop at the bed edge - the app was chasing nothing</li><li>RULE 0: never assert a physical cause without looking at the pixels</li><li>Round 14: conditional jaw filter failed two ways - reverted</li><li>Round 13: jaw filter hides real pots - but deleting it is worse</li></ul>"
+  },
+  {
    "id": 64,
    "ts": "2026-08-29T13:52:26",
    "date": "Aug 29, 09:52 AM EDT",

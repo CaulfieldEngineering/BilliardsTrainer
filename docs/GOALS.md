@@ -2128,3 +2128,15 @@ Rounds continue with Joe's visual feedback as the gate.
   teach "ball = background"). Gap logged: no examples of the orange 5.
   Next: widen mining (the 5, a second session), reach ~40/ball, train
   c8, gate same-batch vs c5.
+
+- 2026-08-29 ~13:05 EDT — ROUND 23: widened the ball-ID corpus across
+  the whole session (--limit/--min-gap/--at) and put POSITIONS on the
+  label tiles, which is what separated the 1 from the 5 (colour alone
+  could not; the amber ball at (316,1232) at 166s is the 5, bottom-left
+  where it drops at 171.3). Corpus 115 boxes (cue 22, 1:14, 2:19, 3:20,
+  4:18, 9:20, 5:2). STOPPED on a data trap: mined frames often contain
+  6 detections where 7 balls are present, and a YOLO frame teaches
+  about the UNMARKED regions too - training on those would reinforce
+  the very misses we are fixing. Wrote only the one verified-complete
+  frame. Next: manual-add mode for missed balls + re-verify the earlier
+  batches, then train.

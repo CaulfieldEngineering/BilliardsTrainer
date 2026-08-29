@@ -29,9 +29,11 @@ M1 = Path(r"C:/Users/Joe/AppData/Local/BilliardsTrainer/m1")
 REC = Path(r"C:/Users/Joe/Dropbox/Billiards/BilliardsTrainer")
 OUT = ROOT / "_train" / "bench_fix"
 SHEET = OUT / "sheet"
+TAG = "bench"
 
 
-def failure_times(name: str, inventory: set[int], limit: int = 12) -> list:
+def failure_times(name: str, inventory: set[int], limit: int = 12,
+                  min_gap: float = 1.0) -> list:
     """Times where the engine's own output shows a naming failure."""
     from billiards_trainer.vision.analysis_cache import SidecarReader
     r = SidecarReader(M1 / name)
@@ -60,7 +62,7 @@ def failure_times(name: str, inventory: set[int], limit: int = 12) -> list:
     # spread them out: one per second at most, capped
     spread, last = [], -9.0
     for t in hits:
-        if t - last >= 1.0:
+        if t - last >= min_gap:
             spread.append(t)
             last = t
         if len(spread) >= limit:
@@ -100,6 +102,10 @@ def build_sheet(name: str, stamps: list) -> None:
             tile = cv2.resize(crop, (150, 150), interpolation=cv2.INTER_NEAREST)
             cv2.putText(tile, f"{fi}-{di}", (5, 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            # position matters for labelling: two similar yellows are
+            # separable by WHERE they are when colour alone is ambiguous
+            cv2.putText(tile, f"{x},{y}", (5, 145),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 0), 1)
             tiles.append(tile)
             boxes.append({"i": di, "x": float(d.x), "y": float(d.y),
                           "r": float(d.radius)})
@@ -151,7 +157,7 @@ def write_labels(spec: str) -> None:
         img = cv2.imread(str(SHEET / f"frame_{fi:02d}.jpg"))
         if img is None:
             continue
-        total += store.add_frame(img, balls, stamp=f"bench_{fi:02d}")
+        total += store.add_frame(img, balls, stamp=f"{TAG}_{fi:02d}")
     print(f"wrote {total} labelled boxes -> {store.root}")
     print("class counts:", store.class_counts())
 
@@ -160,14 +166,28 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--session", default="session-20260824-220247.mp4")
     ap.add_argument("--sheet", action="store_true")
+    ap.add_argument("--limit", type=int, default=12)
+    ap.add_argument("--min-gap", type=float, default=1.0,
+                    help="seconds between mined frames - spread them across "
+                         "the whole session so late-session balls (the "
+                         "orange 5) are represented, not just the opening")
+    ap.add_argument("--tag", default="bench")
     ap.add_argument("--labels", default=None)
+    ap.add_argument("--at", nargs="+", type=float, default=None,
+                    help="mine these exact times instead of hunting "
+                         "failures - for balls a failure frame never "
+                         "happens to contain (the orange 5)")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+    global TAG
+    TAG = a.tag
     if a.labels:
         write_labels(a.labels)
         return
     truth = json.loads((ROOT / "docs" / "bench_truth.json").read_text())
-    stamps = failure_times(a.session, set(truth.get("balls_on_table", [])))
+    stamps = a.at or failure_times(
+        a.session, set(truth.get("balls_on_table", [])),
+        limit=a.limit, min_gap=a.min_gap)
     print("failure frames:", [round(t, 2) for t in stamps])
     if a.sheet:
         build_sheet(a.session, stamps)

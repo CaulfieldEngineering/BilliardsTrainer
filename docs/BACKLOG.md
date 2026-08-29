@@ -78,6 +78,21 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 ROUND 23 (corpus widened; COMPLETENESS TRAP FOUND): mining now
+     spreads across the whole session (--limit/--min-gap) and accepts
+     explicit times (--at), and tiles carry POSITIONS - which is what
+     finally separated the 1 from the 5 (colour could not; at 166s the
+     amber ball at (316,1232) is the 5, bottom-left, potted 5s later).
+     Corpus: 115 boxes (cue 22, 1:14, 2:19, 3:20, 4:18, 9:20, 5:2).
+     TRAP: a YOLO frame teaches about everything in it INCLUDING what
+     is unmarked. Mined frames often show 6 balls when 7 are on the
+     table - the missing one being exactly the ball the model already
+     fails to see - so training on them would REINFORCE the miss. Only
+     one verified-complete frame was written this round.
+     NEXT (before ANY training): add a manual-add mode to
+     tools/mine_ballid.py (Claude views the full frame, supplies the
+     missing balls' positions), re-verify the earlier 109 boxes for
+     completeness, THEN train c8 and gate same-batch vs c5.
   R3 ROUND 22 (corpus started): tools/mine_ballid.py mines the
      ENGINE'S OWN failure frames (moving-but-unnamed, or a number not in
      the session inventory), crops every detection, and writes labels
