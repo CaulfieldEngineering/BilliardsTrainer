@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 66,
+   "ts": "2026-08-29T14:52:06",
+   "date": "Aug 29, 10:52 AM EDT",
+   "kind": "finding",
+   "title": "Round 24: the training data is sound - I checked by looking",
+   "score": "corpus verified complete; training next",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/066-frame2_check.png",
+     "caption": "Your table at 166s with every box drawn: six balls, six boxes, including the orange 5 at bottom-left. The seventh circle is the pocket leather, left unlabelled on purpose."
+    }
+   ],
+   "html": "<div class='note win'><p><strong>Round 24: last round's alarm was a false one, and looking at a full frame proved it.</strong></p><p>I stopped mining yesterday because some training frames showed six balls where I thought seven were on the table - which would have taught the app that a real ball is background. Today I drew every box onto the full picture and looked.</p><p>The frames are complete. Every ball actually on the felt has exactly one box around it, including your orange 5 at the bottom-left. The 'missing' balls were simply balls that were already potted - not misses. The picture below is your table at 166 seconds: six balls, six boxes, plus one circle on the pocket leather that stays deliberately unlabelled.</p><p>I also tried filling the supposed gaps from the tracker's own memory. That was worse: it drew second boxes on balls that were already found - two circles on the same red, two on the same yellow. Reverted.</p><p><strong>What this means:</strong> the 115 labelled balls are sound, and the part of the app that FINDS balls is doing its job. The failure is purely in reading which ball is which - exactly what the training data addresses. Training runs next round.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>75.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>1</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 23: corpus widened, orange 5 found, completeness trap caught</li><li>Round 22: mine the engine&#x27;s own naming failures into training data</li><li>Round 21: cadence ruled out - the recogniser reads 4 of 7 balls</li><li>Round 20: stitching built, no effect - the blocker is recognition</li><li>Round 19: three-clause pot rule built - and identity is what blocks it</li><li>Round 18: dead zones built and reverted - measurement produced the spec</li><li>Round 17: arrival gate works, and proves pot credit needs dead zones</li><li>Round 16: a shot means the cue ball moved, and went somewhere</li><li>Dev Journal timestamps in Joe&#x27;s clock (Eastern), not UTC</li><li>Round 15: coasts stop at the bed edge - the app was chasing nothing</li><li>RULE 0: never assert a physical cause without looking at the pixels</li><li>Round 14: conditional jaw filter failed two ways - reverted</li></ul>"
+  },
+  {
    "id": 65,
    "ts": "2026-08-29T14:22:49",
    "date": "Aug 29, 10:22 AM EDT",

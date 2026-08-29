@@ -2140,3 +2140,12 @@ Rounds continue with Joe's visual feedback as the gate.
   the very misses we are fixing. Wrote only the one verified-complete
   frame. Next: manual-add mode for missed balls + re-verify the earlier
   batches, then train.
+
+- 2026-08-29 ~14:00 EDT — ROUND 24: round 23's "completeness trap" was
+  a FALSE ALARM, settled by drawing every box on the full frames and
+  LOOKING (RULE 0). Each ball on the felt carries exactly one box; the
+  "missing" balls were already potted. Tracker-state gap-filling was
+  tried and reverted - it duplicated boxes on balls the finder had
+  already found. Net: the 115-box corpus is sound and the FINDER is
+  healthy; the identifier is the sole failure, which is what the
+  corpus trains. Next round: train c8 + gate same-batch vs c5.

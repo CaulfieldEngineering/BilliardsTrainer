@@ -78,6 +78,20 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 ROUND 24 (trap was a FALSE ALARM; corpus cleared for training):
+     drew every box onto the full frames and looked. Frames ARE
+     complete - each ball on the felt has exactly one box (166s: six
+     balls, six boxes, incl. the orange 5 at (316,1233)); the
+     "missing" balls were simply already potted. Also tried filling
+     the supposed gaps from tracker state: it produced DUPLICATE boxes
+     on balls the finder had already found (two circles on the same
+     red, two on the same yellow) - reverted.
+     CONFIRMS round 21 from the other side: the FINDER is healthy, the
+     IDENTIFIER is the failure - which is exactly what this corpus
+     trains. The 115 boxes stand.
+     NEXT: train c8 on the corpus (tools/finetune_ballid.py), then gate
+     same-batch vs c5 - promote only if bench naming rises AND held-out
+     sessions do not regress (MEASUREMENT_CORE M2 rules).
   R3 ROUND 23 (corpus widened; COMPLETENESS TRAP FOUND): mining now
      spreads across the whole session (--limit/--min-gap) and accepts
      explicit times (--at), and tiles carry POSITIONS - which is what
