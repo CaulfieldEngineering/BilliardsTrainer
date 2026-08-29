@@ -29,11 +29,10 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 15  # v15: a model claim with NO measured reference can
-                     # still be overruled by a decisive match against one
-                     # we did measure - so naming no longer leans on the
-                     # unvalidated 2026-08-15 references for balls that
-                     # are not even on the table
+ENGINE_RULES_V = 16  # v16: a track must be SEEN MIN_ID_FRAMES times
+                     # before it may show a number - one detection is a
+                     # guess, not an identity (it was the whole source of
+                     # this clip's invented numbers)
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:

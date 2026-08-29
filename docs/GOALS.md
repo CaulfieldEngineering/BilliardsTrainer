@@ -2333,3 +2333,21 @@ Rounds continue with Joe's visual feedback as the gate.
   analyze() into a ~30-minute rescan - I blamed process contention
   before reading my own diff. Only defect left on the bench: 36 frames
   of coasting ghost numbers while the cue stick is on the table.
+
+- 2026-08-30 ~14:00 EDT - ROUND 36 *** PHASE 1 COMPLETE *** (rules_v
+  15 -> 16). The bench clip is clean: strokes 10/10, fake 0, outcomes
+  10/10, unexplained 0, pots 4/4, invented numbers 0, named correctly
+  99.3%, cue 99.9%. Both remaining invented numbers were tracks with
+  ONE real sighting and 17 coasted rows, asserting a number from a
+  single frame while the cue stick lay on the table; the emit stage
+  grants a first number with no delay. Added MIN_ID_FRAMES=3 - a track
+  must be seen three times before it may show a number. Cost 2 frames
+  of the purple 4 (naming 99.5 -> 99.3), gain 36 -> 0 invented frames.
+  Vision-checked at t=120s. NOTE: `moving balls named` (94.7 vs 95) is
+  the presence-only metric round 28 proved blind; kept on the board.
+  NEXT MAJOR: Joe asked why replay and live are separate engines - they
+  should not be. Two trackers exist (vision/tracking.py BallTracker 716
+  lines live; measure/tracker.py MotionTracker 447 lines offline +
+  shadow in MeasurementCore). The merge seam is already built and
+  scoring divergence; finish it, promote MotionTracker, delete
+  BallTracker. Every fix from rounds 30-36 is offline-only until then.

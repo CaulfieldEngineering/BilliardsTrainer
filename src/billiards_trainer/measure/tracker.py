@@ -86,6 +86,10 @@ class _Track:
                    if v == n and now - vt <= FRESH_S)
 
 
+MIN_ID_FRAMES = 3        # real sightings a track needs before it may SHOW
+                         # a number at all. One detection is a guess, not
+                         # an identity (round 36); a genuine ball passes
+                         # this in a tenth of a second.
 RETIRE_S = 3.0           # inactive this long AND last seen leaving the
                          # table = the track is DELETED, so it can neither
                          # match a new ball nor lend one a dead ball's
@@ -345,6 +349,19 @@ class MotionTracker:
             cand = tr.number
             if cand >= 0 and claims.get(cand) is not tr:
                 cand = -1                   # arbitration loser
+            # ONE SIGHTING IS NOT AN IDENTITY. Below, a track's FIRST
+            # number is shown with no delay - right for a real ball,
+            # which should not wait five frames to be named, but it also
+            # let a single detection name itself and then coast. Both of
+            # the bench's remaining invented numbers are exactly that
+            # shape: 18 rows, ONE real sighting, 17 coasted, never
+            # moving, asserting a number read from one frame (id11 an
+            # "10" at 119.7s, id14 an "8" at 236.1s - both while the cue
+            # stick lay on the table). A real ball clears this bar in a
+            # tenth of a second and is unaffected; a one-frame blob never
+            # does.
+            if tr.age_frames < MIN_ID_FRAMES:
+                cand = -1
             # REST-FROZEN IDENTITY (the live tracker's actual bought
             # rule, gate round 3: 79 residual flickers were sustained
             # misreads outlasting 5-frame hysteresis). A ball that has

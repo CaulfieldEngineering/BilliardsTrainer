@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-29T22:24:32Z",
+ "ts": "2026-08-29T22:40:39Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
@@ -111,16 +111,13 @@
   }
  ],
  "caps": {
-  "cue_named_pct": 100.0,
-  "named_moving_pct": 94.9,
-  "invented_numbers": [
-   8,
-   10
-  ],
-  "invented_frames": 36,
-  "name_right_pct": 99.5,
+  "cue_named_pct": 99.9,
+  "named_moving_pct": 94.7,
+  "invented_numbers": [],
+  "invented_frames": 0,
+  "name_right_pct": 99.3,
   "name_wrong_frames": 3,
-  "name_unnamed_frames": 2,
+  "name_unnamed_frames": 4,
   "name_missing_frames": 88,
   "name_confusions": {
    "9->1": 2,
@@ -152,9 +149,9 @@
     "missing": 6
    },
    "4": {
-    "right": 136,
+    "right": 134,
     "wrong": 0,
-    "unnamed": 0,
+    "unnamed": 2,
     "missing": 81
    },
    "9": {

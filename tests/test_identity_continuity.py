@@ -132,6 +132,39 @@ class TestOnlyASightingProvesMovement:
                 "that exempts pocket leather from the furniture rule")
 
 
+class TestOneSightingIsNotAnIdentity:
+    """Round 36. A track's FIRST number is shown with no delay, which is
+    right for a real ball - but it also let a single detection name
+    itself and then coast. Both of the bench's remaining invented
+    numbers were exactly that: 18 rows, ONE real sighting, 17 coasted,
+    never moving, asserting a number read from one frame."""
+
+    def test_a_single_detection_never_asserts_a_number(self):
+        from billiards_trainer.measure.tracker import MIN_ID_FRAMES
+        assert MIN_ID_FRAMES >= 2, "one frame must not be enough"
+        tk = _tracker()
+        t = 0.0
+        rows = tk.update([(300.0, 600.0, 13.0, 8)], t)      # seen once...
+        assert all(r.number < 0 for r in rows)
+        for _ in range(10):                                  # ...then coasts
+            t += 1 / 30.0
+            rows = tk.update([], t)
+            assert all(r.number < 0 for r in rows), \
+                "a one-frame blob named itself and coasted on the name"
+
+    def test_a_real_ball_is_named_almost_immediately(self):
+        from billiards_trainer.measure.tracker import MIN_ID_FRAMES
+        tk = _tracker()
+        t = 0.0
+        rows = []
+        for _ in range(MIN_ID_FRAMES + 1):
+            rows = tk.update([(300.0, 600.0, 13.0, 3)], t)
+            t += 1 / 30.0
+        assert any(r.number == 3 for r in rows), \
+            "a genuine ball must clear this bar in a fraction of a second"
+        assert MIN_ID_FRAMES <= 5, "the delay must stay imperceptible"
+
+
 class TestARestingBallCanStillBeCorrected:
     """Round 33. A resting ball must not FLICKER, but it must not be
     permanently uncorrectable either.
