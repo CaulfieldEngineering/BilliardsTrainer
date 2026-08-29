@@ -2165,3 +2165,19 @@ Rounds continue with Joe's visual feedback as the gate.
   1-vs-9 separation is only 7.3 Lab, so that lands next round with a
   white-fraction stripe guard and a gate. Phantoms = 462/1534 raw
   detections (30%) -> next target.
+
+- 2026-08-29 ~17:00 EDT - ROUND 26 (NEGATIVE, reverted): traced the last
+  missed outcome (170.6). The engine tracks that ball INTO the pocket -
+  dies 14.2px from centre at 3007 px/s - but scores nothing because the
+  track is unnamed and shots.py gates unnamed drops on purpose. The last
+  missed pot is blocked on R3 NAMING, not pot logic. Tried deleting
+  UNNAMED_MIN_SPAN (whole-life bbox, 230px, which deleted the potted
+  track): measured WORSE (strokes 10->9, outcomes 9->8, unexplained
+  0->1) and did not fix 170.6. Reverted; baseline re-verified.
+  Also CORRECTED MY OWN round-25 claim: phantoms are 30% of RAW finder
+  output but only 0.1% of track-frames after prepare_detections
+  (25/34821) - measured in the wrong place first time. Detector score
+  separates phantoms (0.30-0.49) from balls (0.86-0.87) INCLUDING the
+  static 9, so "never moves" must never be the phantom test.
+  R3 is now the sole blocker; next round = white-fraction stripe
+  arbitration + measured colour refs, together, gated and pinned.

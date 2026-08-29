@@ -97,7 +97,42 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
-  R0 NEXT TARGET - PHANTOMS ARE 30% OF ALL DETECTIONS: three fixed
+  R4 ROUND 26 (NEGATIVE, reverted; the 170.6 pot is an R3 problem):
+     Traced the last missed outcome end to end. The engine DOES track
+     the potted ball into the pocket: id7 dies 14.2px from the centre
+     (pocket_r 24.8) at peak 3007 px/s. It scores nothing because the
+     track is UNNAMED and shots.py gates unnamed drops
+     (elif n >= 1 or unnamed_pots) - deliberately, since a glove
+     lifting balls out of a pocket faked a make in round 5.
+     => the last missed pot is BLOCKED ON R3 NAMING, not on pot logic.
+     Tried on the way: deleting UNNAMED_MIN_SPAN (250px measured over a
+     track's WHOLE LIFE, which deleted id7 at 230px). MEASURED WORSE -
+     strokes 10/10 -> 9/10, outcomes 9/10 -> 8/10, unexplained 0 -> 1,
+     and 170.6 still missed. REVERTED. (The span gate is still wrong in
+     principle - whole-life bbox is the wrong evidence - but it is not
+     what blocks the pot, and removing it alone regresses.)
+  R0 PHANTOM CLAIM CORRECTED - 30% was measured in the WRONG PLACE:
+     that was RAW finder output. After prepare_detections only 0.1% of
+     track-frames sit in a pocket zone (25/34821), and every in-zone
+     track also moved >200px/s (real balls passing through). A pocket
+     dead zone would be a near-no-op AND would risk the jaw traffic
+     that killed rounds 13/14/17. Phantoms are real but rare: one
+     lingering "est" ghost on the bottom-left pocket leather, visible
+     in the 140s overlay. NOT the top target; deferred.
+     Discriminator if ever needed: detector score separates cleanly -
+     phantoms 0.30/0.36/0.49 vs real balls 0.86/0.87/0.86, and the
+     STATIC 9 scores 0.86 with the real balls (so "never moves" must
+     never be the test - it would delete a genuine resting ball).
+  R3 IS NOW THE ONLY THING THAT MATTERS - it blocks the 170.6 pot, pot
+     attribution (2/4), and leaves the static 9 unnamed (overlay at
+     171.8 shows the 9 wrongly named "1" once the real 1 is potted).
+     NEXT ROUND: solid-vs-stripe by WHITE FRACTION (measured on
+     labelled crops: solids max 0.098, stripes min 0.189, split 0.143)
+     landed TOGETHER with the measured colour refs, gated on the
+     scorecard, pinned with a test. Refs alone are NOT safe: measured
+     values put the 1 and 9 only 7.3 Lab apart (old refs 22.9), which
+     is exactly the confusion seen at 171.8.
+  R0 OLD CLAIM (superseded above) - PHANTOMS ARE 30% OF ALL DETECTIONS: three fixed
      non-balls are reported in hundreds of frames - bottom-left pocket
      leather ~(289,1370) x214, a pale felt mark ~(566,1107) x180, a
      dark object ~(223,800) x68 = 462/1534. Recorded in bench_truth
