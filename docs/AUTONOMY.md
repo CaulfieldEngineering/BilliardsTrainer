@@ -67,6 +67,14 @@ order to compare the app's performance to what you actually see. We
 shouldn't have to wait for me to review the video to call out
 issues."
 
+RULE 0 (Joe, 2026-08-28: "You DO NOT make assumptions. Always look at
+the image yourself!"): before asserting ANY physical cause - motion
+blur, occlusion, lighting, what a ball did - CROP THE PIXELS AND LOOK.
+Claude blamed blur for lost detections across three rounds without ever
+viewing a moving ball; the frames showed a sharp ball in a pocket jaw
+and the "blurred" samples measured 202 px/s. A measurement that counts
+how much is not a substitute for an image that shows what.
+
 RULE: any change touching detection, tracking, identity, shot
 segmentation, outcomes, trails, or export is verified by a FRAME-TRUTH
 WATCH before it lands or rolls out: dump frames (cv2 → PNG), READ

@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 56,
+   "ts": "2026-08-29T01:46:11",
+   "date": "Aug 29, 01:46 UTC",
+   "kind": "finding",
+   "title": "Correction: there was no blur - I never looked",
+   "score": "3 rounds spent on a cause that does not exist",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/056-blur_check.png",
+     "caption": "The ball the app 'could not see' at 170.7s: sharp and round, sitting in the pocket jaw. Four consecutive frames."
+    }
+   ],
+   "html": "<div class='note warn'><p><strong>Correction: I was wrong about motion blur, and Joe was right.</strong> For three rounds I explained the app losing sight of balls as motion blur, and built toward fixing it. Joe pointed out he had already fixed blur with the camera's shutter settings. He was correct.</p><p>I finally cropped the ball the app claimed it could not see. It is sharp, round, and clearly visible - sitting in the pocket jaw. The measurements agree: those 'lost' moments have a median speed of 202 pixels per second, which at 1/500th of a second is under half a pixel of smear. There is no blur.</p><p><strong>What is actually happening:</strong> 55% of the losses are at pockets, where the leather partly hides the ball and its confidence drops - and then a filter I wrote discards it. The other 45% are slow-moving balls on the open table, a separate cause I have not identified yet and will not guess at.</p><p>The lesson, which is now a standing rule: I do not get to assert a physical cause without looking at the picture. Counting tells me how much; only the image tells me what.</p></div>"
+  },
+  {
    "id": 55,
    "ts": "2026-08-29T01:41:19",
    "date": "Aug 29, 01:41 UTC",

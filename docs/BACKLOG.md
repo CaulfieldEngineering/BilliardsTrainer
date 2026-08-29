@@ -78,6 +78,16 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 RE-AIMED AGAIN (2026-08-28, Joe caught a false premise): the
+     "motion blur" story was WRONG. Cropped the pixels at last: the
+     ball the engine loses is SHARP, sitting in the pocket jaw, and the
+     lost samples measure a median 202 px/s (<0.5px smear at 1/500s).
+     Joe fixed blur at the camera before these clips were shot. Real
+     split of the coasted samples: 55% within 3 pocket radii (leather
+     occlusion drops confidence, then the round-1 jaw filter discards
+     them - the arrival-gated filter is the fix, now for the RIGHT
+     reason) and 45% SLOW balls in open play (cause unknown - measure
+     it, do not guess). Blur recovery is OFF the plan.
   R3 REDIRECTED (round 12, tools/naming_audit.py): the loss is NOT
      recognition. Of all moving-ball samples: 72.1% named, only 3.8%
      SEEN-but-unnamed, and 24.0% never seen at all - coasted estimates

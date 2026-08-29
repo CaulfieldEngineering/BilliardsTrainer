@@ -2025,3 +2025,15 @@ Rounds continue with Joe's visual feedback as the gate.
   attempt gates on ARRIVAL (a track travelling toward that pocket),
   which requires passing the engine's own tracker into the shared
   detection stage.
+
+- 2026-08-28 ~22:50 — FALSE PREMISE CORRECTED (Joe caught it): three
+  rounds blamed motion blur for lost detections; Joe said he had fixed
+  blur at the camera. He was right. Cropping the pixels for the first
+  time showed a SHARP ball in the pocket jaw, and the lost samples
+  measure a median 202 px/s (<0.5px smear at 1/500s). True split: 55%
+  pocket-occlusion (compounded by my own round-1 jaw filter), 45% slow
+  balls in open play (cause unmeasured - next). Blur recovery removed
+  from the plan. Joe's rule, now standing in AUTONOMY.md as RULE 0 and
+  in memory: "You DO NOT make assumptions. Always look at the image
+  yourself!" - no claim about a physical cause without cropping the
+  pixels first.
