@@ -2070,3 +2070,14 @@ Rounds continue with Joe's visual feedback as the gate.
   DECISION: Joe's POCKET DEAD ZONES (ladder R0) must land first - enter
   a zone and stay = potted, regardless of detection - after which the
   arrival gate is safe. Next round.
+
+- 2026-08-29 ~08:40 EDT — ROUND 18 (5th negative, and it produced the
+  spec): built Joe's pocket dead zones. Alone 8->6 calls; paired with
+  the arrival gate 5/10 and attribution 0/4. Measured why: the potted
+  2-ball's track freezes 1.8 pocket-radii short of the mouth as pure
+  ESTIMATE rows, and the closest-approach table shows NO separating
+  distance (pot at 1.48R vs misses at 1.35/1.63/1.74/1.75R, and the
+  hand-catch miss at 0.47R closer than two real pots). Reverted;
+  baseline restored (10/10, 8/10, 1 fake, 0 unexplained, 2/4). SPEC
+  recorded: potted = in-zone AND vanished AND no hand adjacent - all
+  three, using the carried-ids already in the stream.

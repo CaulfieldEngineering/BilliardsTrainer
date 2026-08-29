@@ -78,6 +78,23 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R0/R4 ROUND 18 (built + reverted; produced the SPEC): implemented
+     Joe's dead zones (enter a zone, do not come back out = potted;
+     replacing the death-point/path-tail/bed-exit/lip-hover heuristics).
+     Alone: calls 8->6 (the jaw filter still hides the ball entering).
+     With the arrival gate: 5/10, attribution 0/4 - the entering track
+     is DIM and unnamed, and its coast freezes ~1.8 radii short of the
+     mouth (measured on the 2-ball pot: id7 sits at 44px = 1.8R, all
+     ESTIMATE rows). MEASURED SEPARATION (closest approach in pocket
+     radii, pots vs misses): 0.15 POT, 0.29 POT, 0.47 MISS (hand catch),
+     0.54 POT, 0.82 POT, 1.35 miss, 1.48 POT, 1.63 miss, 1.74 miss,
+     1.75 miss. NO distance threshold separates them - which is why
+     every attempt traded one shot for another.
+     SPEC for the next attempt (all three parts, none optional):
+       potted = entered zone (<=1.5R) AND stopped being seen AND NOT
+       hand-adjacent at the vanish (carried-ids are already in the
+       stream since round 10; the 0.47R false case is Joe's hand catch).
+     Keep ZONE_R ~1.5R; the arrival gate stays OFF until this lands.
   R0/R4 ROUND 17 (built + reverted, but it SETTLES the design): the
      arrival-gated jaw filter works as designed - engine tracker piped
      into prepare_detections via MotionTracker.live(), pockets marked
