@@ -20,7 +20,7 @@ import html
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,7 +136,13 @@ def main() -> None:
     from journal import add
     built = build(a.image)
     now = datetime.now(timezone.utc)
-    title = a.title or f"Hourly check-in — {now.strftime('%b %d, %H:%M UTC')}"
+    _y = now.year
+    _dst = (datetime(_y, 3, 8, 7, tzinfo=timezone.utc)
+            <= now < datetime(_y, 11, 1, 6, tzinfo=timezone.utc))
+    _e = now + timedelta(hours=-4 if _dst else -5)
+    _lbl = "EDT" if _dst else "EST"
+    title = a.title or ("Hourly check-in - "
+                        + _e.strftime("%b %d, %I:%M %p ").lstrip("0") + _lbl)
     e = add(title, "", built["score"], a.image, a.deploy, "finding")
     # attach the formatted body (add() stores plain text; upgrade in place)
     jf = PUB / "journal.json"

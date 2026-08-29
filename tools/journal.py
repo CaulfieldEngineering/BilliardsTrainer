@@ -20,7 +20,7 @@ import json
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +44,14 @@ def add(title: str, body: str, score: str = "", images=(),
     entries = doc.get("entries", [])
     nid = (max((e.get("id", 0) for e in entries), default=0)) + 1
     stamp = datetime.now(timezone.utc)
+    # Joe reads these on his own clock: US Eastern. DST rule is the
+    # simple one (Mar 2nd Sun - Nov 1st Sun); the ISO ts stays UTC so
+    # sorting never depends on the display zone.
+    _y = stamp.year
+    _dst = (datetime(_y, 3, 8, 7, tzinfo=timezone.utc)
+            <= stamp < datetime(_y, 11, 1, 6, tzinfo=timezone.utc))
+    east = stamp + timedelta(hours=-4 if _dst else -5)
+    label = "EDT" if _dst else "EST"
     imgs = []
     for src, caption in images:
         src = Path(src)
@@ -54,7 +62,7 @@ def add(title: str, body: str, score: str = "", images=(),
         imgs.append({"src": f"journal/{name}", "caption": caption})
     entry = {"id": nid,
              "ts": stamp.strftime("%Y-%m-%dT%H:%M:%S"),
-             "date": stamp.strftime("%b %d, %H:%M UTC"),
+             "date": east.strftime("%b %d, %I:%M %p ") + label,
              "kind": kind,
              "title": title,
              "score": score,
