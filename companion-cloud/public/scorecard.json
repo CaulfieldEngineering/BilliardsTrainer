@@ -1,20 +1,20 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-29T12:57:36Z",
+ "ts": "2026-08-29T15:38:50Z",
  "detected": "10/10",
- "outcome": "8/10",
+ "outcome": "9/10",
  "false_strokes": 1,
  "extra_episodes": 0,
  "episodes": 24,
  "shots": [
   {
    "strike": 31.7,
-   "what": "object ball potted, bottom-right",
+   "what": "yellow 1 potted, bottom-right (was recorded as the 9 - the 9 never moves all session)",
    "found": true,
    "outcome_ok": true,
    "engine": "pot",
    "truth": "pot",
-   "ball_truth": 9,
+   "ball_truth": 1,
    "ball_engine": 4,
    "ball_ok": false,
    "img": "journal/evidence/shot_31_7.jpg"
@@ -63,11 +63,11 @@
   },
   {
    "strike": 130.2,
-   "what": "ball potted bottom-right",
+   "what": "yellow 1 rolled to the bottom-right rail and settled mid-table at (617,877) - NO pot (was wrongly recorded as a pot by an unnamed ball)",
    "found": true,
-   "outcome_ok": false,
+   "outcome_ok": true,
    "engine": "no pot",
-   "truth": "pot",
+   "truth": "no pot",
    "img": "journal/evidence/shot_130_2.jpg"
   },
   {
@@ -81,12 +81,12 @@
   },
   {
    "strike": 170.6,
-   "what": "long pot into the bottom-left",
+   "what": "long pot into the bottom-left - the same yellow 1, replaced on the table at 116s (was recorded as a 5; no orange ball exists on this table)",
    "found": true,
    "outcome_ok": false,
    "engine": "no pot",
    "truth": "pot",
-   "ball_truth": 5,
+   "ball_truth": 1,
    "ball_engine": null,
    "ball_ok": false,
    "img": "journal/evidence/shot_170_6.jpg"
@@ -114,9 +114,10 @@
   "cue_named_pct": 100.0,
   "named_moving_pct": 75.7,
   "invented_numbers": [
+   5,
    8
   ],
-  "invented_frames": 18,
+  "invented_frames": 60,
   "pot_attribution": "2/4"
  },
  "setup_labelled": 13,

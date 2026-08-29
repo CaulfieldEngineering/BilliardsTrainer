@@ -2149,3 +2149,19 @@ Rounds continue with Joe's visual feedback as the gate.
   already found. Net: the 115-box corpus is sound and the FINDER is
   healthy; the identifier is the sole failure, which is what the
   corpus trains. Next round: train c8 + gate same-batch vs c5.
+
+- 2026-08-29 ~15:30 EDT - ROUND 25: applied RULE 0 to the GROUND TRUTH
+  and found the measuring stick broken. Colour census (1534 detections)
+  + 2s occupancy timeline over the whole bench clip proved: no orange 5
+  exists; ONE yellow solid carried three names (9/1/5) in truth; the
+  real 9 is STATIC at (528,1079) in 111/111 samples yet truth scored it
+  potted at 31.7 (the engine was being penalised for being RIGHT); and
+  the 130.2 "pot" never happened (ball settles at (617,877)).
+  bench_truth.json corrected with inline provenance; 2 of my own
+  mislabelled corpus boxes fixed (5 -> 1). NO ENGINE CHANGE: outcomes
+  8/10 -> 9/10, real pots 4 not 5. Also found colour_refs.json is an
+  ownerless 2026-08-15 orphan (ball 4 recorded as navy); gave it a
+  writer (tools/build_colour_refs.py) but did NOT write refs - measured
+  1-vs-9 separation is only 7.3 Lab, so that lands next round with a
+  white-fraction stripe guard and a gate. Phantoms = 462/1534 raw
+  detections (30%) -> next target.

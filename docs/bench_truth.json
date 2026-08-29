@@ -1,13 +1,20 @@
 {
  "session": "session-20260824-220247.mp4",
  "established": "2026-08-28 by frame-by-frame vision watch (8 reviewers)",
+ "revised": "2026-08-29 (round 25) by Claude's own pixel measurement - colour census of 1534 detections over the whole clip plus a 2s-resolution occupancy timeline of every ball. Three identity/outcome errors in the original watch were corrected. These corrections were derived from the VIDEO, never from the app's output; the app disagrees with parts of the corrected file too.",
  "note": "GROUND TRUTH for the engine campaign. Every number here was read off the video by eye, not by the app. The app is scored against this; this is never edited to match the app.",
+ "corrections_2026_08_29": [
+  "The original watch believed a yellow 1 AND an orange 5 were both on the table. There is NO orange ball: zero orange detections in 1534 sampled over 216 frames. The set is cue/1/2/3/4/9.",
+  "ONE yellow SOLID ball was given THREE different names by the original watch - '9' at 31.7, '1' at 154.2, '5' at 170.6. The occupancy timeline shows a single yellow solid: on the felt 18-32s (potted ~33s), absent until tossed back on at 116s (matching the 111.5-118.6 setup window), in play 132-170s (potted ~171s), and hand-replaced at 224s (matching the 219.3-238 setup window). It is the 1: its body colour matches the 9's stripe yellow to within 7.3 Lab units, which is how a standard set pairs 1 and 9.",
+  "The real 9 is a yellow STRIPE that sits motionless at (528,1079) in ALL 111 samples from 18s to 236s. It is never potted and never moves. The original watch scored it potted at 31.7, so the scorecard was PENALISING the engine for correctly reporting a 9 that is genuinely on the table.",
+  "Stroke 130.2 was recorded as a pot. It is not: at 0.5s resolution the yellow solid rolls to the bottom-right rail (778,1323), returns, and settles at (617,877) where it remains through 144.5s. No ball leaves the felt. Real pot count is 4, not 5."
+ ],
  "strokes": [
   {
    "strike": 31.7,
    "pot": true,
-   "what": "object ball potted, bottom-right",
-   "ball": 9
+   "what": "yellow 1 potted, bottom-right (was recorded as the 9 - the 9 never moves all session)",
+   "ball": 1
   },
   {
    "strike": 51.5,
@@ -33,9 +40,8 @@
   },
   {
    "strike": 130.2,
-   "pot": true,
-   "what": "ball potted bottom-right",
-   "ball": null
+   "pot": false,
+   "what": "yellow 1 rolled to the bottom-right rail and settled mid-table at (617,877) - NO pot (was wrongly recorded as a pot by an unnamed ball)"
   },
   {
    "strike": 154.2,
@@ -45,8 +51,8 @@
   {
    "strike": 170.6,
    "pot": true,
-   "what": "long pot into the bottom-left",
-   "ball": 5
+   "what": "long pot into the bottom-left - the same yellow 1, replaced on the table at 116s (was recorded as a 5; no orange ball exists on this table)",
+   "ball": 1
   },
   {
    "strike": 189.8,
@@ -68,12 +74,12 @@
   [
    111.5,
    118.6,
-   "yellow ball tossed on; 2 ball hand-placed"
+   "yellow 1 tossed on; 2 ball hand-placed"
   ],
   [
    219.3,
    238.0,
-   "walking, re-placing the 5, then sitting at the keyboard"
+   "walking, re-placing the yellow 1, then sitting at the keyboard"
   ]
  ],
  "balls_on_table": [
@@ -82,9 +88,12 @@
   2,
   3,
   4,
-  5,
   9
  ],
- "balls_note": "cue, yellow 1, blue 2, red 3, purple 4, orange 5, striped 9 (established by eye). Any other number the app reports is invented.",
- "attribution_note": "ball = which ball fell, read by eye. null means the watch could not confirm the number (excluded from attribution scoring rather than guessed)."
+ "balls_note": "cue, yellow solid 1, blue 2, red 3, purple 4, yellow striped 9. There is NO orange 5 - verified by colour census over the whole clip. The 9 is STATIC at (528,1079) for the entire session; the 1 is the only yellow solid and is the ball potted at both 31.7 and 170.6. Any other number the app reports is invented.",
+ "static_balls": {
+  "9": [528, 1079]
+ },
+ "attribution_note": "ball = which ball fell, read by eye. null means the watch could not confirm the number (excluded from attribution scoring rather than guessed).",
+ "phantoms_note": "Three fixed non-ball objects are detected by the finder in hundreds of frames and are NOT balls: the bottom-left pocket leather at ~(289,1370) (214 detections), a pale mark on the felt at ~(566,1107) (180), and a dark object at ~(223,800) (68). Together they are 30% of all raw detections."
 }

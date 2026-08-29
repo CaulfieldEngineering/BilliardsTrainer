@@ -78,6 +78,42 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3/R4 ROUND 25 (THE YARDSTICK WAS BROKEN - fixed, and it scored):
+     RULE 0 applied to docs/bench_truth.json itself for the first time.
+     Colour census of 1534 detections over the whole clip + a 2s
+     occupancy timeline found THREE truth errors:
+       (a) NO orange 5 exists on this table - zero orange detections.
+           ONE yellow solid was named "9" (31.7), "1" (154.2) and "5"
+           (170.6) by the original watch. It is the 1: its body yellow
+           matches the 9's stripe yellow to 7.3 Lab.
+       (b) The real 9 is a yellow STRIPE static at (528,1079) in ALL
+           111 samples, 18s->236s. Truth had it potted at 31.7, so the
+           scorecard was PENALISING the engine for being correct.
+       (c) 130.2 was recorded as a pot; at 0.5s resolution the 1 rolls
+           to the bottom-right rail, returns, and settles at (617,877)
+           through 144.5s. Nothing fell. Real pots = 4, not 5.
+     Truth corrected with inline provenance; my own 2 mislabelled
+     corpus boxes (class 5 -> 1) fixed; corpus now 115 boxes / 6
+     classes, all >=16 samples.
+     RESULT with NO engine change: outcomes 8/10 -> 9/10.
+     Remaining real outcome failure: the 170.6 long pot is missed.
+  R0 NEXT TARGET - PHANTOMS ARE 30% OF ALL DETECTIONS: three fixed
+     non-balls are reported in hundreds of frames - bottom-left pocket
+     leather ~(289,1370) x214, a pale felt mark ~(566,1107) x180, a
+     dark object ~(223,800) x68 = 462/1534. Recorded in bench_truth
+     phantoms_note. Static non-ball rejection is the next round.
+  R3 COLOUR REFS HAVE AN OWNER NOW (tools/build_colour_refs.py):
+     APP_DIR/colour_refs.json had NO writer in the tree - an orphan
+     dated 2026-08-15 whose ball-4 entry recorded the purple 4 as NAVY
+     (142,26,36), next to the real blue 2 - the "purple 4 guesses BLUE"
+     misread the ensemble patches downstream. Measured drift on this
+     table: 2 -> 41.2 Lab, 9 -> 22.9, 3 -> 22.5, 4 -> 11.6.
+     NOT WRITTEN YET (law 4 - it changes live naming, so it gates):
+     measured refs put the 1 and 9 only 7.3 Lab apart (old refs: 22.9),
+     so whole-crop colour must NOT arbitrate 1-vs-9. White fraction
+     must: measured solid max 0.098 vs stripe min 0.189 on labelled
+     crops - a clean split at 0.143. Next round: land refs + the
+     stripe-bit guard together, gate on the scorecard, pin with a test.
   R3 ROUND 24 (trap was a FALSE ALARM; corpus cleared for training):
      drew every box onto the full frames and looked. Frames ARE
      complete - each ball on the felt has exactly one box (166s: six
