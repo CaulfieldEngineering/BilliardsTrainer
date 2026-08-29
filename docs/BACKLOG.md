@@ -78,6 +78,23 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R4 ROUND 19 (built the spec, reverted - DEPENDENCY FOUND): the
+     three-clause rule (in-zone AND vanished AND no hand) got ALL SIX
+     misses right - incl. the 0.47R hand-catch and both jaw rattles -
+     but credited only 1 of 5 pots (6/10 vs baseline 8). Traced per
+     ball: on 4 of 5 pots the NAMED track stops short (the 2-ball's
+     freezes at 1.8R, all ESTIMATE rows) and the final approach belongs
+     to a NEW anonymous fragment, which _series also drops for being
+     short (<250px span). So "did ball N reach the pocket" is false
+     even though a ball did. The baseline scores better only by being
+     identity-blind (anything vanishing near a pocket = pot), which is
+     also why it mis-attributes half its pots.
+     ORDER CORRECTED: R4 CANNOT close before R3. Naming is the FLOOR
+     under the outcome rules, not polish above them. NEXT: identity
+     continuity into the pocket - stitch a dying named track to the
+     fragment that continues its motion (same direction/speed, <0.4s
+     gap, <2 ball diameters), so the ball keeps its name to the drop.
+     The three-clause rule is DONE and waiting; re-apply it after.
   R0/R4 ROUND 18 (built + reverted; produced the SPEC): implemented
      Joe's dead zones (enter a zone, do not come back out = potted;
      replacing the death-point/path-tail/bed-exit/lip-hover heuristics).

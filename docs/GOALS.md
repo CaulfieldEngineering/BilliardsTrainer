@@ -2081,3 +2081,16 @@ Rounds continue with Joe's visual feedback as the gate.
   baseline restored (10/10, 8/10, 1 fake, 0 unexplained, 2/4). SPEC
   recorded: potted = in-zone AND vanished AND no hand adjacent - all
   three, using the carried-ids already in the stream.
+
+- 2026-08-29 ~09:40 EDT — ROUND 19: implemented round 18's three-clause
+  pot spec. Every MISS correct (6/6, incl. hand-catch and both jaw
+  rattles) but only 1/5 pots credited -> 6/10 vs baseline 8/10;
+  reverted. Root cause traced ball by ball: on 4 of 5 pots the ball
+  loses its NAME approaching the pocket - the named track freezes ~1.8
+  pocket-radii out (all estimate rows) and an anonymous short-lived
+  fragment makes the final approach (also dropped by the unnamed-span
+  gate). The baseline only wins by being identity-blind, which is why
+  it mis-attributes half its pots. LADDER ORDER CORRECTED: R4 depends
+  on R3 - naming is the floor under outcomes, not polish above them.
+  Next: identity stitching into the pocket, then re-apply the (already
+  written and validated-on-misses) three-clause rule.
