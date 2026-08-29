@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 53,
+   "ts": "2026-08-29T00:20:23",
+   "date": "Aug 29, 00:20 UTC",
+   "kind": "finding",
+   "title": "Round 12: the naming problem is really a seeing problem",
+   "score": "24% of rolling time is guessed, not seen",
+   "body": "",
+   "images": [],
+   "html": "<div class='note win'><p><strong>I found out where the ball names\nare actually being lost, and it is not what any of us assumed.</strong></p>\n<p>Of every moment a ball is rolling on your table:</p>\n<table><tr><th>What happened</th><th class='num'>Share</th><th>Meaning</th></tr>\n<tr><td>Named correctly</td><td class='num'>72.1%</td><td>working</td></tr>\n<tr><td><strong>Seen, but no name</strong></td><td class='num'>3.8%</td>\n<td>the app had a clear look and still could not read the ball</td></tr>\n<tr><td><strong>Never actually seen</strong></td><td class='num'>24.0%</td>\n<td>the app was <em>guessing</em> the position - there was no picture to read</td></tr></table>\n<p>So the naming problem is barely a recognition problem. Nearly a\nquarter of all rolling-ball time, the detector never finds the ball at\nall - it blurs into the felt while moving - and the app coasts along a\npredicted path instead. You cannot name a ball you cannot see.</p>\n<p>That changes the plan. I was heading toward retraining the model to\nread numbers better; the evidence says the first job is making the\ndetector SEE fast-moving balls. Retraining reads would only ever fix\nthe 3.8%.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.7%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
    "id": 52,
    "ts": "2026-08-28T23:58:06",
    "date": "Aug 28, 23:58 UTC",

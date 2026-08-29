@@ -1988,3 +1988,14 @@ Rounds continue with Joe's visual feedback as the gate.
   stranded cue label is now visibly a guess and the real cue ball is a
   solid unnamed sighting. Bench otherwise steady: 10/10 shots, 8/10
   calls, 2/4 attribution, 72.1% naming, physics 0.06/1k.
+
+- 2026-08-28 ~20:45 — ROUND 12: R3 REDIRECTED BY MEASUREMENT. Built
+  tools/naming_audit.py (uses round 11's sighting/estimate flag) to
+  split naming loss by cause. Result: 72.1% named, 3.8% seen-but-
+  unnamed, 24.0% NEVER SEEN (coasted estimates). The naming gap is a
+  DETECTION-COVERAGE problem on fast balls, not a recognition one -
+  retraining number-reading could only ever address the 3.8% tail.
+  Next: targeted blur recovery aimed at moving tracks (off since the
+  2026-08-23 sweep failed its gates), measured by this audit. No engine
+  change this round, so no re-measure; bench steady at 10/10 shots,
+  8/10 calls, 99.7% cue, 72.1% naming.

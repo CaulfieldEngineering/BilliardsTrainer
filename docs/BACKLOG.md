@@ -57,6 +57,16 @@ its gate holds AND a vision watch agrees.
      stroke invented during hand setup. Gate: 10/10 found, 0 fake.
      NOW: 10/10 FOUND (round 10: engine writes hand context into the
      dense stream, so setup can be told from strokes); 3 fake remain.
+  R3 REDIRECTED (round 12, tools/naming_audit.py): the loss is NOT
+     recognition. Of all moving-ball samples: 72.1% named, only 3.8%
+     SEEN-but-unnamed, and 24.0% never seen at all - coasted estimates
+     where the detector lost the ball to motion blur. You cannot name
+     what you cannot see, so the FIRST R3 job is detection coverage on
+     fast balls (targeted blur recovery - currently OFF after a 2026-08-23
+     sweep failed its gates; re-attempt it aimed at moving tracks only,
+     measured by the naming audit), and the c8 retrain is demoted to the
+     3.8% tail. Worst offenders are track ids, not ball numbers - they
+     are balls that never got a name at all during their flight.
   R3 NOTE (round 9, FAILED + reverted 2026-08-28): a session-inventory
      prior (reject numbers read far less often than the rest) made every
      line WORSE - it cannot separate a phantom from a real ball the
