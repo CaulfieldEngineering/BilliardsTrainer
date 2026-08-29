@@ -2351,3 +2351,20 @@ Rounds continue with Joe's visual feedback as the gate.
   shadow in MeasurementCore). The merge seam is already built and
   scoring divergence; finish it, promote MotionTracker, delete
   BallTracker. Every fix from rounds 30-36 is offline-only until then.
+
+- 2026-08-30 ~17:00 EDT - ROUND 37: measured the two trackers head to
+  head on identical input (new tools/tracker_bakeoff.py - one decode,
+  one set of prepared detections, both trackers, same naming truth).
+  BallTracker (LIVE) 57.5% named correctly vs MotionTracker (OFFLINE)
+  98.9%. The live tracker calls the striped 9 a "3" in 221/221 samples,
+  so the red 3 is never right either (0/188), and invents an "11" x17.
+  A 41-point gap, and the harness if anything flatters the live side (it
+  gets the ensemble naming AND _pair_identities; only vacancy pruning is
+  omitted, which cannot fix a swap). Found and fixed a harness bug
+  mid-round: the first run omitted the frame argument to
+  _pair_identities so the colour correction never ran and both sides
+  were understated. This is the promotion evidence MeasurementCore's
+  divergence scaffolding was built to collect. NEXT: promote
+  MotionTracker to the live tracker, delete BallTracker and the shadow
+  scaffolding, gated on the bench scorecard plus a live render check.
+  Nothing shipped today; the app is unchanged.
