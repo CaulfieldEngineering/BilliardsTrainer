@@ -130,3 +130,42 @@ class TestOnlyASightingProvesMovement:
             assert tr.ever_moved is False, (
                 f"a coast of {drifted:.0f}px was counted as the ball moving; "
                 "that exempts pocket leather from the furniture rule")
+
+
+class TestARestingBallCanStillBeCorrected:
+    """Round 33. A resting ball must not FLICKER, but it must not be
+    permanently uncorrectable either.
+
+    The rest-freeze used to reset the pending counter, so evidence
+    against a resting track's name could never accumulate: the name it
+    held when it settled was final. The bench's static 9 took "1" during
+    a 6-frame lapse at 156.3 and wore it for the next 80 seconds while
+    the identifier read 9 underneath in 114 of 114 frames."""
+
+    def _settled(self, tk, number, n=40, t0=0.0):
+        t = t0
+        for _ in range(n):
+            tk.update([(300.0, 600.0, 13.0, number)], t)
+            t += 1 / 30.0
+        return t
+
+    def test_a_brief_misread_still_bounces_off(self):
+        tk = _tracker()
+        t = self._settled(tk, 9)
+        for _ in range(8):                     # a short burst of nonsense
+            tk.update([(300.0, 600.0, 13.0, 1)], t)
+            t += 1 / 30.0
+        rows = tk.update([(300.0, 600.0, 13.0, 9)], t)
+        assert any(r.number == 9 for r in rows), \
+            "a resting ball flipped on a brief misread"
+
+    def test_a_sustained_correction_lands(self):
+        from billiards_trainer.measure.tracker import REST_HYST_K
+        tk = _tracker()
+        t = self._settled(tk, 1)               # settled on the WRONG name
+        rows = []
+        for _ in range(REST_HYST_K + 15):      # unanimous, sustained truth
+            rows = tk.update([(300.0, 600.0, 13.0, 9)], t)
+            t += 1 / 30.0
+        assert any(r.number == 9 for r in rows), \
+            "a resting ball could never be corrected - the freeze was permanent"

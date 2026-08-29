@@ -29,10 +29,11 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 13  # v13: the identifier outranks the finder's colour
-                     # heuristic; a track that left the table is retired
-                     # so its name cannot latch onto another ball; only a
-                     # real sighting proves a track ever moved
+ENGINE_RULES_V = 14  # v14: a ball at REST can be corrected by sustained
+                     # contrary reads (the freeze was permanent, so the
+                     # name a ball held when it settled was final), and
+                     # the model's read is checked against this table's
+                     # measured colours (it reads the purple 4 as a 7)
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -68,7 +69,7 @@ def _acquire_calib(video, pipe):
         cap.release()
 
 
-def _pair_identities(found, ident_by_pos) -> None:
+def _pair_identities(found, ident_by_pos, frame_bgr=None) -> None:
     """EXCLUSIVE finder<->identifier pairing, in place: one identifier
     read feeds ONE finder detection (the first marathon run let
     neighbours share a read and spread duplicate numbers)."""
@@ -103,6 +104,19 @@ def _pair_identities(found, ident_by_pos) -> None:
         # emits 8s and an 11 across this clip).
         if num >= 0:
             d.number = num
+            if frame_bgr is not None:
+                # THE MODEL READS THE PURPLE 4 AS THE 7. That is a real
+                # misread of the dark 4/7/8 cluster under Joe's warm
+                # light, and until now the tracker's rest-freeze hid it:
+                # the 4 settled on the heuristic's correct guess before
+                # the "7" could accumulate. With a resting ball made
+                # correctable (round 33), the misread wins instead - 129
+                # sightings - so the correction the ensemble already owns
+                # has to run here too. It compares the crop against THIS
+                # table's measured colours and only overrules the model
+                # when the claim is far and another number is close.
+                from ..detector_strategies.ensemble import FindIdEnsemble
+                FindIdEnsemble._fix_colour(frame_bgr, d)
 
 
 def reprocess(video: str, out_dir: str | None = None,
@@ -238,7 +252,7 @@ def reprocess(video: str, out_dir: str | None = None,
                 ids = ident.detect(frame, calib) or []
                 ident_by_pos = [(d.x, d.y, d.number) for d in ids
                                 if getattr(d, "number", -1) >= 0]
-            _pair_identities(found, ident_by_pos)
+            _pair_identities(found, ident_by_pos, frame)
             # THE shared stage: raw-frame -> rect space + every filter
             prepared = pipe.prepare_detections(found, calib, frame.shape,
                                                frame=frame,

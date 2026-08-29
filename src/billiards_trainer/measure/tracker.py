@@ -31,6 +31,10 @@ ACQUIRE_R = 8.0          # wider gate for a young/still track: a struck
                          # used to fragment into one track per frame
 VOTE_N = 9               # number votes considered for identity
 HYST_K = 5               # frames a new number must lead before shown
+REST_HYST_K = 45         # ...and this many while the ball is at REST,
+                         # where flicker is likeliest and a correction
+                         # rarest: ~1.5s of unanimous contrary reads.
+                         # Not infinity, which is what it used to be.
 FRESH_S = 2.5            # a number-read older than this carries no CLAIM
                          # weight in arbitration (identity majority still
                          # uses all votes). Bought 2026-08-28: Joe's
@@ -359,7 +363,25 @@ class MotionTracker:
                     tr.ax, tr.ay = tr.x, tr.y
                 tr.pend, tr.pend_k = -1, 0
             elif at_rest and tr.emitted >= 0:
-                tr.pend, tr.pend_k = -1, 0  # frozen: misreads bounce off
+                # A resting ball must not FLICKER - but it must not be
+                # permanently uncorrectable either. This branch used to
+                # reset the pending counter, so evidence against a
+                # resting track's name could never accumulate at all: the
+                # name it happened to hold when it settled was final. The
+                # bench's static 9 took "1" during one 6-frame lapse at
+                # 156.3 and wore it for the remaining 80 seconds while
+                # the identifier read 9 underneath in 114 of 114 frames,
+                # and three separate attempts to fix its INPUTS only
+                # changed which wrong name it froze on. A misread still
+                # bounces off - nothing survives REST_HYST_K consecutive
+                # frames by accident - but a sustained, unanimous
+                # correction now lands.
+                if cand == tr.pend:
+                    tr.pend_k += 1
+                else:
+                    tr.pend, tr.pend_k = cand, 1
+                if tr.pend_k >= REST_HYST_K:
+                    tr.emitted, tr.pend, tr.pend_k = cand, -1, 0
             else:
                 if cand == tr.pend:
                     tr.pend_k += 1

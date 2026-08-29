@@ -2284,3 +2284,21 @@ Rounds continue with Joe's visual feedback as the gate.
   the defect is the 9's correct READ being given away. NEXT: a short
   per-position memory of recent reads so a stationary ball keeps the
   name it was just read as, instead of falling back to colour.
+
+- 2026-08-30 ~07:00 EDT - ROUND 33 *** SHIPPED, R3 AND R4 GATES PASSED ***
+  (rules_v 13 -> 14). After three rounds attacking the naming INPUTS, the
+  cause was the emit stage: REST-FROZEN IDENTITY was absolute and RESET
+  the pending counter, so a resting ball's name could never be revised -
+  the static 9 took "1" in a 6-frame lapse at 156.3 and wore it for 80s
+  while the identifier read 9 in 114/114 frames. That is why the previous
+  three fixes only changed WHICH wrong name froze. FIX: at rest a
+  candidate must lead REST_HYST_K=45 frames (~1.5s) instead of forever.
+  Lifting the freeze exposed a bug it had been hiding - the model reads
+  the purple 4 as a 7 (4: 136/136 -> 2/136) - so the ensemble's
+  _fix_colour now runs on the engine path against measured refs.
+  MEASURED: named correctly 89.2 -> 99.5% (target 95, PASSED), outcomes
+  9/10 -> 10/10, pot attribution 3/4 -> 4/4, per ball 0:221/221 1:84/85
+  2:156/156 3:188/189 4:136/136 9:218/221 - three wrong sightings in the
+  whole clip. Strokes 10/10 and cue 100% held. Vision-checked at t=200s.
+  Pinned by 9 tests. GAP: colour refs live in APP_DIR and are rebuilt
+  from a gitignored corpus - fix before P2.
