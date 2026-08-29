@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 57,
+   "ts": "2026-08-29T01:57:31",
+   "date": "Aug 29, 01:57 UTC",
+   "kind": "finding",
+   "title": "Round 15: the app was chasing balls that were not there",
+   "score": "naming 72.1% -> 75.7%; fake shots 3 -> 5",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/057-open_loss.png",
+     "caption": "Four 'lost balls' on open felt: a ball in the glove, two empty pocket corners, and one off the table on the floor."
+    }
+   ],
+   "html": "<div class='note'><p><strong>I looked first this time.</strong> The remaining 'lost' ball movement on open felt turned out not to be lost balls at all. Cropping four examples: one is a ball in your gloved hand, two are the pocket corner with no ball present, and one is <em>off the table entirely</em>, down on the floor.</p><p>So the app was not failing to see balls - it was continuing to predict where a ball would be after losing it, and those predictions drifted onto bare cloth and eventually off the table, while being counted as real ball movement.</p><p><strong>Fix:</strong> a prediction that leaves the table is not a ball, and now stops immediately.</p><table><tr><th>Measure</th><th class='num'>Before</th><th class='num'>After</th></tr><tr><td>Ball movement correctly named</td><td class='num'>72.1%</td><td class='num'>75.7%</td></tr><tr><td>Movement that was only a guess</td><td class='num'>24.2%</td><td class='num'>19.6%</td></tr><tr><td>Invented movement (total samples)</td><td class='num'>3598</td><td class='num'>3241</td></tr></table><p><strong>And an honest cost:</strong> invented shots during your hand-setup went from 3 to 5. With fewer ghost tracks diluting it, the rule that recognises 'this is Joe placing balls' now needs retuning. Shots found stayed at 10 of 10 and correct calls at 8 of 10.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>75.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>5</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>RULE 0: never assert a physical cause without looking at the pixels</li><li>Round 14: conditional jaw filter failed two ways - reverted</li><li>Round 13: jaw filter hides real pots - but deleting it is worse</li><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
    "id": 56,
    "ts": "2026-08-29T01:46:11",
    "date": "Aug 29, 01:46 UTC",

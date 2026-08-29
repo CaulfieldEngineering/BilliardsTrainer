@@ -78,6 +78,15 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 ROUND 15 (kept): looked at the open-felt losses per RULE 0 - they
+     were NOT missed balls. Crops show a ball in the glove, two empty
+     pocket corners, and one prediction off the table on the FLOOR. The
+     tracker was coasting into nowhere and counting it as ball motion.
+     Coasts now stop at the bed edge: naming 72.1->75.7%, guessed
+     motion 24.2->19.6%, total moving samples 3598->3241. COST: fake
+     strokes 3->5 - with fewer ghost tracks diluting it, CARRIED_SETUP
+     (0.5) no longer catches Joe's hand-setup episodes. NEXT: retune
+     that threshold against the three known setup windows.
   R3 RE-AIMED AGAIN (2026-08-28, Joe caught a false premise): the
      "motion blur" story was WRONG. Cropped the pixels at last: the
      ball the engine loses is SHARP, sitting in the pocket jaw, and the

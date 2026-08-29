@@ -181,7 +181,20 @@ class MotionTracker:
             if tr.id in used_t or tr.t == t:
                 continue
             tr.misses = t - tr.t if tr.misses == 0.0 else tr.misses + 0.0
-            if t - tr.t > COAST_S:
+            # COASTING INTO NOWHERE (round 15, pixels looked at first per
+            # RULE 0): the "lost detections" on open felt were largely
+            # not missed balls at all - they were predictions that drifted
+            # off the ball, and in one case clean off the table onto the
+            # floor. A prediction that leaves the bed is not a ball; stop
+            # inventing motion for it.
+            off_bed = False
+            if self._pockets:
+                xs = [p[0] for p in self._pockets]
+                ys = [p[1] for p in self._pockets]
+                pad = 2.0 * max(tr.radius, 8.0)
+                off_bed = not (min(xs) - pad <= tr.x <= max(xs) + pad
+                               and min(ys) - pad <= tr.y <= max(ys) + pad)
+            if t - tr.t > COAST_S or off_bed:
                 tr.active = False
                 tr.vx = tr.vy = 0.0
             else:

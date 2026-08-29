@@ -2037,3 +2037,13 @@ Rounds continue with Joe's visual feedback as the gate.
   in memory: "You DO NOT make assumptions. Always look at the image
   yourself!" - no claim about a physical cause without cropping the
   pixels first.
+
+- 2026-08-28 ~23:20 — ROUND 15 (RULE 0 applied first): cropped the
+  open-felt "lost balls" before theorising - a ball in the glove, two
+  empty pocket corners, one prediction off the table on the floor. Not
+  missed detections: the tracker coasting into nowhere and counting it
+  as motion. Coasts now terminate at the bed edge. Naming 72.1->75.7%,
+  guessed motion 24.2->19.6%, moving samples 3598->3241, shots hold
+  10/10 and calls 8/10. Regression published with it: fake strokes
+  3->5, because the hand-setup rule (CARRIED_SETUP=0.5) was tuned when
+  ghost tracks diluted the carried fraction - retune next.
