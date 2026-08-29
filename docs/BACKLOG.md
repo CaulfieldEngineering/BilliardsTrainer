@@ -57,6 +57,18 @@ its gate holds AND a vision watch agrees.
      stroke invented during hand setup. Gate: 10/10 found, 0 fake.
      NOW: 10/10 FOUND (round 10: engine writes hand context into the
      dense stream, so setup can be told from strokes); 3 fake remain.
+  R3 ROUND 14 (tried + reverted): "persistence" jaw filter - refuse a
+     dim near-pocket read only if a detection sat at the same spot last
+     frame. FAILED twice: (a) it read self._last_detections, which ONLY
+     the live path writes, so offline it was inert (scores identical to
+     deleting the filter); (b) with real history it also killed balls
+     RESTING near a pocket - they too are at the same spot every frame -
+     and shots found went 10 -> 0. Reverted. LESSON: "has not moved"
+     cannot separate leather from ball; both sit still. NEXT: gate on
+     ARRIVAL - accept a dim near-pocket read only when a track was
+     travelling toward that pocket in the preceding ~0.5s (needs the
+     engine's own tracker passed into prepare_detections; the pipeline's
+     tracker is empty offline).
   R3 ROUND 13 (tried + reverted): deleting the jaw confidence filter
      recovered ~35% more moving-ball samples (real pots score 0.49-0.74
      at 16-28px from the pocket and were being discarded) BUT the pocket

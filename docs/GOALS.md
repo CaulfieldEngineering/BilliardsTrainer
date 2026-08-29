@@ -2014,3 +2014,14 @@ Rounds continue with Joe's visual feedback as the gate.
   of that class) and a piped pytest exit code let a run proceed on a
   red suite - both repaired; the Edit-tool-only and never-gate-on-a-
   piped-exit-code rules exist for exactly this and were not followed.
+
+- 2026-08-28 ~22:30 — ROUND 14: NEGATIVE RESULT (3rd), published. The
+  conditional jaw filter failed two distinct ways: inert offline (it
+  consulted live-path-only history), then over-aggressive once fixed
+  (a ball RESTING near a pocket also never moves, so it was discarded;
+  shots 10 -> 0). Reverted; bench restored exactly (10/10 shots, 8/10
+  calls, 3 fake, 2/4 attribution, invented "8" 18 frames). Lesson
+  recorded: stillness cannot separate leather from ball - the next
+  attempt gates on ARRIVAL (a track travelling toward that pocket),
+  which requires passing the engine's own tracker into the shared
+  detection stage.

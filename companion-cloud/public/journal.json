@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 55,
+   "ts": "2026-08-29T01:41:19",
+   "date": "Aug 29, 01:41 UTC",
+   "kind": "finding",
+   "title": "Round 14: two ways to get a pocket filter wrong",
+   "score": "reverted - bench holds at 10/10 shots, 8/10 calls",
+   "body": "",
+   "images": [],
+   "html": "<div class='note warn'><p><strong>Round 14: attempted, measured, reverted.</strong> The plan from last round was to make the pocket filter conditional - refuse a dim reading near a pocket only when something has been sitting at that exact spot frame after frame (leather), and allow it when a ball is arriving (a pot).</p><p>Two failures, both caught by measurement rather than by reasoning. First the rule did nothing at all: it consulted a history that only the live camera path writes, so during re-processing it was always empty. Then, once it had a real history, it was <em>too</em> effective - a ball resting near a pocket is also at the same spot every frame, so the app began discarding balls that were legitimately parked by the jaws. Shots found collapsed from 10 to 0.</p><p>Reverted, re-measured, bench back exactly where it was. The flaw in my rule is now obvious and worth stating: 'has not moved' does not separate leather from a ball - <em>both</em> sit still. The next attempt uses arrival instead: accept a dim reading near a pocket only when a ball was travelling toward that pocket in the moments before, which leather never does.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.7%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 13: jaw filter hides real pots - but deleting it is worse</li><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
    "id": 54,
    "ts": "2026-08-29T01:07:04",
    "date": "Aug 29, 01:07 UTC",
