@@ -2202,3 +2202,18 @@ Rounds continue with Joe's visual feedback as the gate.
   >=0.418), and colour_refs.json's stale 2026-08-15 entries for balls
   not on this table are what the phantoms match (302 -> 56 invented
   frames when dropped).
+
+- 2026-08-29 ~21:00 EDT - ROUND 28: fixed the INSTRUMENT, per round 27's
+  finding that the scorecard cannot see a ball called by another ball's
+  name. Added per-ball naming correctness (tools/scorecard.py) fed by a
+  pixel-derived truth stream (tools/build_naming_truth.py, 221 samples,
+  colour + the 0.95 stripe window, self-contained so it cannot drift
+  with the app). Verified by eye on 4 frames / 23 labels before use.
+  BASELINE on the unchanged champion: 76.0% named CORRECTLY, and the
+  damage is not diffuse - it is one ball: the static striped 9 scores
+  0/221, called "1" in 154 sightings and blank in the rest, while cue
+  (221/221), 2 (156/156) and 4 (136/136) are perfect and the 3 is
+  187/189. Pinned by 6 tests including the literal round-27 case.
+  No engine change; champion untouched. Next round re-lands round 27's
+  five pieces ONE AT A TIME gated on name_right_pct, to find which one
+  costs the red 3.

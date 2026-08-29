@@ -97,6 +97,39 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
+  R3 ROUND 28 - THE INSTRUMENT IS FIXED, AND IT LOCALISED THE DEFECT:
+     Added per-ball naming CORRECTNESS to tools/scorecard.py, fed by a
+     new pixel-derived truth stream (tools/build_naming_truth.py ->
+     docs/bench_naming_truth.json, 221 samples). Truth is colour family
+     + the 0.95-window stripe reading, self-contained on purpose: a
+     yardstick that imports the app's appearance code moves whenever the
+     app does, which is how round 27's regression stayed invisible.
+     Verified BY EYE on 4 frames / 23 labels before use
+     (_train/bench_fix/naming_truth_check.png).
+     BASELINE (champion, unchanged engine): 76.0% named correctly.
+       per ball  0:221/221  1:66/85  2:156/156  3:187/189  4:136/136
+                 9:0/221
+       confusions 9->1 x154 (plus 9->3 x1, 1->2 x1)
+     THE DEFECT IS ONE BALL: the static striped 9 is NEVER named
+     correctly - 154 sightings called "1", the rest blank. Cue, 2 and 4
+     are perfect; the 3 is 187/189. Naming is not diffusely bad, it is
+     one total failure. Also 88 truth sightings had no track within
+     30px (worth a look later).
+     Pinned by tests/test_naming_correctness.py (6 tests incl. the
+     literal round-27 case: a ball answering to another ball's name must
+     score WRONG, and an average must not launder it).
+  R3 NEXT ROUND - RE-LAND ROUND 27 ONE PIECE AT A TIME, gated on
+     name_right_pct (not named_moving_pct, which is presence-only and
+     was the blind spot). The five pieces, to bisect:
+       1. stripe_reading window 0.62 -> 0.95 and v>170 -> v>150
+       2. _name_unknown: exclude the +8 partner from the colour margin
+       3. _name_unknown: call _fix_stripe_bit after naming
+       4. _name_unknown: 0.70 finder-score bar (phantoms score <=0.49)
+       5. engine -> strat.detect (the ONE naming owner; law 1)
+     Round 27 measured the bundle at naming 80.0% / attribution 3/4 with
+     the 9 fixed (6684 frames) but the red 3 renamed "1" x1843. Find
+     which piece costs the 3 - suspicion is (2), since dropping the
+     partner from the margin also drops 11 from the 3's runner-up scan.
   R3 ROUND 27 - FOUND THE REAL BLOCKER, REVERTED ON A REGRESSION THE
      SCORECARD COULD NOT SEE:
      THE ENGINE NEVER CALLED THE ENSEMBLE. measure/engine.py ran

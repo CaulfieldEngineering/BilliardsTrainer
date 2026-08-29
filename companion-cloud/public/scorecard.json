@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-29T17:11:13Z",
+ "ts": "2026-08-29T17:19:27Z",
  "detected": "10/10",
  "outcome": "9/10",
  "false_strokes": 1,
@@ -118,6 +118,53 @@
    8
   ],
   "invented_frames": 60,
+  "name_right_pct": 76.0,
+  "name_wrong_frames": 156,
+  "name_unnamed_frames": 86,
+  "name_missing_frames": 88,
+  "name_confusions": {
+   "9->1": 154,
+   "9->3": 1,
+   "1->2": 1
+  },
+  "name_per_ball": {
+   "0": {
+    "right": 221,
+    "wrong": 0,
+    "unnamed": 0,
+    "missing": 0
+   },
+   "1": {
+    "right": 66,
+    "wrong": 1,
+    "unnamed": 18,
+    "missing": 1
+   },
+   "2": {
+    "right": 156,
+    "wrong": 0,
+    "unnamed": 0,
+    "missing": 0
+   },
+   "3": {
+    "right": 187,
+    "wrong": 0,
+    "unnamed": 2,
+    "missing": 6
+   },
+   "4": {
+    "right": 136,
+    "wrong": 0,
+    "unnamed": 0,
+    "missing": 81
+   },
+   "9": {
+    "right": 0,
+    "wrong": 155,
+    "unnamed": 66,
+    "missing": 0
+   }
+  },
   "pot_attribution": "2/4"
  },
  "setup_labelled": 13,

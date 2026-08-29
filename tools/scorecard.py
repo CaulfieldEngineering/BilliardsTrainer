@@ -61,6 +61,84 @@ def _evidence(name: str, shots: list, out_dir: Path) -> None:
         s["img"] = f"journal/evidence/{fn}"
 
 
+NAMING_TRUTH = ROOT / "docs" / "bench_naming_truth.json"
+NAME_TOL_PX = 30.0      # video pixels; a ball's radius here is ~13
+
+
+def _naming_correctness(r, times, frames) -> dict:
+    """Is each ball called by its RIGHT name? (not merely called something)
+
+    Round 27 shipped a change that lifted every naming number on this
+    scorecard while renaming the red 3 to "1" in 1843 frames. Nothing
+    caught it, because "named" and "on the inventory" were the only tests
+    and a wrong-but-valid name passes both. This compares the app's name
+    for a ball against pixel-derived truth, per ball, and reports the
+    confusions by name so a swap can never hide inside an average again.
+
+    Truth comes from docs/bench_naming_truth.json (tools/build_naming_truth.py),
+    which is derived from colour and the stripe window, never from the app.
+    """
+    import bisect
+
+    import numpy as np
+    try:
+        doc = json.loads(NAMING_TRUTH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    try:
+        hinv = np.asarray(r.meta["hinv"], dtype=float)
+    except (KeyError, TypeError, ValueError):
+        return {}
+
+    def to_video(x, y):
+        v = hinv @ np.array([x, y, 1.0])
+        return v[0] / v[2], v[1] / v[2]
+
+    per: dict = {}
+    confusions: dict = {}
+    for s in doc.get("samples", []):
+        t = s["t"]
+        j = bisect.bisect_left(times, t)
+        if j and (j >= len(times) or abs(times[j - 1] - t) < abs(times[j] - t)):
+            j -= 1
+        if j >= len(times) or abs(times[j] - t) > 0.15:
+            continue
+        live = [x for x in frames[j] if x[6]]
+        placed = [(to_video(x[1], x[2]), x) for x in live]
+        for n, tx, ty in s["balls"]:
+            best, bd = None, 1e9
+            for (vx, vy), row in placed:
+                d = ((vx - tx) ** 2 + (vy - ty) ** 2) ** 0.5
+                if d < bd:
+                    bd, best = d, row
+            e = per.setdefault(int(n), {"right": 0, "wrong": 0,
+                                        "unnamed": 0, "missing": 0})
+            if best is None or bd > NAME_TOL_PX:
+                e["missing"] += 1          # truth says a ball is here; no track
+            elif int(best[4]) < 0:
+                e["unnamed"] += 1
+            elif int(best[4]) == int(n):
+                e["right"] += 1
+            else:
+                e["wrong"] += 1
+                k = f"{int(n)}->{int(best[4])}"
+                confusions[k] = confusions.get(k, 0) + 1
+    if not per:
+        return {}
+    tot = {k: sum(v[k] for v in per.values())
+           for k in ("right", "wrong", "unnamed", "missing")}
+    seen = tot["right"] + tot["wrong"] + tot["unnamed"]
+    return {
+        "name_right_pct": round(100.0 * tot["right"] / max(1, seen), 1),
+        "name_wrong_frames": tot["wrong"],
+        "name_unnamed_frames": tot["unnamed"],
+        "name_missing_frames": tot["missing"],
+        "name_confusions": dict(sorted(confusions.items(),
+                                       key=lambda kv: -kv[1])),
+        "name_per_ball": {str(k): per[k] for k in sorted(per)},
+    }
+
+
 def score(truth_path: Path) -> dict:
     logging.disable(logging.CRITICAL)
     from billiards_trainer.config import Settings
@@ -124,6 +202,8 @@ def score(truth_path: Path) -> dict:
             extra += 1
     # ---- capability metrics (Joe's ladder: cue tracking, object-ball
     # ID, make/miss) - computed from the same dense stream ------------
+    # (naming CORRECTNESS lives in _naming_correctness below - the
+    # presence-only metrics here cannot see a ball named as another ball)
     known = set(truth.get("balls_on_table", []))
     times, frames = r._times, r._frames
     cue_ok = cue_bad = 0
@@ -167,6 +247,7 @@ def score(truth_path: Path) -> dict:
         "invented_numbers": sorted(invented),
         "invented_frames": sum(invented.values()),
     }
+    caps.update(_naming_correctness(r, times, frames))
     found = sum(1 for x in rows if x["found"])
     ok = sum(1 for x in rows if x["outcome_ok"])
     attr_rows = [x for x in rows if "ball_ok" in x]
@@ -202,6 +283,20 @@ def main() -> None:
     c = sc["caps"]
     print(f"  cue ball named  : {c['cue_named_pct']}% of frames (target 99+)")
     print(f"  moving balls named: {c['named_moving_pct']}% (target 95+)")
+    if "name_right_pct" in c:
+        print(f"  NAMED CORRECTLY : {c['name_right_pct']}% of ball sightings "
+              f"(target 95+)  [wrong {c['name_wrong_frames']}, "
+              f"unnamed {c['name_unnamed_frames']}, "
+              f"no track {c['name_missing_frames']}]")
+        if c["name_confusions"]:
+            worst = ", ".join(f"{k} x{v}" for k, v in
+                              list(c["name_confusions"].items())[:5])
+            print(f"  confusions      : {worst}")
+        per = c["name_per_ball"]
+        line = "  per ball        : " + "  ".join(
+            f"{b}:{v['right']}/{v['right'] + v['wrong'] + v['unnamed']}"
+            for b, v in per.items())
+        print(line)
     print(f"  invented numbers: {c['invented_numbers']} "
           f"({c['invented_frames']} frames, target none)")
     print(f"  pots attributed : {c['pot_attribution']} (right ball named)")
