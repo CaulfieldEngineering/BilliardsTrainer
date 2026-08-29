@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 54,
+   "ts": "2026-08-29T01:07:04",
+   "date": "Aug 29, 01:07 UTC",
+   "kind": "finding",
+   "title": "Round 13: the filter that hides your pots (and why deleting it was worse)",
+   "score": "reverted - bench back to 10/10 shots, 8/10 calls",
+   "body": "",
+   "images": [],
+   "html": "<div class='note warn'><p><strong>Round 13: tried, measured, reverted.</strong> Last round showed a quarter of rolling-ball time is guessed rather than seen. I found a likely culprit in my own earlier work: a filter I added on August 28 throws away dim sightings near a pocket, to stop the pocket leather being read as a ball. But a ball is <em>dimmest exactly when it is dropping</em> - I measured real pots scoring 0.49 to 0.74 just sixteen to twenty-eight pixels from the pocket, being discarded.</p><p>So I deleted the filter. Coverage did improve - the app saw about a third more ball movement. But the leather came straight back as a phantom ball number 8, present in 962 frames instead of 18, and that cost more than the coverage gained: shots found fell from 10 to 8 and correct calls from 8 to 6.</p><p>Reverted; the bench is back exactly where it was. The lesson is specific and useful: the filter must not be all-or-nothing. A dim reading near a pocket should be accepted when a ball is <em>arriving</em> there - travelling into the pocket - and refused when nothing is moving toward it. That is the next attempt.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.7%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
+  },
+  {
    "id": 53,
    "ts": "2026-08-29T00:20:23",
    "date": "Aug 29, 00:20 UTC",

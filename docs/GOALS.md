@@ -1999,3 +1999,18 @@ Rounds continue with Joe's visual feedback as the gate.
   2026-08-23 sweep failed its gates), measured by this audit. No engine
   change this round, so no re-measure; bench steady at 10/10 shots,
   8/10 calls, 99.7% cue, 72.1% naming.
+
+- 2026-08-28 ~21:30 — ROUND 13: NEGATIVE RESULT (2nd of the campaign),
+  published. Measured that my own round-1 jaw confidence filter
+  discards REAL pots (0.49-0.74 scores, 16-28px from the pocket) -
+  a direct cause of round 12's 24% coasted-guess share. Deleting it
+  raised coverage ~35% but resurrected the leather as a phantom "8"
+  (18 -> 962 frames), costing shots 10->8 and calls 8->6. Reverted;
+  bench restored exactly (10/10, 8/10, 3 fake, 2/4 attribution).
+  Next: CONDITIONAL jaw filter (accept dim reads when a ball is
+  arriving at that pocket; refuse static leather) + harden
+  furniture-by-time against re-born tracks. PROCESS FAILURE this
+  round: scripted heredoc edits corrupted pipeline.py (3rd occurrence
+  of that class) and a piped pytest exit code let a run proceed on a
+  red suite - both repaired; the Edit-tool-only and never-gate-on-a-
+  piped-exit-code rules exist for exactly this and were not followed.

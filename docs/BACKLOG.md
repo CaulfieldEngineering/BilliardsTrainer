@@ -57,6 +57,15 @@ its gate holds AND a vision watch agrees.
      stroke invented during hand setup. Gate: 10/10 found, 0 fake.
      NOW: 10/10 FOUND (round 10: engine writes hand context into the
      dense stream, so setup can be told from strokes); 3 fake remain.
+  R3 ROUND 13 (tried + reverted): deleting the jaw confidence filter
+     recovered ~35% more moving-ball samples (real pots score 0.49-0.74
+     at 16-28px from the pocket and were being discarded) BUT the pocket
+     leather returned as a phantom "8" in 962 frames (was 18), dropping
+     shots 10->8 and calls 8->6. Net negative; reverted. NEXT ATTEMPT:
+     make the jaw filter CONDITIONAL - accept a dim read near a pocket
+     when a track is moving toward that pocket (a ball arriving), refuse
+     it when nothing is approaching (static leather). Also fix the
+     furniture-by-time rule so a re-born leather track cannot dodge it.
   R3 REDIRECTED (round 12, tools/naming_audit.py): the loss is NOT
      recognition. Of all moving-ball samples: 72.1% named, only 3.8%
      SEEN-but-unnamed, and 24.0% never seen at all - coasted estimates
