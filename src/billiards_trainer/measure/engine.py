@@ -29,11 +29,11 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 14  # v14: a ball at REST can be corrected by sustained
-                     # contrary reads (the freeze was permanent, so the
-                     # name a ball held when it settled was final), and
-                     # the model's read is checked against this table's
-                     # measured colours (it reads the purple 4 as a 7)
+ENGINE_RULES_V = 15  # v15: a model claim with NO measured reference can
+                     # still be overruled by a decisive match against one
+                     # we did measure - so naming no longer leans on the
+                     # unvalidated 2026-08-15 references for balls that
+                     # are not even on the table
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:

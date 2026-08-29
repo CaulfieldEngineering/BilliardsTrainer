@@ -226,6 +226,7 @@ class FindIdEnsemble(DetectorStrategy):
             return FindIdEnsemble._fix_stripe_colour(frame_bgr, f)
         # SOLID FAMILY (1..8): whole-crop median arbitrates identity — the
         # dark trio 4/7/8 is THE confusion cluster under warm light.
+        from ..core.balls import _load_measured_refs as _loaded_refs
         from ..core.balls import lab_distance_to_ref, measured_identity
         rr = max(2, int(round(f.radius * 0.7)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
@@ -240,7 +241,28 @@ class FindIdEnsemble(DetectorStrategy):
         med = tuple(int(v) for v in np.median(keep, axis=0))
         claimed_d = lab_distance_to_ref(med, n)
         if claimed_d is None:
-            return   # no trustworthy reference for the claim — hands off
+            # NO REFERENCE FOR THE CLAIM. Handing off here means an
+            # unknown number is unchallengeable, which made the repair of
+            # the purple-4-read-as-7 depend on an UNVALIDATED 2026-08-15
+            # reference for a 7 that is not even on this table: install
+            # only the measured six and the 4 collapses again, 136/136 ->
+            # 7/136 (round 34). Absence of evidence for the claim must
+            # not protect it. If the crop instead sits decisively on a
+            # reference we DID measure, that measurement wins.
+            m0 = measured_identity(med, max_dist=20.0)
+            if not 1 <= m0 <= 8 or m0 == n:
+                return
+            best = lab_distance_to_ref(med, m0)
+            runner = min((d for k in _loaded_refs() if k != m0
+                          for d in [lab_distance_to_ref(med, k)]
+                          if d is not None), default=None)
+            if best is None or runner is None or runner - best < 25.0:
+                return   # not decisive — leave the model alone
+            f.number = m0
+            f.cls = BallClass.EIGHT if m0 == 8 else BallClass.SOLID
+            f.bgr = pool_ball_bgr(m0)
+            f.measured_bgr = med
+            return
         # RELATIVE margin, not absolute gates: 7-vs-8 references sit only 41
         # Lab units apart, so 'claim within 40 = fine' let every 8-as-7 slip
         # through. Correct only when another solid-family reference beats the

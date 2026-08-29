@@ -2302,3 +2302,19 @@ Rounds continue with Joe's visual feedback as the gate.
   whole clip. Strokes 10/10 and cue 100% held. Vision-checked at t=200s.
   Pinned by 9 tests. GAP: colour refs live in APP_DIR and are rebuilt
   from a gitignored corpus - fix before P2.
+
+- 2026-08-30 ~09:00 EDT - ROUND 34 SHIPPED (rules_v 14 -> 15): made the
+  99.5% durable and honest. Committed docs/colour_refs.json as the
+  version of record with `--install` to restore APP_DIR (byte-identical
+  round-trip) and 6 guarding tests. Then found the result was leaning on
+  UNVALIDATED 2026-08-15 references for balls not on this table:
+  installing only the measured six collapsed the purple 4 to 7/136,
+  because _fix_colour repairs the 4-read-as-7 by comparing against the
+  stale 7 reference, and its `claimed_d is None -> hands off` guard made
+  an unreferenced claim unchallengeable. FIX: a decisive match against a
+  reference we DID measure now overrules a claim that has none.
+  Inherited entries kept as history, not installed. Result identical -
+  99.5% named, 10/10 strokes, 10/10 outcomes, 4/4 pots - on validated
+  data only. Vision-checked at t=120s. Remaining on the bench: 1 fake
+  stroke (hand setup ~13.1s) and 36 frames of coasting ghost numbers
+  during cue/hand activity.

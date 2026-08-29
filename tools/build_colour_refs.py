@@ -80,10 +80,28 @@ def main() -> int:
 
     from billiards_trainer.config import APP_DIR
     ap = argparse.ArgumentParser()
-    ap.add_argument("--store", required=True)
+    ap.add_argument("--store", help="labelled TrainingStore to measure from")
     ap.add_argument("--write", action="store_true",
                     help="without this the tool only reports the diff")
+    ap.add_argument("--install", action="store_true",
+                    help="restore APP_DIR's refs from the version of record "
+                         "in docs/colour_refs.json (a fresh clone has no "
+                         "labelled corpus to measure, but the engine's naming "
+                         "depends on these - see round 33)")
     a = ap.parse_args()
+
+    if a.install:
+        canon = json.loads((ROOT / "docs" / "colour_refs.json")
+                           .read_text(encoding="utf-8"))["refs"]
+        live = {k: {kk: vv for kk, vv in v.items() if kk != "source"}
+                for k, v in canon.items()}
+        path = APP_DIR / "colour_refs.json"
+        path.write_text(json.dumps(live, indent=1), encoding="utf-8")
+        print(f"installed {len(live)} references -> {path}")
+        return 0
+    if not a.store:
+        print("--store is required unless --install is given", file=sys.stderr)
+        return 2
 
     fresh = measure(Path(a.store))
     if not fresh:
