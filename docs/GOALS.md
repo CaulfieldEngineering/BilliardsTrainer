@@ -2105,3 +2105,14 @@ Rounds continue with Joe's visual feedback as the gate.
   The blocker is RECOGNITION, not continuity. Next round measures
   whether identifier CADENCE is the limit (IDENT_EVERY=6 -> 1 on the
   bench) before touching the model.
+
+- 2026-08-29 ~11:20 EDT — ROUND 21: identifier CADENCE ruled out as the
+  naming limit - IDENT_EVERY=1 (6x the reads) produced bit-identical
+  naming (75.7%, 150 seen-unnamed, 636 estimate-only). Probed the
+  170.6 shot directly: 7 balls found, 4 numbers read, one of them a
+  "7" that is not on the table. Cropped and looked: that "7" is the
+  PURPLE 4; 1/4/5 are never read. R3 is therefore a MODEL problem, not
+  cadence, coverage, or continuity - and it is the floor under R4
+  (attribution 2/4 fails on exactly the unnamed/misnamed pots).
+  Reverted to IDENT_EVERY=6. NEXT: mine the c8 retrain corpus from
+  these exact failure frames, label, train, gate.

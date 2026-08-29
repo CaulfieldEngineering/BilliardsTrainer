@@ -78,6 +78,20 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 ROUND 21 (CADENCE RULED OUT; ROOT CAUSE IS THE MODEL): ran the
+     bench with IDENT_EVERY=1 (6x the identifier passes). Naming was
+     BIT-IDENTICAL: 75.7% named, 150 seen-unnamed, 636 estimate-only.
+     Direct probe of the 170.6 shot: the finder finds 7 balls, the
+     identifier reads 4 numbers, and one is a "7" - not on this table.
+     Cropped and LOOKED (RULE 0): blue->2 correct, red->3 correct,
+     yellow->9, and the "7" is the PURPLE 4. Balls 1, 4, 5 get no read
+     at all. Reverted to IDENT_EVERY=6 (identical output, 20% slower).
+     => R3 is a MODEL problem. Confusion pairs seen so far: 4->7 (dark
+     colours), cue->9 (round 8), 3<->5 (Joe's original report), and
+     non-reads of 1/4/5. NEXT: build the c8 retrain corpus by mining
+     these exact failures from the dense sidecars (crop at the frames
+     where a ball is seen-but-unnamed or read as a number not in the
+     session inventory), label, train, gate same-batch vs c5.
   R3 ROUND 20 (built + reverted; DIAGNOSIS CORRECTED): implemented
      identity stitching (a fresh detection continuing a dead track's
      motion inherits its name; corridor test from the last REAL
