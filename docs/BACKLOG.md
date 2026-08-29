@@ -97,6 +97,42 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
+  R3 ROUND 32 - EXACT CAUSE OF THE RESIDUAL 9->1; TWO FIXES TRIED,
+     BOTH MEASURED WORSE, BOTH REVERTED. Champion holds at 89.2%.
+     THE MECHANISM (traced frame by frame): the 9 is wrong in ONE
+     unbroken span, t=157.0 -> 236.0, track id4, and the flip happens in
+     place at 156.31 while the ball is motionless. The identifier reads
+     9 at that position in 114/114 sampled frames across the period - it
+     never stops knowing. But _pair_identities is EXCLUSIVE and greedy
+     by distance: at 155.8-156.4 the yellow 1 rolls past and its find is
+     CLOSER to the 9's own read than the 9's find is, so the read is
+     consumed by the passing ball. The 9 is left unpaired and keeps the
+     finder's colour guess, which is "1" (43/43). Six such frames
+     outvoted 9 permanently (VOTE_N=9).
+     ATTEMPT A - unpaired finds carry NO name:
+       9: 141/221 -> 219/221 (essentially fixed)
+       4: 136/136 -> 0/136   (destroyed - the heuristic is the ONLY
+          thing naming the purple 4; the identifier misreads it)
+       overall 89.2% -> 83.7%, unnamed frames 28 -> 141. REVERTED.
+     ATTEMPT B - repair the guess with the round-27 stripe window
+       (_inner_disc frac 0.95, v>150, thresholds 0.28/0.34) applied to
+       unpaired finds via _fix_stripe_bit:
+       overall 89.2% -> 59.4%, confusions 9->3 x216, 3: 4/189.
+       The widened window mis-promotes on the engine path. REVERTED.
+     LESSON: both attempts treated the wrong GUESS. The defect is that
+     the 9's correct READ is given away.
+  R3 NEXT - GIVE THE READ BACK, don't patch the guess:
+     idea: a short per-POSITION memory of recent identifier reads. A
+     find that is stationary and was read as N within the last ~0.5s
+     keeps N when the exclusive pairing hands its read to a closer
+     neighbour, instead of falling back to the colour guess. Narrow: it
+     cannot touch the purple 4 (which has no competing read to lose).
+     Alternatives if that fails: (a) mutual-nearest pairing so a read is
+     only consumed by the find it is also nearest to, leaving the
+     borrowed case unpaired; (b) let a find keep a name only if the
+     colour guess AGREES with the last read at that position.
+     Gate: name_right_pct > 89.2 AND strokes 10/10 AND outcomes >= 9/10
+     AND per-ball 4 >= 134/136.
   R3 ROUND 31 - *** SHIPPED *** (ENGINE_RULES_V 12 -> 13). First
      champion change of the campaign that improved a gate without
      costing another one.

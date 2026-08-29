@@ -2268,3 +2268,19 @@ Rounds continue with Joe's visual feedback as the gate.
   vision-checked at t=200s. NEXT: the last big naming error is 9->1 x80,
   only while the real 1 is off the table - the unpaired find still
   carries the colour heuristic's guess as a vote.
+
+- 2026-08-30 ~05:00 EDT - ROUND 32 (two negatives, both reverted;
+  champion holds 89.2%): traced the residual 9->1 exactly. One unbroken
+  span t=157->236, flipping in place at 156.31 on a motionless ball. The
+  identifier reads 9 there in 114/114 frames; the failure is that
+  _pair_identities is exclusive and greedy by distance, so when the
+  yellow 1 rolls past at 155.8-156.4 its find is CLOSER to the 9's own
+  read and consumes it - leaving the 9 unpaired and holding the finder's
+  colour guess, "1" (43/43 wrong). Six frames outvoted 9 for good.
+  ATTEMPT A (unpaired finds carry no name): 9 -> 219/221 but the purple
+  4 -> 0/136 (the heuristic is the only thing naming it), overall 83.7%.
+  ATTEMPT B (repair the guess with the round-27 stripe window): 59.4%,
+  the 3 and 9 swap. Both reverted. LESSON: both patched the wrong guess;
+  the defect is the 9's correct READ being given away. NEXT: a short
+  per-position memory of recent reads so a stationary ball keeps the
+  name it was just read as, instead of falling back to colour.
