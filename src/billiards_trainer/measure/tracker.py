@@ -23,12 +23,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ..core.balls import pool_ball_bgr, number_to_class
+from ..core.types import Track
+
 FRICTION = 0.88          # per-0.1s velocity retention while coasting
 COAST_S = 0.6            # coast this long without a detection, then inactive
 GATE_R = 3.2             # association gate, in ball radii, around prediction
 ACQUIRE_R = 8.0          # wider gate for a young/still track: a struck
                          # ball's first frames outrun the tight gate and
                          # used to fragment into one track per frame
+_HISTORY_N = 64          # positions kept per track, for trails
 VOTE_N = 9               # number votes considered for identity
 HYST_K = 5               # frames a new number must lead before shown
 REST_HYST_K = 45         # ...and this many while the ball is at REST,
@@ -67,6 +71,7 @@ class _Track:
     last_v: float = 0.0          # RAW speed of the last match: the
                                  # smoothed vx/vy lag a fresh strike by
                                  # ~6x, so gating uses this instead
+    history: list = field(default_factory=list)   # recent (x, y)
     ax: float = 0.0              # rest anchor (identity freezes at rest)
     ay: float = 0.0
 
@@ -111,6 +116,44 @@ class MotionTracker:
         # leaves. Needs geometry, so the engine passes it in.
         self._pockets = list(pockets or [])
         self._pocket_r = float(pocket_r)
+
+    # ---- the LIVE path's tracker contract -------------------------------
+    # vision/pipeline.py drives its tracker with these three besides
+    # update(). They exist here so the live path can be moved onto this
+    # tracker without a shim (Joe, 2026-08-30: one module, not two).
+
+    def reset(self) -> None:
+        """Forget everything - a new table, clip, or calibration."""
+        self._tracks.clear()
+        self._holder.clear()
+        self._next_id = 1
+
+    def remove_ids(self, ids) -> None:
+        """Kill these tracks outright (the live vacancy pruner's verdict:
+        a still track on demonstrably bare felt is a ghost)."""
+        for tid in list(ids):
+            self._tracks.pop(int(tid), None)
+            for num, holder in list(self._holder.items()):
+                if holder == int(tid):
+                    del self._holder[num]
+
+    def release_numbers(self, ids) -> None:
+        """Make these tracks let go of their NAME without dying.
+
+        Bought live at 005048 @233: the 4's track correctly refuses the
+        arriving cue ball, then sits at the address spot holding number 4
+        for the whole 7s shot, so the real 4 - found near the pocket by a
+        fresh track - can never be named. Killing a resting ball is
+        dangerous; letting go of the number is not."""
+        for tid in list(ids):
+            tr = self._tracks.get(int(tid))
+            if tr is None:
+                continue
+            for num, holder in list(self._holder.items()):
+                if holder == tr.id:
+                    del self._holder[num]
+            tr.votes.clear()
+            tr.emitted, tr.pend, tr.pend_k = -1, -1, 0
 
     def _left_the_table(self, tr) -> bool:
         """Did this track end where a ball leaves play - a pocket, or
@@ -414,34 +457,25 @@ class MotionTracker:
                     n = -1
                 else:
                     emitted_claims[n] = tr.id
-            out.append(_Row(tr.id, tr.x, tr.y, tr.radius, n,
-                            tr.misses > 0.0))
+            # ONE TRACK TYPE. This used to emit a private _Row that carried
+            # the six fields the sidecar needed, while the live path had
+            # its own richer Track - two shapes for one idea, which is
+            # exactly the split Joe asked to end. It now publishes the
+            # shared core.types.Track, carrying everything BOTH consumers
+            # read: the sidecar's fields plus velocity, history for
+            # trails, and the counters the live overlay and evaluators
+            # use. `coasting` still distinguishes an estimate from a
+            # sighting.
+            tr.history.append((tr.x, tr.y))
+            del tr.history[:-_HISTORY_N]
+            out.append(Track(
+                id=tr.id, x=tr.x, y=tr.y, radius=tr.radius,
+                vx=tr.vx, vy=tr.vy,
+                cls=number_to_class(n), number=n, bgr=pool_ball_bgr(n),
+                age=tr.age_frames, hits=tr.age_frames,
+                # published as FRAMES (the live contract); the internal
+                # counter is seconds because coasting is time-based
+                misses=int(round(tr.misses * 30.0)),
+                active=True, history=list(tr.history),
+                coasting=tr.misses > 0.0))
         return out
-
-
-@dataclass
-class _Row:
-    """SidecarWriter-compatible track row."""
-    id: int
-    x: float
-    y: float
-    radius: float
-    number: int
-    coasting: bool
-
-    @property
-    def cls(self):
-        from ..core.types import BallClass
-        if self.number == 0:
-            return BallClass.CUE
-        if 1 <= self.number <= 7:
-            return BallClass.SOLID
-        if self.number == 8:
-            return BallClass.EIGHT
-        if self.number >= 9:
-            return BallClass.STRIPE
-        return BallClass.UNKNOWN
-
-    @property
-    def active(self) -> bool:
-        return True

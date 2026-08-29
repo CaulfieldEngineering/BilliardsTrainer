@@ -56,6 +56,15 @@ def _tracker():
                                   (600.0, 1200.0)], pocket_r=25.0)
 
 
+def _rows(tk, dets, t0=0.0, n=6, step=1 / 30.0):
+    """Feed the same detections n times and return the last frame's rows."""
+    t, rows = t0, []
+    for _ in range(n):
+        rows = tk.update(dets, t)
+        t += step
+    return rows
+
+
 def _feed(tk, dets, t0=0.0, n=12, step=1 / 30.0):
     t = t0
     for _ in range(n):
@@ -130,6 +139,68 @@ class TestOnlyASightingProvesMovement:
             assert tr.ever_moved is False, (
                 f"a coast of {drifted:.0f}px was counted as the ball moving; "
                 "that exempts pocket leather from the furniture rule")
+
+
+class TestTheLiveTrackerContract:
+    """Round 38: one track type, one tracker API.
+
+    MotionTracker now publishes the shared core.types.Track (it used to
+    emit a private six-field row while the live path had its own richer
+    type - two shapes for one idea), and carries the three methods the
+    live pipeline drives its tracker with. This is the groundwork for
+    deleting the second tracker entirely."""
+
+    def test_it_publishes_the_shared_track_type(self):
+        from billiards_trainer.core.types import Track
+        tk = _tracker()
+        rows = _rows(tk, [(300.0, 600.0, 13.0, 3)], n=6)
+        assert rows and all(isinstance(r, Track) for r in rows)
+
+    def test_a_published_track_carries_what_both_consumers_read(self):
+        tk = _tracker()
+        rows = _rows(tk, [(300.0, 600.0, 13.0, 3)], n=6)
+        r = rows[0]
+        for attr in ("id", "x", "y", "radius", "vx", "vy", "cls", "number",
+                     "bgr", "age", "hits", "misses", "active", "history",
+                     "coasting"):
+            assert hasattr(r, attr), f"published track is missing {attr}"
+        assert r.history, "trails need position history"
+
+    def test_a_coasted_row_is_flagged_as_an_estimate(self):
+        tk = _tracker()
+        t = 0.0
+        for _ in range(8):
+            tk.update([(300.0, 600.0, 13.0, 3)], t)
+            t += 1 / 30.0
+        seen = tk.update([(300.0, 600.0, 13.0, 3)], t)
+        assert all(not r.coasting for r in seen)
+        t += 1 / 30.0
+        coasted = tk.update([], t)          # nothing detected: predict
+        assert coasted and all(r.coasting for r in coasted)
+
+    def test_remove_ids_kills_a_track(self):
+        tk = _tracker()
+        rows = _rows(tk, [(300.0, 600.0, 13.0, 3)], n=6)
+        tk.remove_ids([rows[0].id])
+        assert not tk.update([], 1.0)
+
+    def test_release_numbers_frees_the_name_without_killing_the_ball(self):
+        """005048 @233: a resting track held number 4 for a whole shot, so
+        the real 4 could never be named. Killing it is dangerous; letting
+        go of the name is not."""
+        tk = _tracker()
+        rows = _rows(tk, [(300.0, 600.0, 13.0, 4)], n=8)
+        assert any(r.number == 4 for r in rows)
+        tk.release_numbers([rows[0].id])
+        after = tk.update([(300.0, 600.0, 13.0, -1)], 1.0)
+        assert after, "the ball must survive losing its name"
+        assert all(r.number != 4 for r in after)
+
+    def test_reset_forgets_everything(self):
+        tk = _tracker()
+        _rows(tk, [(300.0, 600.0, 13.0, 3)], n=6)
+        tk.reset()
+        assert not tk.update([], 5.0)
 
 
 class TestOneSightingIsNotAnIdentity:

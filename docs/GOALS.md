@@ -2368,3 +2368,20 @@ Rounds continue with Joe's visual feedback as the gate.
   MotionTracker to the live tracker, delete BallTracker and the shadow
   scaffolding, gated on the bench scorecard plus a live render check.
   Nothing shipped today; the app is unchanged.
+
+- 2026-08-30 ~20:00 EDT - ROUND 38: began the engine merge Joe asked for
+  ("it should all just become one file, or one module/class"). STEP 1 of
+  4 done: there is now ONE track type. MotionTracker's private 6-field
+  _Row is deleted; it publishes the shared core.types.Track with
+  everything both consumers read (velocity, trail history, counters,
+  bgr, cls) plus `coasting`, now a field on the shared type. Added the
+  live tracker contract - reset/remove_ids/release_numbers - with tests
+  including the 005048 @233 case law. GATE: bench identical (10/10,
+  10/10, 0 fake, 0 invented, 99.3% named, 4/4 pots) - a structural
+  change must move nothing. SCOPE, stated honestly: the swap is not one
+  round. blur_recovery reaches into BallTracker internals, and four test
+  files pin case law bought from real incidents; those must be migrated
+  before vision/tracking.py (716 lines) can go. Also logged Joe's
+  live-review request (Tier 3, ~2 weeks) with a design note: an
+  invariant-triggered evidence queue beats streaming raw frames, and it
+  should follow the live swap.

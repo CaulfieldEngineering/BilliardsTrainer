@@ -97,6 +97,13 @@ class Track:
     misses: int = 0            # consecutive frames unmatched
     active: bool = True
     history: list[tuple[float, float]] = field(default_factory=list)
+    coasting: bool = False     # this frame's position is PREDICTED, not seen.
+                               # The offline engine has always published this
+                               # (round 11) so consumers can tell a sighting
+                               # from an estimate; it lives here now because
+                               # there is one track type, not two (Joe,
+                               # 2026-08-30: "it should all just become one
+                               # file, or one module/class").
 
     @property
     def xy(self) -> tuple[float, float]:
