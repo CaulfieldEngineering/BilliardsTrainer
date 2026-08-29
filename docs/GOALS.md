@@ -2181,3 +2181,24 @@ Rounds continue with Joe's visual feedback as the gate.
   static 9, so "never moves" must never be the phantom test.
   R3 is now the sole blocker; next round = white-fraction stripe
   arbitration + measured colour refs, together, gated and pinned.
+
+- 2026-08-29 ~19:30 EDT - ROUND 27: found why rounds 25/26 naming work
+  moved nothing - THE ENGINE NEVER CALLED THE ENSEMBLE. engine.py ran
+  the finder and identifier itself and paired them with a private
+  helper carrying the raw model read, so every naming correction the
+  ensemble owns was dead code on the engine path (law 1 violated in the
+  load-bearing place). Wiring engine -> strat.detect measured: naming
+  75.7 -> 80.0%, attribution 2/4 -> 3/4, the static 9 named 9 in 6684
+  frames (was "1" in 4613), outcomes unchanged at 9/10, invented frames
+  60 -> 56. REVERTED: it renamed the red 3 to "1" in 1843 frames, and
+  THE SCORECARD IS BLIND TO THAT - it scores name-PRESENCE and
+  inventory-membership, so a wrong-but-valid name passes. Caught only
+  by looking at the overlay (RULE 0). Baseline restored and re-verified
+  (10/10, 9/10, 75.7%, 2/4). NEXT ROUND = fix the instrument first:
+  per-ball naming correctness anchored to known resting positions, then
+  re-land the engine->ensemble change. Also measured: stripe_reading is
+  blind on this table (20/20 nines read solid under the inner-62%
+  window; window 0.95 + v>150 separates solids <=0.211 from stripe
+  >=0.418), and colour_refs.json's stale 2026-08-15 entries for balls
+  not on this table are what the phantoms match (302 -> 56 invented
+  frames when dropped).

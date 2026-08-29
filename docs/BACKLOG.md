@@ -97,6 +97,48 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
+  R3 ROUND 27 - FOUND THE REAL BLOCKER, REVERTED ON A REGRESSION THE
+     SCORECARD COULD NOT SEE:
+     THE ENGINE NEVER CALLED THE ENSEMBLE. measure/engine.py ran
+     strat._finder and strat._identifier itself and paired them with a
+     private _pair_identities that carried the model's RAW read. So
+     FindIdEnsemble.detect - measured-colour arbitration (_fix_colour),
+     the stripe bit (_fix_stripe_bit) and naming balls neither model
+     read (_name_unknown) - was DEAD CODE on the engine path. Two
+     opinions about one fact; law 1 violated in the load-bearing place.
+     That is why rounds 25/26 naming work moved the score by 0.00.
+     Asked directly about the same pixels the ensemble answers 9 for the
+     static striped ball; the engine's sidecar called it "1" x4613.
+     MEASURED with the engine calling strat.detect (+ measured refs,
+     + widened stripe window, + a 0.70 score bar on colour naming):
+       naming      75.7% -> 80.0%
+       attribution 2/4   -> 3/4
+       static 9    named 9 in 6684 frames (was "1" in 4613)
+       outcomes    9/10 (unchanged), invented frames 60 -> 56
+     REVERTED ANYWAY: the red 3 was renamed "1" in 1843 frames.
+     *** THE SCORECARD CANNOT SEE THAT. *** "moving balls named" counts
+     whether a ball HAS a name; "invented numbers" only flags numbers
+     outside the inventory. A wrong-but-valid name scores as success, so
+     the run reported a clean sweep while two balls were confused.
+  R3 NEXT ROUND IS THE INSTRUMENT, NOT THE ENGINE: add per-ball naming
+     CORRECTNESS to tools/scorecard.py - anchor each of the 6 balls to
+     its known resting position from bench_truth (static_balls plus the
+     occupancy timeline in GOALS round 25) and score name-vs-truth per
+     track-frame. Without it every naming number reported so far,
+     including today's 80.0%, is unverified. THEN re-land the engine ->
+     strat.detect change, which is correct and required.
+  R3 SUPPORTING MEASUREMENTS (keep, both verified this round):
+     - stripe_reading() is BLIND on this table: all 20 labelled 9s read
+       SOLID (0.048-0.141) under the inner-62% window, overlapping the
+       1s (0.000-0.068) - a stripe's white is at the POLES, which that
+       window discards. Window 0.95 + v>150 separates cleanly:
+       solids (n=73) max 0.211 | stripe 9 (n=20) min 0.418 | cue min
+       0.903. CAVEAT: all 20 stripe crops are the same static ball in
+       one pose - not 20 independent samples.
+     - colour_refs.json still carries UNVALIDATED 2026-08-15 entries for
+       balls NOT on this table (5,6,7,8,10-15). The phantoms match them:
+       dropping them cut invented frames 302 -> 56. An unvalidated
+       reference is worse than none.
   R4 ROUND 26 (NEGATIVE, reverted; the 170.6 pot is an R3 problem):
      Traced the last missed outcome end to end. The engine DOES track
      the potted ball into the pocket: id7 dies 14.2px from the centre
