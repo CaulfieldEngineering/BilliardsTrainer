@@ -2233,3 +2233,21 @@ Rounds continue with Joe's visual feedback as the gate.
   recognition problem. Champion reverted and re-verified at 76.0%.
   NEXT: identity continuity - release a number when its ball is potted,
   and make a track born elsewhere EARN a name instead of inheriting it.
+
+- 2026-08-30 ~01:00 EDT - ROUND 30: found BOTH root causes of the naming
+  failure and validated both fixes; not shipped on one boundary
+  artifact. (1) PRECEDENCE INVERTED in engine._pair_identities - the
+  identifier's read is applied only where the finder's colour heuristic
+  has not already guessed, and that heuristic calls the striped 9 a "1"
+  in 43/43 while the identifier reads 9 in 71/72; the correct answer was
+  discarded every frame. (2) TRACKS ARE NEVER DELETED - inactive tracks
+  stay match candidates with a gate that widens over time, so id3
+  (genuinely the yellow 1, potted at 32.2s) re-appeared at 45.4s and
+  then latched onto the RED 3 at 109.2s, which answered to "1" to the
+  end. Fixes: identifier wins; retire tracks unseen >3s whose last
+  position says they left the table (pocket/off-bed), purging their
+  number claim. TOGETHER: naming 76.0% -> 89.2%, invented frames
+  60 -> 36, 9: 0/221 -> 141/221, 3 held at 188/189. BLOCKED: strokes
+  10/10 -> 9/10 because the 154.2 episode opens at 147.98 (6.2s early,
+  outside MATCH_S) - retirement spawns new unnamed tracks whose motion
+  opens the window early. Champion reverted and re-verified at 76.0%.

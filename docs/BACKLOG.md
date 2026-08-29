@@ -97,6 +97,47 @@ its gate holds AND a vision watch agrees.
      classes, all >=16 samples.
      RESULT with NO engine change: outcomes 8/10 -> 9/10.
      Remaining real outcome failure: the 170.6 long pot is missed.
+  R3 ROUND 30 - BOTH ROOT CAUSES FOUND AND FIXED (not shipped; one
+     boundary artifact left). Measured, not theorised:
+     CAUSE 1 - PRECEDENCE INVERTED (measure/engine.py _pair_identities):
+       `if num >= 0 and getattr(d, "number", -1) < 0:` means the
+       identifier's read is applied ONLY where the finder's crude colour
+       heuristic has not already guessed. The heuristic calls the yellow
+       STRIPED 9 a "1" in 43/43 samples; the identifier reads it 9 in
+       71/72 (median score 0.66). The correct read was discarded every
+       frame. It is also where the invented numbers come from (the
+       heuristic emits 8s and an 11 on this clip).
+       FIX: drop the `and d.number < 0` guard - the identifier wins.
+       MEASURED ALONE: 9 goes 0/221 -> 141/221, the 9->1 confusion
+       (x154) vanishes; but naming overall 76.0 -> 73.8 because the
+       freed name "1" then migrates to the red 3 (see cause 2).
+     CAUSE 2 - TRACKS ARE NEVER DELETED (measure/tracker.py): going
+       inactive is not death. Step 2 associates against every track in
+       the dict with no liveness test, and the acquisition gate widens
+       with time unseen, so a long-dead track can claim a new ball
+       anywhere. Full trace of id3: genuinely the yellow 1 at 10.9s,
+       follows it into the bottom-right pocket at 32.2s, re-appears
+       across the table at 45.4s, then latches onto the RED 3 at 109.2s
+       which answers to "1" for the rest of the clip.
+       FIX: retire (delete) a track unseen > RETIRE_S=3.0 AND whose last
+       position says it LEFT THE TABLE (pocket zone or off-bed); purge
+       its _holder claim too. The left-the-table condition matters:
+       blanket retirement at 3s or 8s also retires a ball merely hidden
+       by the bridge hand.
+     BOTH TOGETHER: naming 76.0% -> 89.2%, invented frames 60 -> 36,
+       per ball 0:221/221 1:59/85 2:156/156 3:188/189 4:134/136
+       9:141/221 (champion had 9:0/221).
+     WHY NOT SHIPPED: strokes 10/10 -> 9/10, outcomes 9/10 -> 8/10.
+       The 154.2 stroke is NOT lost - its episode opens at 147.98 (6.2s
+       early, outside the scorecard's MATCH_S=2.5) because retirement
+       spawns fresh unnamed tracks (-16, -17) whose motion opens the
+       window early. movers=[-17,-16,0,1], cue_travel=1331, setup=False.
+  R3 NEXT ROUND - fix the episode boundary, then land both fixes as one
+     gated bundle. The early opening is hand-driven cue movement at ~148
+     that `setup` did not flag; look at the carried/hand context there
+     first, and at whether a newly born unnamed track should be allowed
+     to OPEN an episode at all (it may only extend one).
+     Gate: name_right_pct >= 89 AND strokes 10/10 AND outcomes >= 9/10.
   R3 ROUND 29 - BISECTED ROUND 27 ON THE NEW METRIC; ROOT CAUSE IS
      IDENTITY CONTINUITY, NOT RECOGNITION:
        champion                              76.0%   3: 187/189
