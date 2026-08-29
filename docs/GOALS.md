@@ -2094,3 +2094,14 @@ Rounds continue with Joe's visual feedback as the gate.
   on R3 - naming is the floor under outcomes, not polish above them.
   Next: identity stitching into the pocket, then re-apply the (already
   written and validated-on-misses) three-clause rule.
+
+- 2026-08-29 ~10:30 EDT — ROUND 20: built identity stitching for the
+  pocket approach; bench unchanged (75.7% named, 8/10 calls, 2/4
+  attribution) so it was reverted as unproven. The measurement also
+  CORRECTED round 19's diagnosis: on the 2-ball pot the track named
+  "2" reaches 5px from the pocket with real sightings (no fragment at
+  all); on the long pot the potting ball is unnamed for the entire
+  shot; on the 31.7 pot the app names ball 4 where the truth is ball 9.
+  The blocker is RECOGNITION, not continuity. Next round measures
+  whether identifier CADENCE is the limit (IDENT_EVERY=6 -> 1 on the
+  bench) before touching the model.

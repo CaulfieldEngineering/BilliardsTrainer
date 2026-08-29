@@ -78,6 +78,23 @@ its gate holds AND a vision watch agrees.
      when a track is moving toward that pocket (a ball arriving), refuse
      it when nothing is approaching (static leather). Also fix the
      furniture-by-time rule so a re-born leather track cannot dodge it.
+  R3 ROUND 20 (built + reverted; DIAGNOSIS CORRECTED): implemented
+     identity stitching (a fresh detection continuing a dead track's
+     motion inherits its name; corridor test from the last REAL
+     sighting, since coasting drifts x/y and death zeroes v). Bench:
+     ZERO change (75.7% named, 8/10, 2/4) - reverted as unproven.
+     Looked at what reaches the pocket on the failing pots:
+       51.5s  id2 num=2 reaches 5px WITH REAL SIGHTINGS - no fragment,
+              so round 19's "anonymous fragment" explanation was WRONG
+       170.6s the ball reaching the pocket is num=-1 for the whole shot
+       31.7s  attributed to ball 4; the truth is ball 9 (misread)
+     => The gap is RECOGNITION, not track continuity: the app follows
+     balls but cannot read WHICH ball while they are in play.
+     NEXT (measurement, not a guess): the identifier runs every
+     IDENT_EVERY=6 frames - only a handful of chances during a fast
+     shot. Re-measure the bench with IDENT_EVERY=1 and compare naming;
+     if cadence is the limit, buy it back (fp16 identifier / crop
+     batching). If not, it is the model and the c8 retrain is the work.
   R4 ROUND 19 (built the spec, reverted - DEPENDENCY FOUND): the
      three-clause rule (in-zone AND vanished AND no hand) got ALL SIX
      misses right - incl. the 0.47R hand-catch and both jaw rattles -
