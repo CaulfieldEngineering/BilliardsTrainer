@@ -50,6 +50,18 @@ _MIN_BUF = 6
 #: struck ball can be gone the better part of a second (measured: 0.5s), so
 #: the window stays open — the colour contest is what keeps that safe.
 _MAX_MISSES = 12
+
+
+
+def _missed(t) -> int:
+    """Consecutive frames with no detection for this track.
+
+    The surviving tracker keeps that as `miss_frames`, because its
+    `misses` counts SECONDS (coasting is time-based). Trackers that
+    count frames in `misses` still work - this reads whichever the
+    tracker offers rather than forcing one spelling on both."""
+    v = getattr(t, "miss_frames", None)
+    return int(v if v is not None else getattr(t, "misses", 0))
 #: per-channel BGR difference that counts as "this pixel changed"
 _MOVED = 18
 #: the biggest a smeared BALL gets, in expected radii. A cue stick or a
@@ -155,22 +167,21 @@ class BlurRecovery:
         tracks = getattr(tracker, "_tracks", [])
         if isinstance(tracks, dict):
             tracks = list(tracks.values())
-        # This feature reads a tracker's PRIVATE state (`confirmed`,
-        # `mbgr_hist`, `committed_number`), which the surviving tracker
-        # does not expose. Round 39 moved the live path onto it, so blur
-        # recovery stands down until it is ported (backlog step 3)
-        # rather than raising once per frame behind the catch-all.
+        # This reads the tracker's own per-track state. The guard makes
+        # an unfamiliar tracker stand down rather than raise once per
+        # frame behind the pipeline's catch-all.
         if not all(hasattr(t, "confirmed") and hasattr(t, "mbgr_hist")
                    for t in tracks):
             return []
         # Gate on "its detection just VANISHED". A struck ball was at REST one
         # frame earlier, so anything keyed on move_streak excludes the only
         # case this exists for (measured: it never once fired for the cue).
-        lost = [t for t in tracks if t.confirmed and 1 <= t.misses <= _MAX_MISSES
+        lost = [t for t in tracks if t.confirmed
+                and 1 <= _missed(t) <= _MAX_MISSES
                 and len(t.mbgr_hist) >= 5]
         self._buf.append(frame)
         say(f"called: buf={len(self._buf)} lost="
-            f"{[(t.id, t.misses, t.committed_number) for t in lost]}")
+            f"{[(t.id, _missed(t), t.committed_number) for t in lost]}")
         if len(self._buf) < _MIN_BUF or not lost:
             return []
         try:
@@ -181,7 +192,12 @@ class BlurRecovery:
         h, w = frame.shape[:2]
         r_raw = max(4.0, 0.5 * (h + w) / 90.0)
         short = calib.table.short_side
-        gate = max(8.0, tracker.max_dist_frac * short)
+        # Search radius for "is this blob plausibly that track's ball". The
+        # 0.16 came from BallTracker's 2026-07-02 autotune sweep and is
+        # kept as the default now that the surviving tracker gates by ball
+        # radii instead of a table fraction - this is a SEARCH window, not
+        # an association rule, so it does not have to match the tracker's.
+        gate = max(8.0, getattr(tracker, "max_dist_frac", 0.16) * short)
         ball_r = getattr(tracker, "_ball_r", 0)
         # every OTHER live track's colour, for the contest
         rivals = {o.id: track_colour(o) for o in tracks if len(o.mbgr_hist) >= 5}
@@ -226,12 +242,12 @@ class BlurRecovery:
         # actually left: when misses first read 1 the ball was already
         # 292px away and a 190px window missed it.)
         per_frame = max(gate, 1.3 * speed, 0.30 * short)
-        reach = per_frame * (max(1, t.misses) + 2)
+        reach = per_frame * (max(1, _missed(t)) + 2)
         scale = r_raw / max(6.0, ball_r or 12.0)
         win = int(np.clip(reach * scale, 3 * r_raw, 520))
         x0, y0 = int(max(0, sx - win)), int(max(0, sy - win))
         x1, y1 = int(min(w, sx + win)), int(min(h, sy + win))
-        say(f"id{t.id} misses={t.misses} seed=({sx:.0f},{sy:.0f}) win={win}")
+        say(f"id{t.id} misses={_missed(t)} seed=({sx:.0f},{sy:.0f}) win={win}")
         if x1 - x0 < 8 or y1 - y0 < 8:
             return None
 

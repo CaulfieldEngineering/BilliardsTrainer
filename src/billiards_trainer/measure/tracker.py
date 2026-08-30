@@ -21,6 +21,7 @@ rows for the dense sidecar.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 
 from ..core.balls import pool_ball_bgr, number_to_class
@@ -72,6 +73,17 @@ class _Track:
                                  # smoothed vx/vy lag a fresh strike by
                                  # ~6x, so gating uses this instead
     history: list = field(default_factory=list)   # recent (x, y)
+    miss_frames: int = 0         # CONSECUTIVE frames with no detection.
+                                 # `misses` above is seconds because
+                                 # coasting is time-based; blur recovery
+                                 # reasons in frames, so it gets its own.
+    mbgr_hist: deque = field(
+        default_factory=lambda: deque(maxlen=20))   # this ball's OWN
+                                 # measured colours. Blur recovery needs a
+                                 # per-track reference: a smeared ball
+                                 # washes toward felt, so it can only be
+                                 # found by resembling ITSELF more than it
+                                 # resembles the other balls.
     ax: float = 0.0              # rest anchor (identity freezes at rest)
     ay: float = 0.0
 
@@ -84,6 +96,27 @@ class _Track:
         for v, _vt in self.votes:
             counts[v] = counts.get(v, 0) + 1
         return max(counts, key=lambda k: (counts[k],))
+
+    @property
+    def confirmed(self) -> bool:
+        """Seen often enough to be a real ball, not a one-frame blob."""
+        return self.age_frames >= MIN_ID_FRAMES
+
+    @property
+    def committed_number(self) -> int:
+        """The number this track SHOWS (blur recovery logs it)."""
+        return self.emitted
+
+    @property
+    def settled(self) -> bool:
+        """A confirmed ball that is currently at rest.
+
+        The colour veto blur recovery uses only trusts a track that has
+        actually established a colour while sitting still - a moving
+        ball's readings smear toward felt, which is the whole reason
+        recovery is needed. 30 px/s is the same 'not really moving' bar
+        the association gate uses."""
+        return self.confirmed and (self.vx ** 2 + self.vy ** 2) ** 0.5 < 30.0
 
     def fresh_claim(self, n: int, now: float) -> int:
         """How many RECENT reads back this track's claim to number n."""
@@ -198,10 +231,11 @@ class MotionTracker:
         the live pipeline already had in hand. Accepting both is what
         lets ONE tracker serve both paths without a conversion shim at
         either call site."""
+        srcs = list(dets)
         dets = [d if isinstance(d, tuple)
                 else (float(d.x), float(d.y), float(d.radius),
                       int(getattr(d, "number", -1)))
-                for d in dets]
+                for d in srcs]
         # 1. predict every live track forward
         for tr in self._tracks.values():
             dt = max(0.0, t - tr.t)
@@ -260,8 +294,18 @@ class MotionTracker:
             tr.last_v = (((dx - tr.x) ** 2 + (dy - tr.y) ** 2) ** 0.5) / dt
             tr.x, tr.y, tr.radius, tr.t = dx, dy, dr, t
             tr.misses = 0.0
+            tr.miss_frames = 0
             tr.active = True
             tr.age_frames += 1
+            # Remember what this ball actually LOOKS like. Only a real
+            # measurement counts: measured_bgr is set by the code that
+            # sampled these pixels, never by a palette guess, which is
+            # the distinction blur recovery depends on (it finds a
+            # smeared ball by resembling ITSELF, not a canonical colour).
+            src = srcs[di] if di < len(srcs) else None
+            mb = getattr(src, "measured_bgr", None) if src is not None else None
+            if mb is not None:
+                tr.mbgr_hist.append(tuple(int(v) for v in mb))
             if dn >= 0:
                 tr.votes.append((dn, t))
                 del tr.votes[:-VOTE_N]
@@ -280,6 +324,7 @@ class MotionTracker:
             if tr.id in used_t or tr.t == t:
                 continue
             tr.misses = t - tr.t if tr.misses == 0.0 else tr.misses + 0.0
+            tr.miss_frames += 1          # frames, for blur recovery
             # COASTING INTO NOWHERE (round 15, pixels looked at first per
             # RULE 0): the "lost detections" on open felt were largely
             # not missed balls at all - they were predictions that drifted

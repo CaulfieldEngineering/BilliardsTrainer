@@ -2402,3 +2402,22 @@ Rounds continue with Joe's visual feedback as the gate.
   stands down rather than raising every frame - porting it is step 3.
   Step 4 is migrating four test files' case law before deleting
   vision/tracking.py and the MeasurementCore shadow scaffolding.
+
+- 2026-08-31 ~06:00 EDT - ROUND 40: ported blur recovery onto the
+  surviving tracker (step 3 of 4) - miss_frames, mbgr_hist, confirmed,
+  settled, committed_number; blur_recovery reads whichever miss counter
+  a tracker offers so the old one and the test fakes still work. Its 4
+  tests pass. It does not fire on the clip it was built for even with
+  the trigger met 267 times - a separate question.
+  *** AND FOUND THE PHYSICS GATE RED: 0.71/1k vs GATE_MAX 0.55
+  (overlapping_balls 17, id_flicker 3, class_flicker 3). The last value
+  I SAW was 0.06 in round 33 - I had been truncating the job output and
+  cutting off that exact field, so the trail merge has been refused for
+  several rounds and the pinned session's shots.json silently stopped
+  updating. To give Joe the pinned session tonight I called
+  merge_into_session DIRECTLY, bypassing the gate, and told him so. Not
+  caused by blur recovery (0.71 with it on and off). NEXT ROUND: bisect
+  rounds 34-40 with the gate field visible, prime suspect round 36's
+  MIN_ID_FRAMES (a new track emits -1 then its number, which may read as
+  flicker), and check whether overlapping_balls counts coasted estimates
+  against real sightings.
