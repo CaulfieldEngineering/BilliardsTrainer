@@ -104,6 +104,19 @@ class Track:
                                # there is one track type, not two (Joe,
                                # 2026-08-30: "it should all just become one
                                # file, or one module/class").
+    read: int = -1             # WHAT THIS TRACK ACTUALLY SAW: the majority of
+                               # its retained detection reads, BEFORE
+                               # arbitration, the age bar, hysteresis and the
+                               # uniqueness belt decide what it may SHOW.
+                               # `number` is the verdict; this is the evidence.
+                               # Round 68: five gates sit between the two and
+                               # none of them left a trace, so a track could
+                               # publish 13 on 330 frames while its own reads
+                               # backed that on 8 of 366 (round 65) and nothing
+                               # downstream could see the disagreement - it
+                               # took a bespoke GPU sweep to find. This is a
+                               # MEASUREMENT, not a verdict: nothing reads it
+                               # to name a ball.
 
     @property
     def xy(self) -> tuple[float, float]:

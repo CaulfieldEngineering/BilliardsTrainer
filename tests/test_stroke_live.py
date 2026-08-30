@@ -215,6 +215,25 @@ class TestStripeRepairPromotionOnly:
         assert "num_for.get" in src or "not in num_for" in src, (
             "the unread branch must be selected by absence of a read")
 
+    def test_the_evidence_behind_a_published_name_is_recorded(self):
+        """Round 68: it was not, and that is why two incidents needed sweeps.
+
+        Five gates sit between a track's votes and the name it shows.
+        Only the verdict was ever written down, so a track publishing a
+        name its own reads contradicted was invisible to every
+        downstream tool - round 65's 13 on 330 frames against 8 of 366
+        supporting reads took a bespoke GPU sweep to find.
+        """
+        from billiards_trainer.core.types import Track
+        assert hasattr(Track(id=1, x=0.0, y=0.0, radius=1.0), "read")
+
+        # the sidecar must carry it, and old rows must still load
+        from billiards_trainer.vision.analysis_cache import SidecarReader
+        t = SidecarReader._to_track([7, 1.0, 2.0, 13.0, 9, "stripe", True, False, 1])
+        assert t.number == 9 and t.read == 1, "evidence lost on the way out"
+        old = SidecarReader._to_track([7, 1.0, 2.0, 13.0, 9, "stripe", True])
+        assert old.number == 9 and old.read == -1, "old sidecars must load"
+
     def test_unread_finds_get_the_whole_repair_not_half(self):
         """Round 67: repair_unread ran _fix_colour alone.
 

@@ -86,10 +86,19 @@ class SidecarWriter:
         # debug overlay) can finally tell a measurement from a guess -
         # a cue label was found sitting on empty felt because nothing
         # downstream could.
+        # 9th element (additive, round 68): the track's own READ - the
+        # majority of its detection votes, before arbitration, the age
+        # bar, hysteresis and the uniqueness belt decide what it may
+        # SHOW. Element 4 is the verdict; this is the evidence behind it.
+        # Without it the disagreement between the two is invisible to
+        # every downstream tool, which is how a track published 13 on 330
+        # frames while its own reads backed that on 8 of 366 (round 65).
+        # Every consumer indexes 0..7 and is unaffected.
         rec = [[int(tr.id), round(float(tr.x), 1), round(float(tr.y), 1),
                 round(float(tr.radius), 1), int(tr.number),
                 tr.cls.value, bool(tr.active),
-                bool(getattr(tr, "coasting", False))] for tr in tracks]
+                bool(getattr(tr, "coasting", False)),
+                int(getattr(tr, "read", -1))] for tr in tracks]
         d = {"type": "f", "t": round(t, 3), "tracks": rec}
         # v2 hand-context, omitted when absent so quiet states stay tiny:
         # which balls are hand-adjacent, and how much bed the hand covers.
@@ -404,7 +413,9 @@ class SidecarReader:
             bgr = (200, 200, 200)
         return Track(id=int(r[0]), x=float(r[1]), y=float(r[2]),
                      radius=float(r[3]), number=num,
-                     cls=BallClass(r[5]), active=bool(r[6]), bgr=bgr)
+                     cls=BallClass(r[5]), active=bool(r[6]), bgr=bgr,
+                     coasting=bool(r[7]) if len(r) > 7 else False,
+                     read=int(r[8]) if len(r) > 8 else -1)
 
     def _to_tracks(self, rows) -> list[Track]:
         return [self._to_track(r) for r in rows]

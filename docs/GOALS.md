@@ -3211,3 +3211,38 @@ Rounds continue with Joe's visual feedback as the gate.
   path) but the fact stands: a correct read exists and something after
   it wins. Same shape as round 65's track publishing 13 on 330 frames
   against 8 of 366 supporting reads. That is the next target.
+
+- 2026-08-30 ~12:15 EDT - ROUND 68: THE EVIDENCE BEHIND A PUBLISHED NAME
+  IS NOW RECORDED. Five gates sit between a track's votes and the name it
+  shows (vote majority, uniqueness arbitration, the age bar, hysteresis,
+  the final uniqueness belt) and none left a trace - only the verdict was
+  written down. That is why rounds 65 and 67 each needed a bespoke GPU
+  sweep to answer "why that name?". Track.read now carries the vote
+  majority beside the verdict as sidecar element 8, additive, old
+  sidecars still load, and the scorecard reports it every run:
+      cold   shows what it saw 99.4% of 43358 live sightings
+             [contradicted 94, suppressed 182, unbacked 0]
+      bench  shows what it saw 99.5% of 34246 live sightings
+             [contradicted 24, suppressed 157, unbacked 0]
+  AND IT OVERTURNS THIS BACKLOG'S OWN FRAMING. Target 0 read "THE APP
+  DISCARDS A CORRECT IDENTIFIER READ". At population scale the opposite
+  dominates - the gates mostly RESCUE bad reads:
+    cold saw 3 -> said 5 x87: the published 5 is CORRECT, proved without
+    colour - the 3 was potted at 121.7s so a ball on the table from
+    136.2-159.6s cannot be it, and the ball leaves at 158.9s which is
+    exactly the 5's pot. VISION-CORROBORATED: the ball is plainly orange.
+    cold saw 15 -> said 7 x7: no 15 on that table - arbitration
+    suppressing an invented number, correctly.
+    bench saw 1 -> said 9 x12: ball 9 scores 221/221, so the held name is
+    right - rest-frozen identity working.
+  "Contradicted" is therefore NOT a defect count. The two incidents that
+  motivated the target were real but are the MINORITY direction, and I
+  had generalised from them without measuring the population. SECOND
+  round running that a backlog line I wrote as fact turned out wrong.
+  Both clips unchanged and green: bench 10/10, 10/10, 4/4, naming 99.8%
+  with ZERO wrong, 0 invented; cold 9/9, 9/9, 5/5, naming 99.9%, 1 wrong,
+  0 invented.
+  NEXT: the cold clip's 3/5 pair is a HOLE IN THE YARDSTICK - round 60
+  excluded both as inseparable so the naming truth scores neither, and
+  all 87 contradictions sit in that blind spot. The pot ORDER resolves
+  them independently of colour.

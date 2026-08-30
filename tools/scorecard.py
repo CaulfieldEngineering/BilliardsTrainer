@@ -163,6 +163,55 @@ def _naming_correctness(r, times, frames) -> dict:
     }
 
 
+def _publishes_what_it_saw(frames) -> dict:
+    """Does the app SHOW the name its own evidence supports?
+
+    Five gates sit between a track's votes and the name it publishes -
+    the vote majority, uniqueness arbitration, the age bar, hysteresis,
+    and the final uniqueness belt - and any of them can suppress a
+    correct read. Round 65 found a track publishing "13" on 330 frames
+    while its own reads backed that on EIGHT of 366, and round 67 found
+    the identifier reading 9 one pixel from a ball the app called 1.
+    Both took a bespoke GPU sweep to see, because the evidence behind a
+    published name was never recorded anywhere.
+
+    It is now (Track.read, sidecar element 8), so this compares the two
+    on every live sighting and reports the disagreement by direction.
+    CONTRADICTED is the serious one: the track saw m, said n, and both
+    are real names - the shape of both incidents above. SUPPRESSED is
+    the track declining to name what it saw, which duplicate-prevention
+    does deliberately and often; it is reported, not judged.
+    """
+    agree = contradicted = suppressed = invented = 0
+    worst: dict = {}
+    for rows in frames:
+        for r in rows:
+            if not r[6] or len(r) < 9:
+                continue
+            shown, saw = int(r[4]), int(r[8])
+            if shown == saw:
+                agree += 1
+            elif shown < 0:
+                suppressed += 1
+            elif saw < 0:
+                invented += 1
+            else:
+                contradicted += 1
+                k = f"saw {saw} -> said {shown}"
+                worst[k] = worst.get(k, 0) + 1
+    tot = agree + contradicted + suppressed + invented
+    if not tot:
+        return {}
+    return {
+        "publish_agree_pct": round(100.0 * agree / tot, 1),
+        "publish_checked": tot,
+        "publish_contradicted": contradicted,
+        "publish_suppressed": suppressed,
+        "publish_unbacked": invented,
+        "publish_worst": dict(sorted(worst.items(), key=lambda kv: -kv[1])[:6]),
+    }
+
+
 def score(truth_path: Path) -> dict:
     logging.disable(logging.CRITICAL)
     from billiards_trainer.config import Settings
@@ -275,6 +324,7 @@ def score(truth_path: Path) -> dict:
         "invented_frames": sum(invented.values()),
     }
     caps.update(_naming_correctness(r, times, frames))
+    caps.update(_publishes_what_it_saw(frames))
     found = sum(1 for x in rows if x["found"])
     ok = sum(1 for x in rows if x["outcome_ok"])
     attr_rows = [x for x in rows if "ball_ok" in x]
@@ -341,6 +391,15 @@ def main() -> None:
     print(f"  invented numbers: {c['invented_numbers']} "
           f"({c['invented_frames']} frames, target none)")
     print(f"  pots attributed : {c['pot_attribution']} (right ball named)")
+    if "publish_agree_pct" in c:
+        print(f"  shows what it saw: {c['publish_agree_pct']}% of "
+              f"{c['publish_checked']} live sightings "
+              f"[contradicted {c['publish_contradicted']}, "
+              f"suppressed {c['publish_suppressed']}, "
+              f"unbacked {c['publish_unbacked']}]")
+        if c.get("publish_worst"):
+            print("  ...contradicted : " + ", ".join(
+                f"{k} x{v}" for k, v in c["publish_worst"].items()))
     for row in sc["shots"]:
         mark = "OK " if row["found"] and row["outcome_ok"] else "XX "
         got = row.get("engine", "MISSED")

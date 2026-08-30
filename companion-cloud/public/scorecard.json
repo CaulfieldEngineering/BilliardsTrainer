@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-30T14:33:44Z",
+ "ts": "2026-08-30T15:03:43Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
@@ -159,6 +159,16 @@
     "unnamed": 0,
     "missing": 0
    }
+  },
+  "publish_agree_pct": 99.5,
+  "publish_checked": 34246,
+  "publish_contradicted": 24,
+  "publish_suppressed": 157,
+  "publish_unbacked": 0,
+  "publish_worst": {
+   "saw 1 -> said 9": 12,
+   "saw 9 -> said 1": 6,
+   "saw 6 -> said 1": 6
   },
   "pot_attribution": "4/4"
  },

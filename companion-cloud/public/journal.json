@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 112,
+   "ts": "2026-08-30T15:04:46",
+   "date": "Aug 30, 11:04 AM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 11:04 AM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/112-r68_35.png",
+     "caption": "The ball the app read as the 3 and correctly displayed as the 5. It is plainly orange - and the 3 had already been potted 15 seconds earlier, so it could not have been on the table."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r68_35.png' alt=''><figcaption>The ball the app read as the 3 and correctly displayed as the 5. It is plainly orange - and the 3 had already been potted 15 seconds earlier, so it could not have been on the table.</figcaption></figure></div>"
+  },
+  {
+   "id": 111,
+   "ts": "2026-08-30T15:04:45",
+   "date": "Aug 30, 11:04 AM EDT",
+   "kind": "finding",
+   "title": "The app can now show its working",
+   "score": "The evidence behind every published name is now recorded - and it shows the safeguards mostly RESCUE bad readings, correcting a claim I had written into the notes myself.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/111-r68_35.png",
+     "caption": "The ball the app read as the 3 and correctly displayed as the 5, in the seconds before it was potted. It is plainly orange - and the 3 had already been potted 15 seconds earlier, so it could not have been on the table at all."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The app can now show its working. Until today it recorded only the\nname it decided on, never the evidence behind it - so twice I have had to run\nspecial one-off investigations to answer \"why did it call that ball a 13?\".\nThat question now answers itself on every run.</strong></p>\n\n<pre>\n                          pinned session      new clip\nshows the name its\nown evidence supports          99.5%           99.4%\n   of live sightings          34,246          43,358\n</pre>\n\n<h3>Why this matters</h3>\n<p>There are five separate safeguards between what the app sees and the name it\nputs on screen - things that stop two balls sharing a number, stop a name\nflickering, stop one glimpse naming a ball. Any of them can override what was\nactually seen, usually for good reason. But none of them left any record, so when\na name came out wrong there was no way to tell whether the app misread the ball\nor read it correctly and then overruled itself. Those are opposite problems with\nopposite fixes.</p>\n\n<h3>What it found - and I was wrong about this</h3>\n<p>I had written in the project notes that the app \"discards correct readings\".\nMeasured across 77,000 sightings, the opposite is true far more often: the\nsafeguards are mostly CATCHING bad readings, not throwing away good ones.</p>\n<p>The clearest case is on the new clip. For 87 frames the app read a ball as the\n3 and displayed it as the 5. The display was right and the reading was wrong -\nand I can prove it without relying on colour at all: the 3 was potted at 121.7\nseconds, so a ball still on the table at 136-159 seconds cannot be the 3. It then\nleaves the table at 158.9, which is exactly when the 5 is potted. The picture\nbelow shows a plainly orange ball, which agrees.</p>\n<p>The two problems I had generalised from were real, but they are the rarer\ndirection. I should not have written the general claim from two cases.</p>\n\n<h3>A gap in my own scoring sheet</h3>\n<p>Those 87 frames sit in a blind spot: the red 3 and the orange 5 are so close\nin colour on that table that I excluded both from my reference sheet, which means\nmy scoring never checks either of them. The pot order gives me a way to settle\nthem that has nothing to do with colour, and that is next.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 110,
    "ts": "2026-08-30T14:34:44",
    "date": "Aug 30, 10:34 AM EDT",
@@ -1087,26 +1119,6 @@
    "title": "Miss analysis caught up on every session",
    "score": "",
    "body": "A gap in the pipeline meant new sessions weren't getting the deep second-pass that resolves tricky misses - your marathon session had 51 misses and only 1 categorized. That pass now runs automatically at every session close, and the whole library was swept: 180 verdicts recovered, trusted tags 150 -> 227, uncategorized 203 -> 126. Your Lifetime Stats patterns just got a lot more data behind them.\nFound via the abstention notes shipped last week: 48 marathon misses stated their reasons, and the reasons pointed at the missing pipeline stage rather than bad tracking.\nThe remaining 126 uncategorized are genuine hard cases (each states why) - your grading playlists can settle any of them with two taps.\nThe drift tests now require this stage in the close pass, so it can never silently fall out again.",
-   "images": []
-  },
-  {
-   "id": 32,
-   "ts": "2026-08-26T12:00:00",
-   "date": "Aug 26, 2026",
-   "kind": "update",
-   "title": "The 9-ball mixup is fixed \u2014 100% on gameplay footage",
-   "score": "",
-   "body": "The washed-out-9 problem's last remnant is gone. A correction layer tuned for the OLD camera settings was flipping the 9 into the 1 (nine times out of fifteen on real gameplay frames) even though the AI model itself read every single one correctly. That layer now only upgrades, never downgrades - and ball identification on gameplay frames from your last two sessions measures 100% across every ball on the table.\nFound by building hand-verified ground truth from your own gameplay (12 layouts across the two Aug-24 evening sessions), then testing each pipeline layer separately: the model scored 15/15 on true 9s; the correction layer was the corruptor.\nThe fix was checked on three frame sets before shipping - gameplay (100% overall), dense racks (slightly better), and old-era archives (net neutral).\nThree new tests guard it, including 'a model stripe answer must never be demoted'.",
-   "images": []
-  },
-  {
-   "id": 31,
-   "ts": "2026-08-25T12:00:00",
-   "date": "Aug 25, 2026",
-   "kind": "update",
-   "title": "The shot Details sheet got a real design",
-   "score": "",
-   "body": "You called it the worst UI you'd ever seen - fair. It's now a proper bottom sheet: slides over the player instead of shoving the page under the clock, groups MEASURED data apart from YOUR CALL verdicts, shrinks the utility buttons to an icon row, and pins Cancel / Looks right / Save to a fixed footer. Your stay-down time shows as a big readout at the top of MEASURED - with a POPPED EARLY flag when it applies.\nSelected verdict buttons now fill solid green instead of a thin outline tint.\nThe abstention notes (why an aim line or metric is absent) sit inside the MEASURED group where they belong.\nTap the dimmed backdrop to close - same as Cancel.\nThis is the first slice of the phase-3 UI pass; the player itself is next.",
    "images": []
   }
  ]

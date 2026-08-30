@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T14:34Z
+    written        2026-08-30T15:04Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T14:33Z
+    measured       2026-08-30T15:02Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,51 +57,66 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 67
+### NEXT TARGETS (top first) — round 68
 
-*** THE BENCH NAMES ZERO BALLS WRONG. PHASE 1 IS MET. ***
+*** THE EVIDENCE BEHIND A PUBLISHED NAME IS NOW RECORDED ***
+    Five gates sit between a track's votes and the name it SHOWS - the
+    vote majority, uniqueness arbitration, the age bar, hysteresis, and
+    the final uniqueness belt - and NONE of them left a trace. Only the
+    verdict was ever written down. That is why round 65 (a track showing
+    13 on 330 frames while its own reads backed 8 of 366) and round 67
+    (the identifier reading 9 one pixel from a ball called 1) each
+    needed a bespoke GPU sweep to find.
+    Track.read now carries the vote majority beside the verdict,
+    sidecar element 8, additive - old sidecars still load. The scorecard
+    reports it on every run:
+        cold   shows what it saw 99.4% of 43358 live sightings
+               [contradicted 94, suppressed 182, unbacked 0]
+        bench  shows what it saw 99.5% of 34246 live sightings
+               [contradicted 24, suppressed 157, unbacked 0]
+
+*** AND IT OVERTURNS THIS BACKLOG'S OWN FRAMING ***
+    Target 0 said "THE APP DISCARDS A CORRECT IDENTIFIER READ". At
+    population scale the opposite dominates: the gates are mostly
+    RESCUING bad reads, not suppressing good ones.
+      cold  saw 3 -> said 5 x87: the published 5 is CORRECT. The 3 was
+            potted at 121.7s, so a ball on the table from 136.2-159.6s
+            cannot be the 3 - and it leaves the table at 158.9s, which
+            is exactly the 5's pot. Vision agrees: the ball is orange.
+            87 frames of a bad read overridden correctly.
+      cold  saw 15 -> said 7 x7: there is no 15 on that table.
+            Arbitration suppressing an invented number, correctly.
+      bench saw 1 -> said 9 x12: ball 9 scores 221/221, so the held
+            name is the right one - rest-frozen identity working.
+    So "contradicted" is NOT a defect count. The two incidents that
+    motivated this target were real but are the MINORITY direction, and
+    I had generalised from them without measuring the population.
+
                               bench            cold
-    strokes found             10/10            9/9
-    outcomes right            10/10            9/9
+    strokes / outcomes        10/10            9/9
     pots to right ball          4/4            5/5
-    fake / unexplained          0/0            0/0
-    naming            99.7 -> 99.8%   98.9 -> 99.9%
-    of ALL checks     99.1 -> 99.2%   98.7 -> 99.7%
-    WRONG NAMES             2 -> 0         10 -> 1
-    invented                 0, still       0, still
-    bench ball 9      219/221 -> 221/221 (perfect)
-    cold  ball 9        56/66 -> 65/66
-    The bench's only remaining gaps are ABSENCES, not errors: 2 unnamed
-    sightings and 7 with no track at all. Cold has one 9->1 left.
+    naming                    99.8%           99.9%
+    of ALL checks             99.2%           99.7%
+    wrong names                   0               1
+    invented                      0               0
+    shows what it saw          99.5%           99.4%
 
-*** THE BACKLOG'S OWN HYPOTHESIS WAS WRONG, AND I HAD WRITTEN IT ***
-    Round 66 closed with "the remaining 10 are the frames where the band
-    is turned away from the camera". Measured this round on all 12
-    failing sightings: the band was NEVER hidden. stripe_reading()
-    answers True on EVERY one, and the white fraction when wrong is
-    indistinguishable from when right -
-        cold  wrong p50 0.346  vs  right p50 0.350   (bar 0.173)
-        bench wrong 0.366/0.371 vs right min 0.364   (bar 0.352)
-    ZERO of 12 read below the bar. The promotion was authorised by the
-    pixels and simply never asked for: repair_unread ran _fix_colour
-    alone, so an unread find never had its STRIPE BIT checked. That is
-    the SIXTH one-fact-two-owners split in three rounds, and the third
-    time in a row the answer was "half a repair was running".
-    LESSON: a hypothesis I write into the backlog is not a finding. It
-    inherits authority it never earned. Measure it before acting on it.
-
-0. THE APP DISCARDS A CORRECT IDENTIFIER READ. Bench t=157/158 the
-    identifier reads 9 at ONE PIXEL from the ball while the app
-    published 1. Round 67's fix happened to cure those two frames (the
-    engine's IDENT_EVERY=6 cadence meant they went down the unread
-    path), but the underlying fact stands and is unmeasured: a correct
-    read exists and something after it wins anyway. Round 65 saw the
-    same shape - a track publishing 13 on 330 frames while the evidence
-    backed it on 8 of 366. Instrument what commits a track's name.
+0. THE COLD CLIP'S 3/5 PAIR IS A HOLE IN THE YARDSTICK. Round 60
+    excluded 3 and 5 from that table's references as inseparable (23.3
+    Lab apart), so the naming truth scores NEITHER - its per-ball line
+    is 0,1,2,4,6,7,8,9 with no 3 and no 5. The new instrument found 87
+    frames of internal disagreement sitting exactly in that blind spot.
+    The pot ORDER resolves it independently of colour (3 potted 121.7,
+    5 potted 158.9), which is a source the app never touches. Extend the
+    naming truth to cover 3 and 5 using the pot order, then the 87
+    frames can be scored instead of merely noticed.
 
 1. THE BENCH'S REMAINING GAPS ARE BLINDNESS, NOT ERROR: 7 sightings
-    with no track and 2 unnamed, against 0 wrong. Different failure,
+    with no track and 2 unnamed, against ZERO wrong. Different failure,
     different fix - find why a ball truth can see has no track at all.
+    Its remaining contradictions (saw 9 -> said 1 x6, saw 6 -> said 1
+    x6) are unresolved; there is no 6 on the bench, so the READ is
+    wrong in those, but whether "1" is right is unmeasured.
 
 2. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
     truth scores the cue 175/175 - a TRACKING gap, not naming, because
@@ -109,14 +124,16 @@ queue cannot be told something the measurements disagree with.
 
 3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%) and bench 339 of 790 (42.9%) get NO identity read.
-    The unchecked half is now repaired so the loss is contained, but
+    The unchecked half is repaired now so the loss is contained, but
     that is the upstream fact. Measure whether it is tiling, ball size
     or the score floor before tuning anything downstream.
 
-4. A WARNING ABOUT MY OWN METHOD (round 65): measured on the 66
-    naming-truth samples a chain looked 65/66; over the same window at
-    full frame rate it was 143/366. The truth samples are ~1/sec on
-    settled moments - a fine YARDSTICK and a badly biased SURVEY.
+4. TWO METHOD WARNINGS, both bought: (round 65) the naming truth samples
+    ~1/sec on settled moments - a fine YARDSTICK and a badly biased
+    SURVEY, so any per-frame claim must be measured per frame; and
+    (round 67) a hypothesis written into this backlog is not a finding,
+    but it inherits the authority of one. Round 68 is the second time in
+    two rounds that a backlog line stated as fact turned out wrong.
 
 5. The palette's 1/3/5 independence caveat; the palette is hand-labelled
     and does not scale; the identifier mislabels balls mid-collision

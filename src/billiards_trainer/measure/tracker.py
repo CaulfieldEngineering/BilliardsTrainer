@@ -754,6 +754,9 @@ class MotionTracker:
                 id=tr.id, x=tr.x, y=tr.y, radius=tr.radius,
                 vx=tr.vx, vy=tr.vy,
                 cls=number_to_class(n), number=n, bgr=pool_ball_bgr(n),
+                # the EVIDENCE beside the verdict (round 68) - see
+                # core.types.Track.read
+                read=tr.number,
                 age=tr.age_frames, hits=tr.age_frames,
                 # published as FRAMES (the live contract); the internal
                 # counter is seconds because coasting is time-based
