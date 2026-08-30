@@ -2862,3 +2862,32 @@ Rounds continue with Joe's visual feedback as the gate.
   BOTH CLIPS UNCHANGED: bench 10/10, 10/10, 0 fake, 4/4, named 99.6%,
   all-checks 99.0%, gate 0.18; cold 9/9 strokes, 8/9 outcomes, 4/5 pots,
   gate 0.37. Suite green.
+
+- 2026-08-30 ~09:00 EDT - ROUND 56: COLD POT ATTRIBUTION 4/5 -> 5/5, and
+  a FALSE pot appeared, so outcomes stay 8/9. Trade recorded, not hidden.
+  Widened the colour veto to MOVING tracks. 158.9 now reads "contact on
+  the 5; potted the 5 into the bottom-left pocket" - correct ball,
+  correct pocket, vision-confirmed. BENCH UNCHANGED and perfect.
+  NEW FALSE POT at 173.8: "potted the 9 into the bottom-right" on a ball
+  this table does not have (0,1,2,3,4,5,6,8). WATCHED at high zoom: a
+  gold ball runs down to the bottom rail, BOUNCES and returns up the
+  table, plainly on the felt at 175.7. The phantom track sits at rect
+  (542,896) to 174.2, jumps 246px in 0.3s to (555,1142) - sampled as
+  BARE FELT at every instant - and dies inside the pocket zone, which is
+  what gets credited. This is the invented-number defect producing a
+  wrong OUTCOME; fix the phantom, not the credit. Its jump is a coast
+  onto empty felt, which round 15's "a coast is not evidence" should
+  have stopped - find out why it does not fire.
+  A MEASUREMENT THAT LIED: the 5538-sample survey that set the threshold
+  at 90 said a correct match never exceeds 40 at any speed. It was
+  BIASED BY CONSTRUCTION - it only sampled pairs the tracker already
+  matched well, so it never contained a ball accelerating along a rail.
+  Instrumenting one directly showed that ball's own colour drifting
+  3 -> 29 -> 55 -> 88, one frame short of being refused its own ball.
+  Threshold raised to 140 (above the worst self-drift, below the 213
+  that matters). Scores identical at 90 and 140, so the threshold is not
+  what creates the false pot.
+  HONEST LIMIT RECORDED: gold (102,178,233) vs the white cue
+  (177,228,231) is only 90 apart, INSIDE a fast ball's own drift. Colour
+  cannot separate that pair at speed and no threshold will; it needs a
+  different signal.

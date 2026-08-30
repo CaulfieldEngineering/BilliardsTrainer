@@ -367,6 +367,24 @@ class TestABallDoesNotChangeColour:
         stolen = [r for r in rows if r.id == tid and abs(r.x - 100.0) > 25]
         assert not stolen, "a white ball took the orange ball's track"
 
+    def test_a_moving_track_is_guarded_too(self):
+        """Round 56: the veto used to exempt moving tracks, which is what
+        let the CUE's track take the orange 5 during the collision.
+        Measured over 5538 accepted matches on both clips, motion barely
+        touches measured colour - median 12 even at 600-1200 px/s, never
+        reaching 40 at any speed - so one threshold serves everywhere."""
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for k in range(14):                    # the white cue, in flight
+            tk.update([self._Det(100.0 + k * 25, 500.0, (240, 245, 245), 0)], t)
+            t += 1 / 30
+        x = 100.0 + 14 * 25
+        rows = tk.update([self._Det(x + 25, 500.0, (11, 86, 238), -1)], t)
+        cue = [r for r in rows if r.number == 0]
+        assert not cue or abs(cue[0].x - (x + 25)) > 15, (
+            "a moving cue ball's track adopted an orange ball")
+
     def test_the_same_ball_is_still_matched_when_the_name_flickers(self):
         """Colour must not strand a ball over an identifier hiccup."""
         from billiards_trainer.measure.tracker import MotionTracker

@@ -366,18 +366,48 @@ class MotionTracker:
                     # mismatch to see. Colour cannot go missing that way.
                     # Measured on that theft, orange (11,86,238) against
                     # white (183,234,238) is 227 apart, while a misread
-                    # of the SAME ball sits under 40. Restricted to a
-                    # SETTLED track and a detection it would have to jump
-                    # to: a ball in flight smears toward the cloth, so
-                    # its colour is exactly what must not be trusted.
-                    if (tr.settled and len(tr.mbgr_hist) >= 5
+                    # of the SAME ball sits under 40.
+                    # THIS COVERS MOVING TRACKS TOO (round 56). It was
+                    # first written for SETTLED tracks only, on the
+                    # assumption that a ball in flight smears toward the
+                    # cloth and its colour cannot be trusted. Measured
+                    # over 5538 accepted matches on both clips, that
+                    # assumption is simply wrong - motion barely touches
+                    # the measured colour:
+                    #     at rest <30      median 1   p99 12
+                    #     slow 30-200      median 4   p99 17
+                    #     medium 200-600   median 10  p99 35  max 35
+                    #     fast 600-1200    median 12  max 12
+                    # A correct match never reaches 40 at any speed,
+                    # while the swap sits at 213-227. Exempting moving
+                    # tracks was what let the CUE's track take the orange
+                    # 5 during the collision at 159.4s.
+                    # BUT THAT SURVEY WAS BIASED and the threshold it
+                    # suggested (90) was too tight. It only sampled pairs
+                    # the tracker ALREADY matched well, so it never saw a
+                    # ball accelerating along a rail. Instrumented on the
+                    # cold clip's 174.4s stroke, the gold ball's own
+                    # detections drift 3 -> 29 -> 55 -> 88 from its
+                    # resting median as it speeds up - one frame short of
+                    # being refused its own ball, which is exactly how a
+                    # false pot appeared at 173.8s (the track was
+                    # orphaned, coasted into the pocket zone and died
+                    # there). The bar is 140: above the worst self-drift
+                    # measured (88) and below the real confusions (the
+                    # 213 that matters here, and 237-242 for green).
+                    # HONEST LIMIT: gold (102,178,233) against the white
+                    # cue (177,228,231) is only 90 apart, which is INSIDE
+                    # a fast ball's own drift. Colour cannot separate
+                    # that pair at speed, and no threshold will fix it -
+                    # it needs a different signal.
+                    if (len(tr.mbgr_hist) >= 5
                             and det_bgr[di] is not None
                             and dd > 1.5 * max(tr.radius, dr, 8.0)):
                         n_h = len(tr.mbgr_hist)
                         mine = [sorted(c[k] for c in tr.mbgr_hist)[n_h // 2]
                                 for k in range(3)]
                         if sum((float(a) - float(b)) ** 2
-                               for a, b in zip(mine, det_bgr[di])) > 90.0 ** 2:
+                               for a, b in zip(mine, det_bgr[di])) > 140.0 ** 2:
                             continue
                     named = 0 if (dn >= 0 and tr.emitted == dn) else 1
                     pairs.append((named, dd, di, tr.id))
