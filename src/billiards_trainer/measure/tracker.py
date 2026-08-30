@@ -725,6 +725,26 @@ class MotionTracker:
             if cur is None:
                 claims[n] = tr
                 continue
+            # A SIGHTING OUTRANKS AN ESTIMATE (round 77). Everything below
+            # weighs votes and incumbency, and neither notices that one
+            # claimant is being SEEN this frame while the other is a
+            # coasted prediction. On the bench at 18.81s trk7 held "4" on
+            # a coast while trk8 - a live detection also reading 4 - was
+            # denied it and published nothing; the naming truth puts the
+            # ball at trk8. That is one of the bench's two remaining
+            # unnamed sightings.
+            # Measured over both clips before changing anything: the
+            # pattern occurs on 18 bench frames and 7 cold, and wherever
+            # the truth can say which claimant is the ball it is the LIVE
+            # one 9 times out of 9, the coasting one never. So a track
+            # matched to a detection this frame takes the number outright
+            # - votes and stickiness only arbitrate between claimants of
+            # equal standing, which two coasts or two sightings are.
+            cur_live = cur.t >= t - 1e-9
+            tr_live = tr.t >= t - 1e-9
+            if tr_live != cur_live:
+                claims[n] = tr if tr_live else cur
+                continue
             # STICKY arbitration (gate: 2,032 id-flickers from per-frame
             # winner oscillation): the incumbent holds the number unless
             # the challenger leads by MARGIN clear votes.

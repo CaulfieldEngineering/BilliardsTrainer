@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 125,
+   "ts": "2026-08-30T19:34:41",
+   "date": "Aug 30, 03:34 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 03:34 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/125-r77_ghost.png",
+     "caption": "Green: the real purple 4, seen right now. Orange: the leftover estimate that was holding its number, sitting on empty cloth."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>98.7%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r77_ghost.png' alt=''><figcaption>Green: the real purple 4, seen right now. Orange: the leftover estimate that was holding its number, sitting on empty cloth.</figcaption></figure></div>"
+  },
+  {
+   "id": 124,
+   "ts": "2026-08-30T19:34:41",
+   "date": "Aug 30, 03:34 PM EDT",
+   "kind": "finding",
+   "title": "A leftover guess was holding a real ball's number",
+   "score": "At 18.8s an estimate on empty cloth held the 4 while the visible purple 4 went unnamed. A sighting now outranks an estimate: pinned session naming 99.8% -> 99.9%, none wrong.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/124-r77_ghost.png",
+     "caption": "Green: the real purple 4, seen right now. Orange: the leftover estimate that was holding its number, sitting on empty cloth."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>A ball the app could plainly see was being refused its own number,\nbecause a leftover guess somewhere else on the table was still holding it. Your\npinned session now names 99.9% of ball sightings, with none wrong.</strong></p>\n\n<pre>\n                        pinned session      new clip\nnaming              99.8% -> 99.9%          99.6%\noverall accuracy    99.7% -> 99.8%          99.6%\nballs named WRONG        none, still            1\nsightings left unnamed        2 -> 1            4\nthe purple 4          216/217 -> 217 of 217\n</pre>\n\n<h3>What was happening</h3>\n<p>When the app loses sight of a ball it keeps a short estimate of where it went.\nAt 18.8 seconds one of those estimates was sitting on empty cloth in the middle\nof the table, still claiming to be the 4 - while the real purple 4, in plain\nview over by your hand, was left unnamed because that number was already\ntaken.</p>\n<p>The rule that stops two balls sharing a number was comparing how much evidence\neach had, and never asking the simpler question: which one can I actually SEE\nright now? A ball being looked at now outranks a guess about a ball that isn't.</p>\n\n<h3>I checked how often this happens before changing it</h3>\n<pre>\nthe pattern occurs           18 frames on your pinned table, 7 on the new one\nwhen my notes can say which\none is the real ball         the visible one, 9 times out of 9\n                             the estimate,    never\n</pre>\n<p>So the change is small and the evidence for it is one-sided. The picture below\nshows it: the green ring is the real purple ball, the orange ring is the estimate\nthat was holding its name, sitting on bare cloth.</p>\n\n<h3>One number moved the wrong way</h3>\n<p>Naming of balls IN MOTION on your pinned table slipped from 99.3% to 98.7%.\nSmall, and the overall figure improved, but it is real and I have not chased it\ndown yet.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>98.7%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 123,
    "ts": "2026-08-30T19:04:52",
    "date": "Aug 30, 03:04 PM EDT",
@@ -1166,26 +1198,6 @@
    ],
    "ts": "2026-08-28T16:22:00",
    "kind": "finding"
-  },
-  {
-   "id": 45,
-   "date": "Aug 28, 12:22 PM EDT",
-   "title": "Why the app was missing half your shots",
-   "score": "bench: 5 of 10 shots recorded",
-   "body": "You asked me to watch your 4-minute practice clip and compare it to what the app saw. I did, frame by frame.\nThe clip contains 10 real strokes. The app had recorded 5 of them, invented 2 shots that never happened (they were you setting balls up by hand), and completely missed 5 - including two clean pots.\nIt also scored a ball you CAUGHT IN YOUR HAND as a make, because the ball's track vanished and the old logic treated 'vanished' as 'pocketed'.\nThe most important part: the app's own quality score for this session was a perfect 0.00. Its numbers only check things it knows to check. That's why we now compare every change against what I can actually see in the video.",
-   "images": [],
-   "ts": "2026-08-28T16:22:00",
-   "kind": "finding"
-  },
-  {
-   "id": 44,
-   "ts": "2026-08-28T12:00:00",
-   "date": "Aug 28, 2026",
-   "kind": "update",
-   "title": "You were right - the replays WERE mostly old trails. Fixed this morning.",
-   "score": "",
-   "body": "The overnight merge was built cautious: on any doubt it kept the old sparse trail, and that caution kept exactly the trails you watch - your first clip's cue ball, your second clip's 3-ball (10 points with a near-second hole). The engine's own gate scores have now earned a bolder rule: on gate-passing sessions dense wins by default, and the old trail survives only when the video itself sides with it. Re-merged everywhere: the marathon went from 58 to 124 of 125 covered shots dense; about 316 shots across the library. Re-watch the same two clips.\nVerified before changing anything: the dense data was in the files, Dropbox cloud matched to the second, and the player was innocent - the timid merge rule was the whole story.\nThe 3-ball wrongly counted as a make is a SEPARATE, real issue: re-measurement upgraded trails but has not yet re-judged outcomes. Make/miss verdicts are still the recording-night detector's. Re-deriving outcomes from the dense measurements is queued next - trails first, judgments second, no shortcuts.",
-   "images": []
   }
  ]
 }

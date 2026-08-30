@@ -3438,3 +3438,26 @@ Rounds continue with Joe's visual feedback as the gate.
   change does.
   Engine untouched across all three: bench 10/10, 10/10, 4/4, naming
   99.8% with ZERO wrong, all-checks 99.7%.
+
+- 2026-08-30 ~18:15 EDT - ROUND 77: A COASTED GHOST WAS HOLDING A NUMBER
+  THE REAL BALL WAS DENIED. Bench 18.81s: trk7 showed "4" on a coasted
+  prediction sitting on EMPTY FELT while trk8 - a live detection also
+  reading 4, on the actual purple ball - published nothing. That was one
+  of the bench's two remaining unnamed sightings. Number arbitration
+  weighed votes and incumbency and never noticed that one claimant was
+  being SEEN and the other was a guess.
+  MEASURED FIRST: the pattern occurs on 18 bench frames and 7 cold, and
+  wherever the naming truth can adjudicate it is the LIVE claimant 9 of
+  9 and the coasting one NEVER. A track matched to a detection this
+  frame now takes the number outright; votes and stickiness arbitrate
+  only between claimants of equal standing.
+  BENCH: naming 99.8 -> 99.9%, all-checks 99.7 -> 99.8%, unnamed 2 -> 1,
+  ball 4 216/217 -> 217/217 PERFECT. Held: 10/10, 10/10, 4/4, ZERO wrong,
+  0 invented. COLD unchanged: 9/9, 9/9, 5/5, 99.6%.
+  REGRESSION, posted: bench moving-ball naming 99.3 -> 98.7% and cold's
+  suppressed count 182 -> 227. Kept because the headline that counts
+  blindness as failure improved and cold is flat - but the moving-ball
+  dip is the one number that went the wrong way and is now target 1.
+  VISION-CORROBORATED: the overlay shows trk8 on the purple ball and
+  trk7 on bare cloth.
+  Pinned by TestASightingOutranksAnEstimate.

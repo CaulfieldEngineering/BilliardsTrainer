@@ -265,6 +265,45 @@ class TestRestingBallStillGoesInactiveQuickly:
             f"foreign-cover test costs pots - see the class docstring.")
 
 
+class TestASightingOutranksAnEstimate:
+    """Round 77: a coasted ghost held a number the real ball was denied.
+
+    Bench 18.81s: trk7 showed "4" on a coasted prediction sitting on
+    EMPTY FELT while trk8 - a live detection also reading 4, on the
+    actual purple ball - published nothing. Measured over both clips
+    before changing anything: the pattern occurs on 18 bench frames and
+    7 cold, and wherever the naming truth can say which claimant is the
+    ball it is the LIVE one 9 times out of 9 and the coasting one never.
+    """
+
+    def test_the_live_track_takes_the_number(self):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        # a ball settles at A and owns the number
+        for _ in range(30):
+            tk.update([(200.0, 200.0, 14.0, 4)], t)
+            t += 1 / 30
+        # it stops being detected (coasts) while a DIFFERENT live
+        # detection, far away, also reads 4
+        shown = []
+        for _ in range(10):
+            rows = tk.update([(600.0, 900.0, 14.0, 4)], t)
+            t += 1 / 30
+            shown = rows
+        live = [r for r in shown
+                if abs(r.x - 600.0) < 40 and abs(r.y - 900.0) < 40]
+        assert live, "the live detection produced no track at all"
+        assert live[0].number == 4, (
+            "the live ball was denied its number by a coasted claimant - "
+            "that is the bench's 18.81s ghost, where the coasting track "
+            "sat on empty felt")
+        ghost = [r for r in shown
+                 if abs(r.x - 200.0) < 40 and abs(r.y - 200.0) < 40]
+        assert all(g.number != 4 for g in ghost), (
+            "the number is published on two tracks at once")
+
+
 class TestOccludedBallSurvivesButPottedBallDoesNot:
     """Round 71: the discriminator round 70 was missing.
 
