@@ -402,12 +402,25 @@ class MotionTracker:
                 if holder == tid:
                     del self._holder[num]      # its claim dies with it
         live = [tr for tr in self._tracks.values() if tr.active]
+        # A SHRUNKEN GHOST MUST NOT DODGE THE MERGE. The bar used to be
+        # 0.8 * (a.radius + b.radius), which shrinks with the tracks
+        # being judged - so a small ghost sitting beside a real ball fell
+        # just under it and survived, while the physics scorer, which
+        # measures against the table's MEDIAN diameter, flagged the pair
+        # as interpenetrating. Measured on the bench: one such pair
+        # (the unnamed blob beside the red 3 at 119.7-120.3s) produced
+        # ALL 17 overlapping-ball violations and pushed the gate to
+        # 0.71/1k against a 0.55 limit, which refuses the trail merge.
+        # The live tracker already carried this lesson as a table-wide
+        # radius floor; this is the same idea, self-contained.
+        med_r = (sorted(t.radius for t in live)[len(live) // 2]
+                 if live else 0.0)
         for i, a in enumerate(live):
             for b in live[i + 1:]:
                 if not (a.active and b.active):
                     continue
                 d = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
-                if d < 0.8 * (a.radius + b.radius):
+                if d < 0.8 * max(a.radius + b.radius, 2.0 * med_r):
                     weaker = min(a, b, key=lambda tr: (len(tr.votes), tr.id))
                     weaker.active = False
                     weaker.vx = weaker.vy = 0.0

@@ -29,10 +29,11 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 16  # v16: a track must be SEEN MIN_ID_FRAMES times
-                     # before it may show a number - one detection is a
-                     # guess, not an identity (it was the whole source of
-                     # this clip's invented numbers)
+ENGINE_RULES_V = 17  # v17: the track-merge bar takes a floor at the
+                     # table's median ball diameter, so a SHRUNKEN ghost
+                     # can no longer sit beside a real ball without being
+                     # merged away (it was the whole source of the
+                     # physics gate going red)
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:

@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 83,
+   "ts": "2026-08-30T01:35:03",
+   "date": "Aug 29, 09:35 PM EDT",
+   "kind": "finding",
+   "title": "Round 41: physics check fixed - and your shot list isn't from the engine",
+   "score": "gate 0.71 -> 0.19; the shot list is still the old recording-time pass",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/083-dbg_session-20260824-220247_120_00.png",
+     "caption": "The frame that produced all 17 complaints, after the fix: six balls, six correct names, and the ghost that used to sit beside the red 3 is merged away."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Round 41: fixed the safety check I reported failing - and then found\nwhy your shot list still looks wrong. The second thing is bigger.</strong></p>\n\n<h3>First, the physics check is green again</h3>\n<p>All 17 of its complaints were one event: a small ghost blob sitting beside\nyour red 3 for half a second. The app has a rule that merges two tracks sitting\non top of each other, but that rule measured \"on top of each other\" using the\nsize of the two things being compared - so a <em>shrunken</em> ghost slipped\nunder the bar while the safety check, which measures against a normal ball's\nsize, called it a collision. The merge rule now uses a normal ball's size as\nits floor.</p>\n<p>Impossible events went <strong>0.71 down to 0.19</strong> per thousand,\nagainst a limit of 0.55. The trail rebuild now happens on its own, without me\nbypassing anything.</p>\n\n<h3>Now the thing you actually reported</h3>\n<p>You said @104 is labelled \"rearranging\" when it is a shot on the 2, and @35\nhas a trail on the cue ball but not the 1. You are right on both, and the cause\nis the same for both - and worse than either.</p>\n<p><strong>The shot list on your phone is not coming from the new engine at\nall.</strong> Here is your session, side by side:</p>\n<pre>\nwhat your phone shows:   14.5   35.3   104.3  118.7  132.6  157.2  212.9   (7)\nwhat the engine found:   31.7  51.5  68.8  85.1  101.0  130.2  154.2\n                        170.6  189.8  208.0                             (10)\n</pre>\n<p>The list you see is the ORIGINAL analysis from when the session was\nrecorded. The re-analysis only swaps improved <em>trails</em> into those old\nentries - it never rebuilds the list. So you are looking at a segmentation that\nmisses five of your ten shots, counts two pieces of setup as shots, and still\nsays \"potted the 5\" - a ball we established three days ago is not on your\ntable.</p>\n<p>That is exactly your two complaints. @104 says \"rearranging\" because that\nlabel came from the old pass; the engine finds a real stroke there. @35 shows\none trail because the merge could only upgrade one of them.</p>\n\n<h3>What I am doing about it</h3>\n<p>Rebuilding the shot list from the engine, rather than patching the old one.\nThat is your original instruction - everything you see should read from the one\nmeasurement engine - and this is the last place it is not being followed.</p>\n<p>It is the next round. I did not bolt it onto the end of this one because it\ndecides what every shot in your library is called, and it deserves its own\nbefore-and-after rather than being rushed.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li><li>Round 35: no more phantom shots - R2 passes, the bench is one defect from clean</li><li>Round 34: make the 99.5% reproducible, and stop it leaning on unvalidated refs</li><li>Round 33: naming 89% -&gt; 99.5%, outcomes 10/10, pots 4/4 - R3 and R4 gates passed</li><li>Round 32: the 9&#x27;s correct read is given away to a passing ball - two fixes tried, both worse</li><li>Round 31: naming 76% -&gt; 89% and pot attribution 2/4 -&gt; 3/4, nothing worse (rules_v 13)</li><li>Round 30: both naming root causes found and fixed - 76% to 89%, one artifact from landing</li><li>Round 29: the name outlives the ball - identity continuity is the R3 blocker</li></ul>"
+  },
+  {
    "id": 82,
    "ts": "2026-08-30T01:19:30",
    "date": "Aug 29, 09:19 PM EDT",
@@ -944,16 +960,6 @@
    "title": "Fast shots keep their trails",
    "score": "",
    "body": "Hard-hit balls used to vanish from the trails mid-flight. The app now recovers them through the motion blur.\nA hard-hit ball crosses four of its own widths between frames and smears into a translucent streak. The detector sees nothing \u2014 but the pixels still hold the ball.\nThe recovery: remember what the empty table looks like (the average of the last second and a half), subtract it, and whatever remains that's ball-sized and matches the missing ball's own colour better than any other ball's \u2014 that's your ball. It's how your trails now follow the ball all the way to the rail.\nOne honest limit: a smeared ball's measured position is the middle of the streak, not the ball. Good enough to draw a trail; not good enough to judge a miss by. So recovery feeds the drawings, and verdicts wait for the physics fit.",
-   "images": []
-  },
-  {
-   "id": 3,
-   "ts": "2026-08-22T12:00:00",
-   "date": "Aug 22, 2026",
-   "kind": "update",
-   "title": "Rotation stays put",
-   "score": "",
-   "body": "Rotating the video no longer flips the legend or play button, and toggling overlays no longer un-rotates the video.",
    "images": []
   }
  ]

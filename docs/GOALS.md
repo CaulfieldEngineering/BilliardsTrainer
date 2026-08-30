@@ -2421,3 +2421,22 @@ Rounds continue with Joe's visual feedback as the gate.
   MIN_ID_FRAMES (a new track emits -1 then its number, which may read as
   flicker), and check whether overlapping_balls counts coasted estimates
   against real sightings.
+
+- 2026-08-31 ~09:00 EDT - ROUND 41: physics gate GREEN again, 0.71 ->
+  0.19 (limit 0.55), rules_v 17. All 17 overlapping_balls violations
+  were ONE pair - the unnamed ghost beside the red 3 at 119.7-120.3s.
+  Cause was a threshold mismatch: the tracker merged when
+  d < 0.8*(a.radius+b.radius), a bar that shrinks with the tracks being
+  judged, while the scorer flags overlap at 0.80 * the table's MEDIAN
+  diameter - so a shrunken ghost dodged the merge and still counted as
+  interpenetrating. Fixed with a median-diameter floor. Trail merge now
+  runs legitimately, no bypass. Scorecard unchanged. Ghost gone on the
+  overlay. Remaining 6 events are round 33's intended rest-corrections;
+  metric and design disagree, left the metric alone.
+  *** AND JOE FOUND THE BIG ONE: the shot list is not from the engine.
+  shots.json shows 7 shots from the ORIGINAL recording-time analysis
+  (14.48 35.27 104.31 118.67 132.62 157.18 212.91) while the engine
+  finds the 10 real strokes; the merge only upgrades TRAILS inside those
+  old entries. That is why @104 reads "rearranging" and @35 has one
+  trail. Next round derives the shot list from measure.shots.analyze,
+  keeping the existing schema. ***
