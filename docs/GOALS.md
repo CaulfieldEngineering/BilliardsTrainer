@@ -3546,3 +3546,30 @@ Rounds continue with Joe's visual feedback as the gate.
   the library and neither clip contains a clean one.
   METHOD: check what your control group actually contains. Looking at
   the crops is what caught it.
+
+- 2026-08-30 ~21:15 EDT - ROUND 81: THE IDENTITY MODEL IS BLIND TO DARK
+  BALLS, AND COLOUR CARRIES THEM ENTIRELY. "Reads only half the balls" is
+  answered and the question was partly wrong.
+  MY OWN STATISTIC WAS INFLATED: round 66 counted every finder detection
+  including sub-ball-size chalk marks (r=5-7 vs a real ball's 13-14).
+  Ball-sized finds only: bench 77.1%, not 42.9%.
+  SEAM HYPOTHESIS DEAD: unread balls are NOT concentrated in the tile
+  overlap band (bench 40% unread vs 30% read; cold 1% vs 8%). Radius,
+  finder score and crowding do not separate either.
+  IT IS PER BALL AND IT IS BRIGHTNESS: cold 8 (black) 0/92 = 0.0%, 7
+  (burgundy) 2/85 = 2.4%, 1 (gold) 1/8, 4 (purple) 46%, cue 57%, the
+  bright balls 94-100%; bench 1 (yellow) 29.5%, cue 64%, the rest 94-98%.
+  NO THRESHOLD CAN FIX IT: at the dark balls the model emits NOTHING -
+  31 of 31 probes at the 8 and 28 of 29 at the 7 returned no box, not a
+  low-confidence one. A training gap, not a knob.
+  VISION-CORROBORATED: on one frame every unread ball is among the
+  darkest on the cloth and every bright ball is read.
+  THE CONSEQUENCE: those balls are still named ~100% right (cold's 8 is
+  183/183, its 7 170/170) and ALL of it comes from the measured-colour
+  path. Colour is not a backstop for the dark balls, it is the ONLY
+  thing naming them - round 58 showed what its absence looks like (46
+  unnamed, the purple 4 called the 7).
+  NO CODE CHANGED - a measurement round; both clips verified identical.
+  NEXT: record whether a detection got an identity read so the colour
+  dependency is a standing scorecard line rather than a fact discovered
+  by accident - the same move as round 68's Track.read.

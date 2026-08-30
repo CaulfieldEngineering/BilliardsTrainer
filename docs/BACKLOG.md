@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T20:55Z
+    written        2026-08-30T21:25Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T19:31Z
@@ -57,60 +57,66 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 80
+### NEXT TARGETS (top first) — round 81
 
-*** TRIED TO NARROW THE HAND VETO, COULD NOT DO IT HONESTLY, CHANGED
-    NOTHING - AND MY CONTROL GROUP WAS CONTAMINATED ***
-    The plan (from round 79) was to keep a detection unless its DISC is
-    substantially foreign rather than merely its centre, so a fully
-    visible ball beside a hand stops being discarded.
-    THE DISCRIMINATOR FAILED, backwards from the hypothesis:
-        real balls the veto drops : coverage 0.53-0.89, median 0.84
-        the control               : coverage 0.51-0.93, median 0.76
-    Balls read MORE covered than the control. The mask is a 160px-wide
-    warp, so a ball is ~4 mask pixels in radius and anything adjacent to
-    an arm sits inside one merged blob at ~85%.
-    *** AND THEN THE CONTROL TURNED OUT TO BE BALLS. *** It was built as
-    "vetoed detections with no truth ball nearby", but the naming truth
-    OMITS balls being handled - so the control was largely real balls in
-    Joe's glove. Looking at the crops settled it: a blue ball held in his
-    hand, labelled by my own script as "not a ball". The comparison was
-    balls against balls and proves nothing in either direction. I was one
-    step from concluding "coverage does not separate" as a finding when
-    the truth is "I never had the two populations I claimed".
-    WHAT THE VETO ACTUALLY COSTS, measured against the truth files' own
-    setup windows: 13 vetoed detections at truth times - 2 inside
-    declared hand-setup windows (defensible: the ball is being placed)
-    and 11 a ball IN PLAY with a hand merely nearby (bench 125-131s, and
-    cold 60-63s, which was not previously known). Eleven frames, against
-    a rule bought to stop a gloved bridge hand tracking as a resting "#4"
-    with two ghosts - 25 impossible overlaps, the sole G4 per-session
-    blocker.
-    KEPT UNCHANGED, and the measurement is recorded at the rule so the
-    next attempt starts from it. NO ENGINE BEHAVIOUR CHANGED - a comment
-    and this queue entry only; both clips verified identical.
+*** THE IDENTITY MODEL IS BLIND TO DARK BALLS, AND COLOUR CARRIES THEM
+    ENTIRELY ***
+    "The identifier reads only half the balls" is answered, and the
+    question was partly wrong. FIRST, MY OWN STATISTIC WAS INFLATED:
+    round 66 counted every finder detection, including sub-ball-size
+    chalk marks (the same ones round 69 found at r=5-7 against a real
+    ball's 13-14). Filtering to ball-sized finds, the bench reads 77.1%,
+    not 42.9%.
+    THE SEAM HYPOTHESIS IS DEAD: the identifier infers two overlapping
+    60% tiles, and unread balls are NOT concentrated in the overlap band
+    (bench 40% unread vs 30% read; cold 1% vs 8% - opposite directions).
+    Radius, finder score and crowding do not separate either.
+    IT IS PER BALL, AND IT IS BRIGHTNESS:
+        cold  ball 8 (black)      0/92    0.0%   never once
+              ball 7 (burgundy)   2/85    2.4%
+              ball 1 (gold)       1/8    12.5%
+              ball 4 (purple)    26/56   46.4%
+              ball 0 (cue)       50/88   56.8%
+              balls 2,3,5,6              94-100%
+        bench ball 1 (yellow)    13/44   29.5%
+              ball 0 (cue)       71/111  64.0%
+              balls 3,4,9                94-98%
+    AND NO THRESHOLD CAN FIX IT: at the dark balls the model emits
+    NOTHING AT ALL - 31 of 31 probes at the 8 and 28 of 29 at the 7
+    returned no box, not a low-confidence one. This is a training gap,
+    not a tuning knob.
+    VISION-CORROBORATED: on a single frame every ball marked unread is
+    among the darkest on the cloth and every bright ball is read.
+    THE CONSEQUENCE THAT MATTERS: those balls are named ~100% correctly
+    anyway (cold's 8 scores 183/183, its 7 170/170) and ALL of that
+    comes from the measured-colour path. Colour is not a backstop for
+    the dark balls, it is the ONLY thing naming them. Round 58 already
+    showed what that looks like when it is missing - 46 balls unnamed
+    and the purple 4 called the 7 - which is why per-table references
+    are load-bearing rather than a nicety.
+    NO CODE CHANGED - a measurement round; both clips verified identical.
 
-0. TO SETTLE THE HAND VETO, GET A REAL HAND POPULATION FIRST.
-    session-20260802-173553 - the clip that motivated the rule, where a
-    gloved hand tracked as a "#4" - is NOT in the library, and neither
-    bench nor cold contains a clean one. Either recover that clip or
-    hand-label a set of genuine hand/glove/sleeve detections. Without
-    it, any change to this rule is unmeasurable, and this round is the
-    proof: the obvious control is contaminated by the very thing being
-    measured.
+0. MAKE THE COLOUR DEPENDENCY VISIBLE ON EVERY RUN. Nothing on the
+    scorecard says "these balls are named by colour alone". A per-ball
+    identity-read rate would show it, but the scorecard reads only the
+    sidecar and the flag is not recorded there - Detection knows whether
+    an identity read landed and nothing carries it through. Same shape as
+    round 68's Track.read, which turned an invisible fact into a standing
+    line. Do that, then a silent loss of references shows up as a metric
+    rather than as a mystery weeks later.
 
 1. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT with
-    ZERO wrong names; 7 of its correct names are estimates (all the red
-    3 under Joe's leg, 125-131s). Cold: 4 unnamed 5s, one 9->1.
+    ZERO wrong names; 7 of its correct names are estimates (the red 3
+    under Joe's leg). Cold: 4 unnamed 5s, one 9->1.
 
-2. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
-    is 1,962 KB of dense 30fps trails; nobody has measured what that
-    costs to pull on a bad connection.
+2. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): settling it needs a
+    population of GENUINE hand detections, and session-20260802-173553 -
+    the clip where a gloved hand tracked as a "#4" - is not in the
+    library. Recover it or hand-label one.
 
-3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
-    finds (54.5%), bench 339 of 790 (42.9%) get NO identity read. This
-    is the largest unexplored engine fact left and it needs no new
-    corpus - unlike target 0.
+3. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
+    is 1,962 KB of dense 30fps trails; the cost to pull it on a bad
+    connection is unmeasured.
 
 4. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
     gave the cold clip.
@@ -128,8 +134,10 @@ queue cannot be told something the measurements disagree with.
     78) and a posted regression deserves the same scrutiny as a posted
     win (78); an angle test needs a magnitude guard (75); a regeneration
     needs a gate or it silently deletes (76); a favourable number
-    deserves auditing too (79); AND CHECK WHAT YOUR CONTROL GROUP
-    ACTUALLY CONTAINS - looking at the crops is what caught this one (80).
+    deserves auditing too (79); check what your control group actually
+    contains (80); AND A STATISTIC ABOUT "DETECTIONS" IS ONLY AS GOOD AS
+    ITS DEFINITION OF ONE - 42.9% became 77.1% by excluding things that
+    were never balls (81).
 
 7. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
