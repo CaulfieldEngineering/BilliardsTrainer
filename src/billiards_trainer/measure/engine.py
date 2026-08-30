@@ -450,6 +450,12 @@ def reprocess(video: str, out_dir: str | None = None,
             # 340 times in a 340-frame probe without once being able to
             # look. update() has taken either form since round 39; the
             # live path was already passing objects.
+            # OCCLUDED IS NOT GONE (round 71): hand the tracker the same
+            # foreign cover prepare_detections just used to veto
+            # detections, so a ball the player is standing over keeps its
+            # track instead of dying at COAST_S. Both paths feed this;
+            # the live one does it in _apply_detections.
+            tracker.set_occlusion(getattr(pipe, "_foreign_last", None))
             rows = tracker.update(prepared, t)
             # HAND CONTEXT (bench R2: four strokes invented while Joe was
             # placing balls by hand). The live path has always recorded

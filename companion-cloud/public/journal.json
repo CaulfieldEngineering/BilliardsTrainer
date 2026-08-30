@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 118,
+   "ts": "2026-08-30T16:39:08",
+   "date": "Aug 30, 12:39 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 12:39 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/118-r71_kept.png",
+     "caption": "The red 3 through the six seconds it used to disappear for. The app now holds it, with the right number, and marks it as an estimate rather than a sighting."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r71_kept.png' alt=''><figcaption>The red 3 through the six seconds it used to disappear for. The app now holds it, with the right number, and marks it as an estimate rather than a sighting.</figcaption></figure></div>"
+  },
+  {
+   "id": 117,
+   "ts": "2026-08-30T16:39:08",
+   "date": "Aug 30, 12:39 PM EDT",
+   "kind": "finding",
+   "title": "Balls no longer vanish while you're standing over them",
+   "score": "The hand-blanking hid balls for 6+ seconds. Fixed by keeping a ball alive only while your hands are over that spot - measured: occlusions 100% covered, all nine pots 0%.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/117-r71_kept.png",
+     "caption": "The red 3 through the six seconds it used to disappear for. The app now holds it, with the right number, and marks it as an estimate rather than a sighting."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Fixed properly this time. Balls no longer vanish while you are\nstanding over them - and unlike yesterday's attempt, every pot still\nregisters.</strong></p>\n\n<pre>\n                          pinned session      new clip\nballs lost while you\nstood over them              7 -> 1           2 -> NONE\npots                          4 of 4           5 of 5   (both held)\nmakes and misses            10 of 10           9 of 9   (both held)\noverall accuracy        99.2% -> 99.7%   99.4% -> 99.6%\n</pre>\n\n<h3>What was wrong, and why the first fix failed</h3>\n<p>The app deliberately ignores whatever is inside your arm and hand so a glove\nis never mistaken for a ball. A ball right next to you gets ignored along with\nit, and the app allows six tenths of a second before giving up on it. You stand\nover a shot for six or seven seconds, so the ball simply disappeared.</p>\n<p>My first attempt was to keep any STILL ball alive longer. That broke four\npots, because a ball rolling into a pocket also slows to a stop first - so\n\"still\" could not tell the two apart.</p>\n\n<h3>What actually separates them</h3>\n<p>Whether your hands are over that spot. Before writing any code this time I\nchecked that on every case in both clips:</p>\n<pre>\nthe two balls you were standing over   covered 100% of the time\nall NINE pots                          covered  0% of the time\n</pre>\n<p>No overlap whatsoever. So the app now keeps a ball alive only while your hands\nare actually over it, and gives up immediately everywhere else - which is exactly\nwhat a pot needs. Both were checked afterwards: the disappearing is fixed and all\nnine pots still register.</p>\n\n<h3>One honest detail</h3>\n<p>While you are standing over it, the app is showing you its best estimate of\nwhere that ball is rather than something it can currently see, and it marks those\nmoments internally as estimates so nothing else treats them as sightings. The\npicture below shows it holding the red ball correctly through the whole six\nseconds.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 116,
    "ts": "2026-08-30T16:21:57",
    "date": "Aug 30, 12:21 PM EDT",
@@ -1123,26 +1155,6 @@
    "title": "Shot clock: per-beep volume and a table status readout",
    "score": "",
    "body": "Each shot clock sound - the start chime, the warning, the 3-2-1 ticks, and the buzzer - now has its own volume slider in the clock panel (zero mutes just that one). Release a slider and it plays that sound once at the new level, so you can tune by ear. Above the timer there's now a live status: ON THE CLOCK, SHOT IN PLAY, TABLE SETTLED, PAUSED.\nAlso under the hood tonight: ball detection moved to the GPU (roughly 3.5x more measurements per second) - the tracking improvement you noticed at the table.",
-   "images": []
-  },
-  {
-   "id": 38,
-   "ts": "2026-08-27T12:00:00",
-   "date": "Aug 27, 2026",
-   "kind": "update",
-   "title": "Shot clock controls, break time, and tidier panels",
-   "score": "",
-   "body": "The shot clock panel on the desktop now has its own on/off button, a Pause/Resume button, and dials for per-shot seconds and time after the break - the app spots a break automatically (five or more balls scattering) and gives the next shot the longer countdown. The Stats and Shot Timeline panels now collapse like the others, so you can fold away what you're not using.\nPause freezes the countdown and its sounds; Resume continues from the same number.\nThe clock panel stays visible even when the clock is off, since that's where the on/off lives now.",
-   "images": []
-  },
-  {
-   "id": 37,
-   "ts": "2026-08-27T12:00:00",
-   "date": "Aug 27, 2026",
-   "kind": "update",
-   "title": "Shot clock is live, plus a menu bar and a squishable window",
-   "score": "",
-   "body": "The shot clock now runs off the cue ball itself: the countdown starts the moment your cue ball stops rolling and stops the instant you strike it. Sounds mark every phase - a rising cue when the clock starts (including after every shot), a warning beep, 3-2-1 ticks, and the buzzer. It works with or without recording, and you can flip it on and off from the new Play menu. The desktop window also squishes down to about a third of the screen now, and a File menu keeps everything reachable when it's narrow.\nClock settings (seconds, warning time, sounds) are in Settings > Shot clock; the Play menu is just the on/off.\nThe countdown starts about a fifth of a second after the cue ball truly rests - that debounce is what stops table jitter from false-starting the clock.\nNext precision step when it matters: using the strike SOUND to stop the clock frame-exactly.",
    "images": []
   }
  ]

@@ -45,11 +45,11 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T16:21Z
+    written        2026-08-30T16:39Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T16:19Z
-    shot list      12 entries (10 strokes, 4 makes)
+    measured       2026-08-30T16:37Z
+    shot list      12 entries (9 strokes, 3 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
 gate of record. This block exists so a session picking up the
@@ -57,82 +57,70 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 70
+### NEXT TARGETS (top first) — round 71
 
-*** THE BLINDNESS IS REAL, THE CAUSE IS FOUND, AND MY FIX FAILED ITS
-    GATE AND IS REVERTED ***
-    THE CAUSE, measured and identical on both clips: prepare_detections
-    vetoes any detection whose centre lands in a hand/arm blob, and its
-    own comment promises the track "coasts on the occlusion budget and
-    resumes on reappearance". That budget is COAST_S = 0.6s. A player
-    stands over the table far longer:
-        bench, the red 3   detections vetoed 125.5-131.8s  (6.3s)
-        cold,  the 7       detections vetoed  57.8- 64.5s  (6.7s)
-    In both windows foreign coverage is ~10x its usual level (0.043 vs
-    0.004; 0.035 vs 0.002, nonzero on EVERY frame), the ball is plainly
-    visible in the video, and the finder still detects it at 0.72-0.86.
-    The veto removes it, the track dies at 0.6s and stays dead for six
-    seconds - exactly while the player is down on the shot, which is
-    when the product is supposed to work. The mask is computed on a
-    160px-wide warp (~1.4cm/px), so a ball is ~4 pixels and is swallowed
-    whole by an adjacent arm blob.
-    THE FIX I TRIED: budget 8s when the track is CONFIRMED and AT REST.
-    It fixed the blindness exactly as designed - bench "no track" 7 -> 1,
-    all-checks 99.2 -> 99.5% - and the scorecard threw it out:
-        bench  outcomes 10/10 -> 8/10,  pots 4/4 -> 2/4
-        cold   outcomes  9/9  -> 7/9,   pots 5/5 -> 3/5
-    WHY, and it is physical: A POTTED BALL IS ALSO A CONFIRMED BALL AT
-    REST THAT STOPS BEING DETECTED. It decelerates into the pocket so
-    its last frames read settled; "at rest" cannot tell it from a ball a
-    player is standing over. The ghost sat on the table for 8s and the
-    pot was never seen. Reverted; both clips restored exactly.
-    PINNED: tests/test_motion_tracker.py TestRestingBallStillGoesInactive-
-    Quickly fails if the budget is widened again (verified it fails with
-    the widened constant, so it is a real pin and not decoration).
+*** OCCLUDED IS NOT GONE. THE BLINDNESS IS FIXED AND THE POTS SURVIVED ***
+    Round 70 found the cause (the hand/arm veto removes a ball's
+    detections while the player stands over it - 6.3s and 6.7s measured
+    - against a COAST_S of 0.6s) and its fix cost four pots, because
+    extending the coast on "at rest" cannot tell an occluded ball from a
+    potted one.
+    MEASURED FIRST THIS ROUND, before building anything: is FOREIGN
+    COVER the discriminator? Over every case on both clips -
+        the two occlusions   100% covered
+        all NINE pots          0% covered
+    No overlap. So the mask is now plumbed from prepare_detections into
+    the tracker (set_occlusion, called by BOTH paths) and the coast
+    extends to 8s ONLY while the last-known position is under cover.
+                              bench            cold
+    strokes / outcomes        10/10            9/9
+    pots to right ball          4/4            5/5
+    NO TRACK (blind)          7 -> 1          2 -> 0
+    of ALL checks     99.2 -> 99.7%   99.4 -> 99.6%
+    naming                    99.8%           99.6%
+    wrong names                   0               1
+    invented                      0               0
+    bench ball 3      189/189 -> 195/195 (the six occluded frames)
+    cold  ball 7      168/168 -> 170/170
+    VISION-CORROBORATED: through the whole occlusion the overlay holds
+    the red 3 with the right name and flags it COAST, so nothing
+    downstream mistakes an estimate for a sighting.
+    PINNED both directions: a covered ball survives, an uncovered one
+    still dies at COAST_S (that is the pot case), and no mask means no
+    extension at all.
 
-0. THE CORRECT FIX, now specified by the failure: the discriminator has
-    to be the thing that actually differs between the two cases -
-    whether the ball's position is under FOREIGN COVER right now. A
-    potted ball is not under a hand; an occluded one is. The tracker
-    cannot see this: update() takes only (dets, t). So plumb the foreign
-    mask from prepare_detections into the tracker and extend the coast
-    ONLY while the last-known position is covered. That is the work the
-    round-70 shortcut was trying to avoid, and skipping it is what cost
-    4 pots. Do it properly.
+0. THE CUE BALL AT 95.4% ON THE COLD CLIP (target 99) while the naming
+    truth scores the cue 175/175 - a TRACKING gap. This is now the most
+    likely remaining instance of the SAME family just fixed: the cue
+    metric demands a LIVE sighting every frame, and the cue is the ball
+    the player's hands and cue are nearest to. Measure how much of that
+    4.6% is coasted frames under foreign cover before touching anything.
 
-1. WHILE DOING SO, note the mask is 160px wide (~1.4cm/px) so a ball is
-    ~4 mask pixels and merges into any touching arm blob. Whether the
-    veto should fire at all for a fully-visible ball beside a hand is a
-    separate question worth measuring - the current test is "is the
-    CENTRE inside the blob", not "is the ball actually covered".
+1. THE BENCH'S LAST BLIND SIGHTING AND 2 UNNAMED, against ZERO wrong.
+    Also cold's 4 unnamed 5s and its single 9->1.
 
-2. THE BENCH'S 7 BLIND SIGHTINGS AND 2 UNNAMED remain open (that is what
-    this round attacked). Everything else on the bench is perfect: 10/10
-    strokes, 10/10 outcomes, 4/4 pots, ZERO wrong names, 0 invented.
-    Cold: 9/9, 9/9, 5/5, 1 wrong, 4 unnamed, 2 blind, 0 invented.
+2. WHETHER THE VETO SHOULD FIRE AT ALL for a fully-visible ball beside a
+    hand. The mask is a 160px-wide warp (~1.4cm/px) so a ball is ~4
+    pixels and merges into any touching arm blob, and the test is "is
+    the CENTRE inside the blob", not "is the ball actually covered".
+    Round 71 makes the consequence survivable rather than removing it.
 
-3. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
-    truth scores the cue 175/175 - a TRACKING gap, not naming. Likely
-    the SAME mechanism as this round: the cue metric demands a LIVE
-    sighting every frame, and the cue is the ball a player's hands are
-    nearest to.
-
-4. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
+3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
 
-5. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
+4. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
     gave the cold clip; its truth is still hand-fitted colour windows.
 
-6. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67); a truth-side sample can be contaminated
-    rather than imprecise (69); and AGGREGATING OVER A WINDOW HIDES A GAP
-    INSIDE IT - this round I checked "is there a track near this ball in
-    115-140s", got 560 rows, and concluded the engine was fine, when the
-    failure was a 190-frame hole in the middle of that window (70).
+    rather than imprecise (69); aggregating over a window hides a gap
+    inside it (70); and a cheap discriminator can be confidently wrong,
+    so measure the discriminator itself before building on it - this
+    round's 11-case check took minutes and would have saved round 70 (71).
 
-7. The palette is hand-labelled and does not scale; the identifier
+6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall

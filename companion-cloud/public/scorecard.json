@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-30T16:19:33Z",
+ "ts": "2026-08-30T16:38:11Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
@@ -116,11 +116,11 @@
   "invented_numbers": [],
   "invented_frames": 0,
   "name_right_pct": 99.8,
-  "name_right_all_pct": 99.2,
+  "name_right_all_pct": 99.7,
   "name_checks_total": 1096,
   "name_wrong_frames": 0,
   "name_unnamed_frames": 2,
-  "name_missing_frames": 7,
+  "name_missing_frames": 1,
   "name_confusions": {},
   "name_per_ball": {
    "0": {
@@ -142,10 +142,10 @@
     "missing": 0
    },
    "3": {
-    "right": 189,
+    "right": 195,
     "wrong": 0,
     "unnamed": 0,
-    "missing": 6
+    "missing": 0
    },
    "4": {
     "right": 216,
@@ -160,10 +160,10 @@
     "missing": 0
    }
   },
-  "publish_agree_pct": 99.5,
-  "publish_checked": 34246,
+  "publish_agree_pct": 99.4,
+  "publish_checked": 34673,
   "publish_contradicted": 24,
-  "publish_suppressed": 157,
+  "publish_suppressed": 193,
   "publish_unbacked": 0,
   "publish_worst": {
    "saw 1 -> said 9": 12,

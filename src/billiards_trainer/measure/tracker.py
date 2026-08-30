@@ -28,13 +28,16 @@ from ..core.balls import pool_ball_bgr, number_to_class
 from ..core.types import Track
 
 FRICTION = 0.88          # per-0.1s velocity retention while coasting
-COAST_S = 0.6            # coast this long without a detection, then inactive.
-                         # Too short for a ball the PLAYER is standing over
-                         # (measured: 6.3s and 6.7s of vetoed detections on
-                         # the two clips) - but see the reverted experiment
-                         # at the coast/inactive step before widening it: a
-                         # potted ball is also "at rest and undetected", and
-                         # widening it blindly cost 4 pots across the clips.
+COAST_S = 0.6            # coast this long without a detection, then inactive
+OCCLUDED_COAST_S = 8.0   # ...unless the last-known position is UNDER FOREIGN
+                         # COVER, i.e. the player is standing over it. The
+                         # hand/arm veto removes a ball's detections for as
+                         # long as he is there - measured at 6.3s and 6.7s on
+                         # the two clips - and 0.6s killed the track every
+                         # time. 8s covers both with margin and stays under
+                         # FORGET_S so a genuinely removed ball is forgotten.
+                         # Cover is the discriminator that "at rest" was not:
+                         # occlusions measure 100% covered, all nine pots 0%.
 GATE_R = 3.2             # association gate, in ball radii, around prediction
 ACQUIRE_R = 8.0          # gate FLOOR, in ball radii. A struck ball's
                          # first frames outrun the tight predicted gate
@@ -176,6 +179,9 @@ class MotionTracker:
         self._pocket_r = float(pocket_r)
         # last published frame, for the live path's detect=False reuse
         self._published: list = []
+        # This frame's hand/arm cover; None until a caller supplies it,
+        # and None means every track keeps the plain COAST_S budget.
+        self._foreign = None
 
     # ---- the LIVE path's tracker contract -------------------------------
     # vision/pipeline.py drives its tracker with these three besides
@@ -190,6 +196,36 @@ class MotionTracker:
         as it goes, so it hands the current geometry in each frame."""
         self._pockets = list(pockets or [])
         self._pocket_r = float(pocket_r)
+
+    def set_occlusion(self, foreign) -> None:
+        """This frame's FOREIGN COVER, refreshed per frame by both paths.
+
+        Round 70 established that a resting ball whose detections are
+        vetoed by the hand/arm mask dies in COAST_S = 0.6s while a player
+        stands over the table for 6.3-6.7s - and that widening the coast
+        on "at rest" alone costs POTS, because a potted ball is also a
+        resting ball that stops being detected.
+
+        Foreign cover is the thing that actually differs, measured over
+        every case on both clips (round 71):
+            the two occlusions   100% covered
+            all NINE pots          0% covered
+        No overlap at all. So the tracker needs to see the mask, and this
+        is how it gets it - `foreign` is prepare_detections' own
+        (frac, mask, scale, x0, y0) state, in the same rect space the
+        tracks live in. None disables the extension entirely, which is
+        the safe default: without a mask every track keeps COAST_S.
+        """
+        self._foreign = foreign if (foreign and foreign[1] is not None) else None
+
+    def _covered(self, x: float, y: float) -> bool:
+        """Is this rect-space point under hand/arm/cue cover right now?"""
+        if not self._foreign:
+            return False
+        _frac, mask, fs, fx0, fy0 = self._foreign
+        mh, mw = mask.shape[:2]
+        mx, my = int((x - fx0) * fs), int((y - fy0) * fs)
+        return 0 <= mx < mw and 0 <= my < mh and bool(mask[my, mx])
 
     def reset(self) -> None:
         """Forget everything - a new table, clip, or calibration."""
@@ -560,24 +596,28 @@ class MotionTracker:
             # stays under FORGET_S so a genuinely removed ball is still
             # forgotten. Coasted frames remain flagged `coasting`, so
             # nothing downstream mistakes this for a sighting.
-            # TRIED AND REVERTED (round 70): budget = 8s when the track is
-            # CONFIRMED and AT REST. It fixed the blindness exactly as
-            # designed - the bench's "no track" went 7 -> 1 and all-checks
-            # 99.2 -> 99.5% - and the scorecard threw it out at once:
-            #     bench  outcomes 10/10 -> 8/10, pots 4/4 -> 2/4
-            #     cold   outcomes  9/9  -> 7/9,  pots 5/5 -> 3/5
-            # A POTTED BALL IS ALSO A CONFIRMED BALL AT REST THAT STOPS
-            # BEING DETECTED. A ball dropping into a pocket decelerates,
-            # so its last frames read settled, and "at rest" cannot tell
-            # it from a ball a player is standing over. The ghost then
-            # sat on the table for 8s and the pot was never seen.
-            # The discriminator has to be the thing that actually differs:
-            # whether the ball's position is under FOREIGN COVER right
-            # now. The tracker cannot see that - update() takes only
-            # (dets, t) - so the fix needs the foreign mask plumbed in
-            # from prepare_detections, which is the work this shortcut
-            # was trying to avoid. Cheap test, wrong answer.
-            if t - tr.t > COAST_S or off_bed:
+            # OCCLUDED IS NOT GONE (round 71). The foreign veto in
+            # prepare_detections drops any detection whose centre lands in
+            # a hand/arm blob, so a ball the player stands over stops
+            # being detected while remaining plainly visible - measured at
+            # 6.3s (bench, the red 3) and 6.7s (cold, the 7), against a
+            # COAST_S of 0.6s. The track died and the ball was invisible
+            # to everything downstream for six seconds, exactly while the
+            # player was down on the shot.
+            # TRIED AND REVERTED (round 70): extend the budget whenever the
+            # track is CONFIRMED and AT REST. It cured the blindness and
+            # cost four pots (bench 4/4 -> 2/4, cold 5/5 -> 3/5), because
+            # A POTTED BALL IS ALSO A RESTING BALL THAT STOPS BEING SEEN -
+            # it decelerates into the pocket, so its last frames read
+            # settled and the ghost sat on the table for 8s.
+            # FOREIGN COVER is what actually differs, measured over every
+            # case on both clips: the two occlusions read 100% covered,
+            # all NINE pots read 0%. No overlap. So the extension is
+            # granted only while the last-known position is under cover -
+            # and a track with no mask, or out in the open, is unchanged.
+            budget = (OCCLUDED_COAST_S if self._covered(tr.x, tr.y)
+                      else COAST_S)
+            if t - tr.t > budget or off_bed:
                 tr.active = False
                 tr.vx = tr.vy = 0.0
             else:

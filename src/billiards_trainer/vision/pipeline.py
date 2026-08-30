@@ -582,6 +582,10 @@ class Pipeline:
         # offline now differ only in where frames come from.
         self.tracker.set_geometry([(p.x, p.y) for p in tbl.pockets],
                                   float(tbl.pocket_radius))
+        # OCCLUDED IS NOT GONE (round 71): the same foreign cover the
+        # veto above used, so a ball the player stands over keeps its
+        # track. One fact, both feeds - the engine does this too.
+        self.tracker.set_occlusion(getattr(self, "_foreign_last", None))
         tracks = self.tracker.update(
             detections, float(getattr(self, "_last_t", 0.0)))
         # VACANCY PRUNING (Joe: "false positive cue balls and lingering cue

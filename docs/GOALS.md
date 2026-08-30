@@ -3319,3 +3319,28 @@ Rounds continue with Joe's visual feedback as the gate.
   115-140s", got 560 rows, and concluded the engine was fine. The
   failure was a 190-frame hole INSIDE that window. Aggregating over a
   window hides a gap inside it.
+
+- 2026-08-30 ~15:15 EDT - ROUND 71: OCCLUDED IS NOT GONE - THE BLINDNESS
+  IS FIXED AND THE POTS SURVIVED. Round 70 found the cause (the hand/arm
+  veto strips a ball's detections while the player stands over it, 6.3s
+  and 6.7s measured, against COAST_S = 0.6s) and its fix cost four pots
+  because "at rest" cannot separate an occluded ball from a potted one.
+  MEASURED THE DISCRIMINATOR FIRST, before building anything: foreign
+  cover over every case on both clips - the two occlusions read 100%
+  covered, all NINE pots read 0%. No overlap. The mask is now plumbed
+  from prepare_detections into the tracker via set_occlusion(), called by
+  BOTH paths, and the coast extends to OCCLUDED_COAST_S = 8s ONLY while
+  the last-known position is under cover.
+  BENCH: no-track 7 -> 1, all-checks 99.2 -> 99.7%, ball 3 189/189 ->
+  195/195 (the six occluded frames recovered). HELD: 10/10 strokes,
+  10/10 outcomes, 4/4 pots, naming 99.8% with ZERO wrong, 0 invented.
+  COLD: no-track 2 -> 0, all-checks 99.4 -> 99.6%, ball 7 168/168 ->
+  170/170. HELD: 9/9, 9/9, 5/5, naming 99.6%, 0 invented.
+  VISION-CORROBORATED: through the whole occlusion the overlay holds the
+  red 3 at the right position with the right name and flags it COAST, so
+  an estimate is never mistaken for a sighting.
+  PINNED BOTH DIRECTIONS: a covered ball survives, an uncovered one dies
+  at COAST_S (the pot case), and no mask means no extension.
+  METHOD: round 70's cheap discriminator was confidently wrong and cost a
+  round. Measuring the discriminator ITSELF took minutes here and settled
+  it 11/11 before a line was written. Do that first.

@@ -265,6 +265,69 @@ class TestRestingBallStillGoesInactiveQuickly:
             f"foreign-cover test costs pots - see the class docstring.")
 
 
+class TestOccludedBallSurvivesButPottedBallDoesNot:
+    """Round 71: the discriminator round 70 was missing.
+
+    The hand/arm veto removes a ball's detections while the player
+    stands over it - 6.3s and 6.7s measured on the two clips - and
+    COAST_S is 0.6s, so the track died and the ball went invisible
+    exactly while Joe was down on the shot. Extending the coast on
+    "at rest" alone cost four pots, because a potted ball is also a
+    resting ball that stops being seen.
+
+    FOREIGN COVER separates them cleanly: measured over every case on
+    both clips, the two occlusions read 100% covered and all NINE pots
+    read 0%. These pin both directions of that.
+    """
+
+    @staticmethod
+    def _covered_state(covered: bool):
+        """A (frac, mask, scale, x0, y0) state like prepare_detections'."""
+        import numpy as np
+        mask = np.zeros((100, 100), dtype=bool)
+        if covered:
+            mask[50:70, 20:40] = True      # covers plane (300,600) at s=0.1
+        return (0.05, mask, 0.1, 0.0, 0.0)
+
+    def _run(self, state):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(60):                       # settle a ball at (300,600)
+            tk.set_occlusion(state)
+            rows = tk.update([(300.0, 600.0, 14.0, 3)], t)
+            t += 1 / 30
+        assert rows and rows[0].number == 3
+        alive = 0
+        for _ in range(90):                       # 3s with no detections
+            tk.set_occlusion(state)
+            rows = tk.update([], t)
+            t += 1 / 30
+            if rows:
+                alive += 1
+        return alive / 30.0                       # seconds it stayed alive
+
+    def test_a_ball_under_the_players_hand_keeps_its_track(self):
+        secs = self._run(self._covered_state(True))
+        assert secs > 2.5, (
+            f"an OCCLUDED ball survived only {secs:.2f}s - it must ride out "
+            f"the player standing over it (6.3s and 6.7s measured)")
+
+    def test_a_ball_in_the_open_still_dies_promptly(self):
+        from billiards_trainer.measure.tracker import COAST_S
+        secs = self._run(self._covered_state(False))
+        assert secs <= COAST_S + 0.5, (
+            f"an UNCOVERED ball lingered {secs:.2f}s; that is the pot case, "
+            f"and lingering there cost 4 pots in round 70")
+
+    def test_no_mask_means_no_extension(self):
+        from billiards_trainer.measure.tracker import COAST_S
+        secs = self._run(None)
+        assert secs <= COAST_S + 0.5, (
+            "with no foreign mask supplied the tracker must fall back to "
+            "the plain budget, not extend by default")
+
+
 class TestFastBallStaysOneTrack:
     """Bench round 8: a struck ball covers ~60px/frame; a track born
     this frame has no velocity, so the tight gate missed its own next
