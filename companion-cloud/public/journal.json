@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 85,
+   "ts": "2026-08-30T02:29:59",
+   "date": "Aug 29, 10:29 PM EDT",
+   "kind": "finding",
+   "title": "Round 43: built the simplification, measured it, reverted it",
+   "score": "naming 99.5% and physics better; a shot 7s early and a phantom pot - not shipped",
+   "body": "",
+   "images": [],
+   "html": "\n<div class='note'>\n<p><strong>Round 43: I built the simplification you asked for - a reprocess that\njust pushes the video through the live engine - measured it, and it is not\nready. Better at naming, worse at two things you would notice. Reverted, with\nthe exact reasons.</strong></p>\n\n<h3>What I did</h3>\n<p>Deleted the second frame loop. A reprocess became, literally, \"hand each\nframe to the live pipeline as if it had come from the camera\". The duplicate\nnaming step went with it - the one that made two whole rounds of my naming work\ndo nothing back in round 27.</p>\n\n<h3>What it measured</h3>\n<table>\n<tr><th></th><th>before</th><th>unified</th></tr>\n<tr><td>balls named correctly</td><td>99.3%</td><td><strong>99.5%</strong></td></tr>\n<tr><td>impossible-physics events</td><td>0.19</td><td><strong>0.12</strong></td></tr>\n<tr><td>shots found</td><td>10 / 10</td><td><strong>9 / 10</strong></td></tr>\n<tr><td>pots credited correctly</td><td>4 / 4</td><td><strong>3 / 4</strong></td></tr>\n<tr><td>speed</td><td>23 fps</td><td><strong>5.9 fps</strong></td></tr>\n</table>\n<p>So the direction is right - naming and physics both got better, which is what\nyou would expect from removing a duplicate. But two things got worse in ways you\nwould see:</p>\n<ul>\n<li>One shot starts <strong>seven seconds early</strong> - the 154-second shot\nopens at 147, so its replay would begin while you are still walking up to the\ntable.</li>\n<li>One shot claims <strong>two balls potted when one fell</strong>.</li>\n</ul>\n<p>And it is <strong>four times slower</strong>, because the live path does work\nper frame that a file does not need. That alone is not a blocker - it is an\novernight job either way - but it is not free.</p>\n\n<h3>Why I reverted rather than shipped it</h3>\n<p>Your session is back to ten shots out of ten and four pots out of four. I am\nnot going to hand you a simpler architecture that shows a shot starting seven\nseconds early, when the thing you asked me to fix this week was exactly that\nkind of error.</p>\n<p>The two faults are both familiar - a stray track opening a shot window too\nsoon, and a ball that vanishes mid-shot being counted as potted. I have fixed\nboth before on the other loop. They need fixing on this one, and then the\nduplicate goes for good.</p>\n\n<h3>One thing the experiment exposed</h3>\n<p>Running the live pipeline over a file revealed a THIRD shot detector - the\nlive path has its own, separate from the one the engine uses and separate from\nthe one your scorecard is judged on. So \"one engine\" is still not true even\nafter this. That is now written down as part of the same job rather than\ndiscovered again later.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li><li>Round 35: no more phantom shots - R2 passes, the bench is one defect from clean</li><li>Round 34: make the 99.5% reproducible, and stop it leaning on unvalidated refs</li><li>Round 33: naming 89% -&gt; 99.5%, outcomes 10/10, pots 4/4 - R3 and R4 gates passed</li><li>Round 32: the 9&#x27;s correct read is given away to a passing ball - two fixes tried, both worse</li><li>Round 31: naming 76% -&gt; 89% and pot attribution 2/4 -&gt; 3/4, nothing worse (rules_v 13)</li></ul>"
+  },
+  {
    "id": 84,
    "ts": "2026-08-30T01:54:23",
    "date": "Aug 29, 09:54 PM EDT",
@@ -951,16 +962,6 @@
    "title": "The red line is now the real path",
    "score": "",
    "body": "The 'line it took' overlay draws the ball's entire recorded path \u2014 rail bounces included. Nothing is written on top of the video anymore.\nAfter a few rounds of your feedback the overlay settled on one principle: draw measurements, not conclusions. The red line is the ball's entire recorded path \u2014 rail bounce and all \u2014 not a simplified arrow.\nNothing is written on top of the video anymore; the verdict lives in the bar below. The legend drags anywhere and remembers its spot. And a new rule for future changes: overlays get rendered against real footage before they ship, because two of the earlier misses would have been caught by simply looking.",
-   "images": []
-  },
-  {
-   "id": 5,
-   "ts": "2026-08-22T12:00:00",
-   "date": "Aug 22, 2026",
-   "kind": "update",
-   "title": "Drag the legend out of the way",
-   "score": "",
-   "body": "The overlay legend can be dragged anywhere on the video and remembers where you put it \u2014 even through rotation.",
    "images": []
   }
  ]

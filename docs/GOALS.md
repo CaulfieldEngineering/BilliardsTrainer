@@ -2459,3 +2459,19 @@ Rounds continue with Joe's visual feedback as the gate.
   loops still exist; the live one already measures 99.5% vs the offline
   99.3%. Collapsing them is next, and engine._pair_identities dies with
   it.
+
+- 2026-08-31 ~16:00 EDT - ROUND 43 (attempt measured, REVERTED): built
+  Joe's simplification - reprocess = drive Pipeline.process() over the
+  file, engine._pair_identities and the engine's own tracker deleted,
+  the four case-law tests re-pointed at FindIdEnsemble (they pass
+  there). MEASURED: named correctly 99.3 -> 99.5% and physics gate
+  0.19 -> 0.12 (both BETTER, as predicted), but strokes 10/10 -> 9/10,
+  pots 4/4 -> 3/4, and 23fps -> 5.9fps. The two faults are user-visible:
+  the 154.2 stroke opens at 147.24 (7s early) and multi-ball episodes
+  credit balls that merely vanished (@85.14 -> [2,3] when only the 3
+  fell). Reverted so the pinned session keeps 10/10 and 4/4; round 42's
+  shot derivation is retained. The architecture is right - it improved
+  both metrics that are purely about SEEING - but it is not correct yet
+  on the two about INTERPRETING. Also found a THIRD shot detector: the
+  live path runs events/shot.py independently of shots.analyze, so "one
+  engine" is still not true.
