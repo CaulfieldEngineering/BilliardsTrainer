@@ -200,6 +200,42 @@ class TestLipHover:
         assert not ep.pocketed and 9 in ep.resting
 
 
+class TestYouCannotPotABallThatWasNotThere:
+    """Round 44. The 31.7 stroke potted the 1 - and also credited the 4,
+    whose entire series was eight samples starting 0.9s into the shot,
+    40px from the same pocket the 1 had just fallen into. Two balls
+    cannot drop into one pocket at one instant, and the 4 was resting
+    mid-table throughout. A ball that materialises mid-shot beside a
+    pocket is a misname of the traffic around the mouth, not a make."""
+
+    def _potted(self, ep):
+        return [b for b, _x, _y in ep.pocketed]
+
+    def test_a_ball_that_appears_mid_shot_at_a_pocket_is_not_potted(self):
+        def latecomer(k):
+            if k < 120:
+                return None                      # not on the table at all
+            if k >= 150:
+                return None                      # ...then gone again
+            return (25 - (k - 120) * 0.2, 1195 + (k - 120) * 0.2)
+        times, frames = _stream(
+            {0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+             7: latecomer}, n_frames=400)
+        eps = analyze(times, frames, pockets=[(20, 1200)], pocket_r=25)
+        assert eps, "the cue moving must still open an episode"
+        assert 7 not in self._potted(eps[0]), \
+            "a ball that was not on the table when the shot began was potted"
+
+    def test_a_ball_present_from_the_start_still_scores(self):
+        """The guard must not cost a real pot: this ball is on the felt
+        when the stroke opens and rolls in."""
+        times, frames = _stream(
+            {0: _roll_then_rest(60, 100, 100, 100, 250, 250),
+             9: _roll_then_vanish(70, 160, 300, 600, 20, 20)})
+        ep = analyze(times, frames, pockets=[(15, 15)], pocket_r=25)[0]
+        assert self._potted(ep) == [9]
+
+
 class TestUnnamedMovers:
     def test_unnamed_fast_roll_into_pocket_is_a_make(self):
         # bench: the potted 5 crossed the table as an unnamed track

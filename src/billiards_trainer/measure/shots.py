@@ -27,6 +27,11 @@ SETTLE_S = 0.70      # all-quiet this long closes the episode
 LINGER_S = 2.0       # a vanished ball may reappear this long after
                      # settle and still cancel its pocket credit
 PRESENT_S = 0.5      # seen within this window of settle = on the table
+POT_PRESENT_S = 0.5  # a ball must have been seen this soon after the
+                     # episode opened to be eligible for POT credit. It
+                     # was either already on the table or it was not; a
+                     # ball that materialises mid-shot beside a pocket is
+                     # a misname, not a make.
 
 
 @dataclass
@@ -258,6 +263,24 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
                 continue
             # fell asleep at the mouth, then vanished: fall through to
             # the pocket-credit path
+        # YOU CANNOT POT A BALL THAT WAS NOT ON THE TABLE. A ball that
+        # first appears in the MIDDLE of a shot, already beside a pocket,
+        # and then dies there was never rolling into it - it is a brief
+        # misname of the ball that actually fell, or of the traffic
+        # around the mouth. Measured on the bench: the 31.7 stroke potted
+        # the 1 (its samples run from before the strike, across the felt,
+        # into the bottom-right pocket) but ALSO credited the 4, whose
+        # entire series was 8 samples starting 0.9s into the shot, 40px
+        # from that same pocket. Two balls cannot fall into one pocket at
+        # one instant, and the 4 was resting mid-table throughout.
+        # `pre`, not `pts`: the question is whether THIS episode had the
+        # ball at its start, not whether the number appears somewhere in
+        # the session. The real 4 was on the felt all clip - it simply
+        # was not tracked under that number during this shot, which is
+        # precisely why the phantom could borrow it.
+        if not any(p[0] <= t_open + POT_PRESENT_S for p in pre):
+            ep.lost.append((n, round(last[1], 1), round(last[2], 1)))
+            continue
         # track died with motion: pocket credit iff the FINAL PATH passes
         # through a pocket zone. The death point alone is not enough -
         # a dropping ball's track coasts THROUGH the mouth and dies

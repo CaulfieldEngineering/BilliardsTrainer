@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 86,
+   "ts": "2026-08-30T02:42:36",
+   "date": "Aug 29, 10:42 PM EDT",
+   "kind": "update",
+   "title": "Round 44: you cannot pot a ball that was not on the table",
+   "score": "phantom pot credit fixed; shot list correct end to end",
+   "body": "",
+   "images": [],
+   "html": "\n<div class='note win'>\n<p><strong>Round 44: killed the phantom pot. Your shot list is now correct\nend to end - ten shots, four makes, each crediting exactly one ball, and it is\nthe right ball every time.</strong></p>\n\n<h3>The bug</h3>\n<p>The shot at 31.7 seconds said <em>two</em> balls were potted - the 1 and the\n4 - when only the 1 fell. Both were credited to the same pocket at the same\ninstant, which cannot happen.</p>\n<p>Tracing it: the real ball's path runs from before the strike, across the\nfelt, into the bottom-right pocket. The \"4\" had <strong>eight readings\ntotal</strong>, starting nearly a second into the shot, already sitting beside\nthat same pocket. It was never a ball rolling in - it was a momentary\nmislabelling of the traffic around the pocket mouth, and your actual 4 was\nresting in the middle of the table the whole time.</p>\n<p>So there is now a rule the app was missing: <strong>you cannot pot a ball\nthat was not on the table when the shot began.</strong> A ball that appears\nmid-shot next to a pocket and vanishes there is a misname, not a make.</p>\n\n<h3>Your practice session now</h3>\n<pre>\n@ 31.68  make  potted the 1        @130.24  miss\n@ 51.54  make  potted the 2        @154.24  miss\n@ 68.81  miss                      @169.98  make  potted the 1\n@ 85.14  make  potted the 3        @189.84  miss\n@100.98  miss                      @207.98  miss\n</pre>\n<p>Ten strokes at the moments they happened, four makes, every ball correctly\nnamed. That matches what actually happened in the clip, shot for shot.</p>\n\n<h3>Still wrong, and I would rather you hear it from me</h3>\n<p>The sentence for the first make reads \"potted the 1 into the\n<em>right-middle</em> pocket\". It went into the bottom-right. The ball is right,\nthe make is right, the pocket NAME is wrong - the sentence works that out\nseparately from the shot itself, and that separate calculation is off. Small,\nisolated, and next.</p>\n\n<h3>Why this matters beyond the one shot</h3>\n<p>This was also one of the two faults blocking the simplification you asked\nfor last round. One down: phantom pot credits are gone. The other - a shot\nwindow opening seven seconds early - is what still stands between us and\ndeleting the duplicate engine for good.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li><li>Round 35: no more phantom shots - R2 passes, the bench is one defect from clean</li><li>Round 34: make the 99.5% reproducible, and stop it leaning on unvalidated refs</li><li>Round 33: naming 89% -&gt; 99.5%, outcomes 10/10, pots 4/4 - R3 and R4 gates passed</li><li>Round 32: the 9&#x27;s correct read is given away to a passing ball - two fixes tried, both worse</li></ul>"
+  },
+  {
    "id": 85,
    "ts": "2026-08-30T02:29:59",
    "date": "Aug 29, 10:29 PM EDT",
@@ -952,16 +963,6 @@
    "title": "A first pattern in your misses",
    "score": "",
    "body": "Among misses the app is confident about, you miss RIGHT about 3x as often as left (25 vs 8). Small sample \u2014 a hint, not a diagnosis.\nOnly trusted verdicts are counted \u2014 every miss where the app couldn't clearly see the ball is excluded rather than guessed. That keeps the pattern honest, but it also keeps the sample small for now.\nAs more shots earn trusted verdicts (the physics-fit work in progress), this number firms up. If it holds near 3-to-1, that's the first concrete thing to take to the practice table.",
-   "images": []
-  },
-  {
-   "id": 6,
-   "ts": "2026-08-22T12:00:00",
-   "date": "Aug 22, 2026",
-   "kind": "update",
-   "title": "The red line is now the real path",
-   "score": "",
-   "body": "The 'line it took' overlay draws the ball's entire recorded path \u2014 rail bounces included. Nothing is written on top of the video anymore.\nAfter a few rounds of your feedback the overlay settled on one principle: draw measurements, not conclusions. The red line is the ball's entire recorded path \u2014 rail bounce and all \u2014 not a simplified arrow.\nNothing is written on top of the video anymore; the verdict lives in the bar below. The legend drags anywhere and remembers its spot. And a new rule for future changes: overlays get rendered against real footage before they ship, because two of the earlier misses would have been caught by simply looking.",
    "images": []
   }
  ]

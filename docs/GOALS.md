@@ -2475,3 +2475,21 @@ Rounds continue with Joe's visual feedback as the gate.
   on the two about INTERPRETING. Also found a THIRD shot detector: the
   live path runs events/shot.py independently of shots.analyze, so "one
   engine" is still not true.
+
+- 2026-08-31 ~20:00 EDT - ROUND 44: killed the phantom pot credit. The
+  31.7 stroke credited both the 1 and the 4 to the same pocket at the
+  same instant; the "4" was eight samples beginning 0.9s into the shot,
+  already beside that pocket, while the real 4 rested mid-table. Added
+  POT_PRESENT_S: a ball is eligible for pot credit only if it was seen
+  within 0.5s of the episode opening - you cannot pot a ball that was
+  not on the table. (First attempt failed by testing the number's
+  whole-session samples; it must be scoped to the episode's own.)
+  Pot credits are now exactly truth: 31.68=[1] 51.54=[2] 85.14=[3]
+  169.98=[1]. The shot list Joe sees is correct end to end - 10 strokes,
+  4 makes, right ball each time. Bench unchanged (10/10, 10/10, 0 fake,
+  0 invented, 99.3%, 4/4, gate 0.19); 2 pinning tests.
+  NEXT, small: the pot sentence names the wrong pocket (@31.68 reads
+  "right-middle" for a bottom-right drop) - the pockets are named
+  correctly, so describe._pocket_name's inputs are wrong. Also one of
+  the two loop-collapse blockers is now cleared; the 7s-early episode
+  boundary is the remaining one.
