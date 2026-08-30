@@ -3377,3 +3377,33 @@ Rounds continue with Joe's visual feedback as the gate.
   detections drop intermittently, and the track survives but COASTS.
   METHOD: a metric can be the defect. Before chasing a number, check it
   is counting what it claims to.
+
+- 2026-08-30 ~16:45 EDT - ROUND 73: MEASURED THE LAST CUE GAP AND
+  DELIBERATELY CHANGED NOTHING. The cold clip's residual 1.2% is at
+  91.1-92.6s where the ball sits at a pocket jaw with the cue stick
+  across it. Per frame: finder sees it and it survives 70 frames; finder
+  sees it and prepare_detections DROPS it 11 frames; finder never sees
+  it 9 frames - and NONE of the drops are under foreign cover, so this
+  is not the round-71 hand family. The JAW PHANTOM rule is what drops
+  them: near a pocket a sub-0.60 detection is treated as leather, and
+  the stick across the ball collapses its score to 0.33-0.58.
+  A COLOUR ESCAPE HATCH WAS MEASURED ON BOTH POPULATIONS AND REJECTED:
+  bench leather (277 dets) sits 93-101 Lab from any reference, the real
+  cue ball at the jaw 56-58 (corrupted by the stick, so it resembles
+  nothing), and one dark near-pocket detection sits 7 Lab from the black
+  8. The hatch would admit the phantom AND still reject the ball. No
+  code written.
+  VISION-CORROBORATED: the bench detections the rule kills sit on EMPTY
+  FELT at the jaw; the cold ones are a plainly visible white cue ball
+  under the stick. Right on 277, wrong on 11.
+  KEPT: the trade is 277 phantoms killed for 11 real frames, and the
+  ball keeps its TRACK throughout anyway (round 71) - only the per-frame
+  metric suffers. Constants pinned against silent loosening and the
+  measurement recorded at the rule, so a future round does not "fix"
+  this and rediscover ghost tracks and phantom episodes.
+  NO ENGINE BEHAVIOUR CHANGED - comments and tests only; both clips
+  verified unchanged (bench 10/10, 10/10, 4/4, 99.8% naming, ZERO wrong,
+  all-checks 99.7%; cold 9/9, 9/9, 5/5, 99.6%, all-checks 99.6%).
+  METHOD: a measured NEGATIVE result is a real deliverable. Round 71's
+  discipline - measure the discriminator before building on it - paid
+  again, this time by preventing a change rather than enabling one.

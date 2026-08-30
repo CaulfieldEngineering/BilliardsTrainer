@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T16:56Z
+    written        2026-08-30T17:28Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T16:37Z
@@ -57,32 +57,37 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 72
+### NEXT TARGETS (top first) — round 73
 
-*** THE CUE METRIC WAS SCORING THE APP FOR NOT HALLUCINATING A BALL ***
-    The cold clip's cue read 95.4% against a 99 target. Measured: the
-    failures are not spread out at all - one 7-second window is
-    essentially the whole deficit, and in it THE CUE BALL IS IN A POCKET.
-    It sits in the jaws at 101.4s, drops, and Joe reaches in and replaces
-    it at ~108.6s. The app correctly has no cue track throughout and the
-    metric counted all 210 frames as failures.
-    THE BACKLOG'S OWN HYPOTHESIS WAS WRONG AGAIN: target 0 said this was
-    "the most likely remaining instance of the SAME family" as round 71's
-    hand-cover blindness. Measured, only 3% of the failing frames are
-    under foreign cover. It was not that family at all.
-    Absence now comes from the naming truth (pixel-derived, eye-checked -
-    no new hand-labelled data, one owner for the fact), and only a RUN of
-    consecutive samples counts, because a lone missing sample may be the
-    yardstick ABSTAINING and an abstention must never excuse the engine.
-    Cold yields exactly one window, 102-108s, against an independent
-    pixel sweep that puts the ball off the bed 101.5-108.5s. Bench yields
-    NONE - its cue is present in all 221 samples.
-    The skip count and the windows PRINT on every run; a metric that
-    drops frames from its own denominator has to say how many.
-        cold cue   95.4% -> 98.8%   [210 frames skipped, [101.5, 108.5]]
-        bench cue  99.9% -> 99.9%   [0 skipped]
-    NO ENGINE CODE CHANGED THIS ROUND - metric and tests only, so every
-    other number on both clips is untouched.
+*** THE CUE'S RESIDUAL IS THE JAW-PHANTOM RULE DOING ITS JOB. MEASURED,
+    AND DELIBERATELY NOT CHANGED. ***
+    The cold clip's last 1.2% of cue loss is at 91.1-92.6s, where the
+    ball sits at a pocket jaw with the cue stick across it. Per frame:
+        finder sees it, survives prepare  70 frames
+        finder sees it, prepare DROPS it  11 frames   <- the residual
+        finder never sees it               9 frames
+    and NONE of the drops are under foreign cover, so this is NOT the
+    round-71 hand family. What drops them is the JAW PHANTOM rule -
+    near a pocket, a sub-0.60 detection is treated as leather. The cue
+    stick across the ball collapses its score to 0.33-0.58.
+    A COLOUR ESCAPE HATCH WAS MEASURED ON BOTH POPULATIONS AND REJECTED:
+        bench leather, 277 dets     93-101 Lab from ANY reference
+        the real cue ball at a jaw  56-58 Lab, nearest ref the 1
+        one cold near-pocket det     7 Lab from the black 8
+    With the stick over it the ball's colour is corrupted so it
+    resembles nothing, while a dark phantom resembles the 8: the hatch
+    would admit the phantom AND still reject the ball. No code written.
+    VISION-CORROBORATED: the bench detections the rule kills sit on
+    EMPTY FELT at the jaw; the cold ones are a plainly visible white cue
+    ball under the stick. The rule is right on 277 and wrong on 11.
+    KEPT. The trade is 277 phantoms killed for 11 real frames, and the
+    ball keeps its TRACK throughout anyway (round 71) - only the
+    per-frame metric suffers. The constants are now pinned so they
+    cannot be loosened silently, and the measurement is recorded at the
+    rule so a future round does not "fix" this and rediscover ghost
+    tracks, phantom episodes and off-table trails.
+    NO ENGINE BEHAVIOUR CHANGED - comments and tests only. Both clips
+    verified unchanged.
 
                               bench            cold
     strokes / outcomes        10/10            9/9
@@ -93,41 +98,37 @@ queue cannot be told something the measurements disagree with.
     wrong names                   0               1
     invented                      0               0
 
-0. THE CUE'S REMAINING 1.2% IS THE CUE STICK LYING OVER THE BALL.
-    Characterised this round and it is a DIFFERENT failure from the
-    pocket window: at 91.1-92.6s the ball sits at a pocket jaw with the
-    stick across it, detections drop intermittently, and the track
-    survives but COASTS - round 71's machinery keeps it alive, and a
-    coasted frame still scores as a miss. Correct behaviour arguably,
-    but if the ball is visible beside the stick the detector should hold
-    it. Measure whether the stick is occluding the ball or merely
-    adjacent before changing anything - that distinction is what round
-    70 got wrong.
+0. THE BENCH'S LAST BLIND SIGHTING AND ITS 2 UNNAMED, against ZERO
+    wrong; plus cold's 4 unnamed 5s and its single 9->1. These are now
+    the only per-ball defects left on either clip. Note the bench's 2
+    unnamed include t=19 ball 4 where the track's own READ was 4 and it
+    published nothing - a SUPPRESSED correct read (round 68's
+    instrument sees it), which is a different fault from a misread.
 
-1. THE BENCH'S LAST BLIND SIGHTING AND 2 UNNAMED, against ZERO wrong.
-    Also cold's 4 unnamed 5s and its single 9->1.
-
-2. WHETHER THE FOREIGN VETO SHOULD FIRE AT ALL for a fully-visible ball
+1. WHETHER THE FOREIGN VETO SHOULD FIRE AT ALL for a fully-visible ball
     beside a hand. The mask is a 160px-wide warp (~1.4cm/px) so a ball
     is ~4 pixels and merges into any touching blob, and the test is "is
     the CENTRE inside the blob", not "is the ball actually covered".
+    Round 71 made the consequence survivable rather than removing it.
 
-3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
+2. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
 
-4. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
+3. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
     gave the cold clip; its truth is still hand-fitted colour windows.
 
-5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
-    the authority of one (67, and again this round); a truth-side sample
-    can be contaminated rather than imprecise (69); aggregating over a
-    window hides a gap inside it (70); measure the discriminator itself
-    before building on it (71); and A METRIC CAN BE THE DEFECT - before
-    chasing a number, check that it is counting what it claims to (72).
+    the authority of one (67, 72); a truth-side sample can be
+    contaminated rather than imprecise (69); aggregating over a window
+    hides a gap inside it (70); measure the discriminator itself before
+    building on it (71, and this round it FAILED and saved a
+    regression); a metric can be the defect (72); and a measured
+    NEGATIVE result is a real deliverable - the cheapest round is the
+    one that stops a future session breaking something (73).
 
-6. The palette is hand-labelled and does not scale; the identifier
+5. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall

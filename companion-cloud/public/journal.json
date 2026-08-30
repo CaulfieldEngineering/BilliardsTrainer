@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 122,
+   "ts": "2026-08-30T17:28:38",
+   "date": "Aug 30, 01:28 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 01:28 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/122-r73_jaw.png",
+     "caption": "Left three: what the rule correctly throws away on your pinned table - empty felt at the pocket jaw. Right two: the real cue ball under your stick, which it throws away by mistake."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r73_jaw.png' alt=''><figcaption>Left three: what the rule correctly throws away on your pinned table - empty felt at the pocket jaw. Right two: the real cue ball under your stick, which it throws away by mistake.</figcaption></figure></div>"
+  },
+  {
+   "id": 121,
+   "ts": "2026-08-30T17:28:38",
+   "date": "Aug 30, 01:28 PM EDT",
+   "kind": "finding",
+   "title": "I measured the last tracking gap and left it alone",
+   "score": "The cue stick over a ball at a pocket makes it look faint, and a rule that kills 277 false detections kills it too. The obvious fix would have made things worse - measured, then not written.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/121-r73_jaw.png",
+     "caption": "Left three: what the rule correctly throws away on your pinned table - empty felt at the pocket jaw. Right two: the real cue ball under your stick, which it throws away by mistake."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>I went to fix the last known tracking gap, measured it properly, and\nconcluded the app is already right. Nothing changed today - which is the\npoint.</strong></p>\n\n<h3>The gap</h3>\n<p>On the newer clip there is about a second and a half where the app loses sight\nof the cue ball. It is sitting in the jaws of a pocket with your cue stick lying\nacross it.</p>\n<p>The app has a rule that anything it sees only faintly, right next to a pocket,\nis the pocket's leather rather than a ball. That rule exists because the leather\nwas once being tracked as a ball for minutes at a time, inventing shots. Your cue\nstick lying over the ball makes the ball look faint, so the rule throws it away\nwith the leather.</p>\n\n<h3>Why I did not \"fix\" it</h3>\n<p>The obvious fix is to let a faint detection through if it is the colour of a\nreal ball. I measured that on both sides before writing any code:</p>\n<pre>\nthe leather the rule correctly kills   nothing like any ball colour (277 cases)\nthe real cue ball under the stick      also nothing like any ball colour\none dark false detection               looks a lot like the black 8\n</pre>\n<p>With the stick across it the ball's colour is spoiled, so it resembles nothing\n- while a dark false detection resembles the 8 nicely. The \"fix\" would have let\nthe false one in and still thrown the real ball out. So I wrote none of it.</p>\n\n<h3>What the rule is actually worth</h3>\n<p>On your pinned table it correctly discards 277 false detections at the pockets\n- I checked the pictures and they are empty felt. It costs 11 frames of one real\nball. And even in those 11 frames the app does not lose the ball: it keeps\nfollowing it, it just marks those moments as estimates rather than sightings.</p>\n<p>I have written the measurement into the code beside the rule, so a future\nsession does not \"improve\" it and quietly bring the phantom shots back.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 120,
    "ts": "2026-08-30T16:56:44",
    "date": "Aug 30, 12:56 PM EDT",
@@ -1147,26 +1179,6 @@
    "title": "Library re-measurement complete: 13 of 17 sessions now dense",
    "score": "",
    "body": "The overnight rollout finished. Thirteen sessions - including the marathon - now carry frame-by-frame dense trails, every one passing the physics gate with room to spare (worst score 0.23 impossible-states per thousand against the old tracker's 0.55). 137 shots' trails upgraded across the library on top of the marathon's. Each merged session's 'proc' stamp shows today.\nThree August 23 sessions were REFUSED by the gate (scores 0.69-3.12) and keep their honest sparse trails - that was camera-surgery day, and the EOS focus rectangles burned into the feed are the suspected cause. They're queued for investigation, not forced through.\nOne 2-minute camera-adjustment clip couldn't calibrate at all and was skipped.\nA quality gate that refuses its own new engine's output when the numbers aren't there is the whole point - what merged, earned it.",
-   "images": []
-  },
-  {
-   "id": 42,
-   "ts": "2026-08-28T12:00:00",
-   "date": "Aug 28, 2026",
-   "kind": "update",
-   "title": "The engine passed its full-session exam - the whole library is re-measuring overnight",
-   "score": "",
-   "body": "The measurement engine re-processed your entire 110-minute marathon session and scored 0.21 physically-impossible states per thousand measurements - beating the current production tracker's 0.55 on the same footage, with identity flicker at zero across all 198,950 frames. 58 more shots' trails upgraded after arbitration. On that result the remaining 16 sessions started re-processing overnight; each session's 'proc' stamp updates as it lands.\nAlso tonight: sessions recorded before August 19 were deleted at Joe's direction (29 videos, 34.5 GB freed). The library and lifetime stats now start at August 19; Dropbox can recover the files for 30 days.\nEvery trail upgrade still has to prove agreement with the old path or match the video itself - disagreements keep the honest original.",
-   "images": []
-  },
-  {
-   "id": 41,
-   "ts": "2026-08-27T12:00:00",
-   "date": "Aug 27, 2026",
-   "kind": "update",
-   "title": "Make calls name the pocket, a Time Foul voice, and a truth-telling ball tray",
-   "score": "",
-   "body": "Makes are now announced the way you'd call them: 'Five ball in the top left pocket.' If the shot clock runs out unshot, the buzzer is followed by a spoken 'Time Foul.' And the ball tray now shows exactly what the system detects on the table, updating within a fraction of a second - no more comfort smoothing, so if the tray flickers, that's the detector telling on itself. The tray, the schematic, and the announcer now all read the same measurement source, and a make can no longer be announced while the ball is visibly still sitting on the table.\nThe 8-ball chip wears a bright ring when present so black never looks like the greyed-out 'potted' state.\nKnown honest gap: the 3 and 5 ball still get confused under warm light - that's the identifier model, and its retraining data is being mined from the new dense measurements.",
    "images": []
   }
  ]

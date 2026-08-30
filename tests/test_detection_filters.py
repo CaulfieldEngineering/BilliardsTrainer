@@ -782,3 +782,32 @@ class TestJawPhantom:
                   cls=BallClass.SOLID, number=-1, score=0.48)
         dets, _ = _run_apply(p, calib, [dim])
         assert len(dets) == 1, "low score alone must not reject mid-table"
+
+    def test_the_measured_trade_is_not_loosened_silently(self):
+        """Round 73 measured what this rule costs and KEPT it.
+
+        Its premise ("real balls score >=0.85") does fail in one case:
+        with the cue STICK across a ball at a jaw the score collapses to
+        0.33-0.58 and 11 real frames die with the leather. A colour
+        escape hatch was measured on BOTH populations and rejected -
+        bench leather sits 93-101 Lab from any reference, the real cue
+        ball 56-58 (corrupted by the stick, so it resembles nothing),
+        and one dark near-pocket phantom sits 7 Lab from the black 8.
+        The hatch would admit the phantom and still reject the ball.
+        Trade as measured: 277 phantoms killed for 11 real frames, and
+        the ball keeps its track anyway (round 71).
+
+        So the constants stay put unless a NEW discriminator is measured
+        on both populations. This fails if they drift.
+        """
+        import inspect
+
+        from billiards_trainer.vision import pipeline as pl
+        src = inspect.getsource(pl.Pipeline.prepare_detections)
+        i = src.find("JAW PHANTOM")
+        assert i > 0, "the jaw-phantom rule vanished"
+        rule = src[i:i + 3000]
+        assert "d.score < 0.60" in rule, (
+            "the jaw confidence bar moved; round 73 measured 0.60 as the "
+            "trade that kills 277 phantoms for 11 real frames")
+        assert "scale=2.2" in rule, "the jaw zone moved"

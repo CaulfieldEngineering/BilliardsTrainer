@@ -535,6 +535,24 @@ class Pipeline:
             # trails). Near a pocket, a LOW-CONFIDENCE read is the
             # pocket furniture; real balls - including jaw-hangers -
             # score like balls on this rig (>=0.85 typical).
+            # ROUND 73 MEASURED THE COST AND KEPT THE RULE. Its premise
+            # does fail in one case: when the cue STICK lies across a
+            # ball at a jaw the ball's score collapses (0.33-0.58 over
+            # 91.1-92.6s on the cold clip) and 11 real frames die with
+            # the leather - the whole of that clip's residual cue gap.
+            # A colour escape hatch ("admit it if it matches a measured
+            # reference") was measured on both populations and REJECTED:
+            #     bench leather, 277 dets   93-101 Lab from any reference
+            #     the real cue ball at the jaw   56-58 Lab, nearest the 1
+            #     one cold near-pocket det        7 Lab from the black 8
+            # With the stick over it the ball's colour is corrupted, so
+            # it resembles nothing, while a dark phantom resembles the 8.
+            # The hatch would admit the phantom and still reject the
+            # ball. The trade as it stands is 277 phantoms killed for 11
+            # real frames lost, and the ball keeps its track anyway
+            # (round 71) - it is only the per-frame metric that suffers.
+            # Do not loosen this without a discriminator measured on
+            # BOTH populations.
             if (d.score < 0.60
                     and tbl.pocket_at(d.x, d.y, scale=2.2) is not None):
                 continue
