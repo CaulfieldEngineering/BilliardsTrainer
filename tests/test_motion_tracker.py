@@ -249,3 +249,84 @@ class TestFastBallStaysOneTrack:
         rows = tk.update([(150.0, 300.0, 11.0, -1), (150.0, 380.0, 11.0, -1)], t)
         by_y = {round(r.y): r.number for r in rows}
         assert by_y[300] == 1 and by_y[380] == 2, "neighbours swapped"
+
+    def test_accelerating_ball_keeps_its_track(self):
+        """THE @85 CASE (round 47), replayed with the measured positions.
+
+        Joe: "20260824-220247@85 is a bank that misses the initial
+        transient tail of the 3 ball." The 3 rested at (258.8, 376.1),
+        was struck, and its detections ran away down-left. The gate gave
+        the wide acquisition window only while speed < 30, so the frame
+        AFTER the ball first moved its gate collapsed from 95px to 47.7
+        while its own detection - already named 3 - sat 50.1px away. Two
+        pixels short: a new track was born on the real ball and the 3's
+        track coasted on a dead prediction, so the trail drew a straight
+        line across the gap. A ball ACCELERATES off the cue, so last
+        frame's speed always under-predicts; the floor must hold through
+        the strike, not be withdrawn at the first sign of motion."""
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(12):                       # at rest, confirmed
+            tk.update([(258.8, 376.1, 11.9, 3)], t)
+            t += 1 / 30
+        # the real measured opening: creep, then hard acceleration
+        for x, y in ((250.0, 379.8), (203.5, 402.5), (158.5, 424.2),
+                     (113.7, 445.7), (100.3, 452.2)):
+            rows = tk.update([(x, y, 11.0, 3)], t)
+            t += 1 / 30
+        assert len(rows) == 1, (
+            f"the struck 3 fragmented into {len(rows)} tracks")
+        assert rows[0].number == 3, "the 3 lost its name off the cue"
+        assert abs(rows[0].x - 100.3) < 12 and abs(rows[0].y - 452.2) < 12, (
+            "the track must be ON the ball, not on a stale prediction")
+
+    def test_a_long_dead_track_cannot_reach_across_the_table(self):
+        """The gate's travel term is bounded by the coast window.
+
+        Bought on the bench at 32.9s (round 47): dt_g is time since the
+        last real SIGHTING, so a track nothing had matched for fifteen
+        seconds grew a gate of hundreds of pixels. A dead nameless blob
+        parked at the bottom-LEFT pocket since 17.1s reached 496px across
+        the table, adopted a detection in the bottom-RIGHT pocket, and
+        published it as a "5" - a ball this table does not have."""
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(8):                        # a blob, then abandoned
+            tk.update([(103.0, 1196.0, 10.7, -1)], t)
+            t += 1 / 30
+        for _ in range(450):                      # fifteen seconds unseen
+            tk.update([], t)
+            t += 1 / 30
+        rows = tk.update([(599.0, 1181.0, 17.8, 5)], t)
+        far = [r for r in rows if r.x > 500]
+        assert far, "the far detection must produce a track"
+        assert len(rows) >= 2 or not any(r.x < 200 for r in rows), (
+            "the parked blob reached across the table and adopted it")
+        near = [r for r in rows if r.x < 200]
+        assert not near or near[0].id != far[0].id, (
+            "one track cannot be in both pockets at once")
+
+    def test_a_named_track_outbids_a_closer_nameless_one(self):
+        """THE 170.6s LONG POT (round 47).
+
+        The identifier had already labelled the moving ball `1`. Its own
+        track was 32.8px away - but a nameless blob parked in the
+        bottom-left pocket sat 28.6px away and won on distance alone by
+        4.2px. The 1's track was left coasting, died, and the ball
+        entered the pocket unnamed, so a real pot could be attributed to
+        no ball at all. The identifier's read is evidence; distance is
+        only a guess about which ball this is."""
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(12):                       # the 1, named and settled
+            tk.update([(130.0, 1061.0, 12.6, 1), (103.0, 1196.0, 10.7, -1)], t)
+            t += 1 / 30
+        for x, y in ((118.0, 1088.0), (101.0, 1131.0)):
+            tk.update([(x, y, 13.1, 1), (103.0, 1196.0, 10.7, -1)], t)
+            t += 1 / 30
+        # the blob goes unseen; the 1 keeps travelling toward the pocket
+        rows = tk.update([(83.6, 1171.9, 13.3, 1)], t)
+        named = [r for r in rows if r.number == 1]
+        assert named, "the named ball lost its identity to a nameless blob"
+        assert abs(named[0].x - 83.6) < 12 and abs(named[0].y - 1171.9) < 12, (
+            "the 1's own track must hold the ball into the pocket")

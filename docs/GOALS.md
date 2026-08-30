@@ -2521,3 +2521,37 @@ Rounds continue with Joe's visual feedback as the gate.
   is inside the search, not the gating. NOTE: every scorecard number
   calls this shot perfect - detected, outcome right, ball named, pot
   credited. A fabricated trail is invisible to all of them.
+
+- 2026-08-30 ~00:30 EDT - ROUND 47: Joe's @85 SOLVED, and round 46's
+  diagnosis was WRONG. Not blur, not detection: ASSOCIATION. Instrumented
+  the gate frame by frame - at t=85.609 the detector had the 3 at
+  (203.5,402.5) ALREADY NAMED `3`, its own track measured d=50.1 against
+  gate=47.7, out by 2.4px, so a new nameless track was born on the real
+  ball and the 3's track coasted on a dead prediction; the trail drew a
+  straight line across the gap. CAUSE: ACQUIRE_R applied only while
+  speed<30, so a track was PUNISHED for starting to move (95px at rest ->
+  47.7px on the strike frame) - prediction is worst exactly when a ball
+  ACCELERATES. FIX: ACQUIRE_R is a floor, not a branch.
+  Two more of the same family, both found BY the scorecard rejecting my
+  first attempt: (a) dt_g is time since last SIGHTING, so a blob parked
+  since 17.1s grew a ~474px gate, reached 496px across the table and
+  published an invented "5" - now bounded by COAST_S; (b) greedy-on-
+  distance let that nameless blob outbid the 1's own named track by 4.2px
+  on the 170.6s long pot, so the ball entered the pocket unnamed and a
+  real pot was credited to nobody - a NAME now outranks four pixels.
+  BENCH: strokes 10/10, outcomes 10/10, pots 4/4, fake 0, unexplained 0,
+  cue 99.9%, NAMED CORRECTLY 99.4% (was 99.3), invented 0, gate 0.216
+  (7 violations, unchanged in absolute terms; the rate rose only because
+  the run publishes 4,400 FEWER ball-frames - the ghosts are gone).
+  VISION-CORROBORATED: rendered the shot as the phone draws it - at
+  t=86.12 the red trail now leaves the 3's spot and banks off the LEFT
+  cushion, the leg Joe said was missing.
+  TOOLING: extracted MotionTracker.gate_for() - my probe was re-deriving
+  the gate inline and drifting from it, and reprocess() computed
+  t = start_s + pts_s, double-counting the seek so every partial-window
+  probe reported false timestamps. A probe that lies is worse than none;
+  it cost round 46 a wrong diagnosis. Also found and DEFERRED: the engine
+  bypasses FindIdEnsemble.detect, so sample_colour never runs and
+  measured_bgr is None on every offline detection - mbgr_hist stays empty
+  and blur recovery cannot fire (find() called 340/340 frames, zero
+  candidates). Its own round.

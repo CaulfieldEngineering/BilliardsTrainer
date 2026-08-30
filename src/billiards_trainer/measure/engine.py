@@ -211,7 +211,6 @@ def reprocess(video: str, out_dir: str | None = None,
     from ..detector_strategies import discover
     from ..vision.analysis_cache import SidecarWriter
     from ..vision.pipeline import Pipeline
-    from .tracker import MotionTracker
 
     video = Path(video)
     out_root = Path(out_dir) if out_dir else (video.parent / "m1")
@@ -266,9 +265,20 @@ def reprocess(video: str, out_dir: str | None = None,
                                                       for row in hinv],
                                              "w": w_px, "h": h_px,
                                              "source": video.name})
-    tracker = MotionTracker(
-        pockets=[(pk.x, pk.y) for pk in calib.table.pockets],
-        pocket_r=float(calib.table.pocket_radius))
+    # ONE TRACKER INSTANCE, not merely one tracker CLASS (round 47).
+    # Round 39 put live and offline on the same MotionTracker code, but
+    # this line still built a SECOND one while the Pipeline kept its own,
+    # and prepare_detections' blur-recovery pass reads pipe.tracker. That
+    # tracker is never updated offline, so `lost` was empty on every
+    # frame and recovery could not fire once in a whole clip - which is
+    # why Joe's @85 report (the 3's opening tail replaced by a straight
+    # line across a 360px jump) survived a feature built to prevent
+    # exactly it. Sharing the instance costs nothing: the offline loop is
+    # the only thing driving it.
+    tracker = pipe.tracker
+    tracker.reset()
+    tracker.set_geometry([(pk.x, pk.y) for pk in calib.table.pockets],
+                         float(calib.table.pocket_radius))
     ident_by_pos: list = []      # latest identifier detections (x, y, n)
 
     def recording_live() -> bool:
@@ -316,7 +326,16 @@ def reprocess(video: str, out_dir: str | None = None,
             if fi > 0 and pts_s <= prev_pts:      # backend hiccup
                 pts_s = prev_pts + 1.0 / fps
             prev_pts = pts_s
-            t = start_s + pts_s
+            # NOT start_s + pts_s (round 47). start_s is applied by
+            # seeking the capture, so pts_s is ALREADY absolute in the
+            # source video; adding it again doubled the offset. Harmless
+            # for full runs (start_s == 0) and poison for every partial
+            # one: a probe of the @85 bank reported its frames at
+            # t=160-171, so a window filter on real time matched nothing
+            # and the investigation looked like "recovery never runs".
+            # An investigation tool that lies about its own clock is
+            # worse than no tool.
+            t = pts_s
             if fi % 150 == 0:
                 if recording_live():
                     log.warning("recording started - engine aborted at %.1fs", t)
@@ -345,9 +364,17 @@ def reprocess(video: str, out_dir: str | None = None,
             prepared = pipe.prepare_detections(found, calib, frame.shape,
                                                frame=frame,
                                                refresh_foreign=True)
-            dets = [(float(d.x), float(d.y), float(d.radius),
-                     int(getattr(d, "number", -1))) for d in prepared]
-            rows = tracker.update(dets, t)
+            # Hand the tracker the DETECTIONS, not a flattened tuple
+            # (round 47). The tuple carried x/y/r/number and dropped
+            # measured_bgr, which is the only thing that fills a track's
+            # mbgr_hist - and blur recovery requires 5 samples of it
+            # before it will consider a track recoverable. So offline,
+            # every track had an empty colour history, `lost` was empty
+            # on every frame of every clip, and the recovery pass ran
+            # 340 times in a 340-frame probe without once being able to
+            # look. update() has taken either form since round 39; the
+            # live path was already passing objects.
+            rows = tracker.update(prepared, t)
             # HAND CONTEXT (bench R2: four strokes invented while Joe was
             # placing balls by hand). The live path has always recorded
             # which balls are hand-adjacent; the engine computed the mask

@@ -30,9 +30,9 @@ from ..core.types import Track
 FRICTION = 0.88          # per-0.1s velocity retention while coasting
 COAST_S = 0.6            # coast this long without a detection, then inactive
 GATE_R = 3.2             # association gate, in ball radii, around prediction
-ACQUIRE_R = 8.0          # wider gate for a young/still track: a struck
-                         # ball's first frames outrun the tight gate and
-                         # used to fragment into one track per frame
+ACQUIRE_R = 8.0          # gate FLOOR, in ball radii. A struck ball's
+                         # first frames outrun the tight predicted gate
+                         # and used to fragment into one track per frame
 _HISTORY_N = 64          # positions kept per track, for trails
 VOTE_N = 9               # number votes considered for identity
 HYST_K = 5               # frames a new number must lead before shown
@@ -223,6 +223,48 @@ class MotionTracker:
         frames that skip detection, so playback can outrun the detector."""
         return list(self._published)
 
+    def gate_for(self, tr, dr: float, t: float) -> float:
+        """How far from its prediction may this track claim a detection?
+
+        ONE COPY of the formula (round 47). Investigation tools were
+        re-deriving it inline and drifting from it, and a probe that
+        lies about the code is worse than no probe - it cost this
+        campaign a whole round of wrong diagnosis.
+
+        VELOCITY-AWARE (bench round 8, vision-verified 2026-08-28 - the
+        single biggest defect found then): a struck ball covers ~60px
+        per frame, but a track born this frame has NO velocity, so a
+        fixed 3.2-radius (~35px) window missed its own next sighting and
+        spawned a fresh track EVERY frame - the overlay showed the cue
+        ball's path as nine simultaneous phantom balls, fragmenting
+        identity, trails, counts and episodes at once.
+
+        ACQUIRE IS A FLOOR, NOT A BRANCH (round 47, Joe's @85 report:
+        the 3's opening travel missing from its trail). The wide gate
+        used to apply only while speed < 30, so a track was PUNISHED for
+        starting to move: at rest the 3 had a 95px gate, and on the frame
+        it was struck `speed` jumped to 289 and the gate COLLAPSED to
+        47.7 while its own detection - already named `3` by the
+        identifier - sat 50.1px away. Out by two pixels, so a new
+        unnumbered track was born on the real ball and the 3's track was
+        left coasting on a dead prediction; the trail then drew a
+        straight line across the gap. Prediction is worst exactly when a
+        ball is ACCELERATING (0 to 1500px/s in two frames), which last
+        frame's speed cannot describe, so the floor must hold there too.
+
+        BOUNDED BY THE COAST WINDOW (round 47): dt is time since the last
+        real SIGHTING, so for a track nothing had matched in fifteen
+        seconds the travel term grew to hundreds of pixels - a dead
+        nameless blob parked at the bottom-LEFT pocket since 17.1s
+        reached 496px and adopted a detection in the bottom-RIGHT pocket,
+        publishing it as a "5", a ball this table does not have. Past
+        COAST_S the track is inactive and its prediction is worthless.
+        """
+        speed = max((tr.vx ** 2 + tr.vy ** 2) ** 0.5, tr.last_v)
+        span = max(tr.radius, dr, 8.0)
+        dt_g = min(max(0.0, t - tr.t), COAST_S)
+        return max(GATE_R * span + speed * dt_g, ACQUIRE_R * span)
+
     def update(self, dets, t: float) -> list:
         """dets for one frame at time t; returns this frame's Tracks.
 
@@ -247,36 +289,30 @@ class MotionTracker:
                 tr.vy *= damp
         # 2. exclusive greedy association by predicted distance
         pairs = []
-        for di, (dx, dy, dr, _dn) in enumerate(dets):
+        for di, (dx, dy, dr, dn) in enumerate(dets):
             for tr in self._tracks.values():
-                # VELOCITY-AWARE GATE (bench round 8, vision-verified
-                # 2026-08-28 - the single biggest defect found so far):
-                # a struck ball covers ~60px per frame, but a track born
-                # this frame has NO velocity, so a fixed 3.2-radius
-                # (~35px) window missed its own next sighting and spawned
-                # a fresh track EVERY frame. The overlay showed the cue
-                # ball's path as nine simultaneous phantom balls with the
-                # "cue" label stranded on the first one - fragmenting
-                # identity, trails, counts and episodes all at once.
-                # A young/still track therefore gets an ACQUISITION gate
-                # wide enough for real ball speed; established tracks keep
-                # the tight predicted gate plus their own travel.
-                speed = max((tr.vx ** 2 + tr.vy ** 2) ** 0.5, tr.last_v)
-                base = GATE_R * max(tr.radius, dr, 8.0)
-                dt_g = max(0.0, t - tr.t)
-                # no usable velocity (at rest, or just born) = nothing to
-                # predict with, so the gate must cover a real first step
-                if speed < 30.0:
-                    gate = max(base, ACQUIRE_R * max(tr.radius, dr, 8.0))
-                else:
-                    gate = base + speed * dt_g
+                gate = self.gate_for(tr, dr, t)
                 dd = ((tr.x - dx) ** 2 + (tr.y - dy) ** 2) ** 0.5
                 if dd <= gate:
-                    pairs.append((dd, di, tr.id))
+                    # A NAME OUTRANKS FOUR PIXELS (round 47). Greedy on
+                    # distance alone let junk outbid the truth: on the
+                    # 170.6s long pot the identifier had already labelled
+                    # the moving ball `1`, and its own track was 32.8px
+                    # from it - but a NAMELESS blob parked in the
+                    # bottom-left pocket, unseen for four frames, sat
+                    # 28.6px away and won the detection by 4.2px. The 1's
+                    # track was left coasting, died, and the ball entered
+                    # the pocket unnamed, so a real pot could not be
+                    # attributed to any ball. Distance is a guess about
+                    # which ball this is; the identifier's read is
+                    # evidence, and evidence sorts first. Both still have
+                    # to be inside the gate to be considered at all.
+                    named = 0 if (dn >= 0 and tr.emitted == dn) else 1
+                    pairs.append((named, dd, di, tr.id))
         pairs.sort()
         used_d: set = set()
         used_t: set = set()
-        for _dd, di, tid in pairs:
+        for _named, _dd, di, tid in pairs:
             if di in used_d or tid in used_t:
                 continue
             used_d.add(di)
