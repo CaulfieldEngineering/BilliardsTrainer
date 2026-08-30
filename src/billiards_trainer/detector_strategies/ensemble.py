@@ -140,7 +140,19 @@ class FindIdEnsemble(DetectorStrategy):
             if f.number is not None and f.number > 0:
                 present.add(f.number)
         else:
-            FindIdEnsemble._fix_colour(frame_bgr, f)
+            # THE WHOLE REPAIR, not the colour half (round 67). This ran
+            # _fix_colour alone, so an unread find never had its STRIPE
+            # BIT checked - and the heuristic's standing error on both
+            # tables is calling the stripe by its base number. Measured
+            # on all 12 remaining 9-as-1 sightings: stripe_reading()
+            # answers True on EVERY one of them, and their white
+            # fraction is indistinguishable from the frames that get it
+            # right (cold wrong p50 0.346 vs right 0.350; bench wrong
+            # 0.366/0.371 vs right min 0.364). The band was never
+            # hidden - as the backlog had assumed without measuring. The
+            # promotion was authorised by the pixels and simply never
+            # asked for.
+            FindIdEnsemble.repair_identity(frame_bgr, f)
 
     @staticmethod
     def _name_unknown(frame_bgr, f, taken=frozenset()) -> None:

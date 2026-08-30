@@ -215,6 +215,26 @@ class TestStripeRepairPromotionOnly:
         assert "num_for.get" in src or "not in num_for" in src, (
             "the unread branch must be selected by absence of a read")
 
+    def test_unread_finds_get_the_whole_repair_not_half(self):
+        """Round 67: repair_unread ran _fix_colour alone.
+
+        So an unread find never had its stripe bit checked - and the
+        heuristic's standing error on both tables is calling the stripe
+        by its base number. All 12 remaining 9-as-1 sightings had
+        stripe_reading() answering True, with a white fraction
+        indistinguishable from the frames that got it right. The
+        promotion was authorised by the pixels and never asked for.
+        """
+        import inspect
+
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        body = [ln.split("#")[0] for ln in
+                inspect.getsource(FindIdEnsemble.repair_unread).splitlines()]
+        assert any("repair_identity" in ln for ln in body), (
+            "unread finds get half the repair again")
+        assert not any("_fix_colour" in ln for ln in body), (
+            "repair_unread reaches past repair_identity into half of it")
+
     def test_missing_reference_does_not_protect_a_stripe_claim(self):
         """Round 65: it did, and 330 frames answered to an invented 13.
 

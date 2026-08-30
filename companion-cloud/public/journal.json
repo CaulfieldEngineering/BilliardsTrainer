@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 110,
+   "ts": "2026-08-30T14:34:44",
+   "date": "Aug 30, 10:34 AM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 10:34 AM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/110-r67_fixed.png",
+     "caption": "The five frames that used to be called a 1, now correctly a 9. The white band is plainly visible in every one - my claim that these were frames with the band hidden was simply wrong."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r67_fixed.png' alt=''><figcaption>The five frames that used to be called a 1, now correctly a 9. The white band is plainly visible in every one - my claim that these were frames with the band hidden was simply wrong.</figcaption></figure></div>"
+  },
+  {
+   "id": 109,
+   "ts": "2026-08-30T14:34:44",
+   "date": "Aug 30, 10:34 AM EDT",
+   "kind": "finding",
+   "title": "The pinned session now names zero balls wrong",
+   "score": "Unread balls were getting half a repair - colour checked, stripe-or-solid never. Bench wrong names 2 -> 0, cold 10 -> 1.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/109-r67_fixed.png",
+     "caption": "The five frames that used to be called a 1, now correctly a 9. Note the white band is plainly visible in every one - my claim that these were frames with the band hidden was simply wrong."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Your pinned session now names zero balls wrong. Not \"almost none\" -\nzero. Every ball it puts a number on, it gets right, across all ten shots. The\nnew clip is at one mistake in 925 checks.</strong></p>\n\n<pre>\n                     pinned session         new clip\nshots found              10 of 10           9 of 9\nmakes and misses         10 of 10           9 of 9\npots to right ball         4 of 4           5 of 5\nnaming              99.7% -> 99.8%    98.9% -> 99.9%\nBALLS NAMED WRONG        2 -> ZERO         10 -> 1\nthe striped 9        219/221 -> 221/221   56/66 -> 65/66\n</pre>\n\n<h3>What was wrong</h3>\n<p>Last round I fixed the app so that balls the naming model never reads still\nget checked against your set's real colours. But that check was only doing half\nits job: it corrected a ball's COLOUR and never re-checked whether it was a\nstripe or a solid. And that is precisely the mistake the app keeps making on your\ntables - calling the striped 9 a plain 1, because they are the same colour and\ndiffer only by the white band.</p>\n\n<h3>I was wrong about why, and I had written it down as if it were true</h3>\n<p>I finished last round saying the remaining errors were frames where the\nstripe's band was turned away from the camera, so there was no white to see. That\nsounded reasonable and I never measured it. This round I did, on all twelve\nfailing frames:</p>\n<pre>\nwhite visible when the app got it WRONG    35%\nwhite visible when the app got it RIGHT    35%\n</pre>\n<p>Identical. The band was in plain view every single time - you can see it in\nthe picture below. The app had everything it needed to get those frames right and\nwas simply never asking the question. My explanation had become part of the\nproject's notes, where it carried an authority it had not earned.</p>\n\n<h3>What is left</h3>\n<p>Your pinned table's remaining gaps are not mistakes but blind spots: seven\nsightings where the app sees no ball at all, and two where it declines to name\none. That is a different problem from naming something incorrectly, and it is\nnext.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 108,
    "ts": "2026-08-30T14:03:31",
    "date": "Aug 30, 10:03 AM EDT",
@@ -1075,26 +1107,6 @@
    "title": "The shot Details sheet got a real design",
    "score": "",
    "body": "You called it the worst UI you'd ever seen - fair. It's now a proper bottom sheet: slides over the player instead of shoving the page under the clock, groups MEASURED data apart from YOUR CALL verdicts, shrinks the utility buttons to an icon row, and pins Cancel / Looks right / Save to a fixed footer. Your stay-down time shows as a big readout at the top of MEASURED - with a POPPED EARLY flag when it applies.\nSelected verdict buttons now fill solid green instead of a thin outline tint.\nThe abstention notes (why an aim line or metric is absent) sit inside the MEASURED group where they belong.\nTap the dimmed backdrop to close - same as Cancel.\nThis is the first slice of the phase-3 UI pass; the player itself is next.",
-   "images": []
-  },
-  {
-   "id": 30,
-   "ts": "2026-08-25T12:00:00",
-   "date": "Aug 25, 2026",
-   "kind": "update",
-   "title": "New ball-ID model promoted: 18% fewer misreads",
-   "score": "",
-   "body": "The challenger trained on the newly-mined layouts beat the champion on strictly held-out sessions - 18% fewer out-of-game number claims with coverage unchanged - and is now live. It's the first promotion since c5, and the first payoff from unblocking the layout miner.\nJudged fairly: identical 24 sessions for both models, every session that contributed training data excluded, so the win can't be memorization.\nThe old champion is archived one copy away for instant rollback.\nNext accuracy lever: the starved stripe balls (10 and 12 still have one training example each) - one minute of a racked 8-ball game on camera feeds them automatically now.",
-   "images": []
-  },
-  {
-   "id": 29,
-   "ts": "2026-08-25T12:00:00",
-   "date": "Aug 25, 2026",
-   "kind": "update",
-   "title": "Found it: one clock bug behind everything tonight",
-   "score": "",
-   "body": "The analysis clock ran ~3 seconds behind the video - every symptom you hit inherited it. Trails animated seconds after the balls had stopped. Aim lines were computed on mid-shot frames (wrong line, or no line at all). Slow-mo clips cut at the skewed time and started mid-shot. All timestamps are now anchored to the video itself, per shot, using each shot's frame-verified strike moment.\nYour @58 shot now has its aim line. Tonight's session re-verified server-side: shot 3's line lies exactly along the stick, through the cue ball, stopping at the 4.\nThe jittery move-stop-move tail is fixed too (the overlay clock could step backwards between frames; it can't now).\nTonight's session is fully corrected; the rest of the library retrofits overnight.\nThis is phase 1 of the cleanup you called for. Phase 2 makes every shot go through ONE identical pipeline the moment it completes - no more some-shots-analyzed-some-not. Phase 3 is the UI redesign.",
    "images": []
   }
  ]

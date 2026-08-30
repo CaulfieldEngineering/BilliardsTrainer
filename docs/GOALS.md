@@ -3178,3 +3178,36 @@ Rounds continue with Joe's visual feedback as the gate.
   found the real cause.
   REMAINING: the 9->1 pair is now the ONLY naming error on either clip
   (cold x10, bench x2); everything else is perfect on both tables.
+
+- 2026-08-30 ~11:30 EDT - ROUND 67: THE BENCH NAMES ZERO BALLS WRONG.
+  repair_unread (round 66) ran _fix_colour ALONE, so a find the
+  identifier never read had its colour checked and its STRIPE BIT never
+  checked - and the heuristic's standing error on both tables is calling
+  the stripe by its base number. Now the whole repair. SIXTH
+  one-fact-two-owners split in three rounds; third round running where
+  the answer was "half a repair was executing".
+  BENCH: wrong names 2 -> 0, naming 99.7 -> 99.8%, all-checks 99.1 ->
+  99.2%, ball 9 219/221 -> 221/221 PERFECT, no confusions at all. Still
+  10/10 strokes, 10/10 outcomes, 4/4 pots, 0 fake, 0 invented. Its only
+  remaining gaps are ABSENCES: 2 unnamed, 7 with no track.
+  COLD: naming 98.9 -> 99.9%, all-checks 98.7 -> 99.7%, ball 9 56/66 ->
+  65/66, wrong 10 -> 1. Still 9/9, 9/9, 5/5, 0 fake, 0 invented.
+  THE BACKLOG'S OWN HYPOTHESIS WAS WRONG AND I HAD WRITTEN IT. Round 66
+  closed with "the remaining 10 are frames where the band is turned away
+  from the camera". Measured on all 12 failing sightings: the band was
+  NEVER hidden - stripe_reading() answers True on EVERY one, and the
+  white fraction when wrong is indistinguishable from when right (cold
+  wrong p50 0.346 vs right 0.350, bar 0.173; bench wrong 0.366/0.371 vs
+  right min 0.364, bar 0.352). ZERO of 12 read below the bar. The
+  promotion was authorised by the pixels and never asked for.
+  LESSON: a hypothesis I write into the backlog is not a finding, but it
+  inherits the authority of one. Measure before acting on it.
+  VISION-CORROBORATED: rendered all five previously-failing frames - each
+  now reads 9 and each shows the white band plainly, which is the direct
+  refutation of my own claim.
+  OPEN AND UNMEASURED: bench t=157/158 the identifier read 9 at ONE
+  PIXEL from the ball while the app published 1. This round's fix cured
+  those two frames incidentally (IDENT_EVERY=6 sent them down the unread
+  path) but the fact stands: a correct read exists and something after
+  it wins. Same shape as round 65's track publishing 13 on 330 frames
+  against 8 of 366 supporting reads. That is the next target.

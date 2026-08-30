@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T14:03Z
+    written        2026-08-30T14:34Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T14:01Z
+    measured       2026-08-30T14:33Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,80 +57,76 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 66
+### NEXT TARGETS (top first) — round 67
 
-*** HALF OF EVERY DETECTION HAD NEVER BEEN CHECKED BY ANYTHING ***
-    _pair_identities gated the ENTIRE measured-colour repair behind
-    `if num >= 0` - a number from the identifier. The identifier reads
-    only a fraction of the balls on the table:
-        cold   846 finds, 461 (54.5%) with NO identity read
-        bench  790 finds, 339 (42.9%) with NO identity read
-    Every one of those kept the FINDER's colour-heuristic guess with
-    nothing checking it, and the heuristic emits stripe numbers
-    directly. The names it was handing out unchecked:
-        cold   {8:93, 7:86, 10:86, 2:55, 0:42, -1:39, 4:29, 1:22, ...}
-        bench  {2:219, 0:40, 1:33, 8:31, 4:9, 3:6, -1:1}
-    A "10" on a table with no 10 and an "8" on a table with no 8. THAT
-    is where the invented numbers came from - never the identifier.
-    The live ensemble has repaired exactly these finds since round 34.
-    The engine never did. Now one copy, FindIdEnsemble.repair_unread,
-    called by both. FIFTH one-fact-two-owners split in two rounds.
-
-*** INVENTED NUMBERS NOW ZERO ON BOTH CLIPS - a campaign first ***
+*** THE BENCH NAMES ZERO BALLS WRONG. PHASE 1 IS MET. ***
                               bench            cold
     strokes found             10/10            9/9
     outcomes right            10/10            9/9
     pots to right ball          4/4            5/5
     fake / unexplained          0/0            0/0
-    naming            99.8 -> 99.7%   97.6 -> 98.9%
-    of ALL checks     99.2 -> 99.1%   97.4 -> 98.7%
-    moving named      98.9 -> 99.3%   96.5 -> 96.6%
-    invented              0, still   330 frames -> 0
-    cold ball 9            -         45/66 -> 56/66
-    The bench dipped 0.1% (one ball-4 sighting became unnamed, 217/217
-    -> 216/217) while its moving-ball naming rose 98.9 -> 99.3%. Posted
-    as a regression; kept because the cold clip gained 1.3% and shed
-    every invented frame.
-    VISION-CORROBORATED: the frame that read trk3=13 now reads trk3=9,
-    on the visibly orange-banded stripe.
+    naming            99.7 -> 99.8%   98.9 -> 99.9%
+    of ALL checks     99.1 -> 99.2%   98.7 -> 99.7%
+    WRONG NAMES             2 -> 0         10 -> 1
+    invented                 0, still       0, still
+    bench ball 9      219/221 -> 221/221 (perfect)
+    cold  ball 9        56/66 -> 65/66
+    The bench's only remaining gaps are ABSENCES, not errors: 2 unnamed
+    sightings and 7 with no track at all. Cold has one 9->1 left.
 
-0. THE 9->1 PAIR IS NOW THE ONLY NAMING ERROR ON EITHER CLIP.
-    cold 9->1 x10 (ball 9 at 56/66), bench 9->1 x2 (219/221). Nothing
-    else is wrong anywhere: cold is 0:175/175 1:15/15 2:38/38 4:111/111
-    6:184/184 7:151/151 8:183/183, bench is perfect on 0,1,2,3.
-    Round 65 measured why this pair is hard HERE: on the cold table the
-    stripe's band sits ~10 Lab from the gold 1, and the per-frame white
-    fraction of that stripe falls to 0.236 while the bench's solids
-    reach 0.340 - the two tables' distributions overlap, so the bar is
-    per-table (docs/colour_refs*.json `stripe_bar`). The remaining 10
-    are the frames where the band is turned away from the camera.
+*** THE BACKLOG'S OWN HYPOTHESIS WAS WRONG, AND I HAD WRITTEN IT ***
+    Round 66 closed with "the remaining 10 are the frames where the band
+    is turned away from the camera". Measured this round on all 12
+    failing sightings: the band was NEVER hidden. stripe_reading()
+    answers True on EVERY one, and the white fraction when wrong is
+    indistinguishable from when right -
+        cold  wrong p50 0.346  vs  right p50 0.350   (bar 0.173)
+        bench wrong 0.366/0.371 vs right min 0.364   (bar 0.352)
+    ZERO of 12 read below the bar. The promotion was authorised by the
+    pixels and simply never asked for: repair_unread ran _fix_colour
+    alone, so an unread find never had its STRIPE BIT checked. That is
+    the SIXTH one-fact-two-owners split in three rounds, and the third
+    time in a row the answer was "half a repair was running".
+    LESSON: a hypothesis I write into the backlog is not a finding. It
+    inherits authority it never earned. Measure it before acting on it.
 
-1. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
+0. THE APP DISCARDS A CORRECT IDENTIFIER READ. Bench t=157/158 the
+    identifier reads 9 at ONE PIXEL from the ball while the app
+    published 1. Round 67's fix happened to cure those two frames (the
+    engine's IDENT_EVERY=6 cadence meant they went down the unread
+    path), but the underlying fact stands and is unmeasured: a correct
+    read exists and something after it wins anyway. Round 65 saw the
+    same shape - a track publishing 13 on 330 frames while the evidence
+    backed it on 8 of 366. Instrument what commits a track's name.
+
+1. THE BENCH'S REMAINING GAPS ARE BLINDNESS, NOT ERROR: 7 sightings
+    with no track and 2 unnamed, against 0 wrong. Different failure,
+    different fix - find why a ball truth can see has no track at all.
+
+2. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
     truth scores the cue 175/175 - a TRACKING gap, not naming, because
-    the cue metric demands a LIVE sighting every frame. Measure where
-    the cue's label rides a coast.
+    the cue metric demands a LIVE sighting every frame.
 
-2. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? Now that the
-    unchecked half is repaired the loss is contained, but a model that
-    misses 43-55% of finds is the upstream fact. Worth measuring
-    whether it is tiling, ball size, or the score floor before anything
-    downstream is tuned further.
+3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
+    finds (54.5%) and bench 339 of 790 (42.9%) get NO identity read.
+    The unchecked half is now repaired so the loss is contained, but
+    that is the upstream fact. Measure whether it is tiling, ball size
+    or the score floor before tuning anything downstream.
 
-3. A WARNING ABOUT MY OWN METHOD, bought in round 65: measured on the
-    66 naming-truth samples a chain looked 65/66; measured over the same
-    window at full frame rate it was 143/366. The truth samples are
-    ~1/sec on settled moments - a fine YARDSTICK and a badly biased
-    SURVEY. Any per-frame claim must be measured per frame.
+4. A WARNING ABOUT MY OWN METHOD (round 65): measured on the 66
+    naming-truth samples a chain looked 65/66; over the same window at
+    full frame rate it was 143/366. The truth samples are ~1/sec on
+    settled moments - a fine YARDSTICK and a badly biased SURVEY.
 
-4. The palette's 1/3/5 independence caveat; the palette is hand-labelled
+5. The palette's 1/3/5 independence caveat; the palette is hand-labelled
     and does not scale; the identifier mislabels balls mid-collision
     (round 55); colour cannot separate gold from white at speed (round
-    56); the remaining 7 blind checks on the bench; both naming figures
-    in the phone STATUS view; recovered detections lose their name;
-    _locate is ~37% of engine wall time; rebuild_batch.py still drives an
-    OLD build() path (every clip in the library is stale at rules_v 20);
-    events/shot.py is a third shot detector in the live path; delete
-    vision/tracking.py and the MeasurementCore shadow scaffolding.
+    56); both naming figures in the phone STATUS view; recovered
+    detections lose their name; _locate is ~37% of engine wall time;
+    rebuild_batch.py still drives an OLD build() path (every clip in the
+    library is stale at rules_v 20); events/shot.py is a third shot
+    detector in the live path; delete vision/tracking.py and the
+    MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on
