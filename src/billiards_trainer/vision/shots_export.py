@@ -137,9 +137,25 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict,
                 (t, tr.x, tr.y, tr.radius, tr.number))
         t += 0.15
     paths = _bridge_unnumbered(by_id)
+    # A POTTED BALL'S TRAIL ENDS AT THE POCKET (Joe, 2026-08-31: "the
+    # yellow trail follows it into the pocket and then the trail shoots
+    # across the table. If we know that a ball is potted we should know
+    # that the trail ends at the pocket"). A track does not stop when its
+    # ball drops - it gets re-attached to whatever is moving nearby and
+    # carries on - so the raw path runs into the pocket and then back out
+    # across the felt. The engine already recorded WHICH pocket it
+    # credited; cut the polyline at its closest approach to that pocket.
+    potted_at = dict(zip(s.get("pocketed_balls") or [],
+                         s.get("pocketed_xy") or []))
     out = []
     for e in paths.values():
         pts = e["pts"]
+        pk = potted_at.get(e["n"])
+        if pk and len(pts) >= 3:
+            near_i = min(
+                range(len(pts)),
+                key=lambda i: (pts[i][1] - pk[0]) ** 2 + (pts[i][2] - pk[1]) ** 2)
+            pts = pts[:near_i + 1]
         if len(pts) < 3:
             continue
         travel = sum(((pts[i + 1][1] - pts[i][1]) ** 2
@@ -444,6 +460,7 @@ def export_shots_summary(video_path, with_trails: bool = True,
             "action": s.get("action", "stroke"),
             "pocketed": int(s.get("pocketed", 0)),
             "pocketed_balls": s.get("pocketed_balls") or [],
+            "pocketed_at": s.get("pocketed_at") or [],
         }
         if s.get("corrected") or s.get("action_corrected"):
             entry["corrected"] = True

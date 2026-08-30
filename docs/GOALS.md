@@ -2493,3 +2493,17 @@ Rounds continue with Joe's visual feedback as the gate.
   correctly, so describe._pocket_name's inputs are wrong. Also one of
   the two loop-collapse blockers is now cleared; the 7s-early episode
   boundary is the remaining one.
+
+- 2026-08-31 ~23:00 EDT - ROUND 45: Joe asked whether I see these
+  artifacts when watching the videos. I do not, and the reason matters:
+  every vision check has drawn the TRACKER's beliefs, never the trails
+  and text the phone renders from shots.json. Built tools/render_shot.py
+  (summary trails on the video, plus --strip N to step through a shot)
+  and it is now part of every round. FIXED from his reports: the potted
+  ball's trail now ends at the credited pocket (was shooting back across
+  the table); the pot sentence names the engine's credited pocket (was
+  re-deriving from the trail's wandering end); consecutive non-strokes
+  merge into one "Table change" per his design call (19 entries -> 13).
+  OPEN: @85's object-ball trail starts mid-travel - reproduced on the
+  31.68 strip, so it is general. Bench unchanged: 10/10, 10/10, 0 fake,
+  0 invented, 99.3% named, 4/4 pots, gate 0.19.

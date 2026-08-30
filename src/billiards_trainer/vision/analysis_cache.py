@@ -117,10 +117,11 @@ class SidecarWriter:
         # moved by hand (a rearrange), and which numbered balls fell -
         # the live path historically knew neither. Omitted keys keep old
         # readers and old sidecars working unchanged.
-        for key in ("action", "pocketed_balls"):
+        for key in ("action", "pocketed_balls", "pocketed_at",
+                    "pocketed_xy"):
             val = getattr(event, key, None)
             if val:
-                rec[key] = list(val) if key == "pocketed_balls" else val
+                rec[key] = list(val) if key != "action" else val
         self._f.write(json.dumps(rec) + "\n")
         self._f.flush()
 

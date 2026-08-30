@@ -138,11 +138,30 @@ def _write_shots(writer, times, frames, carried, calib) -> int:
                   pockets=[(p.x, p.y) for p in calib.table.pockets],
                   pocket_r=float(calib.table.pocket_radius),
                   carried=carried)
+    def _struck(e) -> bool:
+        return (not e.setup and e.cue_moved
+                and e.cue_travel >= MIN_CUE_TRAVEL
+                and e.cue_peak >= MIN_CUE_PEAK)
+
+    # TABLE CHANGE (Joe, 2026-08-31: "I don't think we need to separate
+    # out rearranging as discrete events. Perhaps we can add a post
+    # processor to merge consecutive rearranging - I call it Table
+    # Change - into one event"). Gathering balls is not a sequence of
+    # events, it is one interruption between shots: the bench produced
+    # NINE separate "rearranging" entries in a 19-item list, one of
+    # which was only Joe walking to his next shot. Consecutive
+    # non-strokes collapse into a single span.
+    merged: list = []
+    for e in eps:
+        if not _struck(e) and merged and not _struck(merged[-1]):
+            merged[-1] = merged[-1].__class__(
+                **{**merged[-1].__dict__, "t_settle": e.t_settle})
+            continue
+        merged.append(e)
+    eps = merged
     n = 0
     for e in eps:
-        struck = (not e.setup and e.cue_moved
-                  and e.cue_travel >= MIN_CUE_TRAVEL
-                  and e.cue_peak >= MIN_CUE_PEAK)
+        struck = _struck(e)
         # NOTHING IS POTTED WITHOUT A STROKE. A ball that disappears while
         # Joe is gathering by hand has been PICKED UP, not made - and the
         # episode stage cannot tell those apart from the track alone. The
@@ -150,12 +169,30 @@ def _write_shots(writer, times, frames, carried, calib) -> int:
         # the 24-28s setup window, which is exactly the kind of phantom
         # make he has reported before.
         balls = [int(b) for b, _x, _y in e.pocketed if b >= 0] if struck else []
+        # WHICH POCKET, decided here and carried. The engine knows the
+        # pocket it credited; the sentence layer used to re-derive one
+        # from the last point of the ball's TRAIL, which keeps going
+        # after the ball is gone (its track gets re-attached to whatever
+        # is nearby). On the bench that put the 31.7 pot "into the
+        # right-middle pocket" when it fell bottom-right, because the
+        # trail ended mid-table at (489,792). One measurement, carried,
+        # instead of two derivations that can disagree.
+        at, at_xy = [], []
+        if struck:
+            for b, px, py in e.pocketed:
+                if b < 0:
+                    continue
+                p = min(calib.table.pockets,
+                        key=lambda q: (q.x - px) ** 2 + (q.y - py) ** 2)
+                at.append(p.name)
+                at_xy.append([round(float(p.x), 1), round(float(p.y), 1)])
         writer.add_shot(SimpleNamespace(
             start_t=e.t_strike, end_t=e.t_settle,
             outcome="make" if (struck and e.pocketed) else "miss",
             num_pocketed=len(e.pocketed) if struck else 0,
             action="stroke" if struck else "rearrange",
-            pocketed_balls=balls))
+            pocketed_balls=balls, pocketed_at=at,
+            pocketed_xy=at_xy))
         n += 1
     log.info("m1 shots derived: %d (%d strokes)", n,
              sum(1 for e in eps

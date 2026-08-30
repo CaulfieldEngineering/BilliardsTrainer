@@ -140,11 +140,24 @@ def describe_shot(reader: SidecarReader, s: dict) -> dict:
     # still read "cue ball scratched".
     if s.get("outcome") == "scratch":
         gone = gone | {0}
+    # THE POCKET THE ENGINE CREDITED, when it recorded one. Deriving it
+    # again from the trail's last point is wrong: a potted ball's track
+    # does not stop at the pocket, it gets re-attached to whatever is
+    # moving nearby and wanders on. The 31.7 pot read "into the
+    # right-middle pocket" for a bottom-right drop because its trail
+    # ended mid-table at (489,792) - the arithmetic was right, the point
+    # it was asked about was not.
+    measured_at = dict(zip(s.get("pocketed_balls") or [],
+                           s.get("pocketed_at") or []))
     potted = []
     for num in sorted(gone):
         e = next((e for e in paths.values() if e["num"] == num), None)
         entry = {"ball": num}
-        if e and e["path"] and env:
+        if num in measured_at:
+            from ..core.geometry import POCKET_LABEL
+            entry["pocket"] = POCKET_LABEL.get(measured_at[num],
+                                               measured_at[num])
+        elif e and e["path"] and env:
             _, lx, ly = e["path"][-1]
             entry["pocket"] = _pocket_name(lx, ly, env)
         potted.append(entry)
@@ -169,7 +182,10 @@ def compose_text(d: dict) -> str:
     if d.get("action") == "ball_in_hand":
         return "Ball in hand — cue ball placed."
     if d.get("action") == "rearrange":
-        return "Rearranging — object balls shuffled by hand."
+        # Joe names this one: everything between shots - gathering
+        # balls, walking round, re-racking - is a TABLE CHANGE, and
+        # consecutive ones arrive already merged into a single span.
+        return "Table change."
     if d.get("action") == "nothing":
         return "No table action."
     bits = []

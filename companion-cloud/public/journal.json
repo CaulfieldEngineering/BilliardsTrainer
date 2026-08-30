@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 87,
+   "ts": "2026-08-30T03:14:40",
+   "date": "Aug 29, 11:14 PM EDT",
+   "kind": "update",
+   "title": "Round 45: trails end at the pocket - and I was checking the wrong picture",
+   "score": "three of four reports fixed; built the view that shows what Joe sees",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/087-strip_31_68.png",
+     "caption": "Stepping through the potted shot, trails drawn exactly as the phone draws them. The 1's yellow trail grows as it travels, reaches the bottom-right pocket and STOPS - previously it carried on across the table because the track got re-attached after the ball dropped."
+    }
+   ],
+   "html": "\n<div class='note win'>\n<p><strong>Round 45: four things you reported, three fixed - and you caught me\nchecking the wrong thing entirely.</strong></p>\n\n<h3>\"Do you not see these artifacts when you watch the videos?\"</h3>\n<p>No, and the reason is a real hole in how I have been working. Every visual\ncheck in this campaign has drawn the TRACKER's beliefs - where each ball is,\nwhat it is called - frame by frame. That is why naming and make/miss got solid.\nIt never drew <em>your trails</em>, which come from a different file. So a trail\nshooting across the table after a pot was invisible in everything I was\nlooking at. You found three defects in that blind spot in ten minutes.</p>\n<p>I have built the missing view: it renders the phone's own trails and text\nonto the video, and a contact sheet stepping through a shot so I can see it\nplay out. I cannot press play - I see stills, not motion - but stepping every\nshot is the honest substitute, and it is now part of every round.</p>\n\n<h3>Fixed</h3>\n<ul>\n<li><strong>@32, the trail overrunning the pocket.</strong> A ball's track does\nnot stop when the ball drops - it grabs whatever is moving nearby and carries\non. The engine already knew which pocket it credited, so the trail is now cut\nthere. Verified by stepping through all twelve frames of the shot.</li>\n<li><strong>The wrong pocket name.</strong> Same cause: the sentence was naming\nthe pocket nearest the trail's wandering end. It now uses the pocket the engine\nactually credited - \"potted the 1 into the bottom-right pocket\".</li>\n<li><strong>@45 \"rearranging\" when you were just walking.</strong> Taken your\nsuggestion: consecutive non-shots merge into one <strong>Table change</strong>.\nYour session went from 19 entries to 13 - ten strokes and three table\nchanges.</li>\n</ul>\n\n<h3>Not fixed yet</h3>\n<p><strong>@85, the missing start of the 3's trail.</strong> Confirmed - I can\nsee the same thing on the shot I stepped through: the object ball's trail\nbegins mid-travel instead of at the ball. Next.</p>\n<p><strong>Trails animating in sync while you scrub.</strong> Logged as a\nfeature; it is a player change rather than an engine one.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li><li>Round 35: no more phantom shots - R2 passes, the bench is one defect from clean</li><li>Round 34: make the 99.5% reproducible, and stop it leaning on unvalidated refs</li><li>Round 33: naming 89% -&gt; 99.5%, outcomes 10/10, pots 4/4 - R3 and R4 gates passed</li></ul>"
+  },
+  {
    "id": 86,
    "ts": "2026-08-30T02:42:36",
    "date": "Aug 29, 10:42 PM EDT",
@@ -953,16 +969,6 @@
    "title": "What the pros do, and what we're borrowing",
    "score": "",
    "body": "We compared our tracking against published pool-vision systems. Three lessons are now the roadmap.\nYou asked whether fast-ball tracking is a solved problem \u2014 it mostly is, and not with expensive cameras. Systems like POOL-AID and PoolLiveAid ran on ordinary webcams a decade ago.\nTheir trick #1: don't look FOR balls, look for anything that isn't table. A smeared ball doesn't look like a ball, but it never looks like blue felt either. We had this backwards \u2014 our smart detector finds balls brilliantly when they're sharp and goes blind when they move. Their approach never goes blind.\nTheir trick #2: carry uncertainty. When a system loses sight of a ball, it should get less sure about where it is \u2014 and search wider \u2014 automatically. We'd hand-built a dozen special rules that each approximate a piece of that.\nTheir trick #3: fit physics to the whole shot. A ball rolls straight, slows smoothly, and bounces off rails at known angles. Fit that model to every glimpse you got, and it fills the gaps \u2014 with an honest error bar. That's the plan now, in that order, each step measured before it replaces anything.",
-   "images": []
-  },
-  {
-   "id": 7,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "A first pattern in your misses",
-   "score": "",
-   "body": "Among misses the app is confident about, you miss RIGHT about 3x as often as left (25 vs 8). Small sample \u2014 a hint, not a diagnosis.\nOnly trusted verdicts are counted \u2014 every miss where the app couldn't clearly see the ball is excluded rather than guessed. That keeps the pattern honest, but it also keeps the sample small for now.\nAs more shots earn trusted verdicts (the physics-fit work in progress), this number firms up. If it holds near 3-to-1, that's the first concrete thing to take to the practice table.",
    "images": []
   }
  ]
