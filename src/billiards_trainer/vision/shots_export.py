@@ -12,6 +12,7 @@ review verdicts appended after — re-export refreshes it).
 
 import json
 import logging
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -127,15 +128,63 @@ def _shot_trails(reader: SidecarReader, s: dict, tf: dict,
     # ball stole that track at the contact point, so the track finished the
     # shot riding the cue and the exporter relabelled its entire history --
     # including the stretch where it really was sitting on the 4.
-    by_id: dict = {}
+    # A BANK NEEDS SAMPLES AT THE CUSHION (Joe, 2026-08-30: "we are still
+    # not getting enough responsiveness resolution to accurately reflect
+    # the bank shot"). A flat 0.15s grid is fine on a straight roll and
+    # blind at a corner: on the pinned session's shot 5 the ball moves up
+    # to 210 plane units - eight ball-widths - between two samples, so a
+    # cushion contact can fall entirely between them.
+    # Raising the whole grid is the wrong lever: it pays everywhere for a
+    # problem that exists only at corners. The GRID IS KEPT (the renderer
+    # interpolates its live tip between consecutive samples, and uneven
+    # spacing there is what made the tail move "in chunks"), and extra
+    # samples are ADDED where the path actually turns.
+    STEP, FINE = 0.15, 1.0 / 30.0
+    TURN_DEG = 20.0          # below the renderer's 35 so a corner it will
+                             # draw hard always has samples to draw it with
+    grid: dict = {}
     t = t0_win
     while t <= t1 + 1e-9:
         for tr in reader.tracks_at(t):
             if not tr.active:
                 continue
-            by_id.setdefault(tr.id, []).append(
+            grid.setdefault(tr.id, []).append(
                 (t, tr.x, tr.y, tr.radius, tr.number))
-        t += 0.15
+        t += STEP
+    fine: dict = {}
+    t = t0_win
+    while t <= t1 + 1e-9:
+        for tr in reader.tracks_at(t):
+            if not tr.active:
+                continue
+            fine.setdefault(tr.id, []).append(
+                (t, tr.x, tr.y, tr.radius, tr.number))
+        t += FINE
+    by_id = {}
+    for tid, coarse in grid.items():
+        rows = fine.get(tid) or []
+        keep = {round(p[0], 3): p for p in coarse}
+        for i in range(1, len(rows) - 1):
+            ax, ay = rows[i][1] - rows[i - 1][1], rows[i][2] - rows[i - 1][2]
+            bx, by = rows[i + 1][1] - rows[i][1], rows[i + 1][2] - rows[i][2]
+            na, nb = math.hypot(ax, ay), math.hypot(bx, by)
+            # A TURN NEEDS TRAVEL, NOT JUST AN ANGLE. Without this floor
+            # the angle test fires on a ball at REST: at 30fps its
+            # frame-to-frame displacement is detector noise, so its
+            # direction is random and every frame reads as a corner. The
+            # first cut of this took the bench's export from 920 points
+            # to 9,763 (24 KB -> 224 KB) for that reason alone. A real
+            # cushion contact moves many units per frame; 2.0 is well
+            # under that and well over the noise.
+            if na < 2.0 or nb < 2.0:
+                continue
+            cos = max(-1.0, min(1.0, (ax * bx + ay * by) / (na * nb)))
+            if math.degrees(math.acos(cos)) > TURN_DEG:
+                # the turn itself and its immediate neighbours, so the
+                # corner has a real vertex and two clean approaches
+                for k in (i - 1, i, i + 1):
+                    keep[round(rows[k][0], 3)] = rows[k]
+        by_id[tid] = [keep[k] for k in sorted(keep)]
     paths = _bridge_unnumbered(by_id)
     # A POTTED BALL'S TRAIL ENDS AT THE POCKET (Joe, 2026-08-31: "the
     # yellow trail follows it into the pocket and then the trail shoots

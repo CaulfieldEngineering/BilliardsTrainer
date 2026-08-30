@@ -1408,6 +1408,41 @@ $("ov-why").onclick = () => {
 // segments reshaped on every sample and the tail visibly stepped
 // (Joe: "the tail kind of moves in chunks"). The live half-segment from
 // that midpoint to the interpolated tip is drawn per-frame by the caller.
+// A CUSHION IS A CORNER, NOT A CURVE (Joe, 2026-08-30: "we are still not
+// getting enough responsiveness resolution to accurately reflect the bank
+// shot"). Both path builders below walk midpoint -> midpoint using each
+// sample as a quadratic CONTROL point, which by construction never
+// touches the sample - it cuts every corner by a quarter of the vertex
+// offset. That is right for a rolling curve and wrong for a bank.
+// Measured on the pinned session's shot 5, the 3's 140-degree cushion
+// contact at 86.47s, drawn from the shipped 0.15s samples:
+//     quadratic throughout : off by 18.8 units (0.72 ball-widths)
+//     hard corner          : off by 10.0 units (0.39 ball-widths)
+// so the rounding alone was about half the error; the rest is the
+// sampling, which the exporter now densifies at turns. The threshold is
+// flat between 25 and 45 degrees (identical measurements), so 35 sits in
+// the middle of a plateau rather than on a cliff.
+const HARD_TURN_DEG = 35;
+function turnDeg(a, b, c) {
+  const v1x = b[0] - a[0], v1y = b[1] - a[1];
+  const v2x = c[0] - b[0], v2y = c[1] - b[1];
+  const n1 = Math.hypot(v1x, v1y), n2 = Math.hypot(v2x, v2y);
+  if (n1 < 1e-6 || n2 < 1e-6) return 0;
+  const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (n1 * n2)));
+  return Math.acos(cos) * 180 / Math.PI;
+}
+// ONE rule, both builders (they used to carry the same three lines twice).
+function segThrough(path, pts, i) {
+  const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+  const my = (pts[i][1] + pts[i + 1][1]) / 2;
+  if (i > 0 && turnDeg(pts[i - 1], pts[i], pts[i + 1]) > HARD_TURN_DEG) {
+    path.lineTo(pts[i][0], pts[i][1]);      // through the bounce, not past it
+    path.lineTo(mx, my);
+  } else {
+    path.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+  }
+}
+
 function stablePrefix(pts) {
   const path = new Path2D();
   if (!pts.length) return path;
@@ -1418,11 +1453,7 @@ function stablePrefix(pts) {
     path.lineTo((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2);
     return path;
   }
-  for (let i = 1; i < n; i++) {
-    const mx = (pts[i][0] + pts[i + 1][0]) / 2;
-    const my = (pts[i][1] + pts[i + 1][1]) / 2;
-    path.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
-  }
+  for (let i = 1; i < n; i++) segThrough(path, pts, i);
   return path;
 }
 
@@ -1431,11 +1462,7 @@ function smoothPath(pts) {
   if (!pts.length) return path;
   path.moveTo(pts[0][0], pts[0][1]);
   if (pts.length === 2) { path.lineTo(pts[1][0], pts[1][1]); return path; }
-  for (let i = 1; i < pts.length - 1; i++) {
-    const mx = (pts[i][0] + pts[i + 1][0]) / 2;
-    const my = (pts[i][1] + pts[i + 1][1]) / 2;
-    path.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
-  }
+  for (let i = 1; i < pts.length - 1; i++) segThrough(path, pts, i);
   const n = pts.length - 1;
   path.quadraticCurveTo(pts[n - 1][0], pts[n - 1][1], pts[n][0], pts[n][1]);
   return path;
