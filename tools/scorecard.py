@@ -130,6 +130,19 @@ def _naming_correctness(r, times, frames) -> dict:
     seen = tot["right"] + tot["wrong"] + tot["unnamed"]
     return {
         "name_right_pct": round(100.0 * tot["right"] / max(1, seen), 1),
+        # THE UNFORGIVING FIGURE (round 49, raised by Joe 2026-08-30:
+        # "what does it mean to correctly name 99.6% of balls"). The
+        # line above divides by right+wrong+unnamed, so every check
+        # where truth says a ball IS here and the app has no live
+        # sighting is dropped from the denominator - 88 of 1096 on the
+        # bench, 8% of the evidence, invisible in the headline. Worse,
+        # that headline RISES as tracking gets WORSE: lose a ball and
+        # the denominator shrinks with it, so a detector that gave up
+        # entirely would score 100%. This one divides by EVERY truth
+        # check, so being blind costs exactly what being wrong costs.
+        "name_right_all_pct": round(
+            100.0 * tot["right"] / max(1, seen + tot["missing"]), 1),
+        "name_checks_total": seen + tot["missing"],
         "name_wrong_frames": tot["wrong"],
         "name_unnamed_frames": tot["unnamed"],
         "name_missing_frames": tot["missing"],
@@ -290,6 +303,9 @@ def main() -> None:
               f"(target 95+)  [wrong {c['name_wrong_frames']}, "
               f"unnamed {c['name_unnamed_frames']}, "
               f"no track {c['name_missing_frames']}]")
+        print(f"  ...OF ALL CHECKS: {c['name_right_all_pct']}% of "
+              f"{c['name_checks_total']} pixel-truth checks (target 95+) "
+              f"- counts BLIND as failure, not just WRONG")
         if c["name_confusions"]:
             worst = ", ".join(f"{k} x{v}" for k, v in
                               list(c["name_confusions"].items())[:5])

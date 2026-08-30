@@ -862,6 +862,22 @@ class Pipeline:
             r_ball = expected_ball_radius_px(calib.table, self.settings.table.size)
             shrink = max(0.0, 1.0 - r_ball / float(cam[2]))
             rect = cam[:2] + (rect - cam[:2]) * shrink
+            # THE OFFSET POINT MUST MOVE WITH THE CENTRE (round 49). The
+            # radius below is |rect_off - rect|, and this correction used
+            # to slide only `rect`, so the radius was a distance between
+            # two DIFFERENT coordinate frames. The error is directional -
+            # the offset is +x in raw, so on the side where +x points
+            # toward the camera nadir the radius came out SHORT and on
+            # the far side LONG. Measured on the bench: the purple 4,
+            # sitting still in plain sight near the left rail, was found
+            # every frame at score 0.87 and correctly named 4, projected
+            # to r=8.72 against a size floor of 8.94, and was DISCARDED
+            # BY 0.22 PIXELS for 82 consecutive seconds (19s-101s, 81 of
+            # the 88 blind checks on the whole clip). The same bug on the
+            # other side is why the ceiling was raised to 1.75 for a ball
+            # "in the top-right corner projecting at 1.59x" - that was a
+            # bandage on this, not a property of the optics.
+            rect_off = cam[:2] + (rect_off - cam[:2]) * shrink
         out = []
         for d, (rx, ry), (ox, oy) in zip(raw_dets, rect, rect_off, strict=False):
             out.append(Detection(float(rx), float(ry), float(np.hypot(ox - rx, oy - ry)),

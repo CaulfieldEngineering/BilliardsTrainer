@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 91,
+   "ts": "2026-08-30T05:32:12",
+   "date": "Aug 30, 01:32 AM EDT",
+   "kind": "fix",
+   "title": "Round 49: a ball the app deleted for 82 seconds",
+   "score": "Joe's question about the naming percentage led to the purple 4 being discarded by two tenths of a pixel, every frame, for 82 seconds",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/091-missing_moments.png",
+     "caption": "The blind moments, before the fix. The purple 4 circled in red, sitting in plain sight on open felt, unoccluded, from t=19 to t=88 - with the app's nearest tracked ball 264px away."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Round 49, and this one came straight out of your question. Asking\nwhat \"99.6% named correctly\" meant led to a purple ball that the app deleted\nfrom existence for 82 seconds - while every number on the scorecard said it was\nbeing tracked perfectly.</strong></p>\n\n<h3>What the metric was hiding</h3>\n<p>Yesterday's answer: the headline divided by the moments the app HAD a ball,\nso the 88 checks where it had nothing were left out. I added the unforgiving\nversion - right divided by every check, blind included. It read 91.4%, below\nthe 95 bar. So I went and looked at those 88 moments.</p>\n<p><strong>81 of the 88 were the same ball</strong>, the purple 4, in one\nunbroken stretch from 19 seconds to 101 seconds. Not occluded, not blurred -\nsitting still on open felt in plain view. The app's nearest tracked ball was\n264 pixels away.</p>\n\n<h3>The cause: a ball measured against the wrong ruler</h3>\n<p>The app finds a ball, then converts its position to a flat overhead view. A\nball sits a couple of centimetres ABOVE the cloth, so the app corrects for that\nheight. The bug: it applied the correction to the ball's centre but NOT to the\nsecond point it measures the ball's WIDTH against - so the width came out as a\ndistance between two different maps.</p>\n<p>The error leans one way. On one side of the room balls measured too small, on\nthe other too big. The purple 4 was on the small side:</p>\n<pre>\nwhat the detector saw     a ball, 0.87 confidence, correctly read as \"4\"\nits measured width        8.72 pixels\nthe minimum accepted      8.94 pixels\n</pre>\n<p><strong>Thrown away by two tenths of a pixel, every frame, for 82\nseconds.</strong> The proof it is fixed is not the ball reappearing - it is that\nevery ball on the table now measures the same size. Before, widths across one\nframe ranged 8.7 to 14.2. Now they range 12.0 to 12.9, against an expected\n12.4. That is what the overhead view was always supposed to give.</p>\n\n<h3>The bench</h3>\n<pre>\n                          before    after\nblind moments               88        7\nthe purple 4            134/136   217/217\nnaming, blind counted     91.4%    99.0%\nmoving balls named        95.6%    98.9%\nshots found               10/10    10/10\npots attributed             4/4      4/4\n</pre>\n\n<h3>And two things it got WORSE - posted as they are</h3>\n<p>Making the 4 visible for 82 extra seconds gave the shot-scoring stage more to\nchew on, and it exposed two faults that the blind spot had been hiding:</p>\n<p><strong>Your 208s shot is scored wrong.</strong> The blue 2 runs into the\nbottom-right, rattles, and comes back out - I watched it, it is plainly on the\ntable at the end. The app calls it a make, and says it potted the <em>1</em>, a\nball that went down 38 seconds earlier. Cause found: the 2's path is carried by\nTHREE separate tracks, and the middle fragment - born mislabelled right at the\njaw, dead a third of a second later inside the pocket - collects the credit.</p>\n<p><strong>The 13-second setup is still called a shot.</strong> I fixed one real\nbug there (the cue's speed was being measured across a moment where its label\njumped to a different object, reading 2920 px/s when the true figure is 213),\nbut it was not the whole cause.</p>\n<p>Both are the same underlying thing: one ball becoming several tracks. That is\nnow the top of the list, and I deliberately threw away a downstream patch I\nwrote for it - it would have hidden the symptom without fixing the ball.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li></ul>"
+  },
+  {
    "id": 90,
    "ts": "2026-08-30T04:52:53",
    "date": "Aug 30, 12:52 AM EDT",
@@ -977,16 +993,6 @@
    "title": "Home screen restored",
    "score": "",
    "body": "The card list is gone \u2014 the home screen is back to the layout you didn't mind (What's New row stays, pause-fade stays). The real redesign target is the clips player, Instagram-style, coming next.",
-   "images": []
-  },
-  {
-   "id": 11,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Pause button gets out of the way",
-   "score": "",
-   "body": "The play symbol now fades out a moment after you pause, so it no longer sits on top of the frame you paused to study.",
    "images": []
   }
  ]

@@ -45,11 +45,11 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T04:51Z
+    written        2026-08-30T05:32Z
     bench          session-20260824-220247.mp4
-    engine rules_v 18
-    measured       2026-08-30T04:51Z
-    shot list      14 entries (10 strokes, 4 makes)
+    engine rules_v 19
+    measured       2026-08-30T05:30Z
+    shot list      13 entries (11 strokes, 5 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
 gate of record. This block exists so a session picking up the
@@ -57,64 +57,81 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 48
+### NEXT TARGETS (top first) — round 49
 
-0. *** THE HEADLINE METRIC EXCLUDES 8% OF THE CHECKS *** (raised by
-   Joe, 2026-08-30: "what does it mean to correctly name 99.6% of
-   balls"). _naming_correctness divides right by (right+wrong+unnamed)
-   and leaves `missing` OUT of the denominator. On the bench that is 88
-   of 1096 checks - 8.0% - where pixel truth says a ball is at a spot
-   and the app has NO live sighting within 30px. So "99.6% named
-   correctly" honestly means "of the moments it had the ball at all".
-   88 blind moments is a bigger hole than 4 misnamed ones, and the
-   headline hides it behind a number that goes UP as tracking gets
-   worse (fewer tracked = smaller denominator).
-   DO: (a) report a second, unforgiving figure - right / ALL truth
-   checks (currently 1004/1096 = 91.6%) - beside the existing one, and
-   put BOTH in the phone's STATUS view; (b) then attack the 88. First
-   split them: a ball genuinely occluded by hand/cue is not the same
-   failure as a ball in plain sight with no track, and only the pixels
-   can tell those apart - render the missing moments and LOOK before
-   theorising. Gate: no regression in name_right_pct while the new
-   figure rises.
+0. *** ONE BALL BECOMES THREE TRACKS AT THE JAW *** - the cause of BOTH
+   remaining bench failures, and it is an ASSOCIATION defect, not a
+   scoring one. Measured at 208.0s, where the blue 2 dives into the
+   bottom-right, rattles and comes back out (Claude WATCHED it; the 2 is
+   plainly on the felt at the end):
+       track id1  name "2"   45 sightings   from 207.01 (460,624)
+       track id3  name "1"   11 sightings   from 208.51 (477,712)  <- dive
+       track id9  name "2"  137 sightings   from 208.88 (593,1134) <- return
+   The middle fragment is born misnamed AT THE JAW, dies 0.3s later
+   inside the pocket zone, and is scored a MAKE that "potted the 1" - a
+   ball potted 38s earlier and never replaced. The same entry's trail
+   list carries ball 2 with 51 points, so one shot entry contradicts
+   itself. The 1Hz naming truth cannot see an 0.33s burst, which is why
+   NAMED CORRECTLY still reads 99.6% through all of this.
+   WHY IT FRAGMENTS: the ball is fast AND near a pocket, where the jaw
+   confidence filter thins the dim reads (see the R3 round-13/14 notes),
+   so the track starves exactly where it is hardest to re-acquire. Fix
+   the association through the jaw and both the wrong outcome and the
+   phantom name go with it.
+   DO NOT patch this downstream. Round 49 TRIED "the pot goes to the name
+   the track actually wore" and it cannot fire: id3 never wore another
+   name, it was born misnamed. Reverted, with the reasoning kept in
+   shots.py so it is not re-attempted.
 
-1. RECOVERED DETECTIONS LOSE THEIR NAME. blur_recovery emits an
+1. THE 13.1s HAND SETUP IS STILL SCORED A STROKE (fake 1/10). Round 49
+   fixed one half: cue travel and peak are now measured only between
+   consecutive samples of the SAME track, because the name "0" hopping
+   to another track ~97px away read as 2920 px/s against a 400 bar. That
+   was a real bug (pinned by TestSpeedAcrossALabelHop) but it did not
+   clear this episode, so the cue genuinely exceeds the bar within one
+   track while Joe rolls it into place by hand. The hand context that
+   should catch it is absent: the sidecar shows ff=None through
+   16-20s, so no foreign/hand state was recorded exactly while the cue
+   was being placed. NEXT: find out why _foreign_state produces nothing
+   there before touching the speed bars - the bars are measured and
+   correct (real strokes 691-2063, this setup 213).
+
+2. THE HEADLINE METRIC NOW HAS AN HONEST TWIN. `...OF ALL CHECKS` counts
+   blind as failure: 91.4% -> 99.0% this round. Still to do: put BOTH
+   figures in the phone's STATUS view, and split the remaining 7 blind
+   checks (ball 3 x6 at 126-131s, ball 1 x1 at 158s) into
+   genuinely-occluded vs in-plain-sight by LOOKING at them.
+
+3. RECOVERED DETECTIONS LOSE THEIR NAME. blur_recovery emits an
    UNNUMBERED detection stamped `recovered_for=<track id>`, and
-   MotionTracker ignores that field entirely - it competes on distance
-   like any other blob. Measured round 48: with recovery ungated the
-   purple 4 went 134/136 -> 136/136 (recovery genuinely found it), but
-   `moving balls named` fell 95.7% -> 92.2% because the recovered
-   sightings arrive nameless. Honour `recovered_for` in association and
-   both numbers should move together. THIS is how to get the 4 to
-   136/136 without the regression.
-2. _locate IS STILL ~37% OF ENGINE WALL TIME. Measured over 900 bench
-   frames: ungated 311 calls at 287ms = 66% of wall; after the name gate
-   and _MIN_MISSES=2, 145 calls; after caching the background median
-   (which sweep() had always done and _locate never did), ~178ms each =
-   37%. The window clips to 520, so the crop is routinely ~1040x1040 and
-   the median runs over 15 of them. NEXT: shrink the window (it is sized
-   for the worst case on every call), or subsample the buffer depth, or
-   do the search at half resolution as sweep does. Engine is 18.5 fps
-   vs a 24 fps baseline; the library catch-up feels this on every clip.
-3. THE BENCH IS EASY. Recovery found nothing here because the clip is
-   well lit; the module was built for
-   session-20260820-005048-recovered @233, where balls ARE lost. Now
-   that measured colour reaches the offline tracker, re-run that clip
-   and check recovery actually fires - it never could before round 48.
-4. P2 COLD CLIP is still blocked on the colour-refs reproducibility gap:
-   APP_DIR/colour_refs.json is regenerated from _train, which is
-   gitignored, so a fresh clone cannot rebuild it.
-5. tools/rebuild_batch.py still drives an OLD build() path and tests
-   staleness by timestamp. It must drive measure/job.run and compare
-   ENGINE_RULES_V before it is pointed at the library. Joe's "clean and
-   reproducible way of updating reprocessed clips" is not done until
-   this lands.
-6. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
+   MotionTracker ignores that field - it competes on distance like any
+   other blob. Round 48 measured the cost: ungated recovery took the
+   purple 4 to 136/136 but dropped `moving balls named` to 92.2%.
+   Honour `recovered_for` and both move together.
+
+4. _locate IS ~37% OF ENGINE WALL TIME (round 48). The window clips to
+   520 so the crop is ~1040x1040 and the median runs over 15 of them.
+   Caching helped (287ms -> ~178ms); shrink the window or search at half
+   resolution as sweep() does.
+
+5. THE BENCH IS EASY. Recovery finds nothing here because the clip is
+   well lit; it was built for session-20260820-005048-recovered @233.
+   Now that measured colour reaches the offline tracker, re-run that
+   clip - recovery could never fire there before round 48.
+
+6. P2 COLD CLIP blocked on colour-refs reproducibility:
+   APP_DIR/colour_refs.json is rebuilt from _train, which is gitignored.
+
+7. tools/rebuild_batch.py still drives an OLD build() path and tests
+   staleness by timestamp; must drive measure/job.run and compare
+   ENGINE_RULES_V before being pointed at the library.
+
+8. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
    independently of shots.analyze. One opinion per fact (L1).
-7. DELETE vision/tracking.py (716 lines) after migrating its case law
-   out of 4 test files; also vision/identity.py's `_Internal` import,
-   tools/eval_tracking.py, and the MeasurementCore shadow/divergence
-   scaffolding.
+
+9. DELETE vision/tracking.py (716 lines) after migrating its case law out
+   of 4 test files; also vision/identity.py's `_Internal` import,
+   tools/eval_tracking.py, and the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

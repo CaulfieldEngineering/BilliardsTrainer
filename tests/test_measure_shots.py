@@ -324,3 +324,41 @@ class TestCueTravelGate:
                                  3: _roll_then_rest(60, 160, 300, 200, 300, 800)})
         ep = analyze(times, frames)[0]
         assert ep.cue_travel < 150
+
+
+class TestSpeedAcrossALabelHop:
+    """A number is a label on a track, and labels hop.
+
+    Round 49: the bench's hand-setup at 13.1s was scored a STROKE. The
+    cue's own track dropped out for one sample, the name "0" sat briefly
+    on a different track ~97px away, and the cue "peak" computed ACROSS
+    that hop read 2920 px/s against a 400 px/s bar. Real strokes peak
+    691-2063 and that setup really peaks at 213, so the bar was right and
+    the MEASUREMENT was wrong. Travel and peak now only accumulate
+    between consecutive samples of the SAME track.
+    """
+
+    def _rows(self, seq):
+        """seq: list of (t, [(track_id, x, y, number), ...])"""
+        times = [t for t, _ in seq]
+        frames = [[(i, x, y, 12.0, n, "solid", True, False)
+                   for (i, x, y, n) in rows] for _, rows in seq]
+        return times, frames
+
+    def test_a_label_hop_does_not_count_as_cue_travel(self):
+        from billiards_trainer.measure.shots import _series
+        seq = []
+        t = 0.0
+        for _ in range(10):                       # the cue, sitting still
+            seq.append((t, [(1, 100.0, 100.0, 0)]))
+            t += 1 / 30
+        seq.append((t, [(2, 400.0, 400.0, 0)]))   # the label hops away
+        times, frames = self._rows(seq)
+        pts = _series(times, frames)[0]
+        assert all(len(p) > 3 for p in pts), "series must carry the track id"
+        hop = [(a, b) for a, b in zip(pts, pts[1:]) if a[3] != b[3]]
+        assert hop, "the fixture must contain a label hop"
+        same = sum(((b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2) ** 0.5
+                   for a, b in zip(pts, pts[1:]) if a[3] == b[3])
+        assert same < 1.0, (
+            "a still cue accumulated travel across a track switch")

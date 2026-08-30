@@ -2604,3 +2604,46 @@ Rounds continue with Joe's visual feedback as the gate.
   and the headline RISES as tracking gets worse. Queue item 0: report
   right/ALL (today 1004/1096 = 91.6%) beside it, then split the 88 into
   genuinely-occluded vs in-plain-sight by LOOKING at those frames.
+
+- 2026-08-30 ~02:00 EDT - ROUND 49 (rules_v 18 -> 19). MIXED RESULT,
+  posted as such. Joe asked what "99.6% named correctly" means; the
+  answer exposed that _naming_correctness divides by right+wrong+unnamed
+  and leaves `missing` OUT. Added `name_right_all_pct` (right / ALL
+  1096 pixel-truth checks) - it read 91.4%, BELOW the 95 bar, so R3 was
+  never actually passing.
+  LOOKED at the 88 blind checks (new tools/show_missing.py): 81 were ONE
+  ball, the purple 4, in one unbroken span 19.0s -> 101.0s, in PLAIN
+  SIGHT on open felt, nearest live track 264px away. Zero coasting.
+  ROOT CAUSE, found by bisecting prepare_detections: the FINDER saw it
+  every frame at score 0.87, correctly named 4 - and the size prior
+  deleted it. _project_raw_to_rect applies the ball-height parallax
+  correction to the CENTRE (`rect`) but not to the offset point
+  (`rect_off`) it measures the radius against, so the radius was a
+  distance between two DIFFERENT coordinate frames. The error is
+  directional: the 4 projected to r=8.72 against a floor of 8.94 -
+  DISCARDED BY 0.22px for 82 seconds. The 1.75 ceiling in that same
+  filter turns out to be a bandage for this bug on the other side.
+  PROOF: radii across one frame went from 8.72-14.20 (+-24%) to
+  11.98-12.93 (+-4%) around exp_r 12.42.
+  MEASURED: blind checks 88 -> 7; ball 4 134/136 -> 217/217; all-checks
+  91.4% -> 99.0%; moving named 95.6% -> 98.9%; named 99.4% -> 99.6%;
+  strokes 10/10, pots 4/4, invented 0, gate 0.18, engine 331s all HELD.
+  REGRESSED - outcomes 10/10 -> 9/10 and fake 0 -> 1. Both are faults
+  the blind spot was HIDING, not new damage, and both have one cause:
+  ONE BALL BECOMES THREE TRACKS. At 208.0s the blue 2 dives into the
+  bottom-right, rattles and returns (VISION-CORROBORATED: rendered the
+  shot, the 2 is plainly on the felt at the end) - carried by id1/"2"
+  (45 sightings), id3/"1" (11, born misnamed AT THE JAW, dead 0.3s
+  later inside the pocket) and id9/"2" (137). The orphan fragment
+  collects a MAKE that "potted the 1", 38s after the real 1 went down,
+  while the same entry's trail list carries ball 2 with 51 points.
+  SHIPPED with it: MIN_PRESENT=3 (a ball needs more than one sighting
+  to be pot-eligible) and per-track cue travel/peak - the name "0"
+  hopping to a track 97px away read 2920px/s against a 400 bar, when
+  real strokes peak 691-2063 and that setup peaks at 213 (pinned by
+  TestSpeedAcrossALabelHop). Neither cleared its bench case; both are
+  correctness fixes kept on their own merits.
+  TRIED AND REVERTED: "the pot goes to the name the track actually
+  wore". It CANNOT fire here - id3 never wore another name, it was born
+  misnamed - and it would have hidden the symptom without fixing the
+  fragmentation (L2). Reasoning kept in shots.py so it is not retried.

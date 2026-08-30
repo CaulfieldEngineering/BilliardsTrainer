@@ -32,6 +32,20 @@ POT_PRESENT_S = 0.5  # a ball must have been seen this soon after the
                      # was either already on the table or it was not; a
                      # ball that materialises mid-shot beside a pocket is
                      # a misname, not a make.
+MIN_PRESENT = 3      # ...and seen this MANY times, not once. Round 49:
+                     # the yellow 1 was potted at 170.6s and gone for the
+                     # rest of the clip, yet the 208.0s shot was scored a
+                     # MAKE that "potted the 1 into the bottom-right".
+                     # The whole basis was ONE frame - at t=208.51 the
+                     # red 3's track read "1" for a single sample, mid
+                     # table, 6.3 pocket radii from anything - and that
+                     # lone flicker made the 1 "present", so its absence
+                     # afterwards read as a drop. A ball that is really
+                     # on the table is seen dozens of times in an episode
+                     # (the four real pots carry 28-66 trail points); one
+                     # sighting is a misread, not a ball. Same bar the
+                     # tracker already uses before it will SHOW a number
+                     # (MIN_ID_FRAMES).
 
 
 @dataclass
@@ -74,7 +88,18 @@ def _series(times, frames):
                 continue
             n = tr[4]
             key = n if n >= 0 else -int(tr[0])
-            by_n.setdefault(key, []).append((times[j], tr[1], tr[2]))
+            # the TRACK ID rides along (round 49). A number can hop from
+            # one track to another for a frame, and a speed computed
+            # ACROSS that hop is not the ball's speed - it is the
+            # distance between two different objects. That is what
+            # defeated the stroke test on the bench's hand-setup at
+            # 13.1s: the cue's own track dropped out for one sample, the
+            # label "0" sat briefly on another track ~97px away, and the
+            # cue "peak" read 2920 px/s against a 400 px/s bar. Real
+            # strokes peak 691-2063 and that setup really peaks at 213,
+            # so the bar was right and the measurement was wrong.
+            by_n.setdefault(key, []).append(
+                (times[j], tr[1], tr[2], int(tr[0])))
     # unnamed tracks must EARN ball status: substantial travel at ball
     # speed. Gloves/stick blobs dwell and creep; rolling balls cross felt.
     for key in [k for k in by_n if k < 0]:
@@ -127,7 +152,7 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
     for n, pts in by_n.items():
         out = moving_ts.setdefault(n, [])
         for k in range(1, len(pts)):
-            (t0, x0, y0), (t1, x1, y1) = pts[k - 1], pts[k]
+            (t0, x0, y0), (t1, x1, y1) = pts[k - 1][:3], pts[k][:3]
             dt = t1 - t0
             if 0 < dt < 0.5:
                 v = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 / dt
@@ -178,10 +203,15 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
         # constantly while setting up; that is not a shot.
         cue_pts = [p for p in by_n.get(0, [])
                    if t_open - 0.3 <= p[0] <= t_close]
+        # SAME TRACK ONLY, for both travel and speed (round 49): a step
+        # between two different tracks that happened to share the name
+        # "0" measures the gap between two objects, not the distance the
+        # cue ball rolled.
         ep.cue_travel = sum(
             ((cue_pts[k][1] - cue_pts[k - 1][1]) ** 2
              + (cue_pts[k][2] - cue_pts[k - 1][2]) ** 2) ** 0.5
-            for k in range(1, len(cue_pts)))
+            for k in range(1, len(cue_pts))
+            if cue_pts[k][3] == cue_pts[k - 1][3])
         # HOW FAST, not just how far. A hand cannot roll a ball at stroke
         # speed, and that is what separates a real shot from Joe placing
         # balls: measured over the whole bench, the one hand-setup that
@@ -197,6 +227,8 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
         peak = 0.0
         for q in range(1, len(cue_pts)):
             dt = cue_pts[q][0] - cue_pts[q - 1][0]
+            if cue_pts[q][3] != cue_pts[q - 1][3]:
+                continue                     # a label hop, not a roll
             if 0 < dt < 0.2:
                 v = (((cue_pts[q][1] - cue_pts[q - 1][1]) ** 2
                       + (cue_pts[q][2] - cue_pts[q - 1][2]) ** 2) ** 0.5) / dt
@@ -278,9 +310,22 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
         # the session. The real 4 was on the felt all clip - it simply
         # was not tracked under that number during this shot, which is
         # precisely why the phantom could borrow it.
-        if not any(p[0] <= t_open + POT_PRESENT_S for p in pre):
+        if (not any(p[0] <= t_open + POT_PRESENT_S for p in pre)
+                or len(pre) < MIN_PRESENT):
             ep.lost.append((n, round(last[1], 1), round(last[2], 1)))
             continue
+        # TRIED AND REVERTED (round 49): "the pot goes to the name the
+        # track actually wore" - refuse the credit when the dying track
+        # spent more of the episode under a different number. It cannot
+        # fire on the case that motivated it. Measured at 208.0s: the
+        # blue 2's path is carried by THREE tracks - id1/"2" (45
+        # sightings) up to the strike, id3/"1" (11) diving into the
+        # bottom-right jaw, id9/"2" (137) coming back out. id3 is not a
+        # track that changed its mind; it is a FRAGMENT, born misnamed
+        # at the jaw and dead 0.3s later, so it never wore another name
+        # and the rule saw nothing to compare. The defect is upstream -
+        # one ball must not become three tracks - and a downstream
+        # ownership test is a bandage on it (L2: measure, don't patch).
         # track died with motion: pocket credit iff the FINAL PATH passes
         # through a pocket zone. The death point alone is not enough -
         # a dropping ball's track coasts THROUGH the mouth and dies
@@ -292,7 +337,7 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
                 if last[0] - 1.0 <= p[0] <= last[0]]
         near = None
         for (qx, qy) in (pockets or []):
-            for (_t, tx, ty) in tail:
+            for (_t, tx, ty) in (p[:3] for p in tail):
                 if ((tx - qx) ** 2 + (ty - qy) ** 2) ** 0.5 < 2.6 * pocket_r:
                     near = (qx, qy)
                     break
@@ -309,7 +354,7 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
             bx0, bx1, by0, by1 = min(xs), max(xs), min(ys), max(ys)
             exit_p = None
             seen_off = False
-            for (_t, tx, ty) in reversed(tail):
+            for (_t, tx, ty) in (p[:3] for p in reversed(tail)):
                 if bx0 <= tx <= bx1 and by0 <= ty <= by1:
                     if seen_off:
                         exit_p = (tx, ty)

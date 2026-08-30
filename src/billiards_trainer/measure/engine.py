@@ -29,12 +29,13 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 18  # v18: association fixed three ways (acquire gate is
-                     # a FLOOR not a branch, travel term bounded by the
-                     # coast window, a NAME outranks four pixels), and
-                     # every detection now carries its measured colour
-                     # offline - it never did, so blur recovery and the
-                     # colour machinery were structurally dead in clips
+ENGINE_RULES_V = 19  # v19: the rect radius was measured between two
+                     # different coordinate frames (parallax applied to
+                     # the centre, not to the offset point it is measured
+                     # against), so a real ball in plain sight could fall
+                     # 0.22px under the size floor and be discarded for
+                     # 82 seconds. Ball radii across a frame tightened
+                     # from +-24% to +-4%; blind checks 88 -> 7
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
