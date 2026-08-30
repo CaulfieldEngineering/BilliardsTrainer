@@ -111,22 +111,36 @@ class FindIdEnsemble(DetectorStrategy):
         for fi, f in enumerate(found):
             if fi in used_f:
                 continue
-            if f.number is None or f.number < 0:
-                self._name_unknown(frame_bgr, f, present)
-                if f.number > 0:
-                    present.add(f.number)
-            else:
-                # An unmatched find keeps the FINDER's colour-heuristic
-                # guess — which nothing ever checked, while matched pairs
-                # get the measured-colour correction. Under Joe's warm
-                # light the purple 4 guesses BLUE (its crop measures 7.8
-                # Lab from the 4's reference and 69 from the 2's), so the
-                # 4 voted '2' every frame of a session, arbitration
-                # stripped the duplicate, and the ball stayed nameless.
-                # Same decisive-margin machinery, same trust order:
-                # measured table colour over a canonical-palette guess.
-                self._fix_colour(frame_bgr, f)
+            self.repair_unread(frame_bgr, f, present)
         return found
+
+    @staticmethod
+    def repair_unread(frame_bgr, f, present: set) -> None:
+        """Check a find the IDENTIFIER never read — one copy (round 66).
+
+        An unread find keeps the FINDER's colour-heuristic guess, which
+        nothing checks. Under Joe's warm light the purple 4 guesses BLUE
+        (its crop measures 7.8 Lab from the 4's reference and 69 from the
+        2's), so the 4 voted '2' every frame of a session, arbitration
+        stripped the duplicate, and the ball stayed nameless. Same
+        decisive-margin machinery, same trust order: measured table
+        colour over a canonical-palette guess.
+
+        THE ENGINE NEVER DID THIS (round 66). _pair_identities gates the
+        whole repair behind `if num >= 0`, and the identifier reads only
+        a fraction of the balls on the table - on the cold clip's
+        176-196s it reads the cue and the green 6 and NOTHING ELSE, so
+        the stripe, the 8 and the 7 were named by the unchecked
+        heuristic. That is where the invented numbers come from: the
+        heuristic emits stripe numbers directly, and 330 frames of "13"
+        were its guess with no measured colour ever consulted.
+        """
+        if f.number is None or f.number < 0:
+            FindIdEnsemble._name_unknown(frame_bgr, f, present)
+            if f.number is not None and f.number > 0:
+                present.add(f.number)
+        else:
+            FindIdEnsemble._fix_colour(frame_bgr, f)
 
     @staticmethod
     def _name_unknown(frame_bgr, f, taken=frozenset()) -> None:

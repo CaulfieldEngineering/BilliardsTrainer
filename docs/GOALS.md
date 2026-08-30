@@ -3146,3 +3146,35 @@ Rounds continue with Joe's visual feedback as the gate.
   frame rate it is 143/366. The truth samples are ~1/sec on settled
   moments - a fine yardstick, a biased survey - and I stated the 65/66 as
   if it described the engine. Same trap as the round-49 survey.
+
+- 2026-08-30 ~10:45 EDT - ROUND 66: HALF OF EVERY DETECTION HAD NEVER
+  BEEN CHECKED. _pair_identities gated the entire measured-colour repair
+  behind `if num >= 0`, and the identifier reads only a fraction of the
+  balls: cold 461 of 846 finds (54.5%) and bench 339 of 790 (42.9%) get
+  NO identity read. All of those kept the finder's colour-heuristic
+  guess with nothing checking it, and the heuristic emits stripe numbers
+  directly - it was handing out a "10" on a table with no 10 and an "8"
+  on a table with no 8. THAT is the source of the invented numbers; it
+  was never the identifier. The live ensemble has repaired exactly these
+  finds since round 34 and the engine never did - now one copy,
+  FindIdEnsemble.repair_unread, called by both. FIFTH one-fact-two-owners
+  split in two rounds.
+  INVENTED NUMBERS NOW ZERO ON BOTH CLIPS, a campaign first.
+  COLD: naming 97.6 -> 98.9%, all-checks 97.4 -> 98.7%, ball 9 45/66 ->
+  56/66, invented 330 frames -> 0, wrong 21 -> 10, unnamed 1 -> 0,
+  9->13 x11 gone. Still 9/9, 9/9, 5/5, 0 fake.
+  BENCH: naming 99.8 -> 99.7% (REGRESSION, one ball-4 sighting now
+  unnamed, 217/217 -> 216/217) while moving-ball naming rose 98.9 ->
+  99.3%. Still 10/10, 10/10, 4/4, 0 invented. Kept: the cold clip gained
+  1.3% and shed every invented frame.
+  VISION-CORROBORATED: re-rendered the exact frame that read trk3=13 -
+  it now reads trk3=9 on the visibly orange-banded stripe, and the
+  overlay shows how few balls carry an identifier read at all.
+  DISPROVED FIRST: the identity CADENCE (IDENT_EVERY=6, stale positions
+  re-paired for five frames) was my hypothesis and the measurement
+  killed it - the number handed to that ball is flat across staleness
+  (FRESH {1:42,5:15,9:41} vs stale+5 {1:42,5:19,9:36}). The probe's
+  by-product - nearest identity read 190px away, gate 32px - is what
+  found the real cause.
+  REMAINING: the 9->1 pair is now the ONLY naming error on either clip
+  (cold x10, bench x2); everything else is perfect on both tables.

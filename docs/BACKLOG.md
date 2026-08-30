@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T13:41Z
+    written        2026-08-30T14:03Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T13:36Z
+    measured       2026-08-30T14:01Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,78 +57,70 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 65
+### NEXT TARGETS (top first) — round 66
 
-*** THE STRIPE REPAIR HAD NEVER RUN ON A RECORDED CLIP ***
-    The live path repaired the STRIPE BIT then the COLOUR; the offline
-    engine (_pair_identities) called the colour half ONLY. So
-    _fix_stripe_bit - bought over rounds 27-33 - has never executed on a
-    single clip the campaign has ever scored, and round 64's fix to the
-    stripe reader changed literally nothing because the code it fixed
-    was unreachable. Now ONE entry point, FindIdEnsemble.repair_identity,
-    called by both. Same class as round 48 (sample_colour live-only).
-    THREE separate one-fact-two-owners splits surfaced in this ONE round:
-      1. the repair SEQUENCE      (engine had half of it)
-      2. the stripe WINDOW        (the yardstick has documented the
-         0.95 disc since round 27 - "all 20 labelled 9s read solid"
-         under the inner 62% - while the engine kept the 62%)
-      3. the no-reference RULE    (_fix_colour learned in round 34 that
-         absence of evidence must not protect a claim;
-         _fix_stripe_colour, the second copy, never did)
+*** HALF OF EVERY DETECTION HAD NEVER BEEN CHECKED BY ANYTHING ***
+    _pair_identities gated the ENTIRE measured-colour repair behind
+    `if num >= 0` - a number from the identifier. The identifier reads
+    only a fraction of the balls on the table:
+        cold   846 finds, 461 (54.5%) with NO identity read
+        bench  790 finds, 339 (42.9%) with NO identity read
+    Every one of those kept the FINDER's colour-heuristic guess with
+    nothing checking it, and the heuristic emits stripe numbers
+    directly. The names it was handing out unchecked:
+        cold   {8:93, 7:86, 10:86, 2:55, 0:42, -1:39, 4:29, 1:22, ...}
+        bench  {2:219, 0:40, 1:33, 8:31, 4:9, 3:6, -1:1}
+    A "10" on a table with no 10 and an "8" on a table with no 8. THAT
+    is where the invented numbers came from - never the identifier.
+    The live ensemble has repaired exactly these finds since round 34.
+    The engine never did. Now one copy, FindIdEnsemble.repair_unread,
+    called by both. FIFTH one-fact-two-owners split in two rounds.
 
-*** THE WHITE-FRACTION BAR IS A PER-TABLE FACT, MEASURED ***
-    Per detection over both clips' naming truth (n=1811) the two tables
-    OVERLAP EACH OTHER outright:
-        bench solids max 0.340   bench stripe min 0.364  -> bar 0.352
-        cold  solids max 0.110   cold  stripe min 0.236  -> bar 0.173
-    No constant serves both: the bench's bar rejects the cold stripe on
-    nearly every frame, and the cold bar promotes the bench's red 3 tail
-    frames into an invented 11. The bar now lives with the other
-    per-table appearance facts (this session's colour refs) as
-    `stripe_bar`, and a table with no measured bar ABSTAINS.
+*** INVENTED NUMBERS NOW ZERO ON BOTH CLIPS - a campaign first ***
+                              bench            cold
+    strokes found             10/10            9/9
+    outcomes right            10/10            9/9
+    pots to right ball          4/4            5/5
+    fake / unexplained          0/0            0/0
+    naming            99.8 -> 99.7%   97.6 -> 98.9%
+    of ALL checks     99.2 -> 99.1%   97.4 -> 98.7%
+    moving named      98.9 -> 99.3%   96.5 -> 96.6%
+    invented              0, still   330 frames -> 0
+    cold ball 9            -         45/66 -> 56/66
+    The bench dipped 0.1% (one ball-4 sighting became unnamed, 217/217
+    -> 216/217) while its moving-ball naming rose 98.9 -> 99.3%. Posted
+    as a regression; kept because the cold clip gained 1.3% and shed
+    every invented frame.
+    VISION-CORROBORATED: the frame that read trk3=13 now reads trk3=9,
+    on the visibly orange-banded stripe.
 
-                              bench        cold
-    strokes found             10/10        9/9
-    outcomes right            10/10        9/9
-    pots to right ball          4/4        5/5
-    fake / unexplained          0/0        0/0
-    naming            99.6 -> 99.8%   97.5 -> 97.6%
-    of ALL checks     99.0 -> 99.2%   97.3 -> 97.4%
-    invented              none/none   151 -> 330 frames   <-- REGRESSION
+0. THE 9->1 PAIR IS NOW THE ONLY NAMING ERROR ON EITHER CLIP.
+    cold 9->1 x10 (ball 9 at 56/66), bench 9->1 x2 (219/221). Nothing
+    else is wrong anywhere: cold is 0:175/175 1:15/15 2:38/38 4:111/111
+    6:184/184 7:151/151 8:183/183, bench is perfect on 0,1,2,3.
+    Round 65 measured why this pair is hard HERE: on the cold table the
+    stripe's band sits ~10 Lab from the gold 1, and the per-frame white
+    fraction of that stripe falls to 0.236 while the bench's solids
+    reach 0.340 - the two tables' distributions overlap, so the bar is
+    per-table (docs/colour_refs*.json `stripe_bar`). The remaining 10
+    are the frames where the band is turned away from the camera.
 
-0. *** THE TRACKER PUBLISHES A NAME 2% OF THE EVIDENCE SUPPORTS. ***
-    This is the real defect and it is NOT naming. Dense sweep of the
-    cold clip's 176-196s window, 366 sightings of the stripe's track:
-        what the TRACK publishes :  13 x330,  9 x36
-        what the CHAIN returns   :   9 x143,  1 x130,  5 x85,  13 x8
-    The track shows 13 on 330 frames while the per-frame evidence
-    supports 13 on EIGHT of 366, against a plurality of 9. Whatever
-    commits a track's name is not taking the majority of its reads.
-    Fixing the naming chain cannot help this ball until that is fixed -
-    and it is why this round's chain repairs moved the error from
-    "9->1 x17" to "9->13 x11" rather than removing it. START HERE.
-
-1. AND A WARNING ABOUT MY OWN METHOD, bought this round: measured on the
-    66 naming-truth samples the chain looked near-perfect (65/66 -> 9).
-    Measured over the SAME window at full frame rate it returns 9 on
-    143/366. The truth samples are ~1/sec and sit on settled, clean
-    moments; they are a fine YARDSTICK and a badly biased SURVEY. I
-    stated the 65/66 as if it described the engine's behaviour and it
-    did not. Same trap as the round-49 survey of already-matched pairs.
-    Any per-frame claim must be measured per frame.
-
-2. INVENTED [13] 330 FRAMES on the cold clip (was 151) - a REGRESSION
-    this round, and a symptom of target 0 rather than of naming. Kept
-    rather than reverted because the pinned bench improved on every
-    metric (99.6->99.8, wrong 3->2, unnamed 1->0, still zero invented)
-    and because reverting hides the tracker defect instead of fixing it.
-    If Joe would rather see a duplicate real name than an invented one,
-    revert the engine wiring and the bench gives back 0.2%.
-
-3. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
+1. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
     truth scores the cue 175/175 - a TRACKING gap, not naming, because
-    the cue metric demands a LIVE sighting every frame. Same family as
-    target 0: measure where the cue's label rides a coast.
+    the cue metric demands a LIVE sighting every frame. Measure where
+    the cue's label rides a coast.
+
+2. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? Now that the
+    unchecked half is repaired the loss is contained, but a model that
+    misses 43-55% of finds is the upstream fact. Worth measuring
+    whether it is tiling, ball size, or the score floor before anything
+    downstream is tuned further.
+
+3. A WARNING ABOUT MY OWN METHOD, bought in round 65: measured on the
+    66 naming-truth samples a chain looked 65/66; measured over the same
+    window at full frame rate it was 143/366. The truth samples are
+    ~1/sec on settled moments - a fine YARDSTICK and a badly biased
+    SURVEY. Any per-frame claim must be measured per frame.
 
 4. The palette's 1/3/5 independence caveat; the palette is hand-labelled
     and does not scale; the identifier mislabels balls mid-collision

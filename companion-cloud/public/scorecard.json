@@ -1,11 +1,11 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-30T03:13:29Z",
+ "ts": "2026-08-30T14:02:24Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
  "extra_episodes": 0,
- "episodes": 19,
+ "episodes": 15,
  "shots": [
   {
    "strike": 31.7,
@@ -112,16 +112,17 @@
  ],
  "caps": {
   "cue_named_pct": 99.9,
-  "named_moving_pct": 94.7,
+  "named_moving_pct": 99.3,
   "invented_numbers": [],
   "invented_frames": 0,
-  "name_right_pct": 99.3,
-  "name_wrong_frames": 3,
-  "name_unnamed_frames": 4,
-  "name_missing_frames": 88,
+  "name_right_pct": 99.7,
+  "name_right_all_pct": 99.1,
+  "name_checks_total": 1096,
+  "name_wrong_frames": 2,
+  "name_unnamed_frames": 1,
+  "name_missing_frames": 7,
   "name_confusions": {
-   "9->1": 2,
-   "1->9": 1
+   "9->1": 2
   },
   "name_per_ball": {
    "0": {
@@ -131,8 +132,8 @@
     "missing": 0
    },
    "1": {
-    "right": 84,
-    "wrong": 1,
+    "right": 85,
+    "wrong": 0,
     "unnamed": 0,
     "missing": 1
    },
@@ -143,26 +144,26 @@
     "missing": 0
    },
    "3": {
-    "right": 188,
+    "right": 189,
     "wrong": 0,
-    "unnamed": 1,
+    "unnamed": 0,
     "missing": 6
    },
    "4": {
-    "right": 134,
+    "right": 216,
     "wrong": 0,
-    "unnamed": 2,
-    "missing": 81
+    "unnamed": 1,
+    "missing": 0
    },
    "9": {
-    "right": 218,
+    "right": 219,
     "wrong": 2,
-    "unnamed": 1,
+    "unnamed": 0,
     "missing": 0
    }
   },
   "pot_attribution": "4/4"
  },
- "setup_labelled": 9,
+ "setup_labelled": 5,
  "perfect": true
 }

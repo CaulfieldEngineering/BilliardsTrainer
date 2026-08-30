@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 108,
+   "ts": "2026-08-30T14:03:31",
+   "date": "Aug 30, 10:03 AM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 10:03 AM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/108-r66_after.png",
+     "caption": "The middle frame used to call that striped ball a 13; it now reads 9. Yellow rings are the balls the naming model actually read - note how few there are."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 65: the stripe repair had never run on a recorded clip</li><li>Round 63: the yardstick was wrong again - the stripe is a 9, and the engine was right</li><li>Round 62: a NameError had been firing on every engine run for eleven rounds</li><li>Round 61: per-session colour references - cold naming 85.7% -&gt; 93.3%, bench unchanged</li><li>Round 60: the cold clip has a naming gate, and both remaining defects share one root</li><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li></ul><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r66_after.png' alt=''><figcaption>The middle frame used to call that striped ball a 13; it now reads 9. Yellow rings are the balls the naming model actually read - note how few there are.</figcaption></figure></div>"
+  },
+  {
+   "id": 107,
+   "ts": "2026-08-30T14:03:27",
+   "date": "Aug 30, 10:03 AM EDT",
+   "kind": "finding",
+   "title": "Half of what the app sees had never been checked",
+   "score": "The measured-colour check ran only on balls the naming model had read - 43-55% of balls were named by an unchecked guess. Invented numbers now zero on both clips.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/107-r66_after.png",
+     "caption": "The middle frame is the one that used to call that striped ball a 13; it now reads 9. Yellow rings are the balls the naming model actually read - note how few there are. Everything else was being named by a guess nothing checked."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>More than half of everything the app sees had never been checked by\nanything. It has been trusting a crude colour guess on 43-55% of the balls in\nevery frame, and that - not the naming model - is where the made-up ball numbers\ncame from. Both your clips now report zero invented numbers, a first.</strong></p>\n\n<pre>\n                     pinned session         new clip\nshots found              10 of 10           9 of 9\nmakes and misses         10 of 10           9 of 9\npots to right ball         4 of 4           5 of 5\nnaming              99.8% -> 99.7%    97.6% -> 98.9%\nmoving balls named  98.9% -> 99.3%    96.5% -> 96.6%\ninvented numbers       none, still    330 frames -> NONE\n</pre>\n\n<h3>What was actually happening</h3>\n<p>The app names a ball in two stages: a naming model reads it, then a check\ncompares the ball against the real measured colours of your set and overrules the\nmodel when it is clearly wrong. That check only ran on balls the naming model had\nread. And the naming model reads far fewer balls than I assumed:</p>\n<pre>\nnew clip     846 balls seen, 461 of them (54%) never read at all\npinned       790 balls seen, 339 of them (43%) never read at all\n</pre>\n<p>Every one of those fell back to a crude colour guess that nothing checked. The\nguess was handing out a \"10\" on a table with no 10, and an \"8\" on your pinned\ntable, which has no 8. That is exactly the made-up numbers you have seen. The\ncheck now runs on those balls too - it already did while you were playing, it\njust never did when the app analysed a recording.</p>\n\n<h3>The one that got worse</h3>\n<p>Your pinned session slipped by a tenth of a percent: one sighting of the\npurple 4 is now left unnamed instead of named. Against that, its naming of balls\nIN MOTION - the hard case - went up, and the new clip gained 1.3% and lost every\nsingle invented frame. I kept the change, but that dip is real.</p>\n\n<h3>What is left</h3>\n<p>One confusion remains on either table: the yellow ball against the yellow\nstriped ball, ten frames on the new clip and two on your pinned one. Everything\nelse on both tables is now named correctly in every frame I can check. Those ten\nare the frames where the stripe's band is turned away from the camera and there\nis simply less white to see.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 65: the stripe repair had never run on a recorded clip</li><li>Round 63: the yardstick was wrong again - the stripe is a 9, and the engine was right</li><li>Round 62: a NameError had been firing on every engine run for eleven rounds</li><li>Round 61: per-session colour references - cold naming 85.7% -&gt; 93.3%, bench unchanged</li><li>Round 60: the cold clip has a naming gate, and both remaining defects share one root</li><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li></ul>"
+  },
+  {
    "id": 106,
    "ts": "2026-08-30T13:41:42",
    "date": "Aug 30, 09:41 AM EDT",
@@ -1063,26 +1095,6 @@
    "title": "Found it: one clock bug behind everything tonight",
    "score": "",
    "body": "The analysis clock ran ~3 seconds behind the video - every symptom you hit inherited it. Trails animated seconds after the balls had stopped. Aim lines were computed on mid-shot frames (wrong line, or no line at all). Slow-mo clips cut at the skewed time and started mid-shot. All timestamps are now anchored to the video itself, per shot, using each shot's frame-verified strike moment.\nYour @58 shot now has its aim line. Tonight's session re-verified server-side: shot 3's line lies exactly along the stick, through the cue ball, stopping at the 4.\nThe jittery move-stop-move tail is fixed too (the overlay clock could step backwards between frames; it can't now).\nTonight's session is fully corrected; the rest of the library retrofits overnight.\nThis is phase 1 of the cleanup you called for. Phase 2 makes every shot go through ONE identical pipeline the moment it completes - no more some-shots-analyzed-some-not. Phase 3 is the UI redesign.",
-   "images": []
-  },
-  {
-   "id": 28,
-   "ts": "2026-08-25T12:00:00",
-   "date": "Aug 25, 2026",
-   "kind": "update",
-   "title": "Trails and aim lines stay glued to the right shot",
-   "score": "",
-   "body": "You caught it exactly: during laggy loads, the overlay clock kept running from the previous position, so the previous shot's (perfectly drawn) trail animated over the wrong footage - and aim lines could show for a shot the picture hadn't reached yet. The player now refuses to draw any overlay while the picture can't match it, and every navigation resets the overlay clock.\nRoot cause 1: jumping between shots bypassed the overlay clock's reset, so during a slow seek it extrapolated from the old position - the old trail kept animating until the new shot's first frame arrived.\nRoot cause 2: in playlists that hop between session videos, a cached trail from the same shot NUMBER in the previous session could be reused. The cache now knows which session it belongs to.\nNew rule everywhere: mid-seek, mid-load, or mid-swap, the overlay layer goes blank instead of guessing - same philosophy as detection's 'show nothing rather than something wrong'.\nAn adversarial review of the whole overlay timing system also caught and fixed: stale scrub seeks replaying after navigation, the frame-scrubber serving another session's cached frames after a playlist hop, and background frame-warming making overlays flicker while paused.",
-   "images": []
-  },
-  {
-   "id": 27,
-   "ts": "2026-08-24T12:00:00",
-   "date": "Aug 24, 2026",
-   "kind": "update",
-   "title": "You were right: quick pop-ups go with misses",
-   "score": "",
-   "body": "Overnight, every shot in the library (1,193 across 35 sessions) got its stroke measured. The pattern you predicted is real: 32% of your misses come with a stay-down under 1 second, versus 16% of your makes - exactly double. Your median hold is also 0.3s shorter on misses (1.27s vs 1.57s). Lifetime Stats now shows medians and quick-exit rates.\nThe averages almost hid this (1.58s vs 1.65s) - the signature is a fat tail of quick exits on misses, so the stats show median and %-under-1-second instead.\nNo shot in the library measured under 0.7s, so your 'pop-ups' are subtle - a 0.9s exit, not a jump. The camera catches what feels invisible.\nEvery shot's Details sheet now carries its own numbers - check a few of your misses against your makes.",
    "images": []
   }
  ]

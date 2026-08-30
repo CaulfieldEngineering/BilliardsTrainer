@@ -194,6 +194,27 @@ class TestStripeRepairPromotionOnly:
                        for ln in pair), (
             "the engine reaches past repair_identity into half of it")
 
+    def test_finds_the_identifier_never_read_are_still_checked(self):
+        """Round 66: they were not, and that is where invented numbers came from.
+
+        _pair_identities gated the whole repair behind `if num >= 0`.
+        The identifier reads only a fraction of the balls on the table -
+        on the cold clip's 176-196s it reads the cue and the green 6 and
+        nothing else - so every other ball kept the finder's colour
+        heuristic guess, unchecked, and the heuristic emits stripe
+        numbers directly. The live ensemble has repaired exactly these
+        since round 34; the engine never did.
+        """
+        import inspect
+
+        from billiards_trainer.measure import engine as eng
+        src = inspect.getsource(eng._pair_identities)
+        assert "repair_unread" in src, (
+            "unread finds are unchecked again - invented numbers return")
+        # and it must run on the finds WITHOUT a read, not the paired ones
+        assert "num_for.get" in src or "not in num_for" in src, (
+            "the unread branch must be selected by absence of a read")
+
     def test_missing_reference_does_not_protect_a_stripe_claim(self):
         """Round 65: it did, and 330 frames answered to an invented 13.
 

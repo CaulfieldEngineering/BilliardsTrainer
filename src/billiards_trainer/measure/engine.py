@@ -140,6 +140,25 @@ def _pair_identities(found, ident_by_pos, frame_bgr=None) -> None:
                 # only in the live path and never on a recorded clip.
                 from ..detector_strategies.ensemble import FindIdEnsemble
                 FindIdEnsemble.repair_identity(frame_bgr, d)
+    # AND THE FINDS THE IDENTIFIER NEVER READ (round 66). Everything
+    # above is gated on `num >= 0`, so a ball the identifier misses kept
+    # the finder's colour-heuristic guess with NOTHING checking it -
+    # while the live ensemble has repaired exactly those since round 34.
+    # Measured on the cold clip's 176-196s the identifier reads the cue
+    # and the green 6 and nothing else: the stripe, the 8 and the 7 were
+    # all named by the unchecked heuristic, and the heuristic emits
+    # stripe numbers directly. That is the source of the invented "13".
+    if frame_bgr is not None:
+        from ..detector_strategies.ensemble import FindIdEnsemble
+        # Frame-level uniqueness, built the SAME way the ensemble builds
+        # it - over every find that carries a number, not just the read
+        # ones - so two green blobs cannot both become the 6.
+        present = {d.number for d in found
+                   if getattr(d, "number", None) is not None and d.number > 0}
+        for fi_d, d in enumerate(found):
+            if num_for.get(fi_d, -1) >= 0:
+                continue
+            FindIdEnsemble.repair_unread(frame_bgr, d, present)
 
 
 def _write_shots(writer, times, frames, carried, calib) -> int:
