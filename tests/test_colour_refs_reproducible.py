@@ -91,7 +91,11 @@ class TestPerSessionReferences:
         got = balls.use_session_refs("session-20260823-185550.mp4")
         assert got, "the cold clip's own colour references were not found"
         refs = balls._load_measured_refs()
-        assert 13 in refs, "this table's orange STRIPE is missing from its refs"
+        # Round 63: this table's stripe is the 9, not a 13. It was called a
+        # 13 because it looks amber beside the BENCH's yellow 9 - a
+        # cross-table comparison. Within its own table the band sits 10.0
+        # Lab from that table's 1 and 98.8 from its 5, so stripe = 1 + 8.
+        assert 9 in refs, "this table's STRIPE is missing from its refs"
         assert 7 in refs and 6 in refs, "this table's 6 and 7 are missing"
         balls.use_session_refs(None)
         balls._MEASURED_REFS = None

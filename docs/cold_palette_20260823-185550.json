@@ -150,27 +150,6 @@
     ]
    }
   },
-  "13": {
-   "bgr": [
-    32.5,
-    143.5,
-    226.5
-   ],
-   "lab": [
-    170.0,
-    152.0,
-    194.0
-   ],
-   "white_frac": 0.209,
-   "stripe": true,
-   "seen_at": {
-    "t": 40.01,
-    "rect": [
-     283,
-     943
-    ]
-   }
-  },
   "5": {
    "bgr": [
     24.0,
@@ -212,11 +191,33 @@
      1015
     ]
    }
+  },
+  "9": {
+   "bgr": [
+    32.5,
+    143.5,
+    226.5
+   ],
+   "lab": [
+    170.0,
+    152.0,
+    194.0
+   ],
+   "white_frac": 0.209,
+   "stripe": true,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     283,
+     943
+    ]
+   }
   }
  },
  "not_scored": [
   3,
   5
  ],
- "not_scored_why": "The crimson 3 and the orange 5 are only 23.3 Lab apart on this table, and centroids measured at one instant cannot separate them across the clip's lighting: adjudicated by eye, all 66 'truth 3 / app 5' disagreements were MY truth being wrong and the engine being right. A yardstick abstains rather than guesses, so this pair is excluded from naming truth here. Separating them needs centroids sampled per ball across many positions, which needs a way to follow each ball that does not come from the app."
+ "not_scored_why": "The crimson 3 and the orange 5 are only 23.3 Lab apart on this table, and centroids measured at one instant cannot separate them across the clip's lighting: adjudicated by eye, all 66 'truth 3 / app 5' disagreements were MY truth being wrong and the engine being right. A yardstick abstains rather than guesses, so this pair is excluded from naming truth here. Separating them needs centroids sampled per ball across many positions, which needs a way to follow each ball that does not come from the app.",
+ "revised_round63": "13 -> 9. The stripe was called a 13 (orange stripe) on the strength of it looking amber next to the BENCH's yellow 9. That is a cross-table comparison and it is invalid: under THIS table's light its own 1 reads amber too (G/R 0.676). Measured WITHIN the table, the stripe's band sits 10.0 Lab from this table's 1 and 98.8 from its 5, so by 'stripe = solid + 8' it is the 9. The same test on the bench returns 1 -> 9, which is the known answer there, so the method is validated on a case with truth. The engine had been right all along and my file was scoring it wrong 61 times."
 }

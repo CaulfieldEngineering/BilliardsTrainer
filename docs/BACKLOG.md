@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T12:05Z
+    written        2026-08-30T12:28Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T12:03Z
@@ -57,68 +57,67 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 62
+### NEXT TARGETS (top first) — round 63
 
-*** A NameError HAD BEEN FIRING ON EVERY ENGINE RUN FOR ELEVEN ROUNDS ***
-    FIXED. _write_shots ended with a log line that spelled the stroke
-    rule out by hand and named MIN_CUE_TRAVEL / MIN_CUE_PEAK, which
-    round 51 removed from the import when the rule moved into
-    shots.is_stroke. Every clip since raised NameError there, caught by
-    the broad `except` in reprocess() that logs "shot derivation
-    failed". The shot list survived because every add_shot happens ABOVE
-    that line, which is exactly why nothing looked wrong. Both clips now
-    report 0 derivation failures and the summary line works again
-    ("m1 shots derived: 12 (10 strokes)").
-    LESSON: I SAW THIS IN ROUND 56 and dismissed it as an edge case of a
-    25-frame probe. A traceback in a log is evidence; "probably
-    harmless" is a hypothesis, and this one was wrong for eleven rounds.
+*** THE COLD CLIP NOW PASSES EVERY SHOT AND NAMING TARGET ***
+                          bench        cold
+    strokes found         10/10        9/9
+    outcomes right        10/10        9/9
+    pots to right ball      4/4        5/5
+    fake / unexplained      0/0        0/0
+    naming                99.6%       97.5%   (target 95 - PASSES)
+    of ALL checks         99.0%       97.3%   (target 95 - PASSES)
+    Still short: cold cue named 95.3% (target 99), invented [13] over
+    151 frames, gate 0.37 (limit 0.55).
 
-*** THE COLD STRIPE IS NOT A YELLOW 9, MEASURED ***
-    bench 9 band BGR (30,253,251) G/R 1.008   - pure yellow
-    cold  stripe band (20,175,242) G/R 0.723  - amber/orange
-    64.5 Lab apart, and the crops show it plainly. So "9" is wrong on
-    that ball whatever its true number is.
+*** THE YARDSTICK WAS WRONG AGAIN - THE STRIPE IS A 9, NOT A 13 ***
+    Naming went 93.3% -> 97.5% with NO ENGINE CHANGE. My file had been
+    scoring 61 correct engine reads as errors.
+    THE METHODOLOGICAL ERROR, worth not repeating: I compared the cold
+    stripe against the BENCH's yellow 9 (G/R 1.008 vs 0.723), decided it
+    was amber, and called it a 13. That is a CROSS-TABLE comparison and
+    it is invalid - under this table's light its own 1 reads amber too
+    (G/R 0.676). Measured WITHIN the table:
+        stripe band -> 10.0 Lab from this table's 1, 98.8 from its 5
+        so by "stripe = solid + 8" it is the 9
+    CONTROL: the identical test on the bench returns 1 -> 9, which is
+    the known answer there. A method that reproduces a known truth is
+    worth more than one that merely sounds right.
+    This is the THIRD time the truth file has been the defect (round 25
+    on the bench, round 58 and now 63 on the cold clip). Colour labels
+    read across tables are the recurring trap.
 
-0. THE STRIPE REPAIR IS SOUND BUT CANNOT REACH THE ANSWER.
-    _fix_stripe_colour already does the right thing - sample the BAND
-    (a stripe's band is its base colour) and match it against SOLID
-    references, so 13 = 5 + 8. Instrumented over 698 firings on the cold
-    clip it concluded "band agrees with the claim" EVERY time, because
-    the band's nearest reference is the gold 1 at 24 Lab and there IS NO
-    5 in that table's reference set - round 60 excluded 3 and 5 as
-    inseparable. The band actually sits BETWEEN the gold 1 (14,163,241)
-    and the deep-orange 5 (24,56,179), matching neither well.
-    DO: measure the 5's own BAND-equivalent colour properly and decide
-    whether a 5 reference can be admitted for the stripe path even
-    though 3-vs-5 remains unresolved for whole-crop naming. The two uses
-    are different: whole-crop median must separate 3 from 5, while the
-    stripe path only needs the band to prefer 5 over 1.
+0. THE 1/9 PAIR IS THE WHOLE REMAINING NAMING GAP ON THE COLD CLIP.
+    ball 9: 44/66, confused 9->1 x17 and 9->13 x5; everything else is
+    at or near perfect (0:175/175, 1:15/15, 2:38/38, 4:110/111,
+    6:184/184, 7:151/151, 8:183/183).
+    The gold 1 and the 9's band are ~10 Lab apart on this table - the
+    SAME pair the bench spent rounds 27-33 on, where the answer was the
+    stripe bit read from the band (_fix_stripe_bit). Measure what that
+    reader reports for this table's 1 and 9 before changing anything,
+    and use a PER-TABLE bar (round 61: the largest-gap rule classifies
+    every ball correctly on both clips, bench 0.265 / cold 0.245, while
+    the engine's absolute stripe_above=0.48 sits above BOTH real stripes
+    and can therefore only ever abstain).
 
-1. *** A TRUTH-INDEPENDENCE RISK IN MY OWN PALETTE, recorded before it
-    bites. *** docs/cold_palette_20260823-185550.json was labelled by
-    eye, but for the ambiguous balls (1, 3, 5) I accepted the app's own
-    names because they matched what I saw. That is not independent
-    truth: if the engine confuses 1/3/5 systematically, the palette
-    inherits the confusion and the naming score flatters it. The
-    unambiguous balls (0, 2, 6, 7, 8, and the stripe) are safe - they
-    were read from colour alone. BEFORE trusting the 1/3/5 rows for any
-    fix, re-derive them from something the app never touched: their
-    positions across a shot where each is potted, which the shot truth
-    already establishes independently.
+1. INVENTED [13] OVER 151 FRAMES on the cold clip - the engine sometimes
+    says 13 where the ball is the 9. Same pair, other direction.
 
 2. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99) while the naming
     truth scores the cue 175/175 - a TRACKING gap, not naming, because
-    the cue metric demands a live sighting every frame.
+    the cue metric demands a LIVE sighting every frame. Measure where
+    the cue's label rides a coast.
 
-3. A per-table STRIPE BAR (measured round 61: the largest-gap rule
-    classifies every ball correctly on both clips, bench 0.265 / cold
-    0.245, while the engine's absolute stripe_above=0.48 sits above both
-    real stripes and can only abstain).
+3. THE PALETTE'S 1/3/5 ROWS still carry the independence caveat from
+    round 62, though round 63's within-table ordering test now supports
+    them: the three warm balls sort 0.676 > 0.313 > 0.000, i.e. yellow,
+    orange, red -> 1, 5, 3, which is the standard set. Re-derive from
+    the pot order if they are ever used to justify a fix.
 
 4. The palette is still hand-labelled and does not scale; the identifier
-    mislabels balls mid-collision (round 55); colour cannot separate gold
-    from white at speed (round 56); the remaining 7 blind checks on the
-    bench; both naming figures in the phone STATUS view; recovered
+    mislabels balls mid-collision (round 55); colour cannot separate
+    gold from white at speed (round 56); the remaining 7 blind checks on
+    the bench; both naming figures in the phone STATUS view; recovered
     detections lose their name; _locate is ~37% of engine wall time;
     rebuild_batch.py still drives an OLD build() path (every clip in the
     library is stale at rules_v 20); events/shot.py is a third shot

@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 105,
+   "ts": "2026-08-30T12:28:20",
+   "date": "Aug 30, 08:28 AM EDT",
+   "kind": "finding",
+   "title": "The app was right and my notes were wrong",
+   "score": "The striped ball is the 9 after all - 61 correct reads had been scored as errors. Naming on the new clip 93.3% -> 97.5% with no code change.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/105-nine_families.png",
+     "caption": "Each table's plain yellow ball beside its own striped one. They match within a table and differ between tables - which is exactly why comparing the new table's stripe against your pinned table's made it look like a different ball."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The app was right and I was wrong. The striped ball on the new table\nis the 9 after all - I had been marking 61 correct answers as mistakes. With my\nnotes corrected and nothing changed in the app, naming on that session goes from\n93.3% to 97.5%, which passes.</strong></p>\n\n<pre>\n                     pinned session      new clip\nshots found              10 of 10        9 of 9\nmakes and misses         10 of 10        9 of 9\npots to right ball         4 of 4        5 of 5\nnaming                      99.6%          97.5%\n</pre>\n\n<h3>How I got it wrong</h3>\n<p>I compared the striped ball on the new table against the yellow striped ball\non your pinned table. Next to that one it looks distinctly orange, so I recorded\nit as the orange stripe and spent two rounds trying to work out why the app kept\ninsisting otherwise.</p>\n<p>The comparison was the mistake. The two tables are lit differently, and on\nthe new table the plain yellow ball ALSO looks amber. Put the striped ball next\nto its own table's yellow ball and they are obviously the same colour - which\nmakes it the 9, because on a pool set the 9 is just the 1 with a white band.</p>\n<p>I then ran the same test on your pinned session, where I already know the\nanswer: it correctly identifies that table's stripe as the 9. A method that\nreproduces an answer you already have is worth more than one that merely sounds\nconvincing.</p>\n\n<h3>This keeps happening, and it is worth saying plainly</h3>\n<p>That is the third time my own reference notes have been the fault rather than\nthe app - once on your pinned session, twice on the new one. Every time the\ncause was the same: judging a ball's colour against something from a different\ntable. I have written the rule into the notes so it is not repeated: compare a\nball only against other balls on the SAME cloth under the SAME light.</p>\n\n<h3>What is actually left</h3>\n<p>Almost everything on that table is now named perfectly - the cue, the blue,\nthe green, the black, the burgundy, the purple. The one remaining confusion is\nthe yellow ball against the yellow striped ball, which are about as close as two\nballs can be on that cloth. That is the same pair your pinned session struggled\nwith for six rounds before it was solved, so there is a known route.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 62: a NameError had been firing on every engine run for eleven rounds</li><li>Round 61: per-session colour references - cold naming 85.7% -&gt; 93.3%, bench unchanged</li><li>Round 60: the cold clip has a naming gate, and both remaining defects share one root</li><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li></ul>"
+  },
+  {
    "id": 104,
    "ts": "2026-08-30T12:05:23",
    "date": "Aug 30, 08:05 AM EDT",
@@ -1061,16 +1077,6 @@
    "title": "New metric: how long you stay down on the shot",
    "score": "",
    "body": "Every shot now gets stroke measurements straight from the camera: how long your cue stays down after contact, your backstroke length, the pause at the top of it, and your practice-stroke count. Misses often come with popping up early - now there's a number for it, and Lifetime Stats compares your average stay-down on makes vs misses.\nVerified frame-by-frame before shipping: 9 of 9 measured shots matched hand-checked ground truth within 0.1 seconds (a tenth shot, where the balls were moved by hand, correctly measured nothing).\nThe shot Details sheet shows a STROKE row: stay-down seconds, an early pop-up warning, pause milliseconds, backstroke length, practice strokes.\nUnder the hood the true strike moment is re-detected from the cue ball's disappearance (the tracker's shot clock runs ~2.4s late), and the cue stick is tracked even when your arm overlaps it.\nThese field names match your Bluetooth cue sensor's - when it's installed, both sources will measure the same things and check each other.",
-   "images": []
-  },
-  {
-   "id": 25,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Tracking sees through the grain now",
-   "score": "",
-   "body": "Tonight's high-ISO footage was confusing the ball tracker (identity mix-ups ran 4x the usual rate). The analysis feed now gets cleaned of grain before the detector looks at it - measured on your grainiest session: fewer identity mix-ups, better ball numbering, and 12-13% more balls held per frame. Your recordings are untouched.\nVerified on two separate 6-minute slices before enabling: identity hops down 15%, ball-number coverage up, track fragmentation down 14-21%, and more balls tracked per frame in both tests with no metric worse.\nThis is the software half of the grain fix. The camera half (1/250 shutter + half the ISO next time you're at the rig) removes grain at the source and roughly halves file sizes too.",
    "images": []
   }
  ]

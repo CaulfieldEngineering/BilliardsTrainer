@@ -3081,3 +3081,31 @@ Rounds continue with Joe's visual feedback as the gate.
   truth (which ball is potted when) before using them to justify a fix.
   Both clips unchanged: bench 10/10 10/10 4/4 99.6%; cold 9/9 9/9 5/5
   93.3%. Suite green.
+
+- 2026-08-30 ~16:00 EDT - ROUND 63: THE YARDSTICK WAS WRONG AGAIN; THE
+  ENGINE WAS RIGHT. The cold clip's stripe is the 9, not a 13. Naming
+  93.3% -> 97.5% and all-checks 93.1% -> 97.3% with NO ENGINE CHANGE -
+  my file had been scoring 61 correct reads as errors. THE COLD CLIP NOW
+  PASSES every shot and naming target (9/9 strokes, 9/9 outcomes, 5/5
+  pots, 0 fake, naming 97.5% against 95).
+  THE METHODOLOGICAL ERROR: I compared the cold stripe against the
+  BENCH's yellow 9 (G/R 1.008 vs 0.723), judged it amber, and called it
+  a 13. CROSS-TABLE colour comparison is invalid - under this table's
+  light its own 1 reads amber too (G/R 0.676). Measured WITHIN the
+  table, the stripe's band is 10.0 Lab from this table's 1 and 98.8 from
+  its 5, so by "stripe = solid + 8" it is the 9. CONTROL: the identical
+  test on the bench returns 1 -> 9, the known answer there.
+  VISION-CORROBORATED: rendered each table's 1 beside its own stripe -
+  they match within a table and differ between tables, which is exactly
+  the trap.
+  THIRD TIME the truth file has been the defect (round 25 bench, rounds
+  58 and 63 cold). The recurring cause is judging colour across tables;
+  the rule is now written into the backlog and the palette.
+  ALSO EXPLAINS round 62: _fix_stripe_colour concluding "band agrees
+  with the claim" 698/698 was CORRECT every time. I spent that round
+  working out why it would not produce the wrong answer I expected.
+  REMAINING on the cold clip: ball 9 at 44/66 (9->1 x17, 9->13 x5) - the
+  1/9 pair, ~10 Lab apart on this table, which is the same pair the
+  bench spent rounds 27-33 on and solved with the band's stripe bit.
+  Everything else is at or near perfect. Cue named 95.3% is a TRACKING
+  gap, not naming (truth scores the cue 175/175).
