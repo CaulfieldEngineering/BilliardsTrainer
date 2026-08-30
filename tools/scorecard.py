@@ -130,6 +130,15 @@ def _naming_correctness(r, times, frames) -> dict:
                 e["unnamed"] += 1
             elif int(best[4]) == int(n):
                 e["right"] += 1
+                # WHO NAMED THIS BALL - the identity model, or colour?
+                # Round 81 measured that the model emits NOTHING at the
+                # dark balls (the cold table's black 8: 0 of 92), so they
+                # are named entirely by the measured-colour path. Colour
+                # is not a backstop for those, it is the floor - and
+                # nothing on this card said so, which is why it took a
+                # bespoke sweep to notice. Sidecar element 9.
+                if not (len(best) > 9 and best[9]):
+                    e["right_colour"] = e.get("right_colour", 0) + 1
                 # ...but was the ball SEEN, or is this credit resting on a
                 # coasted estimate that happened to be right? Audited in
                 # round 79 after two metrics in seven rounds turned out to
@@ -151,6 +160,7 @@ def _naming_correctness(r, times, frames) -> dict:
     tot = {k: sum(v[k] for v in per.values())
            for k in ("right", "wrong", "unnamed", "missing")}
     tot["right_coast"] = sum(v.get("right_coast", 0) for v in per.values())
+    tot["right_colour"] = sum(v.get("right_colour", 0) for v in per.values())
     seen = tot["right"] + tot["wrong"] + tot["unnamed"]
     return {
         "name_right_pct": round(100.0 * tot["right"] / max(1, seen), 1),
@@ -163,6 +173,12 @@ def _naming_correctness(r, times, frames) -> dict:
         "name_right_seen_pct": round(
             100.0 * (tot["right"] - tot["right_coast"]) / max(1, seen), 1),
         "name_right_on_estimates": tot["right_coast"],
+        # Correct names the identity MODEL never contributed to - colour
+        # alone. See the comment at right_colour above.
+        "name_right_by_colour": tot["right_colour"],
+        "name_by_colour_per_ball": {
+            str(k): per[k].get("right_colour", 0) for k in sorted(per)
+            if per[k].get("right_colour", 0)},
         # THE UNFORGIVING FIGURE (round 49, raised by Joe 2026-08-30:
         # "what does it mean to correctly name 99.6% of balls"). The
         # line above divides by right+wrong+unnamed, so every check
@@ -467,6 +483,11 @@ def main() -> None:
         print(f"  ...OF ALL CHECKS: {c['name_right_all_pct']}% of "
               f"{c['name_checks_total']} pixel-truth checks (target 95+) "
               f"- counts BLIND as failure, not just WRONG")
+        if c.get("name_right_by_colour"):
+            tot_r = sum(v["right"] for v in c["name_per_ball"].values())                 if isinstance(next(iter(c["name_per_ball"].values()), None), dict) else 0
+            print(f"  ...NAMED BY COLOUR: {c['name_right_by_colour']} correct "
+                  f"names the identity model never read - "
+                  f"{c['name_by_colour_per_ball']}")
         if c.get("name_right_on_estimates"):
             print(f"  ...ACTUALLY SEEN: {c['name_right_seen_pct']}% - "
                   f"{c['name_right_on_estimates']} of the correct names sit "

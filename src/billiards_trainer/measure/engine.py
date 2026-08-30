@@ -122,6 +122,11 @@ def _pair_identities(found, ident_by_pos, frame_bgr=None) -> None:
         # 4/4 -> 2/4. The finder's class is not evidence about
         # stripes; it is a guess about them, and round 33 already bought
         # the 9's name the hard way.
+        # WAS THIS BALL ACTUALLY READ, or is colour alone naming it?
+        # See core.types.Detection.identified - the identity model emits
+        # nothing at all at the dark balls, and this is what makes that
+        # visible on the scorecard instead of needing a bespoke sweep.
+        d.identified = num >= 0
         if num >= 0:
             d.number = num
             if frame_bgr is not None:

@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T21:25Z
+    written        2026-08-30T22:17Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T19:31Z
+    measured       2026-08-30T22:14Z
     shot list      12 entries (9 strokes, 3 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,74 +57,55 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 81
+### NEXT TARGETS (top first) — round 82
 
-*** THE IDENTITY MODEL IS BLIND TO DARK BALLS, AND COLOUR CARRIES THEM
-    ENTIRELY ***
-    "The identifier reads only half the balls" is answered, and the
-    question was partly wrong. FIRST, MY OWN STATISTIC WAS INFLATED:
-    round 66 counted every finder detection, including sub-ball-size
-    chalk marks (the same ones round 69 found at r=5-7 against a real
-    ball's 13-14). Filtering to ball-sized finds, the bench reads 77.1%,
-    not 42.9%.
-    THE SEAM HYPOTHESIS IS DEAD: the identifier infers two overlapping
-    60% tiles, and unread balls are NOT concentrated in the overlap band
-    (bench 40% unread vs 30% read; cold 1% vs 8% - opposite directions).
-    Radius, finder score and crowding do not separate either.
-    IT IS PER BALL, AND IT IS BRIGHTNESS:
-        cold  ball 8 (black)      0/92    0.0%   never once
-              ball 7 (burgundy)   2/85    2.4%
-              ball 1 (gold)       1/8    12.5%
-              ball 4 (purple)    26/56   46.4%
-              ball 0 (cue)       50/88   56.8%
-              balls 2,3,5,6              94-100%
-        bench ball 1 (yellow)    13/44   29.5%
-              ball 0 (cue)       71/111  64.0%
-              balls 3,4,9                94-98%
-    AND NO THRESHOLD CAN FIX IT: at the dark balls the model emits
-    NOTHING AT ALL - 31 of 31 probes at the 8 and 28 of 29 at the 7
-    returned no box, not a low-confidence one. This is a training gap,
-    not a tuning knob.
-    VISION-CORROBORATED: on a single frame every ball marked unread is
-    among the darkest on the cloth and every bright ball is read.
-    THE CONSEQUENCE THAT MATTERS: those balls are named ~100% correctly
-    anyway (cold's 8 scores 183/183, its 7 170/170) and ALL of that
-    comes from the measured-colour path. Colour is not a backstop for
-    the dark balls, it is the ONLY thing naming them. Round 58 already
-    showed what that looks like when it is missing - 46 balls unnamed
-    and the purple 4 called the 7 - which is why per-table references
-    are load-bearing rather than a nicety.
-    NO CODE CHANGED - a measurement round; both clips verified identical.
+*** THE COLOUR DEPENDENCY IS NOW A STANDING SCORECARD LINE ***
+    Round 81 found the identity model reads nothing at the dark balls and
+    that colour alone names them - but nothing recorded it, so it took a
+    bespoke sweep to see and would have taken another to notice it
+    changing. Detection.identified -> Track.id_read -> sidecar element 9
+    -> "...NAMED BY COLOUR", the same shape as round 68's Track.read.
+        cold  534 of 1,185 correct names the model never read:
+              {0:73, 1:14, 2:3, 3:5, 4:68, 5:2, 6:2, 7:166, 8:183, 9:18}
+        bench 196 of 1,094:
+              {0:78, 1:59, 2:41, 3:10, 4:7, 9:1}
+    That matches round 81's independent sweep ball for ball - the black 8
+    at 183 (read 0 of 92), the burgundy 7 at 166, the bright balls at
+    2-5. Two measurements taken different ways now agree.
+    VISION-CORROBORATED: on one frame the three balls marked
+    "colour alone" are the black 8, burgundy 7 and purple 4, and every
+    bright ball is marked "model".
+    A BUG WORTH THE COMMENT IT NOW CARRIES: the first cut reported ALL
+    1,094 bench names as colour-only. prepare_detections REBUILDS every
+    Detection, and a rebuilt object loses any field the constructor is
+    not told about - the flag died at projection exactly as measured_bgr
+    once did. It was caught because round 81 had already established the
+    right answer, so the wrong one was recognisable.
+    Both clips otherwise identical: bench 10/10, 10/10, 4/4, naming 99.9%
+    (99.3% seen), ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
 
-0. MAKE THE COLOUR DEPENDENCY VISIBLE ON EVERY RUN. Nothing on the
-    scorecard says "these balls are named by colour alone". A per-ball
-    identity-read rate would show it, but the scorecard reads only the
-    sidecar and the flag is not recorded there - Detection knows whether
-    an identity read landed and nothing carries it through. Same shape as
-    round 68's Track.read, which turned an invisible fact into a standing
-    line. Do that, then a silent loss of references shows up as a metric
-    rather than as a mystery weeks later.
+0. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT with
+    ZERO wrong names. Cold: 4 unnamed 5s, one 9->1, 0 blind. Both
+    clips' remaining errors are now individually named and understood;
+    there is no cheap win left in naming.
 
-1. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT with
-    ZERO wrong names; 7 of its correct names are estimates (the red 3
-    under Joe's leg). Cold: 4 unnamed 5s, one 9->1.
+1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): settling it needs a
+    population of GENUINE hand detections and session-20260802-173553 is
+    not in the library. Recover it or hand-label one.
 
-2. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): settling it needs a
-    population of GENUINE hand detections, and session-20260802-173553 -
-    the clip where a gloved hand tracked as a "#4" - is not in the
-    library. Recover it or hand-label one.
-
-3. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
+2. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
     is 1,962 KB of dense 30fps trails; the cost to pull it on a bad
     connection is unmeasured.
 
-4. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
-    gave the cold clip.
+3. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
+    gave the cold clip - its truth is still hand-fitted colour windows,
+    and round 82 makes the stakes concrete: on the cold clip 534 names
+    rest on those references, 349 of them on the two dark balls alone.
 
-5. tools/phone_view.py (round 74) screenshots the real player; --local
+4. tools/phone_view.py (round 74) screenshots the real player; --local
     serves the working tree so a UI fix is checked BEFORE it ships.
 
-6. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
@@ -135,11 +116,12 @@ queue cannot be told something the measurements disagree with.
     win (78); an angle test needs a magnitude guard (75); a regeneration
     needs a gate or it silently deletes (76); a favourable number
     deserves auditing too (79); check what your control group actually
-    contains (80); AND A STATISTIC ABOUT "DETECTIONS" IS ONLY AS GOOD AS
-    ITS DEFINITION OF ONE - 42.9% became 77.1% by excluding things that
-    were never balls (81).
+    contains (80); a statistic about "detections" is only as good as its
+    definition of one (81); AND A REBUILT OBJECT LOSES EVERY FIELD THE
+    CONSTRUCTOR IS NOT TOLD ABOUT - twice now, measured_bgr and
+    identified, both silent (82).
 
-7. The palette is hand-labelled and does not scale; the identifier
+6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall

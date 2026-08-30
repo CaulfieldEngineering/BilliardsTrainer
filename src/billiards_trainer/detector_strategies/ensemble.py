@@ -100,6 +100,7 @@ class FindIdEnsemble(DetectorStrategy):
             src = self._last_ids[di]
             f = found[fi]
             f.number, f.cls, f.bgr = src.number, src.cls, src.bgr
+            f.identified = True          # the model read this one
             self.repair_identity(frame_bgr, f)
         # Frame-level uniqueness for colour naming: numbers already worn by
         # any detection this frame are off the menu, and each name we hand

@@ -3573,3 +3573,30 @@ Rounds continue with Joe's visual feedback as the gate.
   NEXT: record whether a detection got an identity read so the colour
   dependency is a standing scorecard line rather than a fact discovered
   by accident - the same move as round 68's Track.read.
+
+- 2026-08-30 ~22:00 EDT - ROUND 82: THE COLOUR DEPENDENCY IS NOW A
+  STANDING SCORECARD LINE. Round 81 found the identity model reads
+  nothing at the dark balls and colour alone names them, but nothing
+  recorded it - so it took a bespoke sweep to see and would have taken
+  another to notice it changing. Detection.identified -> Track.id_read ->
+  sidecar element 9 -> "...NAMED BY COLOUR", the same shape as round 68's
+  Track.read.
+      cold  534 of 1,185 {0:73,1:14,2:3,3:5,4:68,5:2,6:2,7:166,8:183,9:18}
+      bench 196 of 1,094 {0:78,1:59,2:41,3:10,4:7,9:1}
+  This MATCHES round 81's independent sweep ball for ball - the black 8
+  at 183 (read 0 of 92), the burgundy 7 at 166, the bright balls at 2-5.
+  Two measurements taken different ways agreeing is worth more than
+  either alone.
+  VISION-CORROBORATED: on one frame the three balls marked "colour
+  alone" are the black 8, burgundy 7 and purple 4; every bright ball is
+  marked "model".
+  A BUG WORTH ITS COMMENT: the first cut reported ALL 1,094 bench names
+  as colour-only. prepare_detections REBUILDS every Detection and a
+  rebuilt object loses any field the constructor is not told about - the
+  flag died at projection exactly as measured_bgr once did. Caught only
+  because round 81 had established the right answer, so the wrong one was
+  recognisable.
+  Both clips otherwise identical: bench 10/10, 10/10, 4/4, naming 99.9%
+  (99.3% seen), ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
+  METHOD: a rebuilt object loses every field the constructor is not told
+  about - twice now, measured_bgr and identified, both silently.

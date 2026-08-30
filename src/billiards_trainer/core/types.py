@@ -73,6 +73,17 @@ class Detection:
     # merely echoes the classifier's guess (review finding: the tracker's
     # colour consensus was an echo chamber). None = no measurement made.
     measured_bgr: tuple[int, int, int] | None = None
+    #: Did the trained IDENTITY model actually read this ball, or is its
+    #: number coming from measured colour alone? Round 81 measured that
+    #: the identity model never once reads the cold table's black 8 (0 of
+    #: 92) and reads its burgundy 7 twice in 85 - it emits no box at all
+    #: at the dark balls, not a weak one. Those balls are still named
+    #: ~100% correctly, entirely by the measured-colour path, so colour
+    #: is not a backstop there: it is the only thing holding them up.
+    #: Nothing recorded that, so it took a bespoke sweep to find. This
+    #: carries it to the sidecar the way Track.read carries the vote
+    #: evidence (round 68).
+    identified: bool = False
 
     @property
     def xy(self) -> tuple[float, float]:
@@ -104,6 +115,12 @@ class Track:
                                # there is one track type, not two (Joe,
                                # 2026-08-30: "it should all just become one
                                # file, or one module/class").
+    id_read: bool = False      # the identity MODEL read this ball this
+                               # frame; False means its name comes from
+                               # measured colour alone. Round 81: the
+                               # model never once reads the cold table's
+                               # black 8 (0 of 92), so for the dark balls
+                               # colour is not a backstop but the floor.
     read: int = -1             # WHAT THIS TRACK ACTUALLY SAW: the majority of
                                # its retained detection reads, BEFORE
                                # arbitration, the age bar, hysteresis and the

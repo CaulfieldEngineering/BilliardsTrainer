@@ -144,3 +144,62 @@ def test_the_skip_count_is_reported(sc):
     assert "cue_frames_skipped" in src and "cue_absent_windows" in src
     assert "frames skipped" in src, (
         "the skip must be printed, not hidden inside the JSON")
+
+
+class TestWhoNamedTheBall:
+    """Round 82: make the colour dependency a standing line.
+
+    Round 81 measured that the identity model emits NOTHING at the dark
+    balls - the cold table's black 8 is read 0 times in 92 - so those
+    balls are named entirely by the measured-colour path. Colour is not
+    a backstop there, it is the floor, and nothing on the scorecard said
+    so. Detection.identified -> Track.id_read -> sidecar element 9 ->
+    "...NAMED BY COLOUR" carries it, the same shape as round 68's
+    Track.read.
+    """
+
+    def test_the_flag_survives_the_projection(self):
+        """THE BUG THIS ROUND ACTUALLY HIT. prepare_detections rebuilds
+        every Detection, and a rebuilt object loses any field the
+        constructor is not told about. On the first cut the scorecard
+        claimed ALL 1,094 bench names were colour-only - which round 81
+        had already disproved - because the flag died at projection, the
+        same way measured_bgr once did."""
+        import inspect
+
+        from billiards_trainer.vision import pipeline as pl
+        src = inspect.getsource(pl.Pipeline._project_raw_to_rect)
+        assert "identified=" in src, (
+            "the projection drops Detection.identified again; every ball "
+            "will look colour-named")
+
+    def test_the_sidecar_round_trips_it(self):
+        from billiards_trainer.vision.analysis_cache import SidecarReader
+        t = SidecarReader._to_track(
+            [7, 1.0, 2.0, 13.0, 8, "eight", True, False, 8, True])
+        assert t.id_read is True
+        t2 = SidecarReader._to_track(
+            [7, 1.0, 2.0, 13.0, 8, "eight", True, False, 8, False])
+        assert t2.id_read is False
+        old = SidecarReader._to_track([7, 1.0, 2.0, 13.0, 8, "eight", True])
+        assert old.id_read is False, "old sidecars must still load"
+
+    def test_both_paths_set_it(self):
+        import inspect
+
+        from billiards_trainer.detector_strategies import ensemble as ens
+        from billiards_trainer.measure import engine as eng
+        assert "identified" in inspect.getsource(eng._pair_identities), (
+            "the offline engine no longer records who named the ball")
+        assert "f.identified" in inspect.getsource(ens.FindIdEnsemble.detect), (
+            "the live path no longer records who named the ball")
+
+    def test_the_scorecard_shows_it(self):
+        import inspect
+
+        import scorecard as sc
+        src = inspect.getsource(sc)
+        assert "name_right_by_colour" in src
+        assert "NAMED BY COLOUR" in src, (
+            "computed but never printed - a number that only lives in "
+            "JSON is not a number Joe sees")

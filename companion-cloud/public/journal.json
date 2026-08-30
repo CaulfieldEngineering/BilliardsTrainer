@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 135,
+   "ts": "2026-08-30T22:17:26",
+   "date": "Aug 30, 06:17 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 06:17 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/135-r82_whonamed.png",
+     "caption": "Yellow: the naming model read this ball. Magenta: named by colour alone. The three magenta ones are the black 8, the burgundy 7 and the purple 4 - the darkest balls on the table."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.4%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r82_whonamed.png' alt=''><figcaption>Yellow: the naming model read this ball. Magenta: named by colour alone. The three magenta ones are the black 8, the burgundy 7 and the purple 4 - the darkest balls on the table.</figcaption></figure></div>"
+  },
+  {
+   "id": 134,
+   "ts": "2026-08-30T22:17:25",
+   "date": "Aug 30, 06:17 PM EDT",
+   "kind": "finding",
+   "title": "The app now says who named each ball",
+   "score": "534 of the newer clip's correct names came from colour with no help from the naming model - 183 of them the black 8. It agrees ball for ball with last round's separate measurement.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/134-r82_whonamed.png",
+     "caption": "Yellow: the naming model read this ball. Magenta: named by colour alone. The three magenta ones are the black 8, the burgundy 7 and the purple 4 - the darkest balls on the table."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Last time I told you the naming model never sees your dark balls and\nthat colour alone names them. The app now says so itself, on every run, instead\nof that being something I had to go digging for.</strong></p>\n\n<pre>\ncorrect names the naming model had NO part in\n   newer table   534 of 1,185     the black 8 alone accounts for 183\n   pinned table  196 of 1,094\n</pre>\n\n<h3>Why this is worth a line on the card</h3>\n<p>Every one of those balls is named correctly. The question the card could not\nanswer before was WHO named it - the trained model, or the comparison against\nyour set's measured colours. For the black 8 and the burgundy 7 the answer is\n\"colour, every single time\".</p>\n<p>That matters because if those colour references ever drift or go missing, the\nnaming score would fall off a cliff for those balls and the first sign would be a\nmystery. Now it would show up as this line moving.</p>\n\n<h3>The new number agrees with the old measurement</h3>\n<p>Last round I counted this a completely different way - by running the model\nover frames and checking what it returned. The two methods now agree ball for\nball: the black 8 at 183, the burgundy 7 at 166, the bright balls in the low\nsingle digits. Two independent measurements landing on the same answer is worth\nmore than either alone.</p>\n\n<h3>And a mistake I caught because of last round</h3>\n<p>My first attempt reported that EVERY name on your pinned table came from\ncolour - which last round had already disproved. The flag was being dropped at a\nstep that rebuilds the ball records from scratch, so it never survived to be\nrecorded. I only recognised the wrong answer because I already knew the right\none.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.4%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 133,
    "ts": "2026-08-30T21:25:26",
    "date": "Aug 30, 05:25 PM EDT",
@@ -1186,28 +1218,6 @@
     }
    ],
    "html": "<div class='note warn'><p><strong>Correction: I was wrong about motion blur, and Joe was right.</strong> For three rounds I explained the app losing sight of balls as motion blur, and built toward fixing it. Joe pointed out he had already fixed blur with the camera's shutter settings. He was correct.</p><p>I finally cropped the ball the app claimed it could not see. It is sharp, round, and clearly visible - sitting in the pocket jaw. The measurements agree: those 'lost' moments have a median speed of 202 pixels per second, which at 1/500th of a second is under half a pixel of smear. There is no blur.</p><p><strong>What is actually happening:</strong> 55% of the losses are at pockets, where the leather partly hides the ball and its confidence drops - and then a filter I wrote discards it. The other 45% are slow-moving balls on the open table, a separate cause I have not identified yet and will not guess at.</p><p>The lesson, which is now a standing rule: I do not get to assert a physical cause without looking at the picture. Counting tells me how much; only the image tells me what.</p></div>"
-  },
-  {
-   "id": 55,
-   "ts": "2026-08-29T01:41:19",
-   "date": "Aug 28, 09:41 PM EDT",
-   "kind": "finding",
-   "title": "Round 14: two ways to get a pocket filter wrong",
-   "score": "reverted - bench holds at 10/10 shots, 8/10 calls",
-   "body": "",
-   "images": [],
-   "html": "<div class='note warn'><p><strong>Round 14: attempted, measured, reverted.</strong> The plan from last round was to make the pocket filter conditional - refuse a dim reading near a pocket only when something has been sitting at that exact spot frame after frame (leather), and allow it when a ball is arriving (a pot).</p><p>Two failures, both caught by measurement rather than by reasoning. First the rule did nothing at all: it consulted a history that only the live camera path writes, so during re-processing it was always empty. Then, once it had a real history, it was <em>too</em> effective - a ball resting near a pocket is also at the same spot every frame, so the app began discarding balls that were legitimately parked by the jaws. Shots found collapsed from 10 to 0.</p><p>Reverted, re-measured, bench back exactly where it was. The flaw in my rule is now obvious and worth stating: 'has not moved' does not separate leather from a ball - <em>both</em> sit still. The next attempt uses arrival instead: accept a dim reading near a pocket only when a ball was travelling toward that pocket in the moments before, which leather never does.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.7%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 13: jaw filter hides real pots - but deleting it is worse</li><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
-  },
-  {
-   "id": 54,
-   "ts": "2026-08-29T01:07:04",
-   "date": "Aug 28, 09:07 PM EDT",
-   "kind": "finding",
-   "title": "Round 13: the filter that hides your pots (and why deleting it was worse)",
-   "score": "reverted - bench back to 10/10 shots, 8/10 calls",
-   "body": "",
-   "images": [],
-   "html": "<div class='note warn'><p><strong>Round 13: tried, measured, reverted.</strong> Last round showed a quarter of rolling-ball time is guessed rather than seen. I found a likely culprit in my own earlier work: a filter I added on August 28 throws away dim sightings near a pocket, to stop the pocket leather being read as a ball. But a ball is <em>dimmest exactly when it is dropping</em> - I measured real pots scoring 0.49 to 0.74 just sixteen to twenty-eight pixels from the pocket, being discarded.</p><p>So I deleted the filter. Coverage did improve - the app saw about a third more ball movement. But the leather came straight back as a phantom ball number 8, present in 962 frames instead of 18, and that cost more than the coverage gained: shots found fell from 10 to 8 and correct calls from 8 to 6.</p><p>Reverted; the bench is back exactly where it was. The lesson is specific and useful: the filter must not be all-or-nothing. A dim reading near a pocket should be accepted when a ball is <em>arriving</em> there - travelling into the pocket - and refused when nothing is moving toward it. That is the next attempt.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.7%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>72.1%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>3</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
   }
  ]
 }

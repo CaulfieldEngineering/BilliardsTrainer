@@ -71,6 +71,9 @@ class _Track:
     bx: float = 0.0              # birth position
     by: float = 0.0
     ever_moved: bool = False
+    id_read: bool = False        # the identity MODEL read this ball this
+                                 # frame (vs its name coming from measured
+                                 # colour alone) - see Detection.identified
     votes: list = field(default_factory=list)
     misses: float = 0.0          # seconds since last real detection
     active: bool = True
@@ -540,6 +543,13 @@ class MotionTracker:
             mb = getattr(src, "measured_bgr", None) if src is not None else None
             if mb is not None:
                 tr.mbgr_hist.append(tuple(int(v) for v in mb))
+            # Did the identity MODEL read this ball this frame, or is its
+            # name coming from measured colour alone? See
+            # core.types.Detection.identified - the model emits nothing at
+            # all at the dark balls, so for those this is always False and
+            # colour is the only thing naming them.
+            tr.id_read = bool(getattr(src, "identified", False)) \
+                if src is not None else False
             if dn >= 0:
                 tr.votes.append((dn, t))
                 del tr.votes[:-VOTE_N]
@@ -864,6 +874,9 @@ class MotionTracker:
                 # the EVIDENCE beside the verdict (round 68) - see
                 # core.types.Track.read
                 read=tr.number,
+                # was this ball READ by the model, or named by colour
+                # alone? (round 82 - see Detection.identified)
+                id_read=tr.id_read,
                 age=tr.age_frames, hits=tr.age_frames,
                 # published as FRAMES (the live contract); the internal
                 # counter is seconds because coasting is time-based

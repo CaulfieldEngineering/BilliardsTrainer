@@ -98,7 +98,13 @@ class SidecarWriter:
                 round(float(tr.radius), 1), int(tr.number),
                 tr.cls.value, bool(tr.active),
                 bool(getattr(tr, "coasting", False)),
-                int(getattr(tr, "read", -1))] for tr in tracks]
+                int(getattr(tr, "read", -1)),
+                # 10th element (additive, round 82): did the identity
+                # MODEL read this ball, or is measured colour naming it
+                # alone? Nothing recorded this, so "the model never sees
+                # the black 8" took a bespoke sweep to find and the
+                # dependency it implies was invisible on every scorecard.
+                bool(getattr(tr, "id_read", False))] for tr in tracks]
         d = {"type": "f", "t": round(t, 3), "tracks": rec}
         # v2 hand-context, omitted when absent so quiet states stay tiny:
         # which balls are hand-adjacent, and how much bed the hand covers.
@@ -415,7 +421,8 @@ class SidecarReader:
                      radius=float(r[3]), number=num,
                      cls=BallClass(r[5]), active=bool(r[6]), bgr=bgr,
                      coasting=bool(r[7]) if len(r) > 7 else False,
-                     read=int(r[8]) if len(r) > 8 else -1)
+                     read=int(r[8]) if len(r) > 8 else -1,
+                     id_read=bool(r[9]) if len(r) > 9 else False)
 
     def _to_tracks(self, rows) -> list[Track]:
         return [self._to_track(r) for r in rows]

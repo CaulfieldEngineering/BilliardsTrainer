@@ -939,7 +939,18 @@ class Pipeline:
                                  # hardened by review -- never once ran on
                                  # real footage. Measured on 005048 @233:
                                  # 0 of 6 detections carried a colour.
-                                 measured_bgr=getattr(d, "measured_bgr", None)))
+                                 measured_bgr=getattr(d, "measured_bgr", None),
+                                 # ...and carry WHO NAMED IT across the
+                                 # projection too, for exactly the reason
+                                 # above. Dropped on the first cut of
+                                 # round 82 and the scorecard immediately
+                                 # claimed all 1,094 bench names were
+                                 # colour-only, which round 81 had already
+                                 # disproved (bright balls read 94-100%).
+                                 # A rebuilt object loses every field the
+                                 # constructor is not told about.
+                                 identified=bool(getattr(d, "identified",
+                                                         False))))
             out[-1].recovered_for = getattr(d, "recovered_for", None)
         return out
 

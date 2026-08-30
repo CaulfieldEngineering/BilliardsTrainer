@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-30T21:24:37Z",
+ "ts": "2026-08-30T22:15:59Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
@@ -120,6 +120,15 @@
   "name_right_pct": 99.9,
   "name_right_seen_pct": 99.3,
   "name_right_on_estimates": 7,
+  "name_right_by_colour": 196,
+  "name_by_colour_per_ball": {
+   "0": 78,
+   "1": 59,
+   "2": 41,
+   "3": 10,
+   "4": 7,
+   "9": 1
+  },
   "name_right_all_pct": 99.8,
   "name_checks_total": 1096,
   "name_wrong_frames": 0,
@@ -131,38 +140,44 @@
     "right": 221,
     "wrong": 0,
     "unnamed": 0,
-    "missing": 0
+    "missing": 0,
+    "right_colour": 78
    },
    "1": {
     "right": 84,
     "wrong": 0,
     "unnamed": 1,
-    "missing": 1
+    "missing": 1,
+    "right_colour": 59
    },
    "2": {
     "right": 156,
     "wrong": 0,
     "unnamed": 0,
-    "missing": 0
+    "missing": 0,
+    "right_colour": 41
    },
    "3": {
     "right": 195,
     "wrong": 0,
     "unnamed": 0,
     "missing": 0,
+    "right_colour": 10,
     "right_coast": 7
    },
    "4": {
     "right": 217,
     "wrong": 0,
     "unnamed": 0,
-    "missing": 0
+    "missing": 0,
+    "right_colour": 7
    },
    "9": {
     "right": 221,
     "wrong": 0,
     "unnamed": 0,
-    "missing": 0
+    "missing": 0,
+    "right_colour": 1
    }
   },
   "publish_agree_pct": 99.4,
