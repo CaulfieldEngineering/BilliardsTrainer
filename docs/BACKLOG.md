@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T20:23Z
+    written        2026-08-30T20:55Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T19:31Z
@@ -57,83 +57,81 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 79
+### NEXT TARGETS (top first) — round 80
 
-*** THE AUDIT: HOW MUCH OF "NAMED CORRECTLY" IS A GUESS? ***
-    Rounds 72 and 78 each found a metric counting something that was not
-    there as though it were a sighting, so this round audited the rest
-    instead of waiting to be caught a third time.
-    FOUND, and it is mild inflation rather than a defect: the naming
-    headline credits a correct name even when the nearest track is a
-    COASTED estimate.
-        bench  7 of 1,094 correct verdicts sit on estimates
-               99.9% reported -> 99.3% counting only sightings
-        cold   2 of 1,185
-               99.6% reported -> 99.4%
-    ALL SEVEN BENCH CASES ARE THE SAME THING: track 11 holding the red 3
-    through 125-131s, the seconds Joe stands over it - round 71's
-    occlusion fix working exactly as designed. The ball is really there
-    and the estimate lands within 8-9px of truth.
-    So this is not a defect to remove, it is a fact to SHOW. Joe's own
-    precedent governs: when he asked "what does it mean to correctly name
-    99.6% of balls" the answer was to expose the stricter figure beside
-    the headline, not to quietly move it. The scorecard now prints
-    "...ACTUALLY SEEN" whenever any credit rests on an estimate.
-    ALSO AUDITED AND CLEAN: `invented numbers` reads zero on BOTH live
-    and coasted rows on both clips, so the latent fault flagged last
-    round has no current effect. Deliberately left counting coasts - an
-    invented number displayed on an estimate is still an invented number
-    Joe sees, so including them is correct for that metric.
-    NO ENGINE CODE CHANGED - metric and tests only.
+*** TRIED TO NARROW THE HAND VETO, COULD NOT DO IT HONESTLY, CHANGED
+    NOTHING - AND MY CONTROL GROUP WAS CONTAMINATED ***
+    The plan (from round 79) was to keep a detection unless its DISC is
+    substantially foreign rather than merely its centre, so a fully
+    visible ball beside a hand stops being discarded.
+    THE DISCRIMINATOR FAILED, backwards from the hypothesis:
+        real balls the veto drops : coverage 0.53-0.89, median 0.84
+        the control               : coverage 0.51-0.93, median 0.76
+    Balls read MORE covered than the control. The mask is a 160px-wide
+    warp, so a ball is ~4 mask pixels in radius and anything adjacent to
+    an arm sits inside one merged blob at ~85%.
+    *** AND THEN THE CONTROL TURNED OUT TO BE BALLS. *** It was built as
+    "vetoed detections with no truth ball nearby", but the naming truth
+    OMITS balls being handled - so the control was largely real balls in
+    Joe's glove. Looking at the crops settled it: a blue ball held in his
+    hand, labelled by my own script as "not a ball". The comparison was
+    balls against balls and proves nothing in either direction. I was one
+    step from concluding "coverage does not separate" as a finding when
+    the truth is "I never had the two populations I claimed".
+    WHAT THE VETO ACTUALLY COSTS, measured against the truth files' own
+    setup windows: 13 vetoed detections at truth times - 2 inside
+    declared hand-setup windows (defensible: the ball is being placed)
+    and 11 a ball IN PLAY with a hand merely nearby (bench 125-131s, and
+    cold 60-63s, which was not previously known). Eleven frames, against
+    a rule bought to stop a gloved bridge hand tracking as a resting "#4"
+    with two ghosts - 25 impossible overlaps, the sole G4 per-session
+    blocker.
+    KEPT UNCHANGED, and the measurement is recorded at the rule so the
+    next attempt starts from it. NO ENGINE BEHAVIOUR CHANGED - a comment
+    and this queue entry only; both clips verified identical.
 
-                              bench            cold
-    strokes / outcomes        10/10            9/9
-    pots to right ball          4/4            5/5
-    cue named                 99.9%           98.9%
-    moving named              99.4%           97.4%
-    naming                    99.9%           99.6%
-    ...actually seen          99.3%           99.4%
-    of ALL checks             99.8%           99.6%
-    wrong names                   0               1
-    invented                      0               0
+0. TO SETTLE THE HAND VETO, GET A REAL HAND POPULATION FIRST.
+    session-20260802-173553 - the clip that motivated the rule, where a
+    gloved hand tracked as a "#4" - is NOT in the library, and neither
+    bench nor cold contains a clean one. Either recover that clip or
+    hand-label a set of genuine hand/glove/sleeve detections. Without
+    it, any change to this rule is unmeasurable, and this round is the
+    proof: the obvious control is contaminated by the very thing being
+    measured.
 
-0. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT with
-    ZERO wrong names, and 7 of its correct names are estimates rather
-    than sightings. The honest next gain is to make those SEEN - i.e.
-    stop the foreign veto discarding a fully-visible ball beside a hand
-    (the mask is a 160px-wide warp, ~1.4cm/px, so a ball is ~4 pixels and
-    merges into any touching blob, and the test is "is the CENTRE inside
-    the blob" rather than "is the ball actually covered"). That would
-    convert estimate-credit into sighting-credit rather than chase the
-    last fraction of a percent.
+1. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT with
+    ZERO wrong names; 7 of its correct names are estimates (all the red
+    3 under Joe's leg, 125-131s). Cold: 4 unnamed 5s, one 9->1.
 
-1. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
+2. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
     is 1,962 KB of dense 30fps trails; nobody has measured what that
     costs to pull on a bad connection.
 
-2. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
-    finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
+3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
+    finds (54.5%), bench 339 of 790 (42.9%) get NO identity read. This
+    is the largest unexplored engine fact left and it needs no new
+    corpus - unlike target 0.
 
-3. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
+4. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
     gave the cold clip.
 
-4. tools/phone_view.py (round 74) screenshots the real player; --local
+5. tools/phone_view.py (round 74) screenshots the real player; --local
     serves the working tree so a UI fix is checked BEFORE it ships.
 
-5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+6. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
-    contaminated rather than imprecise (69); aggregating over a window
-    hides a gap inside it (70); measure the discriminator itself before
-    building on it (71, 73, 77); a metric can be the defect (72, 78) and
-    a posted regression deserves the same scrutiny as a posted win (78);
-    an angle test needs a magnitude guard (75); a regeneration needs a
-    gate or it silently deletes (76); AND A FAVOURABLE NUMBER DESERVES
-    AUDITING TOO - this round went looking for inflation in its own
-    headline and found some (79).
+    contaminated rather than imprecise (69, 80); aggregating over a
+    window hides a gap inside it (70); measure the discriminator itself
+    before building on it (71, 73, 77); a metric can be the defect (72,
+    78) and a posted regression deserves the same scrutiny as a posted
+    win (78); an angle test needs a magnitude guard (75); a regeneration
+    needs a gate or it silently deletes (76); a favourable number
+    deserves auditing too (79); AND CHECK WHAT YOUR CONTROL GROUP
+    ACTUALLY CONTAINS - looking at the crops is what caught this one (80).
 
-6. The palette is hand-labelled and does not scale; the identifier
+7. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall

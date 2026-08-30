@@ -3516,3 +3516,33 @@ Rounds continue with Joe's visual feedback as the gate.
   stopping the foreign veto discarding a fully-visible ball beside a
   hand, rather than chasing the last fraction of a percent.
   METHOD: a favourable number deserves auditing too.
+
+- 2026-08-30 ~20:30 EDT - ROUND 80: TRIED TO NARROW THE HAND VETO,
+  COULD NOT DO IT HONESTLY, CHANGED NOTHING - AND THE CONTROL GROUP WAS
+  CONTAMINATED. Plan was to keep a detection unless its DISC is
+  substantially foreign rather than merely its centre, so a visible ball
+  beside a hand stops being discarded (the bench's red 3, 125-131s).
+  Coverage did not separate, backwards from the hypothesis: real balls
+  0.53-0.89 (median 0.84) against a control 0.51-0.93 (median 0.76). The
+  mask is a 160px-wide warp so a ball is ~4 mask pixels and anything
+  beside an arm sits in one merged blob at ~85%.
+  THEN THE CONTROL TURNED OUT TO BE BALLS. It was "vetoed detections
+  with no truth ball nearby", but the naming truth OMITS balls being
+  handled, so it was largely real balls in Joe's glove - the crops show a
+  blue ball held in his hand labelled "not a ball". Balls against balls;
+  proves nothing either way. I was one step from publishing "coverage
+  does not separate" as a finding.
+  WHAT THE VETO COSTS, against the truth files' own setup windows: 13
+  vetoed detections at truth times - 2 inside declared hand-setup
+  windows (defensible) and 11 a ball IN PLAY with a hand merely nearby
+  (bench 125-131s, cold 60-63s, the latter previously unknown). Eleven
+  frames against a rule bought to stop a gloved hand tracking as a "#4"
+  with two ghosts (25 impossible overlaps, sole G4 blocker). KEPT.
+  NO ENGINE BEHAVIOUR CHANGED - a comment recording the measurement and
+  the queue entry only; both clips verified identical (bench 10/10,
+  10/10, 4/4, naming 99.9%/99.3% seen, ZERO wrong).
+  NEXT: settling this needs a REAL hand population.
+  session-20260802-173553, the clip that motivated the rule, is not in
+  the library and neither clip contains a clean one.
+  METHOD: check what your control group actually contains. Looking at
+  the crops is what caught it.

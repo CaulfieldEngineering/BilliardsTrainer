@@ -403,6 +403,31 @@ class Pipeline:
         # overlaps, the sole G4 per-session blocker. A real ball the hand is
         # touching merges into the blob and is dropped too, which is correct:
         # its track coasts on the occlusion budget and resumes on reappearance.
+        # ROUND 80 TRIED TO NARROW THIS AND COULD NOT, HONESTLY. The
+        # proposal: keep a detection unless its DISC is substantially
+        # foreign, rather than merely its centre - the bench's red 3
+        # spends 125-131s as an estimate because of this rule. Measured
+        # over both clips, disc coverage does NOT separate: balls read
+        # 0.53-0.89 (median 0.84) against a control at 0.51-0.93 (median
+        # 0.76) - balls looked MORE covered. The mask is a 160px-wide
+        # warp, so a ball is ~4 mask pixels in radius and anything beside
+        # an arm sits inside one merged blob at ~85%.
+        # AND THE CONTROL WAS CONTAMINATED, which is the real lesson. It
+        # was built as "vetoed detections with no truth ball nearby", but
+        # the naming truth omits balls being HANDLED - so the control was
+        # largely real balls in Joe's glove. The crops settled it: a blue
+        # ball held in his hand, labelled "not a ball". The comparison was
+        # balls against balls and proves nothing either way.
+        # WHAT THIS RULE ACTUALLY COSTS, measured against the truth files'
+        # own setup windows: 13 vetoed detections at truth times - 2
+        # inside declared hand-setup windows (defensible) and 11 a ball IN
+        # PLAY with a hand merely nearby (bench 125-131s, cold 60-63s).
+        # Eleven frames, against a rule bought to stop a gloved bridge
+        # hand tracking as a resting "#4" with two ghosts.
+        # Settling it needs a population of GENUINE hand detections.
+        # session-20260802-173553, the clip that motivated the rule, is
+        # not in the library and neither of these two contains a clean
+        # one. Do not relax this without it.
         foreign = getattr(self, "_foreign_last", None)
         if detections and foreign and foreign[1] is not None:
             _ffrac, fmask, fs, fx0, fy0 = foreign
