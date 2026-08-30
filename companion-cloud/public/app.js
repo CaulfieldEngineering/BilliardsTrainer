@@ -1694,6 +1694,18 @@ function drawTrails(tOverride) {
   const ctx = cv.getContext("2d");
   ctx.clearRect(0, 0, cv.width, cv.height);
   if (!s || !s.trails || !v.videoWidth) return;
+  // A TABLE CHANGE HAS NO SHOT, SO IT HAS NO SHOT TRAILS (Joe,
+  // 2026-08-30: "First clip of pinned session has wild inaccurate
+  // trails" — shot 1/12, REARRANGING). What was being drawn there is
+  // Joe's HANDS carrying balls around, plus the identity swaps that
+  // hand-carrying causes, rendered with the same glowing lines that
+  // everywhere else mean "this is the path a struck ball took". Long
+  // straight lines across the whole table, meaning nothing. The app's
+  // own rule already covers this — a wrong overlay is worse than a
+  // blank layer — it just was not applied to non-stroke events.
+  const act = s.action || "stroke";
+  if (act === "rearrange" || act === "ball_in_hand" || act === "nothing")
+    return;
   const { P } = videoBox(cv, v);
   const t = tOverride != null ? tOverride : playheadTime(v);
   // curSession in the key: playlists hop between session videos, and a
@@ -1916,8 +1928,17 @@ function playheadTime(v) {
   // shows the held frame, so draw at the hold time instead of strobing.
   // Drawers only — the scrub/continuity logic below must keep running.
   const warmHold = Warmer.holding();
-  const picReady = !swapInFlight && !window.scrubActive
-    && (warmHold != null || (!v.seeking && v.readyState >= 2));
+  // SCRUBBING IS NOT "no picture" - it is a picture at a KNOWN time. The
+  // cover publishes the frame it painted (FrameCache.shownTime), so the
+  // overlay is drawn at THAT time and tracks the thumb, instead of the
+  // layer being blanked for the whole drag (Joe: "trails still do not
+  // follow when I'm scrubbing"). Blanking remains the rule whenever the
+  // time is genuinely unknown - a shot swap in flight, or a seek with no
+  // cover up - because a trail at the wrong time is worse than none.
+  const scrubT = window.scrubActive ? FrameCache.shownTime() : null;
+  const picReady = !swapInFlight
+    && (scrubT != null || (!window.scrubActive
+        && (warmHold != null || (!v.seeking && v.readyState >= 2))));
   if (!picReady) {
     const c = $("trails");
     c.getContext("2d").clearRect(0, 0, c.width, c.height);
@@ -1925,7 +1946,7 @@ function playheadTime(v) {
   } else {
     // trails paused per Joe ("I don't want the animated trails on here
     // yet") — data still exports; flip TRAILS_ON to re-enable
-    if (OV.paths || window.TRAILS_ON) drawTrails(warmHold);
+    if (OV.paths || window.TRAILS_ON) drawTrails(scrubT != null ? scrubT : warmHold);
     else { const c = $("trails");
            c.getContext("2d").clearRect(0, 0, c.width, c.height); }
     if (OV.aim) drawAim();
@@ -2076,6 +2097,7 @@ $("video").addEventListener("seeked", () => {
 const FrameCache = (() => {
   const FPS = 30, CAP = 700;              // ~23s of unique frames
   let blobs = new Map(), bitmaps = new Map(), lastSrc = "";
+  let shownT = null;                      // time of the frame on screen
   const idx = t => Math.round(t * FPS);
   const cap0 = document.createElement("canvas");
   function harvest(now, meta) {
@@ -2153,10 +2175,21 @@ const FrameCache = (() => {
     cv.getContext("2d").drawImage(bm, (cv.width - dw) / 2,
                                   (cv.height - dh) / 2, dw, dh);
     cv.style.display = "block";
+    // TRAILS MUST FOLLOW THE THUMB (Joe, 2026-08-30: "trails still do not
+    // follow when I'm scrubbing the transport playhead. They need to stay
+    // in sync during scrubbing"). The render loop used to BLANK the
+    // overlay for the whole drag, because the video clock is parked while
+    // the cover owns the picture, so drawing at that clock would have put
+    // the trail at the wrong time. The cover knows exactly which frame it
+    // painted - publish it, and the overlay can be drawn at the time
+    // actually on screen instead of not at all.
+    shownT = hit / FPS;
     return true;
   }
-  return { draw, hide: () => { $("scrubcv").style.display = "none"; },
-           has: t => blobs.has(idx(t)) };
+  return { draw, hide: () => { $("scrubcv").style.display = "none";
+                               shownT = null; },
+           has: t => blobs.has(idx(t)),
+           shownTime: () => shownT };
 })();
 
 // ---- CACHE WARMER (Joe: "scrubbing backwards is still sticky"):

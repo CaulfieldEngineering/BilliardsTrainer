@@ -50,6 +50,67 @@ SECRET = Path(r"C:/Users/Joe/.billiards-secrets/page_key.txt")
 URL = "https://billiards-review.vercel.app"
 
 
+def serve_local() -> str:
+    """Serve companion-cloud/public from disk, proxying /api to the cloud.
+
+    Without this the tool can only screenshot what is ALREADY DEPLOYED -
+    so a fix could not be checked until after it had shipped to Joe,
+    which is backwards for a tool whose whole purpose is catching things
+    before he does. Static files come from the working tree; every /api
+    call is forwarded to the real deployment (the page sends its own
+    x-key, so the proxy just relays headers).
+    """
+    import threading
+    import urllib.error
+    import urllib.request
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+    root = str(ROOT / "companion-cloud" / "public")
+
+    class H(SimpleHTTPRequestHandler):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, directory=root, **kw)
+
+        def log_message(self, *a):       # quiet
+            pass
+
+        def _proxy(self, body=None):
+            req = urllib.request.Request(
+                URL + self.path, data=body, method=self.command,
+                headers={k: v for k, v in self.headers.items()
+                         if k.lower() in ("x-key", "content-type", "accept")})
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    data = r.read()
+                    self.send_response(r.status)
+                    for k in ("content-type", "content-length"):
+                        if r.headers.get(k):
+                            self.send_header(k, r.headers[k])
+                    self.end_headers()
+                    self.wfile.write(data)
+            except urllib.error.HTTPError as e:
+                self.send_response(e.code)
+                self.end_headers()
+                self.wfile.write(e.read())
+            except Exception as e:  # noqa: BLE001 - report, never hang
+                self.send_response(502)
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+
+        def do_GET(self):
+            if self.path.startswith("/api/"):
+                return self._proxy()
+            return super().do_GET()
+
+        def do_POST(self):
+            n = int(self.headers.get("content-length") or 0)
+            return self._proxy(self.rfile.read(n) if n else None)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{srv.server_address[1]}"
+
+
 def frame_data_uri(video: Path, t: float):
     """The real frame at absolute time t, plus the file's dimensions."""
     import cv2
@@ -78,6 +139,14 @@ def main() -> int:
                     help="absolute video seconds; overrides --frac")
     ap.add_argument("--out", default="phone_view.png")
     ap.add_argument("--trails", default="1", help="1/0 - force trails on")
+    ap.add_argument("--scrub", action="store_true",
+                    help="simulate a finger on the transport: scrubActive "
+                         "with the frame cache reporting the shown time, so "
+                         "the scrub-sync path is what gets screenshotted")
+    ap.add_argument("--local", action="store_true",
+                    help="serve companion-cloud/public from the WORKING TREE "
+                         "(api proxied to the cloud) so a fix can be checked "
+                         "before it ships")
     a = ap.parse_args()
 
     video = REC / a.session
@@ -85,6 +154,8 @@ def main() -> int:
         print(f"no such recording: {video}")
         return 2
     key = SECRET.read_text(encoding="utf-8").strip()
+    origin = serve_local() if a.local else URL
+    print("origin:", "working tree (local)" if a.local else "deployed")
 
     from PySide6.QtCore import QTimer, QUrl
     from PySide6.QtWidgets import QApplication
@@ -134,7 +205,7 @@ def main() -> int:
         st["phase"] += 1
         if st["phase"] == 1:          # authenticate the way the phone does
             js(f"localStorage.setItem('key', {key!r}); 1",
-               lambda _r: view.load(QUrl(URL)))
+               lambda _r: view.load(QUrl(origin)))
         else:
             QTimer.singleShot(3500, open_session)
 
@@ -186,6 +257,7 @@ def main() -> int:
         # same letterbox the <video> uses, and draw the shipped overlay at
         # the chosen time.
         js(f"""(function() {{
+          try {{
             const v = document.getElementById('video');
             // Stub the playback state Qt cannot provide. This is what lets
             // the app's OWN render loop draw - drawing once by hand was
@@ -199,7 +271,16 @@ def main() -> int:
             }};
             for (const k in defs) Object.defineProperty(v, k, {{
               get: () => defs[k], configurable: true }});
-            window.scrubActive = false;
+            // --scrub: put the page in the state a finger on the
+            // transport creates - the cover owns the picture and the
+            // video clock is parked - so the screenshot proves whether
+            // the overlay follows the thumb or blanks.
+            if ({json.dumps(bool(a.scrub))}) {{
+              window.scrubActive = true;
+              FrameCache.shownTime = () => {t!r};
+            }} else {{
+              window.scrubActive = false;
+            }}
             let img = document.getElementById('__frame');
             if (!img) {{
               img = document.createElement('img');
@@ -215,6 +296,7 @@ def main() -> int:
               if (window.OV) OV.paths = true;
             }}
             return 'stubbed at t={t:.2f}, trails=' + !!window.TRAILS_ON;
+          }} catch (e) {{ return 'INJECT ERR ' + e; }}
           }})()""", drew)
 
     def drew(res):
@@ -232,7 +314,7 @@ def main() -> int:
         app.quit()
 
     view.loadFinished.connect(on_load)
-    view.load(QUrl(URL))
+    view.load(QUrl(origin))
     QTimer.singleShot(60000, app.quit)
     app.exec()
     return st["rc"]
