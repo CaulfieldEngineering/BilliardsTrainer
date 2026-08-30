@@ -429,3 +429,55 @@ class TestTheCueGoesFirst:
         assert eps, "the fixture must produce an episode with both balls"
         assert eps[0].cue_lag is not None and eps[0].cue_lag > 0.25, (
             "the cue trailed the object ball; this is hand setup, not a stroke")
+
+
+class TestASoftStrokeIsStillAStroke:
+    """The first thing a cold clip broke (round 54).
+
+    MIN_CUE_PEAK was 400 px/s, which looked safe because every one of the
+    bench's ten strokes peaks at 691 or more. On
+    session-20260823-185550 @62.6 Joe plays a soft, controlled shot: the
+    cue rolls gently down the table into the blue 2 and pots it in the
+    left-middle, peaking at 324.8 px/s. The engine classified the whole
+    thing a "Table change" and lost the stroke AND the pot. A threshold
+    fitted to one table is not a rule.
+    """
+
+    def _episode(self, px_per_frame):
+        from billiards_trainer.measure.shots import analyze
+        seq, t = [], 0.0
+        for _ in range(20):                        # at rest
+            seq.append((t, [(1, 100.0, 100.0, 0), (2, 600.0, 600.0, 5)]))
+            t += 1 / 30
+        x = 100.0
+        for _ in range(24):                        # the cue rolls, alone
+            x += px_per_frame
+            seq.append((t, [(1, x, 100.0, 0), (2, 600.0, 600.0, 5)]))
+            t += 1 / 30
+        y = 600.0
+        for _ in range(20):                        # then the object ball
+            y += px_per_frame
+            seq.append((t, [(1, x, 100.0, 0), (2, 600.0, y, 5)]))
+            t += 1 / 30
+        for _ in range(30):
+            seq.append((t, [(1, x, 100.0, 0), (2, 600.0, y, 5)]))
+            t += 1 / 30
+        times = [a for a, _ in seq]
+        frames = [[(i, px, py, 12.0, n, "solid", True, False)
+                   for (i, px, py, n) in rows] for _, rows in seq]
+        eps = analyze(times, frames, pockets=[(0.0, 0.0), (900.0, 900.0)],
+                      pocket_r=25.0)
+        return [e for e in eps if e.cue_moved]
+
+    def test_a_soft_roll_into_a_ball_is_a_stroke(self):
+        from billiards_trainer.measure.shots import is_stroke
+        eps = self._episode(11.0)          # ~330 px/s, the cold clip's shot
+        assert eps, "the fixture must produce a cue-moving episode"
+        assert is_stroke(eps[0]), (
+            f"a soft stroke (peak {eps[0].cue_peak:.0f} px/s) was refused")
+
+    def test_a_nudge_is_still_not_a_stroke(self):
+        from billiards_trainer.measure.shots import is_stroke
+        eps = self._episode(1.5)           # ~45 px/s, pushing it about
+        assert not eps or not is_stroke(eps[0]), (
+            "a slow nudge was accepted as a stroke")

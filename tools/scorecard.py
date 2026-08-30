@@ -85,6 +85,17 @@ def _naming_correctness(r, times, frames) -> dict:
         doc = json.loads(NAMING_TRUTH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+    # NAMING TRUTH BELONGS TO ONE CLIP (round 54). This path is fixed,
+    # so scoring any OTHER session with --truth silently compared the
+    # engine against the BENCH's ball positions: the first cold clip
+    # came back "NAMED CORRECTLY 4.8%, no track 881" - a number with no
+    # meaning at all, printed with the same confidence as a real one. A
+    # metric that scores the wrong clip is worse than a missing metric,
+    # because it looks like evidence.
+    want = str(doc.get("session") or "")
+    got = str(r.meta.get("source") or "")
+    if want and got and want != got:
+        return {"name_truth_mismatch": f"{want} (scoring {got})"}
     try:
         hinv = np.asarray(r.meta["hinv"], dtype=float)
     except (KeyError, TypeError, ValueError):
@@ -299,6 +310,9 @@ def main() -> None:
     c = sc["caps"]
     print(f"  cue ball named  : {c['cue_named_pct']}% of frames (target 99+)")
     print(f"  moving balls named: {c['named_moving_pct']}% (target 95+)")
+    if c.get("name_truth_mismatch"):
+        print(f"  NAMED CORRECTLY : not scored - the naming truth file is for "
+              f"{c['name_truth_mismatch']}")
     if "name_right_pct" in c:
         print(f"  NAMED CORRECTLY : {c['name_right_pct']}% of ball sightings "
               f"(target 95+)  [wrong {c['name_wrong_frames']}, "

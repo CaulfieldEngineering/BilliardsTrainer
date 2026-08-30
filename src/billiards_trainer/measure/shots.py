@@ -127,7 +127,33 @@ def _series(times, frames):
 MIN_CUE_TRAVEL = 150.0   # px: below this the cue was addressed or nudged
                          # with the stick, not struck (bench: real strokes
                          # >=263px, nudges 8-29px)
-MIN_CUE_PEAK = 400.0     # px/s: below this the cue was MOVED, not struck.
+MIN_CUE_PEAK = 260.0     # px/s: below this the cue was MOVED, not struck.
+                         # WAS 400, WHICH WAS BENCH-TUNED AND DID NOT
+                         # GENERALISE (round 54, the first thing the cold
+                         # clip broke). Every one of the bench's ten
+                         # strokes peaks at 691+, so 400 looked safe with
+                         # enormous margin. On session-20260823-185550 at
+                         # 62.6s Joe plays a SOFT, controlled shot - the
+                         # cue rolls gently down the table into the blue
+                         # 2 and pots it in the left-middle - peaking at
+                         # 324.8. The engine called that whole stroke a
+                         # "Table change" and lost both the shot and the
+                         # pot. Watched frame by frame; there is no doubt
+                         # it is a stroke.
+                         # WHY LOWERING IS SAFE NOW: this bar is no
+                         # longer what rejects hand setup. CUE_LEAD_TOL
+                         # does that on physics (the bench's fake peaks
+                         # at 2920 and is refused because the cue moved
+                         # 2.90s AFTER the object balls). What is left
+                         # for this bar is cue-only motion with no object
+                         # ball to order against - Joe nudging the ball
+                         # while setting up.
+                         # THE MARGIN IS THIN AND SHOULD BE WATCHED: a
+                         # hand-rolled cue was measured at 213 px/s
+                         # (round 35) and this real stroke at 324.8, so
+                         # 260 sits in a 111 px/s gap rather than the
+                         # 478 px/s gap the old bar enjoyed. Every new
+                         # cold clip must re-check both sides of it.
                          # Distance alone cannot tell Joe placing balls
                          # from a shot - the bench's one surviving fake
                          # covered 210px, over the 150px bar - but speed

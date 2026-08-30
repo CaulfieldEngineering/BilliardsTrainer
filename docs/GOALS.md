@@ -2794,3 +2794,40 @@ Rounds continue with Joe's visual feedback as the gate.
   Pinned by tests/test_motion_timeline.py (4 tests on the burst
   grouping, including that a ball passing behind the cue stick must not
   read as two separate events).
+
+- 2026-08-30 ~07:00 EDT - ROUND 54: THE COLD CLIP BROKE A BENCH-TUNED
+  THRESHOLD, AND CORRECTED MY OWN ROUND-53 ALL-CLEAR.
+  CORRECTION FIRST: round 53 concluded "no missed shots" on
+  session-20260823-185550. WRONG. I noted that a stroke could hide
+  INSIDE a reported entry, checked the LONG Table change, and stopped -
+  the miss was in the SHORT one I skipped. Half-closing a hole is not
+  closing it.
+  MISSED STROKE @62.6: Joe plays a SOFT controlled shot - the cue rolls
+  gently into the blue 2 and pots it in the left-middle. Scored a Table
+  change. Measured: travel 411.7 (ok), lag -0.633 (cue led, ok), peak
+  324.8 against MIN_CUE_PEAK=400 - REJECTED ON SPEED. That bar was
+  fitted to the bench, where all ten strokes peak at 691+, so it looked
+  safe with a 478 px/s margin; it was a fact about one session, not a
+  rule. Lowered to 260, which is safe now only because CUE_LEAD_TOL does
+  the hand-setup rejection on physics (the bench fake peaks at 2920 and
+  is refused for moving the cue 2.90s AFTER the object balls). MARGIN IS
+  THIN and documented in the code: hand-rolled cue 213 px/s, this real
+  stroke 324.8. Re-ran both clips: cold now 9 strokes with the 2 potted
+  into the left-middle (vision-confirmed), BENCH BIT-FOR-BIT UNCHANGED
+  and still perfect.
+  MISSED POT @158.9, FOUND NOT FIXED: the orange 5 runs down the left
+  rail and drops in the bottom-left (absent from every later frame). The
+  engine tracked it 23 trail points then its track DIES MID-FLIGHT at
+  rect (156,820), 8.3 pocket radii from anything, so the credit rule
+  correctly refuses it. TRACKING failure, not scoring - same family as
+  the bench's 85.1. Queue item 0.
+  CORPUS CLIP #2 WRITTEN: docs/cold_truth_20260823-185550.json, by
+  watching rectified top-down strips, never from the app. Scored:
+  strokes 9/9, outcomes 8/9, fake 0, unexplained 0, pots 4/5, cue named
+  95.2% (target 99 - R1 does NOT generalise), invented [7,9,13].
+  FOURTH DUPLICATE-OWNER BUG: the scorecard loads NAMING_TRUTH by a
+  FIXED path, so scoring any other clip with --truth silently compared
+  the engine against the BENCH's ball positions - the cold clip came
+  back "NAMED CORRECTLY 4.8%, no track 881", a meaningless number
+  printed with full confidence. It now refuses to score on a session
+  mismatch and says which clip the file belongs to.

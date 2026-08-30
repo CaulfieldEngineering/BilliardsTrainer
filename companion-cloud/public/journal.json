@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 96,
+   "ts": "2026-08-30T07:38:28",
+   "date": "Aug 30, 03:38 AM EDT",
+   "kind": "finding",
+   "title": "The new clip caught two wrong calls - and one I had cleared",
+   "score": "A soft shot dismissed as table-tidying, a pot scored as a miss, and a correction to yesterday's all-clear",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/096-cold_62_strip.png",
+     "caption": "The shot the app threw away. The cue rolls gently down the table, contacts the blue 2, and the 2 drops into the side pocket - and the app called the whole thing a Table change because the cue was moving too slowly to match the pinned session."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The new clip found two shots the app got wrong - and one of them I\nhad already told you was fine. Correcting that first.</strong></p>\n\n<h3>I was wrong yesterday</h3>\n<p>I said the app had missed no shots on the new clip. I checked the gaps\nbetween shots thoroughly, noted that a shot could also be hiding inside a\nstretch labelled \"Table change\", checked the long one - and stopped. The miss\nwas in the short one I skipped.</p>\n<p>At 62 seconds you play a soft, controlled shot: the cue ball rolls gently\ndown the table into the blue 2 and pots it in the side pocket. The app called\nthe whole thing a Table change and lost the shot AND the pot.</p>\n<p>The reason is the kind of thing only a second table can show you. The app\ndecides \"was that a shot?\" partly on how fast the cue ball moves, and the\nthreshold was set from your pinned session where every single shot drives the\ncue at 691 pixels per second or more. This one peaks at 325. The number was\nnever a rule about pool - it was a fact about one session. It is now set from\nboth.</p>\n\n<h3>And a pot scored as a miss</h3>\n<p>At 158 seconds the orange 5 runs down the left rail and drops in the bottom\ncorner. The app says \"no ball fell\". It is not a scoring mistake: the app\nfollows the 5 for about a second and then loses it in mid-roll, and it has a\ndeliberate rule that a ball it lost track of in open play is never claimed as\npotted. That rule is right. Losing the ball is the bug, and it is the same\nweakness that used to cut the trails short on your bench session.</p>\n\n<h3>The new clip is now a permanent reference</h3>\n<p>I wrote up what actually happens in all 3.3 minutes, by watching it, and the\napp is now scored against two tables instead of one:</p>\n<pre>\n                        pinned session     new clip\nshots found                 10 of 10        9 of 9\nmakes and misses right      10 of 10        8 of 9\npots to the right ball        4 of 4        4 of 5\nfake shots                         0             0\n</pre>\n<p>The gap between those columns is the honest picture of where this stands:\nthe rules hold on a table they were never fitted to, except where the app loses\nsight of a ball.</p>\n\n<h3>One more thing worth admitting</h3>\n<p>When I first scored the new clip it reported \"4.8% of balls named correctly\".\nThat number was meaningless - the scoring tool was comparing the new clip\nagainst the pinned session's ball positions, because the file it reads is fixed.\nIt printed that with exactly the same confidence as a real number. It now\nrefuses to score rather than invent, which is the fourth time this week I have\nfound one fact with two owners.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li></ul>"
+  },
+  {
    "id": 95,
    "ts": "2026-08-30T06:54:25",
    "date": "Aug 30, 02:54 AM EDT",
@@ -1007,16 +1023,6 @@
    "title": "Tap a stats line to grade those clips",
    "score": "",
    "body": "Every miss subgenre in Lifetime Stats \u2014 including Uncategorized \u2014 is now a playlist. Tap it, watch the clips, and set Cut/Missed in each shot's Details. Grading an Uncategorized miss moves it into its subgenre and sharpens the table.",
-   "images": []
-  },
-  {
-   "id": 16,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Stats restructured your way",
-   "score": "",
-   "body": "Lifetime Stats now reads top-down: Total Shots, Makes, Misses \u2014 then each miss subgenre with its meaning built in: Cut Left / Miss Left (Overcut), Cut Left / Miss Right (Undercut), and so on.",
    "images": []
   }
  ]

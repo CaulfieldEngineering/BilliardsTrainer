@@ -1,0 +1,41 @@
+{
+ "session": "session-20260823-185550.mp4",
+ "established": "2026-08-30 (round 54) by Claude's own frame-by-frame watch of rectified top-down views. CORPUS CLIP #2 - the first clip written up that the engine was never tuned against.",
+ "note": "GROUND TRUTH. Every entry here was read off the video by eye, never from the app's output. The app is scored against this; this file is never edited to match the app. Where the app and this file disagree, the disagreement is the finding.",
+ "how_verified": [
+  "Shot list checked against tools/motion_timeline.py, which warps each frame to the table and differences consecutive frames - it sees balls rolling independently of detection, tracking, naming and episode logic, so a stroke the engine never reported still shows up as cloth motion.",
+  "Every pot verified by watching the ball leave the table in a rectified top-down strip, and by confirming it is absent from all later frames.",
+  "Every miss verified by comparing the ball inventory immediately before the stroke with the inventory after it settles."
+ ],
+ "balls_on_table": [0, 1, 2, 3, 4, 5, 6, 8],
+ "ball_colours_observed": {
+  "0": "white cue",
+  "1": "yellow solid",
+  "2": "blue solid",
+  "3": "red solid",
+  "4": "purple solid",
+  "5": "orange solid",
+  "6": "green STRIPE",
+  "8": "black"
+ },
+ "strokes": [
+  {"strike": 48.9, "pot": true, "ball": 1, "what": "yellow 1 potted, top-right"},
+  {"strike": 62.6, "pot": true, "ball": 2,
+   "what": "SOFT stroke - the cue rolls gently down the table into the blue 2 and pots it in the left-middle. The engine called this whole episode a Table change until round 54: its cue peaked at 324.8 px/s against a MIN_CUE_PEAK of 400 that had been fitted to the bench, where every stroke peaks at 691+."},
+  {"strike": 86.2, "pot": false, "what": "nothing fell - ball inventory identical before and after"},
+  {"strike": 99.6, "pot": false, "what": "contact on the 3; nothing fell"},
+  {"strike": 121.7, "pot": true, "ball": 3, "what": "red 3 potted, bottom-right"},
+  {"strike": 138.1, "pot": true, "ball": 4,
+   "what": "purple 4 potted, bottom-right, while the yellow 1 rolls on and stays on the table. The app's SENTENCE said 'potted the 1' until round 52 - the engine had credited the 4 correctly and describe.py re-derived it wrongly."},
+  {"strike": 158.9, "pot": true, "ball": 5,
+   "what": "orange 5 runs down the left rail and is potted in the bottom-left. STILL SCORED A MISS by the engine as of round 54: the 5's track dies mid-flight at rect (156, 820), 8.3 pocket radii from any pocket, so the pocket-credit rule correctly refuses to score a track that vanished mid-table. The defect is the TRACKING loss, not the scoring."},
+  {"strike": 173.8, "pot": false, "what": "nothing fell"},
+  {"strike": 191.9, "pot": false, "what": "nothing fell"}
+ ],
+ "setup_windows": [
+  [26.6, 37.4, "genuine rearrangement - ball positions change completely between frames; Joe repositions by hand and pushes balls with the cue stick"]
+ ],
+ "engine_disagreements_open": [
+  "158.9: a real pot of the orange 5 is scored 'no ball fell' because the tracker loses the ball mid-flight near the left rail. Same family as the bench's 85.1 case (fast ball, association break)."
+ ]
+}
