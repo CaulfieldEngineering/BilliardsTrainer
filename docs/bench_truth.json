@@ -92,8 +92,20 @@
  ],
  "balls_note": "cue, yellow solid 1, blue 2, red 3, purple 4, yellow striped 9. There is NO orange 5 - verified by colour census over the whole clip. The 9 is STATIC at (528,1079) for the entire session; the 1 is the only yellow solid and is the ball potted at both 31.7 and 170.6. Any other number the app reports is invented.",
  "static_balls": {
-  "9": [528, 1079]
+  "9": [
+   528,
+   1079
+  ]
  },
  "attribution_note": "ball = which ball fell, read by eye. null means the watch could not confirm the number (excluded from attribution scoring rather than guessed).",
- "phantoms_note": "Three fixed non-ball objects are detected by the finder in hundreds of frames and are NOT balls: the bottom-left pocket leather at ~(289,1370) (214 detections), a pale mark on the felt at ~(566,1107) (180), and a dark object at ~(223,800) (68). Together they are 30% of all raw detections."
+ "phantoms_note": "Three fixed non-ball objects are detected by the finder in hundreds of frames and are NOT balls: the bottom-left pocket leather at ~(289,1370) (214 detections), a pale mark on the felt at ~(566,1107) (180), and a dark object at ~(223,800) (68). Together they are 30% of all raw detections.",
+ "ball_colours_observed": {
+  "0": "white cue - BGR [229, 255, 252], white fraction 0.971",
+  "1": "yellow SOLID - BGR [11, 237, 248], white fraction 0.120",
+  "2": "blue solid - BGR [243, 132, 21], white fraction 0.060",
+  "3": "red solid - BGR [73, 25, 233], white fraction 0.070",
+  "4": "purple solid - BGR [159, 22, 56], white fraction 0.069",
+  "9": "YELLOW STRIPE - BGR [39, 242, 248], white fraction 0.378 (the band; this is the 1 plus a white stripe)"
+ },
+ "colours_derived_round83": "This file recorded NO ball colours until round 83. They are now derived from the POT ORDER, using no colour judgement: after the 3 is potted at 85.1s only the cue, the 4 and the 9 remain; the cue is white all over, the 9 carries a white band, the 4 is what is left. Stepping backward, each window adds exactly the ball potted at its boundary. THE 1 AND THE 9 ARE THE SAME COLOUR - 1.4 Lab apart, because the 9 IS the 1 with a white band - and are separated only by white fraction (0.120 vs 0.378). That is the same fact rounds 27-33 bought the stripe reader for, re-derived from a different direction. VALIDATION: rebuilding the naming truth from this palette agreed with the hand-fitted one on 1082 of 1082 shared samples, 0 disagreements - the first independent check this clip's truth has ever had, after the truth files were the defect in rounds 25, 58, 63 and 69."
 }

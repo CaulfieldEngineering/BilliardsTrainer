@@ -203,3 +203,53 @@ class TestWhoNamedTheBall:
         assert "NAMED BY COLOUR" in src, (
             "computed but never printed - a number that only lives in "
             "JSON is not a number Joe sees")
+
+
+class TestBenchPaletteProvenance:
+    """Round 83: the bench truth finally has an independent derivation.
+
+    Its naming truth was hand-fitted colour windows and its truth file
+    recorded no ball colours at all, while the truth files have been the
+    defect four times (25, 58, 63, 69). The pot order gives a derivation
+    that uses NO colour judgement, and rebuilding the naming truth from
+    it agreed with the hand-fitted one on 1082 of 1082 shared samples.
+    """
+
+    def test_the_palette_exists_and_covers_the_rack(self):
+        import json
+        pal = json.loads(
+            (ROOT / "docs" / "bench_palette_20260824-220247.json")
+            .read_text(encoding="utf-8"))
+        assert set(pal["balls"]) == {"0", "1", "2", "3", "4", "9"}
+        assert pal["balls"]["9"]["stripe"] is True
+        assert all(not pal["balls"][k]["stripe"]
+                   for k in ("0", "1", "2", "3", "4"))
+
+    def test_the_one_and_the_nine_share_a_colour(self):
+        """The structural fact rounds 27-33 paid for, re-derived: the 9 IS
+        the 1 with a white band, so colour cannot separate them and only
+        the white fraction can. If this ever stops being true the palette
+        was built wrong."""
+        import json
+        import math
+        pal = json.loads(
+            (ROOT / "docs" / "bench_palette_20260824-220247.json")
+            .read_text(encoding="utf-8"))
+        one, nine = pal["balls"]["1"], pal["balls"]["9"]
+        d = math.dist(one["lab"], nine["lab"])
+        assert d < 15.0, (
+            f"the 1 and the 9 measure {d:.1f} Lab apart; they are the same "
+            f"colour and something has gone wrong with the derivation")
+        assert nine["white_frac"] - one["white_frac"] > 0.15, (
+            "white fraction is the ONLY thing separating them and the gap "
+            "has closed")
+
+    def test_the_truth_file_records_its_colours(self):
+        import json
+        d = json.loads((ROOT / "docs" / "bench_truth.json")
+                       .read_text(encoding="utf-8"))
+        assert d.get("ball_colours_observed"), (
+            "the bench truth stopped recording what its balls look like - "
+            "that absence is what made it uncheckable for 83 rounds")
+        assert set(d["ball_colours_observed"]) == {
+            "0", "1", "2", "3", "4", "9"}

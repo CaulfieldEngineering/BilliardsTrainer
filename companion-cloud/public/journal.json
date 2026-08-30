@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 137,
+   "ts": "2026-08-30T22:27:26",
+   "date": "Aug 30, 06:27 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 06:27 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/137-bench_truth_potorder_check.png",
+     "caption": "The second method's own check sheet. It labels the yellow 1 and the striped 9 correctly in the same frame despite them being the same colour, and by 3:20 the 1 is gone - potted at 2:50."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.4%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/bench_truth_potorder_check.png' alt=''><figcaption>The second method&#x27;s own check sheet. It labels the yellow 1 and the striped 9 correctly in the same frame despite them being the same colour, and by 3:20 the 1 is gone - potted at 2:50.</figcaption></figure></div>"
+  },
+  {
+   "id": 136,
+   "ts": "2026-08-30T22:27:26",
+   "date": "Aug 30, 06:27 PM EDT",
+   "kind": "finding",
+   "title": "Your pinned session's notes finally have a second opinion",
+   "score": "Derived which ball is which from the ORDER YOU POT THEM, using no colour judgement. It agrees with my hand-written notes on 1,082 of 1,082 samples, zero disagreements.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/136-bench_truth_potorder_check.png",
+     "caption": "The second method's own check sheet. It labels the yellow 1 and the striped 9 correctly in the same frame despite them being the same colour, and by 3:20 the 1 is gone - potted at 2:50."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>My notes for your pinned session had never been checked by anything\nexcept me. I built a second, completely separate way of working out which ball is\nwhich, and the two agree on 1,082 out of 1,082 - no disagreements at\nall.</strong></p>\n\n<h3>Why this needed doing</h3>\n<p>Everything the app is scored against comes from my notes about which ball is\nwhere. Those notes have turned out to be wrong four times, and each time it cost\na round or more to discover. For your pinned session they were written by eye,\nand the file did not even record what colour each ball is.</p>\n\n<h3>The second method uses no colour judgement at all</h3>\n<p>It uses the order you pot the balls. After the red 3 goes down at 1:25, only\nthree balls are left: the cue, the purple 4 and the striped 9. The cue is the one\nthat is white all over, the 9 is the one with a white band, and the 4 is whatever\nremains. Work backwards from there and each earlier stretch of the video adds\nexactly the ball that was potted at its end.</p>\n<p>Then I rebuilt my notes from scratch using only that, and compared:</p>\n<pre>\nsamples both methods cover        1,082\nwhere they agree                  1,082\nwhere they disagree                   0\n</pre>\n<p>So the notes I have been scoring your app against are sound. I have kept the\noriginals - they cover 13 more moments - and written down where the colours came\nfrom so the next person does not have to take my word for it.</p>\n\n<h3>One thing it re-proved from a new direction</h3>\n<p>Your yellow 1 and your striped 9 are the SAME colour - the 9 is just the 1\nwith a white band painted round it. Measured independently they are within a\nhair's breadth of each other, and the only thing that tells them apart is how\nmuch white is showing. That is the single hardest problem on your pinned table\nand it took six rounds to solve back in the day; now it is written down as a\nfact with a test guarding it, rather than something I happen to remember.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.4%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 135,
    "ts": "2026-08-30T22:17:26",
    "date": "Aug 30, 06:17 PM EDT",
@@ -1186,38 +1218,6 @@
     }
    ],
    "html": "<div class='note win'><p><strong>The app stopped inventing shots out of you setting up.</strong> Invented shots are down from five to one, and unexplained events from ten to zero - shots found stays at 10 of 10.</p><p>Two rules, both taken from looking at the frames rather than guessing:</p><p><strong>1. A shot means the cue ball moved.</strong> When you toss a ball onto the table it rolls freely and looks exactly like a shot - no hand is touching it, so nothing about 'is a hand nearby' can catch it. But your cue ball sits still. Every one of the ten real strokes moves the cue; none of the invented ones do.</p><p><strong>2. A shot means the cue ball went somewhere.</strong> The three remaining false shots were you addressing the ball or nudging it with the stick, pictured below. Measured across the clip: real strokes send the cue at least 263 pixels; a nudge is 8 to 29. The line is drawn at 150, with room on both sides.</p><p>One invented shot remains, during the opening setup where you push the cue around with the stick over a longer distance. That one needs the stick itself to be recognised, which is next.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>75.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>1</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Dev Journal timestamps in Joe&#x27;s clock (Eastern), not UTC</li><li>Round 15: coasts stop at the bed edge - the app was chasing nothing</li><li>RULE 0: never assert a physical cause without looking at the pixels</li><li>Round 14: conditional jaw filter failed two ways - reverted</li><li>Round 13: jaw filter hides real pots - but deleting it is worse</li><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
-  },
-  {
-   "id": 57,
-   "ts": "2026-08-29T01:57:31",
-   "date": "Aug 28, 09:57 PM EDT",
-   "kind": "finding",
-   "title": "Round 15: the app was chasing balls that were not there",
-   "score": "naming 72.1% -> 75.7%; fake shots 3 -> 5",
-   "body": "",
-   "images": [
-    {
-     "src": "journal/057-open_loss.png",
-     "caption": "Four 'lost balls' on open felt: a ball in the glove, two empty pocket corners, and one off the table on the floor."
-    }
-   ],
-   "html": "<div class='note'><p><strong>I looked first this time.</strong> The remaining 'lost' ball movement on open felt turned out not to be lost balls at all. Cropping four examples: one is a ball in your gloved hand, two are the pocket corner with no ball present, and one is <em>off the table entirely</em>, down on the floor.</p><p>So the app was not failing to see balls - it was continuing to predict where a ball would be after losing it, and those predictions drifted onto bare cloth and eventually off the table, while being counted as real ball movement.</p><p><strong>Fix:</strong> a prediction that leaves the table is not a ball, and now stops immediately.</p><table><tr><th>Measure</th><th class='num'>Before</th><th class='num'>After</th></tr><tr><td>Ball movement correctly named</td><td class='num'>72.1%</td><td class='num'>75.7%</td></tr><tr><td>Movement that was only a guess</td><td class='num'>24.2%</td><td class='num'>19.6%</td></tr><tr><td>Invented movement (total samples)</td><td class='num'>3598</td><td class='num'>3241</td></tr></table><p><strong>And an honest cost:</strong> invented shots during your hand-setup went from 3 to 5. With fewer ghost tracks diluting it, the rule that recognises 'this is Joe placing balls' now needs retuning. Shots found stayed at 10 of 10 and correct calls at 8 of 10.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>75.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>8</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>5</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>130.2s</code> ball potted bottom-right \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>RULE 0: never assert a physical cause without looking at the pixels</li><li>Round 14: conditional jaw filter failed two ways - reverted</li><li>Round 13: jaw filter hides real pots - but deleting it is worse</li><li>Round 12: measurement redirects R3 - naming is really a SEEING problem</li><li>Round 11: the stream distinguishes a sighting from an estimate</li><li>Round 10: hand context lands - 10/10 shots found; and a metric caught lying</li><li>Round 9: session-inventory prior FAILED - reverted, published as such</li></ul>"
-  },
-  {
-   "id": 56,
-   "ts": "2026-08-29T01:46:11",
-   "date": "Aug 28, 09:46 PM EDT",
-   "kind": "finding",
-   "title": "Correction: there was no blur - I never looked",
-   "score": "3 rounds spent on a cause that does not exist",
-   "body": "",
-   "images": [
-    {
-     "src": "journal/056-blur_check.png",
-     "caption": "The ball the app 'could not see' at 170.7s: sharp and round, sitting in the pocket jaw. Four consecutive frames."
-    }
-   ],
-   "html": "<div class='note warn'><p><strong>Correction: I was wrong about motion blur, and Joe was right.</strong> For three rounds I explained the app losing sight of balls as motion blur, and built toward fixing it. Joe pointed out he had already fixed blur with the camera's shutter settings. He was correct.</p><p>I finally cropped the ball the app claimed it could not see. It is sharp, round, and clearly visible - sitting in the pocket jaw. The measurements agree: those 'lost' moments have a median speed of 202 pixels per second, which at 1/500th of a second is under half a pixel of smear. There is no blur.</p><p><strong>What is actually happening:</strong> 55% of the losses are at pockets, where the leather partly hides the ball and its confidence drops - and then a filter I wrote discards it. The other 45% are slow-moving balls on the open table, a separate cause I have not identified yet and will not guess at.</p><p>The lesson, which is now a standing rule: I do not get to assert a physical cause without looking at the picture. Counting tells me how much; only the image tells me what.</p></div>"
   }
  ]
 }

@@ -1,0 +1,99 @@
+{
+ "session": "session-20260824-220247.mp4",
+ "note": "Per-table ball palette DERIVED FROM THE POT ORDER, not by eye - the method round 69 built for the cold clip, applied here because this clip's truth was still hand-fitted colour windows and its truth file recorded no ball colours at all. The anchor uses no colour judgement: after the 3 is potted at 85.1s only the cue, the 4 and the 9 remain; the cue is white all over, the 9 carries a white BAND (stripe bar 0.352, measured round 65), the 4 is what is left. Stepping backward each window adds exactly the ball potted at its boundary (+3 at 85.1, +2 at 51.5). THE 1 CANNOT BE FOUND THIS WAY: it sits 1.4 Lab from the 9 because the 9 IS the 1 with a white band, so it is separated by the stripe test in a window where both are on the cloth - which is the same fact rounds 27-33 bought the stripe reader for.",
+ "derived": "2026-08-30 round 83, pot-order",
+ "stripe_bar": 0.352,
+ "balls": {
+  "0": {
+   "bgr": [
+    229.0,
+    255.0,
+    252.0
+   ],
+   "lab": [
+    253.0,
+    123.0,
+    140.0
+   ],
+   "white_frac": 0.971,
+   "stripe": false,
+   "source": "round83-pot-order"
+  },
+  "1": {
+   "bgr": [
+    11.0,
+    237.0,
+    248.0
+   ],
+   "lab": [
+    235.0,
+    112.0,
+    218.0
+   ],
+   "white_frac": 0.12,
+   "stripe": false,
+   "source": "round83-pot-order"
+  },
+  "2": {
+   "bgr": [
+    243.0,
+    132.0,
+    21.0
+   ],
+   "lab": [
+    141.0,
+    140.0,
+    65.0
+   ],
+   "white_frac": 0.06,
+   "stripe": false,
+   "source": "round83-pot-order"
+  },
+  "3": {
+   "bgr": [
+    73.5,
+    25.0,
+    233.0
+   ],
+   "lab": [
+    128.0,
+    202.0,
+    158.0
+   ],
+   "white_frac": 0.07,
+   "stripe": false,
+   "source": "round83-pot-order"
+  },
+  "4": {
+   "bgr": [
+    159.0,
+    22.0,
+    56.0
+   ],
+   "lab": [
+    60.0,
+    179.0,
+    61.0
+   ],
+   "white_frac": 0.069,
+   "stripe": false,
+   "source": "round83-pot-order"
+  },
+  "9": {
+   "bgr": [
+    39.5,
+    242.0,
+    248.0
+   ],
+   "lab": [
+    238.0,
+    110.0,
+    215.0
+   ],
+   "white_frac": 0.378,
+   "stripe": true,
+   "source": "round83-pot-order"
+  }
+ },
+ "not_scored": []
+}

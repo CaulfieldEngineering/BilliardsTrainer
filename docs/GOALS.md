@@ -3600,3 +3600,31 @@ Rounds continue with Joe's visual feedback as the gate.
   (99.3% seen), ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
   METHOD: a rebuilt object loses every field the constructor is not told
   about - twice now, measured_bgr and identified, both silently.
+
+- 2026-08-30 ~23:00 EDT - ROUND 83: THE BENCH TRUTH HAS ITS FIRST
+  INDEPENDENT CHECK, AND IT PASSED. The pinned session's naming truth was
+  still hand-fitted colour windows and its truth file recorded NO ball
+  colours at all, while the truth files have been the defect four times
+  (25, 58, 63, 69) and round 82 showed 196 of its names rest on colour
+  references.
+  Derived the palette from the POT ORDER using no colour judgement: after
+  the 3 is potted at 85.1s only the cue, the 4 and the 9 remain; the cue
+  is white all over, the 9 carries a white BAND, the 4 is what is left;
+  stepping backward each window adds exactly the ball potted at its
+  boundary. REBUILDING THE NAMING TRUTH FROM IT AGREED WITH THE
+  HAND-FITTED ONE ON 1082 OF 1082 SHARED SAMPLES, ZERO DISAGREEMENTS.
+  Differences are coverage only (the pot-order build abstains on 14 and
+  adds 1), so the EXISTING truth is KEPT - now proven, and 13 checks
+  richer.
+  THE 1 AND THE 9 ARE THE SAME COLOUR, re-derived from a new direction:
+  1.4 Lab apart, because the 9 IS the 1 with a white band, separated only
+  by white fraction (0.120 vs 0.378) - exactly what rounds 27-33 bought
+  the stripe reader for, now a pinned fact rather than folklore.
+  docs/bench_truth.json records its ball colours and their provenance for
+  the first time; docs/bench_palette_20260824-220247.json is the palette.
+  NO ENGINE CODE CHANGED; both clips verified identical (bench 10/10,
+  10/10, 4/4, naming 99.9%, ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%).
+  VISION-CORROBORATED: the rebuild's verification sheet labels the 1 and
+  the 9 correctly in one frame, shows the 3 back on the table at t=120
+  (round 70's correction) and the 1 gone by t=200.
+  METHOD: a yardstick nobody has checked is not evidence.

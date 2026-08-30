@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T22:17Z
+    written        2026-08-30T22:27Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,50 +57,55 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 82
+### NEXT TARGETS (top first) — round 83
 
-*** THE COLOUR DEPENDENCY IS NOW A STANDING SCORECARD LINE ***
-    Round 81 found the identity model reads nothing at the dark balls and
-    that colour alone names them - but nothing recorded it, so it took a
-    bespoke sweep to see and would have taken another to notice it
-    changing. Detection.identified -> Track.id_read -> sidecar element 9
-    -> "...NAMED BY COLOUR", the same shape as round 68's Track.read.
-        cold  534 of 1,185 correct names the model never read:
-              {0:73, 1:14, 2:3, 3:5, 4:68, 5:2, 6:2, 7:166, 8:183, 9:18}
-        bench 196 of 1,094:
-              {0:78, 1:59, 2:41, 3:10, 4:7, 9:1}
-    That matches round 81's independent sweep ball for ball - the black 8
-    at 183 (read 0 of 92), the burgundy 7 at 166, the bright balls at
-    2-5. Two measurements taken different ways now agree.
-    VISION-CORROBORATED: on one frame the three balls marked
-    "colour alone" are the black 8, burgundy 7 and purple 4, and every
-    bright ball is marked "model".
-    A BUG WORTH THE COMMENT IT NOW CARRIES: the first cut reported ALL
-    1,094 bench names as colour-only. prepare_detections REBUILDS every
-    Detection, and a rebuilt object loses any field the constructor is
-    not told about - the flag died at projection exactly as measured_bgr
-    once did. It was caught because round 81 had already established the
-    right answer, so the wrong one was recognisable.
-    Both clips otherwise identical: bench 10/10, 10/10, 4/4, naming 99.9%
-    (99.3% seen), ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
+*** THE BENCH TRUTH HAS ITS FIRST INDEPENDENT CHECK, AND IT PASSED ***
+    The pinned session's naming truth was still hand-fitted colour
+    windows, and its truth file recorded NO ball colours at all - while
+    the truth files have been the defect four times (25, 58, 63, 69).
+    Round 82 made the stakes concrete: 196 of its correct names rest on
+    colour references.
+    Derived the palette from the POT ORDER instead, using no colour
+    judgement anywhere: after the 3 is potted at 85.1s only the cue, the
+    4 and the 9 remain; the cue is white all over, the 9 carries a white
+    BAND, the 4 is what is left. Stepping backward, each window adds
+    exactly the ball potted at its boundary (+3 at 85.1, +2 at 51.5).
+        REBUILDING THE NAMING TRUTH FROM IT AGREED WITH THE HAND-FITTED
+        ONE ON 1082 OF 1082 SHARED SAMPLES. ZERO DISAGREEMENTS.
+    The only differences are coverage - the pot-order build abstains on
+    14 samples the old one names and adds 1 - so the EXISTING truth is
+    KEPT: it is now proven correct and carries 13 more checks.
+    THE 1 AND THE 9 ARE THE SAME COLOUR, re-derived from a new
+    direction: 1.4 Lab apart, because the 9 IS the 1 with a white band.
+    Only white fraction separates them (0.120 vs 0.378). That is exactly
+    what rounds 27-33 bought the stripe reader for, and it is now a
+    pinned structural fact rather than folklore.
+    docs/bench_truth.json now records its ball colours and how they were
+    obtained; docs/bench_palette_20260824-220247.json is the palette.
+    NO ENGINE CODE CHANGED; both clips verified identical.
+    VISION-CORROBORATED: the rebuild's own verification sheet labels the
+    1 and the 9 correctly in the same frame, shows the 3 back on the
+    table at t=120 (round 70's correction) and the 1 gone by t=200
+    (potted at 170.6).
 
-0. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT with
-    ZERO wrong names. Cold: 4 unnamed 5s, one 9->1, 0 blind. Both
-    clips' remaining errors are now individually named and understood;
-    there is no cheap win left in naming.
+0. BOTH CLIPS' YARDSTICKS ARE NOW POT-ORDER DERIVED OR POT-ORDER
+    CHECKED. The remaining engine errors are individually named and
+    understood - bench one unnamed and one blind with ZERO wrong; cold
+    4 unnamed 5s, one 9->1. There is no cheap win left in naming, and
+    the queue below is honest about which items are blocked.
 
-1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): settling it needs a
+1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): it needs a
     population of GENUINE hand detections and session-20260802-173553 is
-    not in the library. Recover it or hand-label one.
+    not in the library. Recover it or hand-label one. BLOCKED.
 
 2. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
     is 1,962 KB of dense 30fps trails; the cost to pull it on a bad
-    connection is unmeasured.
+    connection is unmeasured. UNBLOCKED and product-visible.
 
-3. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
-    gave the cold clip - its truth is still hand-fitted colour windows,
-    and round 82 makes the stakes concrete: on the cold clip 534 names
-    rest on those references, 349 of them on the two dark balls alone.
+3. THE COLD PALETTE'S 1/3/5 INDEPENDENCE CAVEAT (round 62) is the last
+    piece of truth-side data on either clip that has not been
+    independently derived - rounds 69 and 83 did the rest. The pot order
+    can settle it the same way.
 
 4. tools/phone_view.py (round 74) screenshots the real player; --local
     serves the working tree so a UI fix is checked BEFORE it ships.
@@ -116,10 +121,11 @@ queue cannot be told something the measurements disagree with.
     win (78); an angle test needs a magnitude guard (75); a regeneration
     needs a gate or it silently deletes (76); a favourable number
     deserves auditing too (79); check what your control group actually
-    contains (80); a statistic about "detections" is only as good as its
-    definition of one (81); AND A REBUILT OBJECT LOSES EVERY FIELD THE
-    CONSTRUCTOR IS NOT TOLD ABOUT - twice now, measured_bgr and
-    identified, both silent (82).
+    contains (80); a statistic about detections is only as good as its
+    definition of one (81); a rebuilt object loses every field the
+    constructor is not told about (82); AND A YARDSTICK NOBODY HAS
+    CHECKED IS NOT EVIDENCE - build the second derivation before
+    trusting the first (83).
 
 6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
