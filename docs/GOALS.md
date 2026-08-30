@@ -2720,3 +2720,43 @@ Rounds continue with Joe's visual feedback as the gate.
   scored blind, and it is blocked on the colour-refs reproducibility gap
   (APP_DIR/colour_refs.json rebuilt from gitignored _train). That is
   next, and the bench-tuned numbers are NOT expected to hold.
+
+- 2026-08-30 ~05:00 EDT - ROUND 52: P2 STARTED - FIRST COLD CLIP, AND IT
+  CAUGHT A REAL BUG. Ran session-20260823-185550 (6020 frames, 3.3 min,
+  a DIFFERENT day, named in no document, never tuned against): 10
+  entries, 8 strokes + 2 Table changes, gate 0.37/1k (limit 0.55; bench
+  is 0.18, so twice as noisy but passing).
+  ALL THREE MAKES VERIFIED FRAME BY FRAME by watching:
+    @48.91  potted the 1, top-right      yellow drops   CORRECT
+    @121.67 potted the 3, bottom-right   red drops      CORRECT
+    @138.14 potted the 4, bottom-right   purple drops   CORRECT
+  THE BUG: @138.14 originally read "Stroke; potted the 1." while
+  pocketed_balls said [4]. The ENGINE was right - watched it, the purple
+  ball drops and the yellow rolls on and stays on the table. describe.py
+  re-derived which ball had departed (departed_for_shot) and used the
+  engine's credit ONLY for the pocket name, so one entry carried two
+  answers and the phone showed the wrong one. On the bench those two
+  derivations always agreed, so it was invisible for weeks; a cold clip
+  made them differ in three minutes. FIX: the engine's `pocketed_balls`
+  is authoritative; the derivation remains a fallback for sidecars
+  written before the engine credited pots. Pinned by 3 tests.
+  THIRD INSTANCE IN THREE ROUNDS of one fact with two owners (round 51:
+  the scorecard's private stroke test; round 52: describe's private pot
+  derivation; still open: events/shot.py in the live path). Now hunting
+  them deliberately rather than waiting for a clip to expose the next.
+  ALSO: colour references are reproducible at last. _load_measured_refs
+  read APP_DIR only and swallowed failure into an empty dict, so any
+  machine without a manual `--install` lost the correction that names
+  the purple 4 (round 33 measured that as 2/136 vs 136/136) with NOTHING
+  reported. docs/colour_refs.json is committed and byte-identical, and
+  is now an automatic fallback; a missing reference logs a warning. 5
+  tests, including "APP_DIR empty, naming still works".
+  BENCH UNCHANGED AND STILL PERFECT after the describe fix: strokes
+  10/10, outcomes 10/10, fake 0, pots 4/4, named 99.6%, all-checks
+  99.0%, invented 0, gate 0.18.
+  NOT VERIFIED ON THE COLD CLIP, stated plainly: the 5 "no ball fell"
+  calls, the 2 Table changes, and whether any real stroke was MISSED. A
+  missed shot is invisible to every metric, because the scorecard only
+  scores shots that a truth file already lists and this clip has none.
+  NEXT: watch all 3.3 minutes including the GAPS between entries, and
+  write the truth file while watching - it becomes corpus clip #2.

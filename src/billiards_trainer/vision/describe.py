@@ -125,6 +125,22 @@ def describe_shot(reader: SidecarReader, s: dict) -> dict:
                 "firm" if rel < 2.2 else "power")
 
     gone, _detail = departed_for_shot(reader, s)
+    # WHICH BALL FELL IS THE ENGINE'S ANSWER, NOT A SECOND DERIVATION
+    # (round 52, found on the first COLD clip). The engine credits pots
+    # in measure/shots._judge and writes them to `pocketed_balls`; this
+    # file then re-derived the same fact from track departures and used
+    # the engine's answer only for the POCKET NAME. On
+    # session-20260823-185550 @138.1 the two disagreed inside a single
+    # entry: the engine credited the 4 into the bottom-right, which is
+    # exactly right - watched it, the purple ball runs down and drops
+    # while the yellow rolls on and stays up - and the sentence Joe
+    # reads said "potted the 1". Two opinions about one fact, and the
+    # phone showed the wrong one (ARCHITECTURE L1). The derivation stays
+    # as the fallback for sidecars written before the engine credited
+    # pots at all.
+    _engine_potted = {int(n) for n in (s.get("pocketed_balls") or [])}
+    if _engine_potted:
+        gone = _engine_potted | (gone & {0})   # keep a measured scratch
     # The RANKED outcome is truth (human verdicts included): if it says
     # this was no scratch, a phantom cue departure in old tracking data
     # must not put "scratched" in the description.

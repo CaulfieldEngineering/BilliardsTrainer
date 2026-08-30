@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T06:07Z
+    written        2026-08-30T06:31Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T06:06Z
@@ -57,80 +57,75 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 51
+### NEXT TARGETS (top first) — round 52
 
-*** PHASE 1 MET, 2026-08-30 (its target date). THE BENCH IS PERFECT. ***
-    strokes 10/10   outcomes 10/10   fake 0   unexplained 0
-    cue named 99.9%   moving named 98.8%   named correctly 99.6%
-    of ALL 1096 pixel-truth checks 99.0%   invented none   pots 4/4
-    physics gate 0.18 per 1k (limit 0.55)   engine rules_v 20
-    Vision-corroborated every round; the 13.1s setup Joe was seen
-    placing balls in is now a Table change, and the 208.0s rattle is
-    correctly no-pot.
-    THIS IS ONE CLIP. It is the pinned session and it is now clean; it
-    is NOT evidence the engine is reliable in general. P2 is a COLD
-    clip - one never tuned against - and everything below serves that.
+*** P2 STARTED: THE FIRST COLD CLIP RAN, AND IT HELD UP ***
+    session-20260823-185550 (6020 frames, 3.3 min, a DIFFERENT DAY from
+    the bench, named in no document, never tuned against).
+    10 entries: 8 strokes + 2 Table changes. Physics gate 0.37 per 1k
+    (limit 0.55; the bench sits at 0.18, so twice as noisy but passing).
+    ALL THREE MAKES VERIFIED BY EYE, frame by frame:
+       @48.91   potted the 1, top-right      yellow ball drops   CORRECT
+       @121.67  potted the 3, bottom-right   red ball drops      CORRECT
+       @138.14  potted the 4, bottom-right   purple ball drops   CORRECT
+                (this one READ "potted the 1" before round 52's fix)
+    NOT YET VERIFIED, and it is the honest gap: whether any real stroke
+    was MISSED (false negatives), whether the five "no ball fell" calls
+    are right, and whether the two Table changes are really setups.
+    Checking those means watching all 3.3 minutes, which is the next
+    bounded round - build a cold-clip watch that samples every episode
+    AND the quiet gaps between them, so a missed shot cannot hide.
 
-0. P2 COLD CLIP - the real test, and it is blocked on reproducibility.
-   APP_DIR/colour_refs.json is regenerated from _train, which is
-   gitignored, so a fresh clone cannot rebuild the measured colour
-   references the naming depends on. Fix that FIRST (docs/colour_refs.json
-   is the version of record; tools/build_colour_refs.py --install
-   places it), then run a clip that has never been looked at and score
-   it blind. Expect the bench-tuned numbers NOT to hold - that gap is
-   the finding.
+0. WATCH THE WHOLE COLD CLIP. Verify the 5 misses and the 2 Table
+    changes, and - the part no metric can do - look at the gaps BETWEEN
+    entries for strokes the engine never reported. A missed shot is
+    invisible to every number on the scorecard, because the scorecard
+    only scores what truth already lists and this clip has no truth
+    file. Write that truth file while watching; it becomes clip #2 of
+    the corpus and unblocks scoring every future round on two tables.
 
-1. THE REMAINING 7 BLIND CHECKS: ball 3 x6 at 126-131s, ball 1 x1 at
-   158s (down from 88 in round 49). Render them with
-   tools/show_missing.py and split genuinely-occluded from
-   in-plain-sight before theorising.
+1. THE COLD CLIP IS TWICE AS NOISY AS THE BENCH (0.37 vs 0.18 per 1k,
+    8 id_flicker + 8 class_flicker). Find out which balls flicker and
+    whether it is the fuller rack (this clip has stripes and a black 8
+    on the table; the bench had six balls and no stripes to confuse).
 
-2. PUT BOTH NAMING FIGURES IN THE PHONE'S STATUS VIEW - the sighting
-   figure (99.6%) and the honest one counting blind as failure (99.0%).
-   The first RISES as tracking gets worse; Joe should see both.
+2. THE REMAINING 7 BLIND CHECKS ON THE BENCH: ball 3 x6 at 126-131s,
+    ball 1 x1 at 158s. tools/show_missing.py renders them.
 
-3. RECOVERED DETECTIONS LOSE THEIR NAME. blur_recovery emits an
-   UNNUMBERED detection stamped `recovered_for=<track id>` and
-   MotionTracker ignores the field. Round 48 measured it: ungated
-   recovery took the purple 4 to 136/136 but dropped `moving balls
-   named` to 92.2%. Honour `recovered_for` and both move together.
+3. PUT BOTH NAMING FIGURES IN THE PHONE'S STATUS VIEW - the sighting
+    figure (99.6%) and the honest one counting blind as failure (99.0%).
 
-4. _locate IS ~37% OF ENGINE WALL TIME (round 48). Window clips to 520
-   so the crop is ~1040x1040 and the median runs over 15 of them.
-   Caching helped (287ms -> ~178ms); shrink the window or search at half
-   resolution as sweep() does. Engine is 21.7 fps against a 24 baseline.
+4. RECOVERED DETECTIONS LOSE THEIR NAME (blur_recovery stamps
+    `recovered_for` and MotionTracker ignores it). Round 48: ungated
+    recovery took the purple 4 to 136/136 but dropped moving-named to
+    92.2%. Honour the field and both move together.
 
-5. THE BENCH IS EASY. Recovery finds nothing here because the clip is
-   well lit; it was built for session-20260820-005048-recovered @233.
-   Now that measured colour reaches the offline tracker (round 48),
-   re-run that clip - recovery could never fire there before.
+5. _locate IS ~37% OF ENGINE WALL TIME. Window clips to 520 so the crop
+    is ~1040x1040 and the median runs over 15 of them. Shrink the window
+    or search at half resolution as sweep() does.
 
 6. tools/rebuild_batch.py still drives an OLD build() path and tests
-   staleness by timestamp; must drive measure/job.run and compare
-   ENGINE_RULES_V before being pointed at the library. Joe's "clean and
-   reproducible way of updating reprocessed clips" is not done until
-   this lands - and with rules_v now 20, every clip in the library is
-   stale.
+    staleness by TIMESTAMP; it must drive measure/job.run and compare
+    ENGINE_RULES_V. rules_v is now 20, so EVERY clip in the library is
+    stale - this is what stands between here and Joe's "clean and
+    reproducible way of updating reprocessed clips".
 
 7. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
-   independently of shots.analyze. One opinion per fact (L1) - round 51
-   found the same class of bug in the scorecard, where a private copy
-   of the stroke test kept failing the bench for a fault the engine had
-   already fixed. Look for the remaining duplicates.
+    independently of shots.analyze. THE SAME CLASS OF BUG has now been
+    found three times in three rounds - the scorecard's private copy of
+    the stroke test (round 51) and describe.py's private derivation of
+    which ball was potted (round 52, caught only because a cold clip
+    made the two answers differ). Hunt the rest deliberately rather
+    than waiting for the next clip to expose one.
 
-8. DELETE vision/tracking.py (716 lines) after migrating its case law out
-   of 4 test files; also vision/identity.py's `_Internal` import,
-   tools/eval_tracking.py, and the MeasurementCore shadow scaffolding.
+8. DELETE vision/tracking.py (716 lines) after migrating its case law
+    out of 4 test files; also vision/identity.py's `_Internal` import,
+    tools/eval_tracking.py, and the MeasurementCore shadow scaffolding.
 
-9. CARRIED_SETUP / _carried_ids IS STRUCTURALLY DEAD and should probably
-   be deleted. A ball being CARRIED is hidden by the hand carrying it,
-   so it has no track, so _carried_ids - which marks only a ball that is
-   both TRACKED and touching a foreign blob - cannot see the case it was
-   written for. Measured round 51: the arm is plainly detected (0.021 to
-   0.036 against a 0.004 empty-table floor) while `carried` is EMPTY on
-   those same frames; 14.5% of samples against a 50% bar. The
-   cue-goes-first rule now does this job on physics alone. Do not delete
-   until P2 confirms the replacement holds on a cold clip.
+9. CARRIED_SETUP / _carried_ids IS STRUCTURALLY DEAD (round 51: a ball
+    being carried is hidden by the hand carrying it, so it has no track
+    to mark). The cue-goes-first rule replaced it. Delete once P2 has
+    confirmed the replacement holds across several cold clips.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

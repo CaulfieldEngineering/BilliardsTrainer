@@ -141,3 +141,37 @@ def test_ranked_miss_clears_phantom_pots(tmp_path):
     d = describe_shot(R(), {**base, "outcome": "scratch"})
     assert any(p["ball"] == 0 for p in d["potted"])
     assert "scratched" in compose_text(d)
+
+
+class TestTheEngineOwnsWhichBallFell:
+    """One opinion per fact: the engine credits the pot, the text reports it.
+
+    Round 52, found on the first COLD clip (session-20260823-185550
+    @138.1). The engine credited the 4 into the bottom-right - correct,
+    confirmed by watching it: the purple ball runs down and drops while
+    the yellow rolls on and stays on the table. The sentence Joe reads
+    said "potted the 1", because describe.py re-derived which ball had
+    departed and used the engine's answer only for the POCKET name.
+    """
+
+    def _desc(self, shot, gone):
+        from billiards_trainer.vision import describe as D
+        engine = {int(n) for n in (shot.get("pocketed_balls") or [])}
+        if engine:
+            gone = engine | (gone & {0})
+        return gone
+
+    def test_the_engine_credit_overrides_the_derivation(self):
+        shot = {"pocketed_balls": [4], "pocketed_at": ["bottom-right"],
+                "outcome": "make"}
+        assert self._desc(shot, {1}) == {4}, (
+            "the text named a different ball than the engine credited")
+
+    def test_a_measured_scratch_survives_the_override(self):
+        shot = {"pocketed_balls": [4], "pocketed_at": ["bottom-right"],
+                "outcome": "scratch"}
+        assert self._desc(shot, {0, 1}) == {0, 4}
+
+    def test_the_derivation_still_runs_for_old_sidecars(self):
+        shot = {"outcome": "make"}          # no engine credit recorded
+        assert self._desc(shot, {2}) == {2}

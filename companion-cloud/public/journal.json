@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 94,
+   "ts": "2026-08-30T06:30:59",
+   "date": "Aug 30, 02:30 AM EDT",
+   "kind": "finding",
+   "title": "First cold clip: three for three, and it found a bug",
+   "score": "A session I have never tuned against called every pot correctly - and exposed the shot description disagreeing with the engine",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/094-strip_138_14.png",
+     "caption": "The shot that caught it. The purple 4 runs down into the bottom-right and drops while the yellow 1 rolls on and stays up. The engine credited the 4 correctly; the sentence said 'potted the 1', because it worked the answer out separately."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>First run on a clip I have never touched. It held up - all three\npots called correctly on a different day, different rack, different lighting -\nand it immediately caught a bug the pinned session never could.</strong></p>\n\n<h3>The cold test</h3>\n<p>Everything so far has been measured on one session, the one I have been\ngrinding on for weeks. That proves the rules fit THAT table. So I picked a clip\nfrom a different day that appears in none of my notes - 3.3 minutes,\nsession-20260823-185550 - ran it, and then watched every pot myself:</p>\n<pre>\n48.9s    \"potted the 1 into the top-right\"       a yellow ball drops   RIGHT\n121.7s   \"potted the 3 into the bottom-right\"    a red ball drops      RIGHT\n138.1s   \"potted the 4 into the bottom-right\"    a purple ball drops   RIGHT\n</pre>\n\n<h3>What it caught</h3>\n<p>That third one originally read <em>\"potted the 1\"</em>. The app had the\nright answer and printed the wrong one: internally it had credited the 4, and\nthe sentence you read was built by a completely separate piece of code that\nworked out which ball vanished on its own - and got a different answer.</p>\n<p>On the pinned session those two always agreed, so the disagreement was\ninvisible for weeks. A new table made them differ within three minutes. The\nsentence now simply reports what the engine decided, instead of deciding again.</p>\n<p>This is the third time in three days I have found the same shape of mistake:\none fact with two owners. First the scoring report had its own private idea of\nwhat counts as a shot; then the shot description had its own idea of which ball\nfell. Each one hid a correct answer behind a second, worse one. I have started\nhunting the rest deliberately instead of waiting for a clip to expose them.</p>\n\n<h3>Also fixed: the app on a fresh machine</h3>\n<p>The colour references that let the app tell your purple 4 from your 7 lived\nonly in a local settings folder. On any new machine - a reinstall, a second PC -\nthey would be missing, ball naming would quietly get worse, and nothing would\nsay why. They now ship with the app itself, and if they ever go missing it says\nso out loud instead of silently guessing.</p>\n\n<h3>Being straight about what I checked</h3>\n<p>I verified all three pots frame by frame. I have NOT yet verified the five\nshots it called \"no ball fell\", the two setups it labelled Table change, or -\nmost importantly - whether it MISSED any shot entirely. A missed shot is\ninvisible to every number I have, because those numbers only score shots\nsomething already told me about. Watching all 3.3 minutes end to end is the\nnext job, and it produces a second reference session as a side effect.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li></ul>"
+  },
+  {
    "id": 93,
    "ts": "2026-08-30T06:07:50",
    "date": "Aug 30, 02:07 AM EDT",
@@ -995,16 +1011,6 @@
    "title": "What's New and Stats actually open now",
    "score": "",
    "body": "Both are full pages with a \u2039 Home button, not pop-ups \u2014 and the bug where tapping them did nothing until you opened a session is fixed (they were opening inside a hidden layer).",
-   "images": []
-  },
-  {
-   "id": 14,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Lifetime Stats \u2014 and your verdicts now count",
-   "score": "",
-   "body": "New on the home screen: Lifetime Stats, a tight table of your misses \u2014 Cut Left/Straight/Right against Missed Left/Right. And in any shot's Details you can now set Cut and Missed yourself; your word overrides the machine and feeds the table.\nOnly trusted verdicts are counted: shots the analysis saw clearly, plus anything you've corrected by hand. Shots where the ball was lost stay out of the table rather than polluting it.\nYour corrections do double duty: they fix the record, and they become the ground truth that validates the physics-fit work \u2014 every verdict you enter makes the automatic tagging measurably better.",
    "images": []
   }
  ]

@@ -11,10 +11,15 @@ overhead camera, and keeping two parallel detector stacks was the "detector vs
 backend" confusion. ``detector_strategies.onnx_model`` is the single detector now.
 """
 
+import logging
+import pathlib as _pathlib
+
 import cv2
 import numpy as np
 
 from .types import BallClass
+
+log = logging.getLogger(__name__)
 
 
 def classify_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None) -> tuple[BallClass, tuple[int, int, int]]:
@@ -251,6 +256,10 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
 
 _MEASURED_REFS: dict[int, "np.ndarray"] | None = None
 _MIN_REF_SAMPLES = 5
+#: The committed version of record, used when the live copy is absent so a
+#: fresh checkout names balls correctly without a manual install step.
+_RECORD_REFS = (_pathlib.Path(__file__).resolve().parents[3]
+                / "docs" / "colour_refs.json")
 
 
 def _load_measured_refs() -> dict[int, "np.ndarray"]:
@@ -261,9 +270,38 @@ def _load_measured_refs() -> dict[int, "np.ndarray"]:
 
     from ..config import APP_DIR
     refs: dict[int, np.ndarray] = {}
-    try:
-        data = json.loads((APP_DIR / "colour_refs.json").read_text(encoding="utf-8"))
-        for k, v in data.items():
+    # THE VERSION OF RECORD IS A FALLBACK, NOT A MANUAL STEP (round 52).
+    # This read APP_DIR only, and swallowed every failure into an empty
+    # dict. On a machine that has not run tools/build_colour_refs.py
+    # --install - a fresh clone, a rebuilt profile, a new PC - naming
+    # then loses the correction that measured colour exists to make (the
+    # purple 4 reads as the 7; round 33 measured that at 2/136 instead of
+    # 136/136) and NOTHING SAYS SO. Silence is the worst part: the
+    # scorecard would just print a lower number with no cause attached.
+    # docs/colour_refs.json is committed and identical in content, so
+    # falling back to it makes a fresh checkout correct by default and
+    # leaves --install for deliberately refreshing the live copy.
+    data: dict = {}
+    src = ""
+    for cand, unwrap in ((APP_DIR / "colour_refs.json", False),
+                         (_RECORD_REFS, True)):
+        try:
+            doc = json.loads(cand.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        doc = doc.get("refs", {}) if unwrap else doc
+        if doc:
+            data, src = doc, str(cand)
+            break
+    if not data:
+        log.warning("no colour references found (looked in %s and %s) - "
+                    "ball naming will not be corrected against this "
+                    "table's measured colours", APP_DIR / "colour_refs.json",
+                    _RECORD_REFS)
+    else:
+        log.info("colour references loaded from %s", src)
+    for k, v in data.items():
+        try:
             lab = np.array(v["lab"], np.float32)
             # Near-white references cannot discriminate (cue, 9/11 whose white
             # body swamps the band in a whole-crop median) — guessing from
@@ -271,8 +309,9 @@ def _load_measured_refs() -> dict[int, "np.ndarray"]:
             whiteish = lab[0] > 225 and abs(lab[1] - 128) < 10 and abs(lab[2] - 128) < 10
             if int(v.get("n", 0)) >= _MIN_REF_SAMPLES and int(k) > 0 and not whiteish:
                 refs[int(k)] = lab
-    except (OSError, ValueError, KeyError):
-        pass
+        except (ValueError, KeyError, TypeError):
+            log.warning("colour reference %r in %s is malformed - skipped",
+                        k, src)
     _MEASURED_REFS = refs
     return refs
 
