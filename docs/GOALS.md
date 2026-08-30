@@ -3654,3 +3654,30 @@ Rounds continue with Joe's visual feedback as the gate.
   NO ENGINE CODE CHANGED; both clips verified identical (bench 10/10,
   10/10, 4/4, naming 99.9%, ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%).
   METHOD: when a method cannot reach something, say which something.
+
+- 2026-08-31 ~00:30 EDT - ROUND 85: TRIED TO READ THE PRINTED NUMBERS OFF
+  THE BALLS; THE CONTROL FAILED, SO THE METHOD IS REJECTED. The cold 6, 7
+  and 8 are never potted so round 84's pot-order check cannot reach them,
+  and round 82 showed the 7 and 8 are named ENTIRELY by colour.
+  ATTEMPT 1: those balls are motionless all clip, so 400 frames each were
+  averaged to cancel noise. The averages are strikingly clean and the
+  colours became unmistakable - but the DIGITS did not resolve; what
+  shows is the white number CIRCLE, foreshortened onto the ball's upper
+  surface by the overhead view. THE CONTROL SETTLED IT: ball 2,
+  independently confirmed by its own pot in round 84, does not read as a
+  "2" either. A method that cannot read a known answer cannot be trusted
+  on an unknown one. Rejected and recorded so it is not retried.
+  ATTEMPT 2, what the round delivers: the averaged colours force the
+  assignment on a standard set - claimed 6 L=93 a*=100 strongly GREEN and
+  85+ Lab from either dark ball; claimed 7 L=21 a*=145 dark RED; claimed
+  8 L=10 a*=126 NEUTRAL and darkest. The only plausible swap was 7 vs 8
+  and they differ on exactly the right axis (19 units of red chroma vs
+  neutral, and the 8 darker). So 6/7/8 move from "by eye, assumption
+  unstated" to "canonical-set, assumption STATED, swap risk assessed".
+  WEAKER THAN THE POT ORDER AND SAYS SO: independent of the APP (round
+  62's circularity) but NOT of the convention. A test guards against
+  re-labelling them pot-order derived, and against losing the record of
+  the rejected digit method.
+  NO ENGINE CODE CHANGED; both clips verified identical.
+  METHOD: put a known answer through every new method - the control is
+  what rejected this round's headline idea.

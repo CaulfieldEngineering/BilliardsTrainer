@@ -22,7 +22,8 @@
      156,
      213
     ]
-   }
+   },
+   "source": "round85-canonical-set (the darkest and NEUTRAL: L=10, a*=126 - no red chroma, unlike the 7)"
   },
   "7": {
    "bgr": [
@@ -43,7 +44,8 @@
      472,
      275
     ]
-   }
+   },
+   "source": "round85-canonical-set (dark RED: L=21, a*=145 - the red chroma is what separates it from the 8)"
   },
   "1": {
    "bgr": [
@@ -151,7 +153,8 @@
      542,
      826
     ]
-   }
+   },
+   "source": "round85-canonical-set (unmistakably GREEN: a*=100 against neutral 128, and 85+ Lab from either dark ball)"
   },
   "5": {
    "bgr": [
@@ -225,5 +228,6 @@
  "stripe_bar": 0.137,
  "stripe_bar_why": "Midpoint of THIS table's measured gap in the palette's own white_frac: solids reach 0.064 (the 6), the stripe sits at 0.209. Required by identify_by_palette, which had no value here at all.",
  "revised_round69": "3 and 5 are now SCORED. See not_scored_why.",
- "validated_round84": "THE FIVE POTTED BALLS ARE NOW INDEPENDENTLY CONFIRMED. A ball that vanishes from the cloth at a pot IS the ball that was potted - no colour reference is consulted; each ball is matched only to ITSELF across the four seconds spanning the pot. 2, 3, 4 and 5 land on their own palette entry at 1.4-6.8 Lab with runners-up 36-70 away. THE 1 NEEDED THE STRIPE TEST, for a structural reason worth recording: its colour TWIN the 9 stays on the table, so the disappearance is masked. Within the yellow family the white fractions run 0.048 / 0.051 / 0.395 before the pot and 0.054 / 0.388 after - a LOW-white (solid) member vanished, which is the 1 and not the stripe. Same fact the bench re-derived in round 83: the 9 IS the 1 with a white band. WHAT THIS CANNOT REACH, stated plainly: 6, 7 and 8 are never potted, so the pot order says nothing about them and they remain by-eye from round 60. That is uncomfortable, because round 82 showed the 7 and 8 are named ENTIRELY by colour (166 and 183 names, the identity model reading them 2 of 85 and 0 of 92) - the two most load-bearing references on this table are the two the pot order cannot check."
+ "validated_round84": "THE FIVE POTTED BALLS ARE NOW INDEPENDENTLY CONFIRMED. A ball that vanishes from the cloth at a pot IS the ball that was potted - no colour reference is consulted; each ball is matched only to ITSELF across the four seconds spanning the pot. 2, 3, 4 and 5 land on their own palette entry at 1.4-6.8 Lab with runners-up 36-70 away. THE 1 NEEDED THE STRIPE TEST, for a structural reason worth recording: its colour TWIN the 9 stays on the table, so the disappearance is masked. Within the yellow family the white fractions run 0.048 / 0.051 / 0.395 before the pot and 0.054 / 0.388 after - a LOW-white (solid) member vanished, which is the 1 and not the stripe. Same fact the bench re-derived in round 83: the 9 IS the 1 with a white band. WHAT THIS CANNOT REACH, stated plainly: 6, 7 and 8 are never potted, so the pot order says nothing about them and they remain by-eye from round 60. That is uncomfortable, because round 82 showed the 7 and 8 are named ENTIRELY by colour (166 and 183 names, the identity model reading them 2 of 85 and 0 of 92) - the two most load-bearing references on this table are the two the pot order cannot check.",
+ "unreached_round85": "6, 7 and 8 ARE NEVER POTTED, so round 84's pot-order check cannot reach them. Two attempts at something stronger: (1) READING THE PRINTED NUMBER. They are motionless all clip, so 400 frames were averaged per ball to cancel noise. The averages are clean and the colours became unmistakable - but the DIGITS did not. What is visible is the white number CIRCLE, foreshortened onto the ball's upper surface by the overhead view. The control settles it: ball 2, independently confirmed by its pot in round 84, does not read as a '2' either. Method REJECTED - if it cannot read a ball whose answer is known, its reading of an unknown one is worthless. (2) CANONICAL SET. The averaged colours are unambiguous - green, dark red, neutral black - and on a standard set that forces 6/7/8. The only plausible swap was 7 against 8, and they differ on exactly the right axis: the 7 carries 19 units of red chroma (a*=145) while the 8 is neutral (a*=126) and darker (L=10 vs 21). THIS IS WEAKER THAN THE POT ORDER AND THE ASSUMPTION IS NOW EXPLICIT: it holds only if this is a standard-coloured set. It is independent of the APP, which is what round 62's circularity warning was about, but it is not independent of the convention. If Joe ever plays with a non-standard set, these three are the entries that break first."
 }

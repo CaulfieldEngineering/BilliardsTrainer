@@ -283,15 +283,33 @@ class TestColdPaletteProvenance:
                 f"ball {n} lost its independent derivation; the potted "
                 f"balls are the only ones the pot order can confirm")
 
-    def test_the_unreachable_balls_are_still_marked_by_eye(self):
+    def test_the_unreachable_balls_never_claim_the_pot_order(self):
         """If someone quietly marks these derived without doing the work,
-        the campaign loses the one honest record of what is unchecked."""
+        the campaign loses the one honest record of what is unchecked.
+
+        Round 85 gave them what support it could - the averaged colours
+        are unambiguous and force the assignment ON A STANDARD SET - but
+        that is an assumption about Joe's equipment, not a measurement,
+        and it must never be dressed up as the pot order."""
         pal = self._pal()
         for n in ("6", "7", "8"):
             src = pal["balls"][n].get("source", "")
             assert "pot-order" not in src, (
                 f"ball {n} is never potted - the pot order cannot confirm "
                 f"it, so claiming it does is false provenance")
+            assert "canonical-set" in src, (
+                f"ball {n} lost the record of HOW it is supported")
+
+    def test_the_rejected_digit_method_stays_recorded(self):
+        """Round 85 tried to read the printed numbers off 400-frame
+        averages. The control failed - ball 2, confirmed by its own pot,
+        does not read as a '2' - so the method was rejected. Keeping that
+        written down stops it being retried as though it were new."""
+        pal = self._pal()
+        note = pal.get("unreached_round85", "")
+        assert "REJECTED" in note and "control" in note, (
+            "the rejected digit-reading attempt is no longer recorded; "
+            "someone will spend a round rediscovering that it fails")
 
     def test_the_gap_is_written_down(self):
         pal = self._pal()

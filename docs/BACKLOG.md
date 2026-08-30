@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T22:53Z
+    written        2026-08-30T23:26Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,52 +57,67 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 84
+### NEXT TARGETS (top first) — round 85
 
-*** THE COLD CLIP'S FIVE POTTED BALLS ARE NOW POT-ORDER CONFIRMED, AND
-    THE THREE THAT CANNOT BE ARE NAMED ***
-    Eight of its ten balls were still by-eye from round 60; only the 3
-    and 5 had been derived (round 69). A ball that VANISHES at a pot IS
-    the ball that was potted - no colour reference consulted, each ball
-    matched only to ITSELF across the four seconds spanning its pot:
-        2 @62.6   lands on its own entry at 1.4 Lab (runner-up 70.0)
-        3 @121.7  6.8 (43.3)
-        4 @138.1  1.7 (40.9)
-        5 @158.9  5.9 (36.4)
-    THE 1 NEEDED THE STRIPE TEST, for a structural reason: its colour
-    TWIN the 9 stays on the table and masks the disappearance. Within the
-    yellow family the white fractions run 0.048 / 0.051 / 0.395 before
-    the pot and 0.054 / 0.388 after - a LOW-white (solid) member vanished,
-    which is the 1 and not the stripe. The same fact the bench re-derived
-    in round 83: the 9 IS the 1 with a white band.
-    *** AND THE METHOD'S LIMIT IS THE UNCOMFORTABLE PART. *** 6, 7 and 8
-    are NEVER POTTED, so the pot order says nothing about them and they
-    remain by-eye. Round 82 showed the 7 and the 8 are named ENTIRELY by
-    colour (166 and 183 names; the identity model reads them 2 of 85 and
-    0 of 92). The two most load-bearing references on that table are
-    exactly the two this method cannot check. A test now guards against
-    anyone quietly marking them derived.
+*** TRIED TO READ THE PRINTED NUMBERS OFF THE BALLS. THE CONTROL FAILED,
+    SO THE METHOD IS REJECTED. ***
+    The cold 6, 7 and 8 are never potted, so round 84's pot-order check
+    cannot reach them - and they are the most load-bearing references on
+    that table (round 82: the 7 and 8 are named ENTIRELY by colour).
+    ATTEMPT 1, and it was a good idea: those balls are MOTIONLESS all
+    clip, so 400 frames each were averaged to cancel sensor noise and
+    compression. The averages are strikingly clean and the colours became
+    unmistakable - but the DIGITS did not resolve. What is visible is the
+    white number CIRCLE, foreshortened onto the ball's upper surface by
+    the overhead camera.
+    THE CONTROL IS WHAT SETTLED IT: ball 2, independently confirmed by
+    its own pot in round 84, does not read as a "2" either. A method that
+    cannot read a ball whose answer is known cannot be trusted on one
+    whose answer is not. Rejected, and recorded so it is not retried as
+    though it were new.
+    ATTEMPT 2, which is what the round actually delivers: the averaged
+    colours are unambiguous and force the assignment ON A STANDARD SET.
+        claimed 6:  L=93  a*=100  strongly GREEN, 85+ Lab from either dark
+        claimed 7:  L=21  a*=145  dark RED
+        claimed 8:  L=10  a*=126  NEUTRAL and darkest
+    The only plausible swap was 7 against 8, and they differ on exactly
+    the right axis - 19 units of red chroma against neutral, and the 8
+    darker. So 6/7/8 move from "by eye, assumption unstated" to
+    "canonical-set, assumption STATED, colours measured, swap risk
+    assessed".
+    THIS IS WEAKER THAN THE POT ORDER AND SAYS SO. It is independent of
+    the APP - which is what round 62's circularity warning was about -
+    but NOT independent of the convention. If Joe ever plays with a
+    non-standard set, these three entries break first. A test guards
+    against anyone re-labelling them pot-order derived.
     NO ENGINE CODE CHANGED; both clips verified identical.
 
-0. VALIDATE THE COLD 6, 7 AND 8 - the last unchecked truth-side data,
-    and the most load-bearing. The pot order cannot reach them, so it
-    needs a different independent handle. Candidates: they are the only
-    balls MOTIONLESS for the whole clip (the truth says so of the 7 and
-    8), so a rest-position argument may identify them without colour;
-    or a rack/setup frame where their order is forced. Do not accept
-    "the app agrees" as evidence - that is exactly the circularity
-    round 62 flagged and round 69 had to undo.
+0. EVERY TRUTH-SIDE ENTRY ON BOTH CLIPS NOW CARRIES ITS PROVENANCE AND
+    ITS LIMIT. Bench: pot-order derived and cross-checked 1082/1082
+    (83). Cold: five balls pot-order confirmed (84), the 1 via the stripe
+    test, three by canonical set with the assumption stated (85). There
+    is no further truth-side work that does not need NEW EVIDENCE -
+    either a non-standard-set clip to test the assumption, or footage
+    where 6/7/8 are potted.
 
-1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
+1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): needs genuine hand
+    detections; session-20260802-173553 is not in the library. BLOCKED.
 
 2. THE PHONE PAYLOAD ON WEAK CELLULAR: the biggest session's shots.json
-    is 1,962 KB of dense 30fps trails and the cost to pull it on a bad
-    connection is unmeasured. UNBLOCKED, product-visible, not engine.
+    is 1,962 KB of dense 30fps trails, and the cost to pull it on a bad
+    connection is unmeasured. UNBLOCKED and product-visible, though it is
+    delivery rather than engine.
 
-3. tools/phone_view.py (round 74) screenshots the real player; --local
+3. THE ENGINE'S REMAINING ERRORS ARE INDIVIDUALLY NAMED: bench one
+    unnamed and one blind sighting with ZERO wrong; cold 4 unnamed 5s and
+    one 9->1. Both clips pass every gate. The honest position is that the
+    measurement engine is at the end of what these two clips can teach -
+    NEW FOOTAGE is now worth more than another pass over these.
+
+4. tools/phone_view.py (round 74) screenshots the real player; --local
     serves the working tree so a UI fix is checked BEFORE it ships.
 
-4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
@@ -116,11 +131,11 @@ queue cannot be told something the measurements disagree with.
     contains (80); a statistic about detections is only as good as its
     definition of one (81); a rebuilt object loses every field the
     constructor is not told about (82); a yardstick nobody has checked is
-    not evidence (83); AND WHEN A METHOD CANNOT REACH SOMETHING, SAY
-    WHICH SOMETHING - the gap is more useful written down than papered
-    over (84).
+    not evidence (83); when a method cannot reach something, say which
+    something (84); AND PUT A KNOWN ANSWER THROUGH EVERY NEW METHOD - the
+    control is what rejected this round's headline idea (85).
 
-5. The palette is hand-labelled and does not scale; the identifier
+6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall
