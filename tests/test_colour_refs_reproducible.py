@@ -70,3 +70,49 @@ class TestTheLoaderFallsBack:
         refs = balls._load_measured_refs()
         assert set(refs) == {3} and abs(float(refs[3][0]) - 10.0) < 1e-3, (
             "the live copy must take precedence over the version of record")
+
+
+class TestPerSessionReferences:
+    """Colour naming is a per-table fact and had a single global set.
+
+    Round 61, measured on the first cold clip: with the engine's global
+    references - which describe the BENCH's rack (0,1,2,3,4,9) -
+    measured_identity() returns -1 for EVERY ball on that table, so the
+    correction that fixes the dark 4/7/8 cluster on the bench cannot
+    fire anywhere else, and the purple 4 was called the burgundy 7 in 25
+    sightings. Installing that table's own references took the same clip
+    from 85.7% to 93.3% naming: the 4 went 66/111 -> 110/111, the 7
+    126/151 -> 151/151, and unnamed balls 46 -> 1.
+    """
+
+    def test_a_session_with_its_own_references_uses_them(self, monkeypatch):
+        from billiards_trainer.core import balls
+        monkeypatch.setattr(balls, "_MEASURED_REFS", None)
+        got = balls.use_session_refs("session-20260823-185550.mp4")
+        assert got, "the cold clip's own colour references were not found"
+        refs = balls._load_measured_refs()
+        assert 13 in refs, "this table's orange STRIPE is missing from its refs"
+        assert 7 in refs and 6 in refs, "this table's 6 and 7 are missing"
+        balls.use_session_refs(None)
+        balls._MEASURED_REFS = None
+
+    def test_a_session_without_them_falls_back(self, monkeypatch):
+        from billiards_trainer.core import balls
+        monkeypatch.setattr(balls, "_MEASURED_REFS", None)
+        assert not balls.use_session_refs("session-does-not-exist.mp4")
+        refs = balls._load_measured_refs()
+        assert refs, "the global reference set must still load"
+        balls.use_session_refs(None)
+        balls._MEASURED_REFS = None
+
+    def test_switching_sessions_clears_the_cache(self, monkeypatch):
+        """The refs are cached globally; a stale cache would silently give
+        one table another table's colours - the exact bug being fixed."""
+        from billiards_trainer.core import balls
+        balls.use_session_refs("session-20260823-185550.mp4")
+        first = dict(balls._load_measured_refs())
+        balls.use_session_refs(None)
+        second = balls._load_measured_refs()
+        assert set(first) != set(second) or first is not second, (
+            "switching sessions must not reuse the previous table's refs")
+        balls._MEASURED_REFS = None

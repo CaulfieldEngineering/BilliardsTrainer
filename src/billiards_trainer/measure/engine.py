@@ -227,10 +227,22 @@ def reprocess(video: str, out_dir: str | None = None,
     from ..config import EXPORTS_DIR, Settings
     from ..detector_strategies import discover
     from ..vision.analysis_cache import SidecarWriter
+    from ..core.balls import use_session_refs
     from ..detector_strategies.ensemble import FindIdEnsemble as _ENSEMBLE
     from ..vision.pipeline import Pipeline
 
     video = Path(video)
+    # COLOUR NAMING IS A PER-TABLE FACT (round 61). The measured colour
+    # references correct the model's misreads - the purple 4 read as a 7
+    # is the case they were built for - and there was ONE global set,
+    # describing the bench's rack. Measured on the first cold clip:
+    # measured_identity() returns -1 for every ball on that table, so the
+    # correction could never fire, and the 4 was called the 7 in 25
+    # sightings. Installing that table's own references took its naming
+    # from 85.7% to 93.3% (the 4 66/111 -> 110/111, the 7 126/151 ->
+    # 151/151, unnamed 46 -> 1). A clip now uses its own set when the
+    # repo has one, and the global set otherwise.
+    use_session_refs(video.name)
     out_root = Path(out_dir) if out_dir else (video.parent / "m1")
     out_root.mkdir(parents=True, exist_ok=True)
     out_video_alias = out_root / video.name    # sidecar naming anchor

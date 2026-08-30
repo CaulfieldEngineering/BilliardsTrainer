@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T11:00Z
+    written        2026-08-30T11:39Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T10:33Z
+    measured       2026-08-30T11:37Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,75 +57,73 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 60
+### NEXT TARGETS (top first) — round 61
 
-*** THE COLD CLIP HAS A NAMING GATE AT LAST ***
-    docs/cold_naming_truth_20260823-185550.json, built from a per-table
-    PALETTE labelled by eye, verified ball by ball in zoomed crops, and
-    scored with `tools/scorecard.py --truth ... --naming-truth ...`.
-      NAMED CORRECTLY   85.7% of 925 pixel-truth checks  (target 95)
-      perfect   0:175/175  1:15/15  2:37/38  6:184/184  8:183/183
-      failing   13: 5/66      4: 66/111      7: 126/151
-      confusions  13->9 x44   4->7 x25   13->1 x17
-    Every confusion class was ADJUDICATED BY EYE before publishing the
-    number - and one class, 3->5 x66, turned out to be MY TRUTH being
-    wrong, so the 3/5 pair is now explicitly not scored on this clip
-    (23.3 Lab apart; centroids from a single frame cannot separate them).
-    Bench unchanged: 10/10, 10/10, 4/4, named 99.6%, gate 0.18.
+*** PER-SESSION COLOUR REFERENCES SHIPPED. COLD NAMING 85.7% -> 93.3% ***
+                          bench        cold
+    strokes found         10/10        9/9
+    outcomes right        10/10        9/9
+    pots to right ball      4/4        5/5
+    fake / unexplained      0/0        0/0
+    naming                99.6%       93.3%   (was 85.7)
+    of ALL checks         99.0%       93.1%
+    Cold per-ball: 0:175/175 1:15/15 2:38/38 4:110/111 6:184/184
+                   7:151/151 8:183/183   13:5/66  <-- the only failure
+    Bench BIT-FOR-BIT UNCHANGED. Vision-checked at t=100: seven of eight
+    balls correctly named, the eighth being the stripe.
 
-0. *** BOTH REMAINING NAMING DEFECTS HAVE ONE ROOT: THERE IS NO
-    PER-TABLE CALIBRATION FOR THIS TABLE. ***
-    a) THE ORANGE STRIPE 13 IS WRONG IN 61 OF 66 SIGHTINGS (called 9, a
-       YELLOW stripe, or 1). Colour cannot decide it - 1 and 13 are 19.0
-       Lab apart - but WHITE FRACTION can: 0.03 for the gold 1 against
-       0.21 for the stripe, a 7x gap. The engine's bar is an ABSOLUTE
-       0.32 (round 59), above both. The truth builder already computes
-       the right bar per table (this clip: 0.137, sitting in its own gap
-       between solids <=0.06 and stripes >=0.21) and it works - that is
-       how the truth file names the 13 correctly.
-       DO: give the ENGINE the same per-table stripe bar. It belongs
-       beside the measured colour references, which are already
-       per-table by construction (docs/colour_refs.json,
-       tools/build_colour_refs.py --install). Compute it from the
-       session's own balls at calibration time.
-    b) THE PURPLE 4 IS CALLED THE BURGUNDY 7 IN 25 SIGHTINGS (4: 66/111,
-       7: 126/151). This is the SAME dark-cluster misread round 33 fixed
-       on the bench with measured colour references - and it cannot fire
-       here, because measured_identity() returns -1 for every ball on
-       this table: the reference file describes the bench's rack
-       (0,1,2,3,4,9) and nothing else (round 58 measurement).
-    SO THE ONE FIX FOR BOTH: colour references and a stripe bar that are
-    built PER SESSION rather than shipped from one table. The tooling
-    exists (build_colour_refs.py) but needs a labelled corpus per table;
-    the palette written this round is exactly that data for this clip.
+0. *** _fix_colour CANNOT NAME A STRIPE. *** The orange 13 is wrong in
+    61 of its 66 sightings even with a correct 13 reference installed,
+    because the correction is hardcoded to solids:
+        m = measured_identity(...);  if not 1 <= m <= 7: return
+    So a stripe can never be repaired by colour, whatever the reference
+    file says. That single guard is the whole of the cold clip's
+    remaining naming gap.
+    THE TIE IT HAS TO BREAK: the gold 1 and the orange 13 are 19.0 Lab
+    apart - too close for colour - but their white fractions are 0.03 vs
+    0.21. So the rule is: nearest colour reference decides the FAMILY,
+    the stripe reading decides which of the two. That is exactly what
+    tools/build_naming_truth.py does, and it names the 13 correctly on
+    every sample, so the method is already proven on this data.
+    CAUTION, bought in round 58: do NOT use the FINDER's solid/stripe
+    class for this. It reads the bench's yellow 9 as SOLID and vetoing
+    on it cost 99.6% -> 76.8% naming. Use stripe_reading(), which
+    measures the band, and only as a tie-break between two references
+    that are close in colour and differ in class.
+    AND USE A PER-TABLE BAR: measured this round, the unsupervised
+    "largest gap in this table's own white fractions, cue excluded" rule
+    classifies every ball correctly on BOTH clips (bench bar 0.265 from
+    solids <=0.170 vs stripe 0.361; cold bar 0.245 from solids <=0.062
+    vs stripe 0.427). The engine's absolute 0.48 stripe_above sits above
+    both real stripes, so it can only ever abstain.
 
-1. THE PALETTE IS LABELLED BY HAND. docs/cold_palette_20260823-185550.json
-    was made by rendering every ball on the table at one frame and
-    reading them by eye. That is fine for two clips and does not scale to
-    the library. Before P3, decide how a new table gets calibrated
-    without a human in the loop - or accept a one-time labelling step per
-    table and build the UI for it (Joe sees the balls once, names them,
-    the app remembers).
+1. THE PALETTE IS STILL LABELLED BY HAND.
+    docs/colour_refs_session-20260823-185550.json came from a palette a
+    human read off a zoomed grid. That is honest calibration data, and it
+    does not scale to the library. Before P3 decide: a one-time
+    "name your balls" step in the app per table, or an automatic palette
+    from a rack frame. NOTE the engine already falls back to the global
+    set for any clip without its own, so an uncalibrated clip is no worse
+    than before this round.
 
-2. THE 3/5 PAIR IS UNSCORED on the cold clip. Separating them needs
-    centroids sampled across many positions per ball, which needs a way
-    to follow each ball that does not come from the app. The motion
-    timeline (round 53) plus hand-verified anchor frames could do it.
+2. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99) while the naming
+    truth scores the cue 175/175. Those disagree because the cue metric
+    demands a LIVE sighting every frame and the naming truth samples once
+    a second - so it is a TRACKING gap, not naming. Measure where the
+    cue's label rides a coast.
 
-3. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9), yet
-    the naming truth scores the cue 175/175. Those two disagree because
-    the cue metric demands a LIVE sighting every frame while the naming
-    truth samples once a second - so this is a TRACKING gap, not a
-    naming one. Measure where the cue's label rides a coast.
+3. THE 3/5 PAIR IS UNSCORED on the cold clip (23.3 Lab apart), and both
+    are excluded from its colour references for the same reason. Getting
+    them needs centroids sampled per ball across many positions.
 
 4. The identifier mislabels balls mid-collision (round 55); colour
     cannot separate gold from white at speed (round 56); the remaining 7
     blind checks on the bench; both naming figures in the phone STATUS
     view; recovered detections lose their name; _locate is ~37% of
     engine wall time; rebuild_batch.py still drives an OLD build() path
-    (every clip in the library is stale at rules_v 20); events/shot.py
-    is a third shot detector in the live path; delete vision/tracking.py
-    and the MeasurementCore shadow scaffolding.
+    (every clip in the library is stale at rules_v 20); events/shot.py is
+    a third shot detector in the live path; delete vision/tracking.py and
+    the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

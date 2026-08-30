@@ -272,11 +272,48 @@ def classify_pool_ball(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
 # ignored (n >= MIN_REF_SAMPLES) and fall back to canonical behaviour.
 
 _MEASURED_REFS: dict[int, "np.ndarray"] | None = None
+#: a session-specific reference set, when one exists for the clip
+#: being processed (see use_session_refs)
+_SESSION_REFS: "_pathlib.Path | None" = None
 _MIN_REF_SAMPLES = 5
 #: The committed version of record, used when the live copy is absent so a
 #: fresh checkout names balls correctly without a manual install step.
 _RECORD_REFS = (_pathlib.Path(__file__).resolve().parents[3]
                 / "docs" / "colour_refs.json")
+
+
+def use_session_refs(session: str | None) -> bool:
+    """Point colour naming at ONE SESSION's own measured references.
+
+    Measured this round on the first cold clip: with the engine's global
+    references - which describe the BENCH's rack (0,1,2,3,4,9) - naming
+    scored 85.7%, the purple 4 was called the burgundy 7 in 25 sightings
+    and 46 balls went unnamed. measured_identity() returns -1 for EVERY
+    ball on that table (round 58), so the correction that fixes the dark
+    4/7/8 cluster on the bench simply cannot fire anywhere else.
+    Installing that table's own references took the same clip to 93.3%:
+    the 4 went 66/111 -> 110/111, the 7 126/151 -> 151/151, unnamed
+    46 -> 1. Colour naming is a per-table fact and had a single global.
+
+    Looks for docs/colour_refs_<stem>.json (checked into the repo, so a
+    fresh clone is calibrated for every table it has seen), falling back
+    to the global file when a session has none. Returns True if a
+    per-session set was found.
+    """
+    global _MEASURED_REFS, _SESSION_REFS
+    _MEASURED_REFS = None                      # any switch clears the cache
+    _SESSION_REFS = None
+    if not session:
+        return False
+    stem = _pathlib.Path(session).stem
+    cand = _RECORD_REFS.parent / f"colour_refs_{stem}.json"
+    if not cand.is_file():
+        log.info("no per-session colour references for %s - using the global "
+                 "set, which may describe a different table", stem)
+        return False
+    _SESSION_REFS = cand
+    log.info("colour references for THIS session: %s", cand.name)
+    return True
 
 
 def _load_measured_refs() -> dict[int, "np.ndarray"]:
@@ -300,8 +337,10 @@ def _load_measured_refs() -> dict[int, "np.ndarray"]:
     # leaves --install for deliberately refreshing the live copy.
     data: dict = {}
     src = ""
-    for cand, unwrap in ((APP_DIR / "colour_refs.json", False),
-                         (_RECORD_REFS, True)):
+    order = [(APP_DIR / "colour_refs.json", False), (_RECORD_REFS, True)]
+    if _SESSION_REFS is not None:
+        order.insert(0, (_SESSION_REFS, True))
+    for cand, unwrap in order:
         try:
             doc = json.loads(cand.read_text(encoding="utf-8"))
         except (OSError, ValueError):

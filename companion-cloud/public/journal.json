@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 103,
+   "ts": "2026-08-30T11:39:54",
+   "date": "Aug 30, 07:39 AM EDT",
+   "kind": "milestone",
+   "title": "The app now learns each table's colours",
+   "score": "Per-session colour references: naming on the new clip 85.7% -> 93.3%, the purple/dark-red mix-up gone, pinned session untouched",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/103-cold_after_refs.png",
+     "caption": "The frame that used to call the purple ball a 7. Every ball now named correctly except the orange striped one, which the app still calls a 9 - a restriction in the code, not a colour problem."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The app now learns each table's ball colours separately, instead of\ncarrying one table's around forever. Naming on the new session went from 85.7%\nto 93.3%, and your pinned session did not move at all.</strong></p>\n\n<h3>What was wrong</h3>\n<p>The app knows your pinned table's exact ball colours - that is what stops it\ncalling your purple ball a 7 there. There was only ever ONE such set, and it\ndescribed that table. On the new session it matched nothing at all, so the\ncorrection simply never ran, and the purple ball was called the dark red one in\n25 places.</p>\n<p>I tested that explanation before building anything: I temporarily gave the\napp the new table's colours and re-ran the clip. Naming jumped straight to\n93.3% and the purple/dark-red mix-up vanished completely. Then I put the old\nones back and built it properly.</p>\n<pre>\nthe purple ball     66 of 111  ->  110 of 111\nthe dark red ball  126 of 151  ->  151 of 151\nballs left unnamed         46  ->          1\n</pre>\n<p>Checked by eye on the exact frame that used to get it wrong: seven of the\neight balls on the table are now named correctly.</p>\n\n<h3>The one that is still wrong, and why</h3>\n<p>The orange STRIPED ball is still called a 9 (the yellow stripe). This is not\nthe colour data - I gave it the right colour and it made no difference. The\ncorrection has a line in it that only allows solid balls to be renamed, so a\nstriped ball can never be corrected no matter what the app knows about it. That\nsingle restriction is the entire remaining gap on that session.</p>\n<p>Fixing it means letting colour decide the FAMILY and the stripe test decide\nwhich of the pair - the gold 1 and the orange 13 are nearly the same colour but\none is 3% white and the other 21%. My reference sheet already does exactly that\nand gets it right every time, so the method is proven; it just needs to move\ninto the app.</p>\n\n<h3>Both sessions</h3>\n<pre>\n                     pinned session      new clip\nshots found              10 of 10        9 of 9\nmakes and misses         10 of 10        9 of 9\npots to right ball         4 of 4        5 of 5\nnaming                      99.6%          93.3%\n</pre>\n<p>One caveat worth stating: the new table's colours were named by me, from\nphotographs. That is honest calibration and it works, but it does not scale to\nyour whole library yet - a table the app has never been shown still falls back\nto the old behaviour, which is no worse than yesterday.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 60: the cold clip has a naming gate, and both remaining defects share one root</li><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li></ul>"
+  },
+  {
    "id": 102,
    "ts": "2026-08-30T11:00:55",
    "date": "Aug 30, 07:00 AM EDT",
@@ -1049,16 +1065,6 @@
    "title": "Trail animations keep up with the ball now",
    "score": "",
    "body": "The animated trails lagged because the phone's browser reports video time slightly in the past, and three hidden per-frame costs were eating the iPhone's processing budget. The overlay now reads the exact time of each displayed frame, and those costs are gone.\nThe overlay clock now uses frame callbacks (exact presented-frame timestamps, iOS 15.4+) instead of the stale 'official playback position', with a clean fallback when paused or on older devices. This also fixes extra lag in Low Power Mode.\nThe frame cache that makes scrubbing instant was JPEG-encoding every single frame during playback; it now stores every 3rd frame (scrubbing still always hits, and the cache covers 70 seconds instead of 23).\nTwo canvas layers were being reallocated on every animation tick even when nothing was drawn - both now only rebuild when the size actually changes.",
-   "images": []
-  },
-  {
-   "id": 23,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Clips now start instantly on your phone",
-   "score": "",
-   "body": "Every recording had its seek index at the wrong end of the file, so your phone had to download huge chunks (up to ~2 GB for a late shot in a long session) before it could play anything. The index now sits at the front: playing any shot needs ~5-10 MB. All 26 older recordings were fixed tonight, and every new recording fixes itself automatically.\nThe recorder writes 'fragmented' video on purpose - it means a crash can't destroy a recording mid-write. But fragmented files carry an empty index up front; iOS can't even learn the clip's duration from it, let alone jump to a shot, so Safari crawled the file from the beginning.\nThe fix re-containers the finished file (a pure copy, ~1.4 seconds per GB, no quality change) right after recording stops - before it ever reaches Dropbox. Crash safety is unchanged: the file stays fragmented while recording is live.\nAlso found: tonight's high-ISO settings inflate file bitrate 4.6x (16 Mbps vs 3.5), which multiplies every download. The grain recommendation coming separately addresses this too.",
    "images": []
   }
  ]

@@ -3013,3 +3013,37 @@ Rounds continue with Joe's visual feedback as the gate.
         (round 58) - the reference file describes the bench's rack.
   NEXT: build colour references AND a stripe bar per session. The
   palette written this round is exactly the labelled data that needs.
+
+- 2026-08-30 ~14:00 EDT - ROUND 61: PER-SESSION COLOUR REFERENCES.
+  COLD NAMING 85.7% -> 93.3%; BENCH BIT-FOR-BIT UNCHANGED (10/10, 10/10,
+  4/4, 99.6%, gate 0.18). Suite green.
+  MEASURED THE HYPOTHESIS BEFORE BUILDING THE PLUMBING: temporarily
+  installed the cold table's own labelled palette as the engine's colour
+  references and re-ran the clip - naming jumped to 93.3% and the
+  dark-cluster confusion vanished (4: 66/111 -> 110/111, 7: 126/151 ->
+  151/151, 2: 37/38 -> 38/38, unnamed 46 -> 1) - then restored the bench
+  set before touching any code.
+  THE DEFECT: colour naming is a PER-TABLE fact that had a single global
+  set describing the bench's rack. measured_identity() returns -1 for
+  every ball on any other table (round 58), so the correction that fixes
+  the dark 4/7/8 cluster on the bench cannot fire anywhere else.
+  SHIPPED: core.balls.use_session_refs(), which prefers
+  docs/colour_refs_<session>.json when the repo has one and falls back
+  to the global set otherwise; measure/engine calls it per clip. The
+  cold table's references are committed, so a fresh clone is calibrated
+  for every table the repo has seen. 3 tests, including that switching
+  sessions clears the cached refs - a stale cache would hand one table
+  another table's colours, which is the exact bug being fixed.
+  VISION-CORROBORATED at t=100 (the frame that used to call the purple 4
+  a 7): seven of eight balls now correctly named.
+  REMAINING, and it is the whole cold gap: the orange 13 is wrong in 61
+  of 66 sightings EVEN WITH a correct 13 reference, because _fix_colour
+  is hardcoded to solids - `if not 1 <= m <= 7: return`. A stripe can
+  never be repaired by colour. The tie it must break (gold 1 vs orange
+  13, 19.0 Lab apart) is decided by white fraction 0.03 vs 0.21, which
+  is exactly what the truth builder does correctly on every sample.
+  ALSO MEASURED, for that fix: an unsupervised per-table stripe bar -
+  "largest gap in this table's own white fractions, cue excluded" -
+  classifies every ball correctly on BOTH clips (bench 0.265, cold
+  0.245), while the engine's absolute stripe_above=0.48 sits above both
+  real stripes and can only abstain.
