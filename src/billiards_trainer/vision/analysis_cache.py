@@ -105,11 +105,23 @@ class SidecarWriter:
 
     def add_shot(self, event) -> None:
         t0 = self._t0 or 0.0
-        self._f.write(json.dumps({
+        outcome = getattr(event, "outcome", "miss")
+        rec = {
             "type": "shot", "start": round(max(0.0, float(event.start_t) - t0), 3),
             "end": round(max(0.0, float(event.end_t) - t0), 3),
-            "outcome": event.outcome.value,
-            "pocketed": int(event.num_pocketed)}) + "\n")
+            "outcome": getattr(outcome, "value", outcome),
+            "pocketed": int(event.num_pocketed)}
+        # OPTIONAL, carried when the producer knows them. The offline
+        # engine derives shots from the measured episode stream and knows
+        # whether the cue was actually STRUCK (a stroke) or the balls were
+        # moved by hand (a rearrange), and which numbered balls fell -
+        # the live path historically knew neither. Omitted keys keep old
+        # readers and old sidecars working unchanged.
+        for key in ("action", "pocketed_balls"):
+            val = getattr(event, key, None)
+            if val:
+                rec[key] = list(val) if key == "pocketed_balls" else val
+        self._f.write(json.dumps(rec) + "\n")
         self._f.flush()
 
     def add_clock(self, rec: dict) -> None:

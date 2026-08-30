@@ -381,7 +381,8 @@ def summary_path(video_path) -> Path:
     return Path(str(video_path) + SUMMARY_SUFFIX)
 
 
-def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
+def export_shots_summary(video_path, with_trails: bool = True,
+                         sidecar_video=None) -> Path | None:
     """Write <video>.shots.json from the sidecar. Returns the path, or
     None when there is no sidecar. Never raises (enrichment only).
 
@@ -390,8 +391,13 @@ def export_shots_summary(video_path, with_trails: bool = True) -> Path | None:
     transform is computed ONCE per video and cached inside the summary —
     re-exports (verdict syncs etc.) reuse it instead of re-running a
     pipeline warmup."""
+    # sidecar_video: read the analysis from somewhere OTHER than beside
+    # the video. A reprocess builds the summary from the freshly measured
+    # sidecar, so nothing of the previous analysis survives into it (Joe,
+    # 2026-08-31: a reprocess "should completely obliterate all sidecar
+    # data and REPROCESS EVERYTHING... It should not be state dependent").
     try:
-        reader = SidecarReader(video_path)
+        reader = SidecarReader(sidecar_video or video_path)
     except OSError:
         return None
     tf = None

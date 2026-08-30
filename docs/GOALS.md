@@ -2440,3 +2440,22 @@ Rounds continue with Joe's visual feedback as the gate.
   old entries. That is why @104 reads "rearranging" and @35 has one
   trail. Next round derives the shot list from measure.shots.analyze,
   keeping the existing schema. ***
+
+- 2026-08-31 ~12:00 EDT - ROUND 42: a reprocess now REBUILDS a clip
+  instead of patching it, per Joe's directive that it "should completely
+  obliterate all sidecar data and REPROCESS EVERYTHING... not state
+  dependent". The engine derives the shot list from the same
+  shots.analyze the scorecard is judged on and writes it into the
+  sidecar; the summary the phone reads is exported from that fresh
+  sidecar; job.run no longer calls trails_merge. Fixes both of Joe's
+  reports: @104 "rearranging" is now the stroke at 100.98, and @35 is
+  the stroke at 31.68 with two trails and "potted the 1". The pinned
+  session now lists all 10 strokes at the truth strike times, 9
+  rearranges, 4 pots on the right balls. Added the rule that nothing is
+  potted without a stroke (the first list credited 3 phantom makes to
+  the 4 during hand-gathering). Bench unchanged, gate 0.19.
+  Joe also said, correctly, that the system is overcomplicated: a
+  reprocess should just drive the live pipeline over the file. Two frame
+  loops still exist; the live one already measures 99.5% vs the offline
+  99.3%. Collapsing them is next, and engine._pair_identities dies with
+  it.

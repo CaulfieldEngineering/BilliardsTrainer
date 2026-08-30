@@ -55,7 +55,7 @@ def run(video: str, presence_pause: bool = False) -> dict:
     presence_pause=False is the on-demand default: the click is the
     consent. Autonomous callers pass True."""
     from .engine import reprocess
-    from .trails_merge import merge_into_session
+    from ..vision.shots_export import export_shots_summary
 
     video_p = Path(video)
     out: dict = {"video": video_p.name}
@@ -82,13 +82,21 @@ def run(video: str, presence_pause: bool = False) -> dict:
         if rate > GATE_MAX:
             out["merged"] = f"NO - gate red ({rate}/1k > {GATE_MAX})"
             return out
+        # REBUILD, DON'T PATCH. This used to merge dense trails into
+        # whatever shot list the recording-time pass had produced, so a
+        # stroke the engine measured correctly could still be shown as
+        # "rearranging" and five real shots were missing entirely. The
+        # summary is now written wholly from the sidecar this run just
+        # produced - shots, trails and all - so a reprocess depends on
+        # the video and the current engine, and on nothing else.
         sj = Path(str(video_p) + ".shots.json")
         if sj.exists():
-            bak = Path(str(sj) + ".pre_dense")
+            bak = Path(str(sj) + ".pre_engine")
             if not bak.exists():
                 bak.write_bytes(sj.read_bytes())
-        out["merged"] = merge_into_session(str(video_p), M1_DIR / video_p.name,
-                                           prefer_dense=True)
+        written = export_shots_summary(str(video_p),
+                                       sidecar_video=M1_DIR / video_p.name)
+        out["summary"] = str(written) if written else "NO - export failed"
         return out
     finally:
         RUNNING.unlink(missing_ok=True)

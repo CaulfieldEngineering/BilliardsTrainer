@@ -119,6 +119,52 @@ def _pair_identities(found, ident_by_pos, frame_bgr=None) -> None:
                 FindIdEnsemble._fix_colour(frame_bgr, d)
 
 
+def _write_shots(writer, times, frames, carried, calib) -> int:
+    """Derive the session's SHOT LIST from the measured stream and write
+    it into the sidecar beside the frames.
+
+    One engine, one answer: the same episode stage the scorecard is
+    judged on decides what a shot is here, so what Joe sees on his phone
+    and what the bench measures can no longer drift apart. A shot is a
+    STROKE only if the cue ball was actually struck - hand-driven
+    gathering fails either the travel bar or the speed bar (round 35:
+    hand-placed 213 px/s vs 691+ for every real stroke)."""
+    from types import SimpleNamespace
+
+    from .shots import MIN_CUE_PEAK, MIN_CUE_TRAVEL, analyze
+    if not times:
+        return 0
+    eps = analyze(times, frames,
+                  pockets=[(p.x, p.y) for p in calib.table.pockets],
+                  pocket_r=float(calib.table.pocket_radius),
+                  carried=carried)
+    n = 0
+    for e in eps:
+        struck = (not e.setup and e.cue_moved
+                  and e.cue_travel >= MIN_CUE_TRAVEL
+                  and e.cue_peak >= MIN_CUE_PEAK)
+        # NOTHING IS POTTED WITHOUT A STROKE. A ball that disappears while
+        # Joe is gathering by hand has been PICKED UP, not made - and the
+        # episode stage cannot tell those apart from the track alone. The
+        # first derived list credited three "makes" to the purple 4 during
+        # the 24-28s setup window, which is exactly the kind of phantom
+        # make he has reported before.
+        balls = [int(b) for b, _x, _y in e.pocketed if b >= 0] if struck else []
+        writer.add_shot(SimpleNamespace(
+            start_t=e.t_strike, end_t=e.t_settle,
+            outcome="make" if (struck and e.pocketed) else "miss",
+            num_pocketed=len(e.pocketed) if struck else 0,
+            action="stroke" if struck else "rearrange",
+            pocketed_balls=balls))
+        n += 1
+    log.info("m1 shots derived: %d (%d strokes)", n,
+             sum(1 for e in eps
+                 if not e.setup and e.cue_moved
+                 and e.cue_travel >= MIN_CUE_TRAVEL
+                 and e.cue_peak >= MIN_CUE_PEAK))
+    return n
+
+
 def reprocess(video: str, out_dir: str | None = None,
               max_frames: int = 0, calib=None, start_s: float = 0.0,
               presence_pause: bool = True) -> dict:
@@ -207,6 +253,11 @@ def reprocess(video: str, out_dir: str | None = None,
         except OSError:
             pass
 
+    # the measured stream, kept so the SHOT stage can run over it at the
+    # end of the pass instead of re-reading the sidecar
+    ep_times: list = []
+    ep_frames: list = []
+    ep_carried: list = []
     t0_wall = time.time()
     last_prog = t0_wall
     last_file = 0.0
@@ -273,6 +324,11 @@ def reprocess(video: str, out_dir: str | None = None,
                 carried, ffrac = set(), 0.0
             writer.add_frame(t, rows, carried_ids=carried,
                              foreign_frac=ffrac)
+            # kept so the SHOT stage can run over this same stream below
+            ep_times.append(t)
+            ep_frames.append([(r.id, r.x, r.y, r.radius, r.number,
+                               r.cls.value, 1, r.coasting) for r in rows])
+            ep_carried.append(sorted(carried))
             written += 1
             fi += 1
             if max_frames and fi >= max_frames:
@@ -287,6 +343,18 @@ def reprocess(video: str, out_dir: str | None = None,
                 print(f"[m1] {fi}/{n_total} frames, {rate:.1f} fps, "
                       f"eta {eta:.0f} min", flush=True)
                 last_prog = now
+        # THE SHOTS COME FROM THE MEASUREMENT, TOO (Joe, 2026-08-31: a
+        # reprocess "should completely obliterate all sidecar data and
+        # REPROCESS EVERYTHING as though it was just coming in as a raw
+        # video. It should not be state dependent."). The engine used to
+        # write only frames, so the shot LIST stayed whatever the
+        # recording-time pass had decided - which is why a genuine stroke
+        # was still labelled "rearranging" on his phone long after the
+        # engine had measured it correctly.
+        try:
+            _write_shots(writer, ep_times, ep_frames, ep_carried, calib)
+        except Exception:  # noqa: BLE001 - frames are the product; shots enrich
+            log.exception("shot derivation failed")
     finally:
         writer.close()
         cap.release()

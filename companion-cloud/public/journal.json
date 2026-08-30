@@ -1,6 +1,17 @@
 {
  "entries": [
   {
+   "id": 84,
+   "ts": "2026-08-30T01:54:23",
+   "date": "Aug 29, 09:54 PM EDT",
+   "kind": "update",
+   "title": "Round 42: a reprocess now rebuilds the clip, not patches it",
+   "score": "shot list comes from the engine; @104 and @35 fixed",
+   "body": "",
+   "images": [],
+   "html": "\n<div class='note win'>\n<p><strong>Round 42: a reprocess now rebuilds a clip from scratch. Your two\nbugs are fixed, and the shot list finally comes from the engine instead of\nfrom whatever was decided while you were recording.</strong></p>\n\n<h3>Your reports</h3>\n<pre>\n@104 \"rearranging\"  ->  now a stroke at 100.98, \"no ball fell\"\n@35  one trail      ->  now a stroke at 31.68, \"potted the 1\", two trails\n</pre>\n<p>Both had the same cause. The re-analysis was only ever patching better\ntrails into the OLD shot list. It never rebuilt the list, so a stroke the\nengine had measured correctly still wore the label the recording-time pass\ngave it - and five of your ten shots were missing from the list entirely.</p>\n\n<h3>What changed</h3>\n<p>The engine now decides the shots as well as the tracking, and the summary\nyour phone reads is written wholly from the run that just happened. Nothing is\ninherited. Your pinned session now lists all ten strokes at the moments they\nactually happened, the nine bits of hand-shuffling as rearranging, and the four\npots credited to the right balls.</p>\n<p>Deriving the shots also exposed a bug immediately: the first version\ncredited three phantom \"makes\" to the purple 4 while you were gathering balls\nby hand. Nothing can be potted without a stroke - that is now a rule.</p>\n\n<h3>You are right that this is overcomplicated</h3>\n<p>You said a reprocess should just push the video through the same engine as a\nlive feed, and that is correct. There are still two frame loops in the code -\nthe live one and an offline one that duplicates it. I unified the tracker\nunderneath them two rounds ago but not the loops themselves.</p>\n<p>I can also show that the second loop is not earning its place: when I\nmeasured the live path end to end over your practice clip it named balls\ncorrectly 99.5% of the time, slightly BETTER than the offline engine's 99.3%.\nCollapsing them is the next round - a reprocess becomes \"run the live pipeline\nover the file\", and the duplicate goes.</p>\n\n<h3>Still honest about what is left</h3>\n<p>One shot (@31.68) reports two balls potted when only one fell. The ball it\nnames is the right one, but the count is wrong. And the batch tool that would\nre-run your whole library still drives an older path - I am not pointing it at\nyour clips until it drives this one.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li><li>Round 35: no more phantom shots - R2 passes, the bench is one defect from clean</li><li>Round 34: make the 99.5% reproducible, and stop it leaning on unvalidated refs</li><li>Round 33: naming 89% -&gt; 99.5%, outcomes 10/10, pots 4/4 - R3 and R4 gates passed</li><li>Round 32: the 9&#x27;s correct read is given away to a passing ball - two fixes tried, both worse</li><li>Round 31: naming 76% -&gt; 89% and pot attribution 2/4 -&gt; 3/4, nothing worse (rules_v 13)</li><li>Round 30: both naming root causes found and fixed - 76% to 89%, one artifact from landing</li></ul>"
+  },
+  {
    "id": 83,
    "ts": "2026-08-30T01:35:03",
    "date": "Aug 29, 09:35 PM EDT",
@@ -950,16 +961,6 @@
    "title": "Drag the legend out of the way",
    "score": "",
    "body": "The overlay legend can be dragged anywhere on the video and remembers where you put it \u2014 even through rotation.",
-   "images": []
-  },
-  {
-   "id": 4,
-   "ts": "2026-08-22T12:00:00",
-   "date": "Aug 22, 2026",
-   "kind": "update",
-   "title": "Fast shots keep their trails",
-   "score": "",
-   "body": "Hard-hit balls used to vanish from the trails mid-flight. The app now recovers them through the motion blur.\nA hard-hit ball crosses four of its own widths between frames and smears into a translucent streak. The detector sees nothing \u2014 but the pixels still hold the ball.\nThe recovery: remember what the empty table looks like (the average of the last second and a half), subtract it, and whatever remains that's ball-sized and matches the missing ball's own colour better than any other ball's \u2014 that's your ball. It's how your trails now follow the ball all the way to the rail.\nOne honest limit: a smeared ball's measured position is the middle of the streak, not the ball. Good enough to draw a trail; not good enough to judge a miss by. So recovery feeds the drawings, and verdicts wait for the physics fit.",
    "images": []
   }
  ]
