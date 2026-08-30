@@ -3488,3 +3488,31 @@ Rounds continue with Joe's visual feedback as the gate.
   METHOD: a posted regression deserves the same scrutiny as a posted
   win. Shrugging this one off as the price of a fix would have left a
   wrong number standing and believed.
+
+- 2026-08-30 ~19:45 EDT - ROUND 79: AUDITED A SCORE THAT FLATTERS THE
+  APP, AND IT DID. Rounds 72 and 78 each found a metric counting absent
+  or estimated balls as sightings, so this round audited the rest rather
+  than wait to be caught a third time.
+  FOUND: the naming headline credits a correct name even when the
+  nearest track is a COASTED estimate. Bench 7 of 1,094 correct verdicts
+  (99.9% -> 99.3% counting only sightings); cold 2 of 1,185 (99.6% ->
+  99.4%). ALL SEVEN bench cases are the SAME thing - track 11 holding
+  the red 3 through 125-131s while Joe stands over it, which is round
+  71's occlusion fix working as designed; the ball is really there and
+  the estimate lands within 8-9px.
+  So not a defect to remove but a fact to SHOW, on Joe's own precedent
+  (his "what does it mean to correctly name 99.6% of balls" was answered
+  by exposing the stricter figure, not moving the headline). The
+  scorecard now prints "...ACTUALLY SEEN" whenever credit rests on an
+  estimate.
+  ALSO AUDITED AND CLEAN: `invented numbers` is zero on BOTH live and
+  coasted rows on both clips. Deliberately left counting coasts - an
+  invented number displayed on an estimate is still one Joe sees.
+  NO ENGINE CODE CHANGED - metric and tests only; both clips otherwise
+  untouched (bench 10/10, 10/10, 4/4, ZERO wrong; cold 9/9, 9/9, 5/5).
+  VISION-CORROBORATED: rendered the seven - the red 3 is plainly there
+  behind Joe's leg in every one.
+  NEXT is now better aimed: convert those estimates into SIGHTINGS by
+  stopping the foreign veto discarding a fully-visible ball beside a
+  hand, rather than chasing the last fraction of a percent.
+  METHOD: a favourable number deserves auditing too.

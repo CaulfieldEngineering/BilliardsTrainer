@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-30T19:51:40Z",
+ "ts": "2026-08-30T20:22:13Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
@@ -118,6 +118,8 @@
   "invented_numbers": [],
   "invented_frames": 0,
   "name_right_pct": 99.9,
+  "name_right_seen_pct": 99.3,
+  "name_right_on_estimates": 7,
   "name_right_all_pct": 99.8,
   "name_checks_total": 1096,
   "name_wrong_frames": 0,
@@ -147,7 +149,8 @@
     "right": 195,
     "wrong": 0,
     "unnamed": 0,
-    "missing": 0
+    "missing": 0,
+    "right_coast": 7
    },
    "4": {
     "right": 217,

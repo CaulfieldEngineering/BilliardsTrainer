@@ -109,6 +109,34 @@ def test_a_coasted_row_is_not_a_moving_ball(sc):
         "prediction is not a sighting")
 
 
+def test_naming_credit_on_estimates_is_reported_separately(sc):
+    """Round 79's audit: how much of "named correctly" is a guess?
+
+    The headline credits a correct name even when the nearest track is a
+    COASTED estimate rather than a sighting. Audited across both clips:
+    7 of the bench's 1,094 correct verdicts and 2 of the cold clip's
+    1,185 sit on estimates - and ALL SEVEN bench cases are the same
+    thing, track 11 holding the red 3 through the seconds Joe stands
+    over it, which is round 71's occlusion fix working exactly as
+    designed. The ball is really there and the estimate is within 9px.
+
+    So this is not a defect to remove; it is a fact to SHOW. Joe's own
+    precedent governs - when he asked "what does it mean to correctly
+    name 99.6% of balls", the answer was to expose the stricter figure
+    beside the headline, not to quietly move it.
+    """
+    import inspect
+    src = inspect.getsource(sc._naming_correctness)
+    assert "right_coast" in src, (
+        "the estimate-backed portion of the naming score is no longer "
+        "counted; the headline silently banks predictions as sightings")
+    assert "name_right_seen_pct" in src, "the stricter figure is not returned"
+    printed = inspect.getsource(sc)
+    assert "ACTUALLY SEEN" in printed, (
+        "the stricter figure is computed but never shown - a number that "
+        "only lives in JSON is not a number Joe sees")
+
+
 def test_the_skip_count_is_reported(sc):
     """A metric that drops frames from its denominator must say so."""
     import inspect

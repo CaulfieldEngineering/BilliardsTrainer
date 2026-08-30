@@ -130,6 +130,18 @@ def _naming_correctness(r, times, frames) -> dict:
                 e["unnamed"] += 1
             elif int(best[4]) == int(n):
                 e["right"] += 1
+                # ...but was the ball SEEN, or is this credit resting on a
+                # coasted estimate that happened to be right? Audited in
+                # round 79 after two metrics in seven rounds turned out to
+                # be counting things that were not there (72, 78): 7 of
+                # the bench's 1,094 correct verdicts and 2 of the cold
+                # clip's 1,185 sit on estimates. Small, but it is
+                # inflation, and the fix is Joe's own precedent - when he
+                # asked "what does it mean to correctly name 99.6% of
+                # balls" the answer was to EXPOSE the stricter figure
+                # beside the headline, not to quietly move it.
+                if len(best) > 7 and best[7]:
+                    e["right_coast"] = e.get("right_coast", 0) + 1
             else:
                 e["wrong"] += 1
                 k = f"{int(n)}->{int(best[4])}"
@@ -138,9 +150,19 @@ def _naming_correctness(r, times, frames) -> dict:
         return {}
     tot = {k: sum(v[k] for v in per.values())
            for k in ("right", "wrong", "unnamed", "missing")}
+    tot["right_coast"] = sum(v.get("right_coast", 0) for v in per.values())
     seen = tot["right"] + tot["wrong"] + tot["unnamed"]
     return {
         "name_right_pct": round(100.0 * tot["right"] / max(1, seen), 1),
+        # ...AND HOW MUCH OF THAT IS A GUESS (round 79). The figure above
+        # credits a correct name even when the nearest track is a COASTED
+        # estimate rather than a sighting - the app was not looking at the
+        # ball, it was predicting it, and happened to be right. That is
+        # worth knowing separately, because every other blindness measure
+        # here treats an estimate as a failure. Bench 7 checks, cold 2.
+        "name_right_seen_pct": round(
+            100.0 * (tot["right"] - tot["right_coast"]) / max(1, seen), 1),
+        "name_right_on_estimates": tot["right_coast"],
         # THE UNFORGIVING FIGURE (round 49, raised by Joe 2026-08-30:
         # "what does it mean to correctly name 99.6% of balls"). The
         # line above divides by right+wrong+unnamed, so every check
@@ -445,6 +467,10 @@ def main() -> None:
         print(f"  ...OF ALL CHECKS: {c['name_right_all_pct']}% of "
               f"{c['name_checks_total']} pixel-truth checks (target 95+) "
               f"- counts BLIND as failure, not just WRONG")
+        if c.get("name_right_on_estimates"):
+            print(f"  ...ACTUALLY SEEN: {c['name_right_seen_pct']}% - "
+                  f"{c['name_right_on_estimates']} of the correct names sit "
+                  f"on a COASTED estimate, not a sighting")
         if c["name_confusions"]:
             worst = ", ".join(f"{k} x{v}" for k, v in
                               list(c["name_confusions"].items())[:5])

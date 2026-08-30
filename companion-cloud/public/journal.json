@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 129,
+   "ts": "2026-08-30T20:23:46",
+   "date": "Aug 30, 04:23 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 04:23 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/129-r79_coastcredit.png",
+     "caption": "All seven cases are this one moment: the red 3 while you stand over it. The ball is really there and the app's estimate is within about a third of a ball-width - but it is an estimate, not a sighting."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.4%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r79_coastcredit.png' alt=''><figcaption>All seven cases are this one moment: the red 3 while you stand over it. The ball is really there and the app&#x27;s estimate is within about a third of a ball-width - but it is an estimate, not a sighting.</figcaption></figure></div>"
+  },
+  {
+   "id": 128,
+   "ts": "2026-08-30T20:23:46",
+   "date": "Aug 30, 04:23 PM EDT",
+   "kind": "finding",
+   "title": "I audited a score that flatters the app",
+   "score": "Some correct names were credited to the app's own estimates rather than to balls it could see. Pinned session 99.9% reported, 99.3% counting only sightings. The scorecard now shows both.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/128-r79_coastcredit.png",
+     "caption": "All seven cases are this one moment: the red 3 while you stand over it. The ball is really there and the app's estimate is within about a third of a ball-width - but it is an estimate, not a sighting."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Twice recently one of my own scores turned out to be the problem\nrather than the app. So this time I went looking for the same fault in a score\nthat FLATTERS the app - and found a little.</strong></p>\n\n<pre>\n                          reported      counting only balls it could SEE\nyour pinned session         99.9%                 99.3%\nthe newer clip              99.6%                 99.4%\n</pre>\n\n<h3>What the difference is</h3>\n<p>When the app cannot see a ball for a moment it keeps a short estimate of where\nit is. If that estimate is in the right place with the right number, my score\ncounted it as a correct naming - even though the app was predicting rather than\nlooking.</p>\n<p>On your pinned session that is seven checks, and all seven are the SAME\nmoment: the red 3 during the six seconds you stand over it. That is the fix I\nmade a few rounds ago working exactly as intended - the app holds onto the ball\ninstead of losing it, and its guess lands within about a third of a ball-width of\nthe truth.</p>\n\n<h3>So I did not change the app, I changed what the score admits</h3>\n<p>This is not something to remove - holding the ball through those seconds is\nright. But the headline should not quietly bank a prediction as if it were a\nsighting. The scorecard now prints both numbers whenever any of the credit rests\non an estimate.</p>\n<p>It is the same answer as when you asked what it meant to correctly name 99.6%\nof balls: show the harder number next to the friendly one rather than move the\nfriendly one.</p>\n\n<h3>The genuinely useful consequence</h3>\n<p>It points at the next real job. Those seven frames are estimates because the\napp deliberately ignores anything inside your arms and hands, and a ball right\nnext to you gets ignored with them - even when it is in plain view. Fixing THAT\nturns guesses into sightings, which is worth more than chasing the last fraction\nof a percent.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.4%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 127,
    "ts": "2026-08-30T19:53:13",
    "date": "Aug 30, 03:53 PM EDT",
@@ -1166,36 +1198,6 @@
    "body": "",
    "images": [],
    "html": "<div class='note warn'><p><strong>This round FAILED and was\nreverted.</strong> I tried to kill the invented \"11\" with a rule that\nlearns which balls are actually in play during a session and rejects\nnumbers read far less often than the rest. It made everything worse:\nnaming fell from 74.5% to 68.7%, correct calls from 8/10 to 7/10, and\nthe phantom \"11\" nearly doubled.</p>\n<p><strong>Why:</strong> the rule cannot tell a fake ball from a real\nball the detector rarely sees. Your orange 5 is detected in only a\nhandful of frames all session, so the rule suppressed the 5 along with\nthe 11 - and every ball it silenced made the tracking worse elsewhere.\nThe lesson is that the phantom number is not a counting problem, it is\na recognition problem: the model genuinely misreads a ball as \"11\".\nThat belongs in the retraining work, not in a filter.</p>\n<p>Code reverted, bench re-measured, and the numbers below are back to\nexactly where they were before the attempt.</p></div><h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>74.5%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>11</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>9/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>4</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>154.2s</code> 1 caught in the bridge hand mid-roll - NO pot \u2014 <span class='fail'>the app missed this shot entirely</span></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
-  },
-  {
-   "id": 49,
-   "ts": "2026-08-28T19:05:21",
-   "date": "Aug 28, 03:05 PM EDT",
-   "kind": "finding",
-   "title": "Hourly check-in \u2014 Aug 28, 19:05 UTC",
-   "score": "9/10 shots \u00b7 8/10 calls",
-   "body": "",
-   "images": [
-    {
-     "src": "journal/049-dbg_session-20260824-220247_170_50.png",
-     "caption": "BEFORE: nine phantom balls the app believed in, strung down empty felt"
-    },
-    {
-     "src": "journal/049-dbg_session-20260824-220247_170_50.png",
-     "caption": "AFTER: phantoms gone, cue ball correctly named at its real position"
-    }
-   ],
-   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>100.0%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>74.5%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>11</td><td class='num'>none</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Shots found</td><td class='num'>9/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Make/miss calls</td><td class='num'>8/10</td><td class='num'>10/10</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>2/4</td><td class='num'>all</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented shots</td><td class='num'>4</td><td class='num'>0</td><td class='num'><span class='fail'>not yet</span></td></tr></table><h2>What it still gets wrong</h2><ul><li><code>154.2s</code> 1 caught in the bridge hand mid-roll - NO pot \u2014 <span class='fail'>the app missed this shot entirely</span></li><li><code>170.6s</code> long pot into the bottom-left \u2014 app said <strong>no pot</strong>, truth is <strong>pot</strong></li></ul><h2>Changes since the last update</h2><ul><li>Stale-shell fix: HTML served no-store + global overflow guards</li><li>R4 demands pot ATTRIBUTION; unnamed-pot path scheduled for demolition</li><li>Capability ladder: rungs measured per clip, published to the STATUS view</li><li>Phases + a self-serve scorecard: proof instead of &quot;see you in two weeks&quot;</li><li>One channel: What&#x27;s New merged into the Dev Journal, rebuilt as a blog</li></ul><h2>Evidence</h2><div class='grid2'><figure><img src='journal/dbg_session-20260824-220247_170_50.png' alt=''><figcaption>BEFORE: nine phantom balls the app believed in, strung down empty felt</figcaption></figure><figure><img src='journal/dbg_session-20260824-220247_170_50.png' alt=''><figcaption>AFTER: phantoms gone, cue ball correctly named at its real position</figcaption></figure></div>"
-  },
-  {
-   "id": 48,
-   "ts": "2026-08-28T17:48:30",
-   "date": "Aug 28, 01:48 PM EDT",
-   "kind": "update",
-   "title": "The plan, in phases you can check yourself",
-   "score": "now: 9/10 found, 8/10 calls",
-   "body": "You are right that 'see you in two weeks' is not good enough. So here is the work broken into five phases, each with a finish line you can verify without asking me.\nThere is now a STATUS entry pinned at the top of this sidebar. It scores the app against what I saw with my own eyes on the practice clip - ten real strokes, watched frame by frame - and it is recomputed after every single fix. Four numbers: shots found, calls right, fake shots invented, and unexplained events. When all four are perfect, phase one is done. Nothing about that depends on my opinion.\nPHASE 1 - the practice clip is perfect. Finish line: 10 of 10 shots found, 10 of 10 make/miss calls right, zero fake shots, zero unexplained. Today it reads 9 found, 8 right, 4 fake, 8 unexplained. Target: 2 days.\nPHASE 2 - a clip I have never touched. I watch a different session by eye FIRST, write down the truth, then run the engine on it cold. Finish line: at least 9 of 10 on both lines with zero fake shots. This is the honest test that phase 1 was not just tuning to one clip. Target: 1 day after phase 1.\nPHASE 3 - the balls get their right names. Today about a fifth of all real ball movement is tracked with no name at all, and the app sometimes invents ball numbers that are not even on your table. Finish line: every moving ball correctly named for at least 95 percent of the time it is moving, on both clips, with zero invented numbers. Target: 2-3 days.\nPHASE 4 - your whole library rebuilt. Every session regenerated from the engine, not patched. Finish line: three sessions picked at random score at least 9 of 10, and your shot lists show the right number of shots. Target: 1-2 days.\nPHASE 5 - live. The same engine runs on the camera while you play, and the old one is deleted. Finish line: a session you play live scores the same as that same session re-processed afterwards. Target: 3-5 days.\nTwo promises about how this gets reported. The scorecard updates after every fix, several times a day, whether the number went up or down - you will see regressions as fast as wins. And if a phase misses its target date, I post that on the date with the reason, rather than letting it slide quietly.",
-   "images": []
   }
  ]
 }
