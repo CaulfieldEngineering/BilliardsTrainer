@@ -2891,3 +2891,34 @@ Rounds continue with Joe's visual feedback as the gate.
   (177,228,231) is only 90 apart, INSIDE a fast ball's own drift. Colour
   cannot separate that pair at speed and no threshold will; it needs a
   different signal.
+
+- 2026-08-30 ~10:00 EDT - ROUND 57: *** COLD CLIP OUTCOMES 8/9 -> 9/9.
+  BOTH CLIPS NOW SCORE PERFECTLY AT SHOT LEVEL *** (bench 10/10 10/10
+  4/4, cold 9/9 9/9 5/5, 0 fake and 0 unexplained on both). Every one of
+  the cold clip's ten entries matches what was watched.
+  FIX 1 - CUSHION BOUNCES. A bounce reverses velocity, so the
+  constant-velocity prediction is at its worst exactly there; for a ball
+  running a long rail toward a corner it sails into the pocket, the
+  track dies there, and a track dying in a pocket zone IS the pot
+  credit. Association now also considers the prediction MIRRORED about
+  the rail. FIRST ATTEMPT DID NOTHING and the reason is worth keeping: I
+  reflected about the bed bounds, which are POCKET CENTRES, but a ball
+  bounces on its SURFACE - the cushion a ball centre meets is one radius
+  earlier. The mirror moved the prediction 1.7px. With the radius inset
+  the track now follows the ball back out: (558,1184) -> (556,1128) ->
+  (553,1072) -> (548,968).
+  FIX 2 - A BALL IS A TRACK, NOT A NAME. With the track surviving, the
+  false pot remained: the ball's shown name flips 9 -> 1 coming off the
+  cushion, so key "9" ends at 2.5 pocket radii and never returns, which
+  reads as a drop. Credit is now refused when the SAME TRACK ID is still
+  being seen after the supposed drop. This is round 49's idea done
+  correctly - that attempt asked a MAJORITY question ("did this track
+  spend more of the episode under another name") which could not fire on
+  a track born mislabelled; this asks the physical one, did it continue.
+  The track ids added in round 49 are what make it answerable.
+  REMAINING ON THE COLD CLIP, now the campaign: invented numbers
+  [7,9,13] over 10009 frames (this table holds 0,1,2,3,4,5,6,8 - and the
+  173.8 false pot was credited to a "9", so it is not cosmetic), and cue
+  named 95.3% against a 99 target. Both are naming, both plausibly the
+  same root: this clip has a fuller rack WITH STRIPES that the bench
+  never had, so stripe/solid confusion has never been under measurement.

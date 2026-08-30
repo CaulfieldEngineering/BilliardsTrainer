@@ -330,3 +330,57 @@ class TestFastBallStaysOneTrack:
         assert named, "the named ball lost its identity to a nameless blob"
         assert abs(named[0].x - 83.6) < 12 and abs(named[0].y - 1171.9) < 12, (
             "the 1's own track must hold the ball into the pocket")
+
+
+class TestACushionBounce:
+    """A ball that bounces off a rail must keep its track (round 57).
+
+    A bounce REVERSES the velocity component across the rail, so a
+    constant-velocity prediction is at its most wrong exactly there: it
+    sails on through the cushion. For a ball running down a long rail
+    toward a corner, that means the prediction goes straight into the
+    pocket - and a track that dies inside a pocket zone IS the pot
+    credit. Measured on the cold clip at 174.5s: the gold ball ran the
+    rail, its track predicted on to 2.22 pocket radii from the
+    bottom-right and died there, and a shot in which nothing was potted
+    was scored a make on a ball the table does not have. The ball had
+    simply bounced and come back up.
+    """
+
+    def _tk(self):
+        from billiards_trainer.measure.tracker import MotionTracker
+        # bed corners at (60,60)-(600,1200), like the real table
+        return MotionTracker(pockets=[(60.0, 60.0), (600.0, 60.0),
+                                      (600.0, 1200.0), (60.0, 1200.0)],
+                             pocket_r=25.0)
+
+    def test_a_ball_bouncing_off_the_end_rail_keeps_its_track(self):
+        tk = self._tk()
+        t, y = 0.0, 1000.0
+        for _ in range(10):                    # running down toward the rail
+            tk.update([(300.0, y, 13.0, 4)], t)
+            y += 40.0
+            t += 1 / 30
+        rows = tk.update([(300.0, 1195.0, 13.0, 4)], t)   # at the cushion
+        t += 1 / 30
+        assert rows, "the ball at the cushion must be tracked"
+        tid = min(rows, key=lambda r: abs(r.y - 1195.0)).id
+        y = 1160.0
+        for _ in range(6):                     # and back UP the table
+            rows = tk.update([(300.0, y, 13.0, 4)], t)
+            y -= 40.0
+            t += 1 / 30
+        same = [r for r in rows if r.id == tid]
+        assert same, "the bouncing ball lost its track at the cushion"
+        assert same[0].y < 1100.0, "the track did not follow the ball back out"
+
+    def test_an_on_bed_prediction_is_not_mirrored(self):
+        """The reflection must only apply when the prediction left the bed."""
+        tk = self._tk()
+        mid = type("T", (), {"x": 300.0, "y": 600.0, "radius": 13.0})()
+        assert tk._bounced(mid) is None
+        # the cushion a BALL CENTRE meets is one radius short of the bed
+        # bound: 1200 - 13 = 1187, so 1260 reflects to 1187 - 73 = 1114
+        past = type("T", (), {"x": 300.0, "y": 1260.0, "radius": 13.0})()
+        got = tk._bounced(past)
+        assert got is not None and abs(got[1] - 1114.0) < 1e-6, got

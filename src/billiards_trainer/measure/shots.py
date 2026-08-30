@@ -458,6 +458,26 @@ def _judge(ep: Episode, by_n, moving_ts, t_open, t_close,
                     if d < 3.0 * pocket_r:
                         near = (qx, qy)
                         break
+        # THE SAME TRACK CARRIED ON UNDER ANOTHER NAME (round 57).
+        # Credits are keyed by NUMBER, so when a ball's shown name
+        # changes mid-flight its old key simply ends - and if it ended
+        # near a pocket that reads as a drop. Measured on the cold clip
+        # at 174.5s: a gold ball runs the long rail, reaches the
+        # bottom-right jaw, BOUNCES and comes back up the table (watched
+        # it; it is on the felt seconds later). Its track survives the
+        # bounce correctly, but its name flips 9 -> 1 on the way out, so
+        # key "9" ends at 2.5 pocket radii and never returns, and the
+        # shot was scored a make on a ball this table does not have.
+        # The ball is the TRACK, not the name: if that same track id is
+        # still being seen after the supposed drop, nothing was potted.
+        tid = last[3] if len(last) > 3 else None
+        if near is not None and tid is not None:
+            alive_after = any(
+                p[0] > last[0] and len(p) > 3 and p[3] == tid
+                for k2, plist in by_n.items() if k2 != n
+                for p in plist)
+            if alive_after:
+                near = None
         if near is None:
             ep.lost.append((n, round(last[1], 1), round(last[2], 1)))
         elif n == 0:

@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 99,
+   "ts": "2026-08-30T09:43:43",
+   "date": "Aug 30, 05:43 AM EDT",
+   "kind": "milestone",
+   "title": "The new clip now reads correctly end to end",
+   "score": "9 of 9 shots, 9 of 9 outcomes, 5 of 5 pots on a session never tuned against - fixed by cushion bounces and by treating a ball as a ball, not a name",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/099-cold_174_quad.png",
+     "caption": "The shot that was wrongly scored a pot. The gold ball runs into the bottom cushion, bounces, and comes back up the table. The app now follows it through the bounce and correctly reports no ball fell."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The new clip now reads correctly end to end. Nine shots found, nine\nmakes and misses right, five pots credited to the right ball - on a session I\nnever tuned anything against.</strong></p>\n\n<pre>\n                     pinned session      new clip\nshots found              10 of 10        9 of 9\nmakes and misses         10 of 10        9 of 9\npots to right ball         4 of 4        5 of 5\nfalse shots                     0             0\n</pre>\n<p>Every one of the ten entries on the new clip matches what I saw watching it.</p>\n\n<h3>Two fixes, and the second only showed up once the first worked</h3>\n<p><strong>Balls bounce off cushions.</strong> The app predicts where a ball\nwill be from where it was going - which is exactly wrong at a cushion, where the\nball turns around. For a ball running down a long rail toward a corner, the\nprediction carries straight on into the pocket, the app loses the ball there,\nand a ball lost in a pocket counts as potted. It now also checks where the ball\nwould be if it bounced.</p>\n<p>My first attempt at that did nothing at all, for a silly reason worth\nadmitting: I bounced the prediction off the line through the pocket centres, but\na ball bounces on its SURFACE, so the real cushion is one ball-radius earlier.\nThe correction moved the prediction by less than two pixels. With the geometry\nright, the app now follows the ball back up the table.</p>\n<p><strong>A ball is not its name.</strong> With the track surviving, the false\npot at 173 seconds was still there - and the reason was that the ball's NAME\nchanged as it came off the cushion, from \"9\" to \"1\". The app credits pots by\nname, so the \"9\" simply stopped existing next to a pocket, which reads as a\ndrop. It now asks the physical question instead: is that same ball still being\nfollowed afterwards? If it is, nothing was potted.</p>\n\n<h3>What is left on the new clip</h3>\n<p>Two things, both about naming rather than shots. It still invents balls that\nare not on your table - a \"7\", a \"9\" and a \"13\" - and it names the cue ball\ncorrectly 95% of the time against 99.9% on the pinned session. That clip has a\nfuller rack with STRIPED balls, which your pinned session never had, so\nstripe-versus-solid confusion has never actually been measured until now. That\nis the next job.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li></ul>"
+  },
+  {
    "id": 98,
    "ts": "2026-08-30T09:02:22",
    "date": "Aug 30, 05:02 AM EDT",
@@ -1025,16 +1041,6 @@
    "title": "31 more misses solved \u2014 backlog down to 62",
    "score": "",
    "body": "A smarter read of rattle-heavy shots (judging only the ball's initial run, not the chaos after it hits the jaws) solved 31 more misses. Trusted verdicts: 116 \u2192 147. Uncategorized: 93 \u2192 62.\nA measurement pass showed most stuck shots weren't missing data \u2014 they were fully observed but their paths bend too much (rattles, rebounds) for a whole-journey fit. The verdict only ever needed the first straight run from contact, so that's what gets judged now, under an even stricter straightness bar.\nOf the 62 remaining: 39 were never captured at all (the shutter-speed change will prevent these going forward), 21 are genuinely too messy to trust, 2 pointed at no pocket. All stay in your grading playlist rather than being guessed.\nYour categorized misses now split about even left/right overall \u2014 with 'cut right, missed right' (overcut) still the single biggest bucket at 28.",
-   "images": []
-  },
-  {
-   "id": 19,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "77 backlog misses solved automatically",
-   "score": "",
-   "body": "The forensic solver you pushed for went through the uncategorized pile: 77 of 171 misses now carry a verdict (Uncategorized 171 \u2192 94, trusted verdicts 38 \u2192 115). Your own corrections still outrank everything.\nIt re-opens only the blurry second of each miss and searches the narrow corridor physics allows, matched against that ball's own colour \u2014 about 8 minutes of compute for the whole pile, versus the 13-hour full rerun that measurably didn't work.\nInteresting early signal: the newly solved misses split 36 left / 41 right \u2014 much more balanced than the first trusted batch suggested. Worth watching as the rest get graded.\nHonestly held back: 54 shots where the fit wasn't trustworthy and 39 where the ball's flight was never captured at all \u2014 those stay in your grading queue rather than being guessed. 49 solved shots know the miss side but not the cut (the cue wasn't tracked); they're listed as 'cut unknown' and count toward totals.",
    "images": []
   }
  ]

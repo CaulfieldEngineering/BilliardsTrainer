@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T09:02Z
+    written        2026-08-30T09:43Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T08:59Z
+    measured       2026-08-30T09:41Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,64 +57,57 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 56
+### NEXT TARGETS (top first) — round 57
 
-*** COLD CLIP: ALL FIVE REAL POTS NOW CREDITED (4/5 -> 5/5) ***
-    but a SIXTH, FALSE pot appeared at 173.8s, so outcomes stay 8/9.
-    One error traded for another; the trade is recorded, not hidden.
-    BENCH UNCHANGED AND PERFECT (10/10, 10/10, 0 fake, 4/4, named
-    99.6%, all-checks 99.0%, gate 0.18).
+*** BOTH CLIPS NOW SCORE PERFECTLY AT SHOT LEVEL ***
+                          bench          cold clip
+    strokes found         10/10          9/9
+    outcomes right        10/10          9/9
+    pots to right ball      4/4          5/5
+    fake strokes              0            0
+    unexplained               0            0
+    Every one of the cold clip's ten entries matches what was WATCHED.
+    P2 is met for shot detection, windowing, outcome and attribution on
+    a clip the engine was never tuned against.
 
-0. *** THE FALSE POT AT 173.8s IS ON A BALL THAT DOES NOT EXIST ***
-    The engine reports "potted the 9 into the bottom-right". This table
-    holds 0,1,2,3,4,5,6,8 - there is no 9. VERIFIED BY WATCHING at high
-    zoom: a gold ball runs DOWN to the bottom rail, BOUNCES, and comes
-    back up the table; it is plainly on the felt at 175.7. Nothing is
-    potted. The phantom track sits still at rect (542,896) until 174.2,
-    then JUMPS 246px in 0.3s to (555,1142) - which pixel sampling shows
-    is bare felt at every instant - and dies there, inside the pocket
-    zone, which is what gets credited.
-    So this is the INVENTED-NUMBER defect (item 1) producing a false
-    OUTCOME, not a scoring bug. Fix the phantom, not the credit. NOTE
-    the jump destination is empty felt: the track is coasting on a bad
-    velocity into the pocket, which round 15's "a coast is not evidence"
-    rule was meant to stop - find out why it does not fire here.
+STILL FAILING ON THE COLD CLIP, and these are now the campaign:
 
-1. INVENTED NUMBERS [7, 9, 13] ON THE COLD CLIP, 10007 frames. 13 does
-    not exist on any table. This clip has a fuller rack WITH STRIPES and
-    a black 8, which the bench never had, so stripe/solid confusion has
-    never been under measurement. It is now producing wrong OUTCOMES,
-    not just wrong labels - promote it.
+0. *** INVENTED NUMBERS [7, 9, 13] - 10009 frames *** This table holds
+    0,1,2,3,4,5,6,8. There is no 7, no 9, and 13 does not exist on any
+    table. It is the last thing standing between the cold clip and a
+    clean card, and it has already caused a wrong OUTCOME once (the
+    173.8 false pot was credited to a "9"), so it is not cosmetic.
+    This clip has a fuller rack WITH STRIPES and a black 8; the bench
+    had six solids and no stripes, so stripe/solid confusion has never
+    been under measurement. START by counting which real ball each
+    invented number sits on, per frame, using the same colour sampling
+    that solved rounds 55-57.
+
+1. CUE BALL NAMED 95.3% (target 99; the bench holds 99.9). R1 does not
+    generalise. The honest metric requires the label to sit on a LIVE
+    sighting, so this is lost tracking or the name moving to another
+    blob - and with a white cue and a pale yellow 1 and a yellow-white
+    9 stripe on this table, the second is likely.
 
 2. THE IDENTIFIER MISLABELS BALLS MID-COLLISION (round 55): the white
     cue read as "5", the orange 5 read as "3", both recovering a few
-    frames later. Measure how often, then refuse or down-weight identity
-    reads while two balls are within a diameter of each other.
+    frames later. Probably the same root as item 0.
 
-3. COLOUR CANNOT SEPARATE GOLD FROM WHITE AT SPEED - an honest limit
-    found this round. A fast ball's own colour drifts up to 88 from its
-    resting median (measured 3 -> 29 -> 55 -> 88 as it accelerates),
-    while gold (102,178,233) against the white cue (177,228,231) is only
-    90 apart. No threshold separates those; that pair needs a different
-    signal (size, trajectory continuity, or the identifier when it is
-    trustworthy).
-    AND A LESSON ABOUT MEASUREMENT: the 5538-sample survey that set the
-    first threshold at 90 was BIASED BY CONSTRUCTION. It only sampled
-    pairs the tracker already matched well, so it never contained a ball
-    accelerating along a rail, and it reported p99=35 when the truth is
-    88. A survey of the cases that already work cannot characterise the
-    cases that fail.
+3. A NAMING TRUTH FILE FOR THE COLD CLIP so per-ball naming is scored on
+    two tables instead of one. Without it items 0-2 have no gate.
 
-4. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9).
+4. COLOUR CANNOT SEPARATE GOLD FROM WHITE AT SPEED (round 56): a fast
+    ball's own colour drifts up to 88 from its resting median while gold
+    against the white cue is only 90 apart. That pair needs a different
+    signal.
 
-5. A NAMING TRUTH FILE FOR THE COLD CLIP; the remaining 7 blind checks
-    on the bench; both naming figures in the phone STATUS view;
-    recovered detections lose their name; _locate is ~37% of engine wall
-    time; rebuild_batch.py still drives an OLD build() path (every clip
-    in the library is stale at rules_v 20); events/shot.py is a third
-    shot detector in the live path; delete vision/tracking.py and the
-    MeasurementCore shadow scaffolding; CARRIED_SETUP/_carried_ids is
-    structurally dead.
+5. The remaining 7 blind checks on the bench; both naming figures in the
+    phone STATUS view; recovered detections lose their name; _locate is
+    ~37% of engine wall time; rebuild_batch.py still drives an OLD
+    build() path (every clip in the library is stale at rules_v 20);
+    events/shot.py is a third shot detector in the live path; delete
+    vision/tracking.py and the MeasurementCore shadow scaffolding;
+    CARRIED_SETUP/_carried_ids is structurally dead.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

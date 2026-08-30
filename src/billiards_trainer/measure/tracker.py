@@ -242,6 +242,53 @@ class MotionTracker:
         frames that skip detection, so playback can outrun the detector."""
         return list(self._published)
 
+    def _bounced(self, tr) -> tuple[float, float] | None:
+        """Where this track's prediction lands if the ball hit a cushion.
+
+        A ball bouncing REVERSES the component of its velocity across the
+        rail, so a constant-velocity prediction is at its most wrong
+        exactly there - it sails straight on, through the cushion, and
+        for a ball travelling along a rail toward a corner that means
+        straight into the pocket.
+
+        Measured on the cold clip at 174.5s: the gold ball runs down the
+        long rail, its track predicts on to 2.22 pocket radii from the
+        bottom-right, loses the ball at the bounce and dies there - and a
+        track dying inside a pocket zone IS the pot credit, so a shot in
+        which nothing was potted was scored a make on a ball the table
+        does not even have. The ball itself bounced and came back up the
+        table, which anyone watching can see.
+
+        Returns the reflected prediction, or None when the prediction
+        stayed on the bed and there is nothing to reconsider.
+        """
+        if not self._pockets:
+            return None
+        xs = [p[0] for p in self._pockets]
+        ys = [p[1] for p in self._pockets]
+        # A BALL BOUNCES ON ITS SURFACE, NOT ITS CENTRE. The bed bounds
+        # come from pocket CENTRES, so a ball centre can only ever reach
+        # one radius short of them - reflecting about the raw bounds
+        # fires a radius too late and barely moves the prediction. First
+        # attempt did exactly that: the gold ball's prediction reached
+        # y=1211.7 against a bound of 1210, so the mirror shifted it
+        # 1.7px and changed nothing. The cushion the ball actually met is
+        # at 1210 - 13 = 1197.
+        r = max(float(getattr(tr, "radius", 0.0)), 8.0)
+        x0, x1 = min(xs) + r, max(xs) - r
+        y0, y1 = min(ys) + r, max(ys) - r
+        mx, my = tr.x, tr.y
+        hit = False
+        if mx < x0:
+            mx, hit = 2.0 * x0 - mx, True
+        elif mx > x1:
+            mx, hit = 2.0 * x1 - mx, True
+        if my < y0:
+            my, hit = 2.0 * y0 - my, True
+        elif my > y1:
+            my, hit = 2.0 * y1 - my, True
+        return (mx, my) if hit else None
+
     def gate_for(self, tr, dr: float, t: float) -> float:
         """How far from its prediction may this track claim a detection?
 
@@ -311,10 +358,17 @@ class MotionTracker:
                 tr.vy *= damp
         # 2. exclusive greedy association by predicted distance
         pairs = []
+        bounce = {tr.id: self._bounced(tr) for tr in self._tracks.values()}
         for di, (dx, dy, dr, dn) in enumerate(dets):
             for tr in self._tracks.values():
                 gate = self.gate_for(tr, dr, t)
                 dd = ((tr.x - dx) ** 2 + (tr.y - dy) ** 2) ** 0.5
+                # ...or where the ball would be if it hit a cushion. See
+                # _bounced: a rail bounce reverses velocity, so the
+                # straight-line prediction is worst precisely there.
+                b = bounce.get(tr.id)
+                if b is not None:
+                    dd = min(dd, ((b[0] - dx) ** 2 + (b[1] - dy) ** 2) ** 0.5)
                 if dd <= gate:
                     # A NAME OUTRANKS FOUR PIXELS (round 47). Greedy on
                     # distance alone let junk outbid the truth: on the

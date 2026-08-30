@@ -481,3 +481,48 @@ class TestASoftStrokeIsStillAStroke:
         eps = self._episode(1.5)           # ~45 px/s, pushing it about
         assert not eps or not is_stroke(eps[0]), (
             "a slow nudge was accepted as a stroke")
+
+
+class TestANameChangeIsNotAPot:
+    """A ball is a TRACK, not a name (round 57).
+
+    Pot credits are keyed by NUMBER, so when a ball's shown name changes
+    mid-flight its old key simply ends - and if it ended near a pocket
+    that read as a drop. Measured on the cold clip at 174.5s: a gold
+    ball runs the long rail, reaches the bottom-right jaw, bounces and
+    comes back up the table. Its track survives the bounce, but its name
+    flips 9 -> 1 on the way out, so key "9" ends at 2.5 pocket radii and
+    never returns - and the shot was scored a make on a ball the table
+    does not even have.
+    """
+
+    def test_a_ball_that_renames_at_the_jaw_is_not_potted(self):
+        from billiards_trainer.measure.shots import analyze
+        seq, t = [], 0.0
+        POCK = [(60.0, 60.0), (600.0, 60.0), (600.0, 1200.0), (60.0, 1200.0)]
+        for _ in range(20):                       # cue and the 9, at rest
+            seq.append((t, [(1, 100.0, 100.0, 0), (2, 550.0, 700.0, 9)]))
+            t += 1 / 30
+        for k in range(12):                       # cue sets off
+            seq.append((t, [(1, 100.0 + k * 20, 150.0, 0),
+                            (2, 550.0, 700.0, 9)]))
+            t += 1 / 30
+        y = 700.0
+        for _ in range(12):                       # the 9 runs to the jaw
+            y += 40.0
+            seq.append((t, [(1, 340.0, 150.0, 0), (2, 560.0, y, 9)]))
+            t += 1 / 30
+        for _ in range(12):                       # bounces back, renamed 1
+            y -= 40.0
+            seq.append((t, [(1, 340.0, 150.0, 0), (2, 560.0, y, 1)]))
+            t += 1 / 30
+        for _ in range(30):
+            seq.append((t, [(1, 340.0, 150.0, 0), (2, 560.0, y, 1)]))
+            t += 1 / 30
+        times = [a for a, _ in seq]
+        frames = [[(i, x, yy, 13.0, n, "solid", True, False)
+                   for (i, x, yy, n) in rows] for _, rows in seq]
+        eps = analyze(times, frames, pockets=POCK, pocket_r=25.0)
+        potted = [p for e in eps for p in e.pocketed]
+        assert not potted, (
+            f"a ball that bounced out of the jaw was scored potted: {potted}")
