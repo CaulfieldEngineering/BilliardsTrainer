@@ -2507,3 +2507,17 @@ Rounds continue with Joe's visual feedback as the gate.
   OPEN: @85's object-ball trail starts mid-travel - reproduced on the
   31.68 strip, so it is general. Bench unchanged: 10/10, 10/10, 0 fake,
   0 invented, 99.3% named, 4/4 pots, gate 0.19.
+
+- 2026-09-01 ~03:00 EDT - ROUND 46: diagnosed Joe's @85 report by
+  STEPPING THROUGH the shot with the new render_shot --strip. The
+  missing "initial transient tail" is not a drawing bug: the sidecar
+  shows the 3 at rest, then creeping (the track lagging), then jumping
+  360px in 0.15s. The detector loses a fast ball to smear/contrast and
+  re-acquires it on the far side; the trail bridges that gap with a
+  straight line, showing a path the ball never took. Not patching the
+  drawing - a gap is not the tail he wants. The real fix is blur
+  recovery, which is ported but fires ZERO times even on the clip it was
+  built for despite trigger conditions being met 267 times; the failure
+  is inside the search, not the gating. NOTE: every scorecard number
+  calls this shot perfect - detected, outcome right, ball named, pot
+  credited. A fabricated trail is invisible to all of them.
