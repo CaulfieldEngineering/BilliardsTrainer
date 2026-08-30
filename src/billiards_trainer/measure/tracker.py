@@ -28,7 +28,13 @@ from ..core.balls import pool_ball_bgr, number_to_class
 from ..core.types import Track
 
 FRICTION = 0.88          # per-0.1s velocity retention while coasting
-COAST_S = 0.6            # coast this long without a detection, then inactive
+COAST_S = 0.6            # coast this long without a detection, then inactive.
+                         # Too short for a ball the PLAYER is standing over
+                         # (measured: 6.3s and 6.7s of vetoed detections on
+                         # the two clips) - but see the reverted experiment
+                         # at the coast/inactive step before widening it: a
+                         # potted ball is also "at rest and undetected", and
+                         # widening it blindly cost 4 pots across the clips.
 GATE_R = 3.2             # association gate, in ball radii, around prediction
 ACQUIRE_R = 8.0          # gate FLOOR, in ball radii. A struck ball's
                          # first frames outrun the tight predicted gate
@@ -530,6 +536,47 @@ class MotionTracker:
                 pad = 2.0 * max(tr.radius, 8.0)
                 off_bed = not (min(xs) - pad <= tr.x <= max(xs) + pad
                                and min(ys) - pad <= tr.y <= max(ys) + pad)
+            # A SETTLED BALL DOES NOT CEASE TO EXIST BECAUSE JOE LEANS
+            # OVER IT (round 70). The foreign veto in prepare_detections
+            # drops any detection whose centre lands in a hand/arm blob,
+            # and its comment promises the track "coasts on the occlusion
+            # budget and resumes on reappearance" - but that budget is
+            # COAST_S = 0.6s and a player stands over the table for far
+            # longer. Measured, the same failure on both clips:
+            #     bench, the red 3    detections vetoed 125.5-131.8 (6.3s)
+            #     cold,  the 7        detections vetoed  57.8- 64.5 (6.7s)
+            # In both windows the foreign coverage is ~10x its usual
+            # level (0.043 vs 0.004 and 0.035 vs 0.002, nonzero on EVERY
+            # frame), the ball is plainly visible in the video, and the
+            # finder still detects it at 0.72-0.86 - the veto is what
+            # removes it. The track then died at 0.6s and stayed dead for
+            # six seconds, which is exactly when the product is supposed
+            # to be working: the player is down on the shot.
+            # A ball IN FLIGHT still gets 0.6s, because a moving ball's
+            # predicted position goes stale immediately. A CONFIRMED ball
+            # AT REST has a position that cannot go stale on its own - it
+            # only moves if something moves it, and that is motion the
+            # detector would see. 8s covers both measured occlusions and
+            # stays under FORGET_S so a genuinely removed ball is still
+            # forgotten. Coasted frames remain flagged `coasting`, so
+            # nothing downstream mistakes this for a sighting.
+            # TRIED AND REVERTED (round 70): budget = 8s when the track is
+            # CONFIRMED and AT REST. It fixed the blindness exactly as
+            # designed - the bench's "no track" went 7 -> 1 and all-checks
+            # 99.2 -> 99.5% - and the scorecard threw it out at once:
+            #     bench  outcomes 10/10 -> 8/10, pots 4/4 -> 2/4
+            #     cold   outcomes  9/9  -> 7/9,  pots 5/5 -> 3/5
+            # A POTTED BALL IS ALSO A CONFIRMED BALL AT REST THAT STOPS
+            # BEING DETECTED. A ball dropping into a pocket decelerates,
+            # so its last frames read settled, and "at rest" cannot tell
+            # it from a ball a player is standing over. The ghost then
+            # sat on the table for 8s and the pot was never seen.
+            # The discriminator has to be the thing that actually differs:
+            # whether the ball's position is under FOREIGN COVER right
+            # now. The tracker cannot see that - update() takes only
+            # (dets, t) - so the fix needs the foreign mask plumbed in
+            # from prepare_detections, which is the work this shortcut
+            # was trying to avoid. Cheap test, wrong answer.
             if t - tr.t > COAST_S or off_bed:
                 tr.active = False
                 tr.vx = tr.vy = 0.0

@@ -219,6 +219,52 @@ class TestPocketFurniture:
         assert rows, "resting balls away from pockets are not furniture"
 
 
+class TestRestingBallStillGoesInactiveQuickly:
+    """Round 70 case law: widening the coast budget for a resting ball
+    costs POTS.
+
+    A ball the player stands over has its detections vetoed by the
+    foreign mask, and 0.6s of coast is far too short for that - measured
+    at 6.3s and 6.7s of occlusion on the two clips. Widening the budget
+    to 8s for a CONFIRMED, AT-REST track fixed the blindness exactly as
+    designed (bench "no track" 7 -> 1) and the scorecard threw it out:
+    bench outcomes 10/10 -> 8/10 and pots 4/4 -> 2/4, cold 9/9 -> 7/9
+    and 5/5 -> 3/5.
+
+    The reason is physical: A POTTED BALL IS ALSO A CONFIRMED BALL AT
+    REST THAT STOPS BEING DETECTED. It decelerates into the pocket, so
+    its last frames read settled, and the ghost then sat on the table
+    for 8s with the pot never seen. Any future widening must be
+    conditioned on the ball actually being under FOREIGN COVER, which
+    needs the mask plumbed into update() - not on rest alone.
+    """
+
+    def test_a_resting_ball_that_vanishes_is_dropped_promptly(self):
+        from billiards_trainer.measure.tracker import COAST_S, MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(60):                     # 2s of a settled ball
+            rows = tk.update([(300.0, 600.0, 14.0, 3)], t)
+            t += 1 / 30
+        assert rows and rows[0].number == 3, "the ball should be tracked"
+        # now it stops being detected - a pot looks exactly like this
+        gone_by = None
+        for k in range(120):                    # up to 4s of nothing
+            rows = tk.update([], t)
+            t += 1 / 30
+            if not rows:
+                gone_by = (k + 1) / 30.0
+                break
+        assert gone_by is not None, (
+            "a resting ball that stops being detected must go inactive - "
+            "if it lingers, a potted ball stays on the table and the pot "
+            "is never seen (round 70: 4 pots lost across the two clips)")
+        assert gone_by <= COAST_S + 0.5, (
+            f"took {gone_by:.2f}s to drop a vanished resting ball; the "
+            f"budget is COAST_S={COAST_S}s. Widening this without a "
+            f"foreign-cover test costs pots - see the class docstring.")
+
+
 class TestFastBallStaysOneTrack:
     """Bench round 8: a struck ball covers ~60px/frame; a track born
     this frame has no velocity, so the tight gate missed its own next

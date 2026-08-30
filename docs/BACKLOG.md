@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T15:35Z
+    written        2026-08-30T16:21Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T15:02Z
+    measured       2026-08-30T16:19Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,101 +57,88 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 69
+### NEXT TARGETS (top first) — round 70
 
-*** THE 3/5 BLIND SPOT IS CLOSED, AND THE REASON IT EXISTED WAS A BAD
-    SAMPLE IN MY OWN PALETTE ***
-    Round 60 excluded the crimson 3 and the orange 5 from the cold
-    clip's naming truth as "23.3 Lab apart, inseparable". Measured
-    properly they are 41.1 Lab apart. The 23.3 was the distance between
-    the 3 and a CONTAMINATED crop recorded as the 5: at t=40.01 the two
-    warm balls measure Lab [118,200,178] (the 3, 5 Lab from its entry)
-    and [142,184,192] (the orange 5), and the old "5" entry
-    [107,176,173] matches NEITHER. It was not a ball colour at all.
-    FOURTH time truth-side data has been the defect (rounds 25, 58, 63,
-    69) - and this one blocked a whole target for nine rounds.
+*** THE BLINDNESS IS REAL, THE CAUSE IS FOUND, AND MY FIX FAILED ITS
+    GATE AND IS REVERTED ***
+    THE CAUSE, measured and identical on both clips: prepare_detections
+    vetoes any detection whose centre lands in a hand/arm blob, and its
+    own comment promises the track "coasts on the occlusion budget and
+    resumes on reappearance". That budget is COAST_S = 0.6s. A player
+    stands over the table far longer:
+        bench, the red 3   detections vetoed 125.5-131.8s  (6.3s)
+        cold,  the 7       detections vetoed  57.8- 64.5s  (6.7s)
+    In both windows foreign coverage is ~10x its usual level (0.043 vs
+    0.004; 0.035 vs 0.002, nonzero on EVERY frame), the ball is plainly
+    visible in the video, and the finder still detects it at 0.72-0.86.
+    The veto removes it, the track dies at 0.6s and stays dead for six
+    seconds - exactly while the player is down on the shot, which is
+    when the product is supposed to work. The mask is computed on a
+    160px-wide warp (~1.4cm/px), so a ball is ~4 pixels and is swallowed
+    whole by an adjacent arm blob.
+    THE FIX I TRIED: budget 8s when the track is CONFIRMED and AT REST.
+    It fixed the blindness exactly as designed - bench "no track" 7 -> 1,
+    all-checks 99.2 -> 99.5% - and the scorecard threw it out:
+        bench  outcomes 10/10 -> 8/10,  pots 4/4 -> 2/4
+        cold   outcomes  9/9  -> 7/9,   pots 5/5 -> 3/5
+    WHY, and it is physical: A POTTED BALL IS ALSO A CONFIRMED BALL AT
+    REST THAT STOPS BEING DETECTED. It decelerates into the pocket so
+    its last frames read settled; "at rest" cannot tell it from a ball a
+    player is standing over. The ghost sat on the table for 8s and the
+    pot was never seen. Reverted; both clips restored exactly.
+    PINNED: tests/test_motion_tracker.py TestRestingBallStillGoesInactive-
+    Quickly fails if the budget is widened again (verified it fails with
+    the widened constant, so it is a real pin and not decoration).
 
-*** THE METHOD ROUND 60 ASKED FOR, BUILT ***
-    Round 60 said separating them "needs a way to follow each ball that
-    does not come from the app". The POT ORDER is that handle:
-    1@48.9 2@62.6 3@121.7 4@138.1 5@158.9 fixes the inventory at every
-    instant. Anchor at 157.0s by assigning every trusted reference and
-    taking the single leftover - that is the 5 by elimination, never by
-    its colour - then walk BACKWARD in position, aborting on ambiguity.
-    It never aborted: 157.0s -> 40.0s, 1756 samples, colour Lab
-    [145.8,182.5,192.9] sd [2.4,1.8,0.9] over the whole span. The other
-    warm ball in the pair era is then the 3: 44 paired samples, 44/44 of
-    each nearer its own centroid than the other's.
-    TWO METHODS FAILED FIRST and both failures were mine, not the
-    premise's: an absolute 30-Lab "unknown" cut admitted 3-5 balls a
-    frame, and a leftover-by-chroma heuristic produced a sample whose
-    own spread (36.6 Lab mean, 93.7 max) exceeded the separation it was
-    meant to resolve. The anchor guard refusing to start on an unclean
-    frame is what forced the third, correct attempt.
+0. THE CORRECT FIX, now specified by the failure: the discriminator has
+    to be the thing that actually differs between the two cases -
+    whether the ball's position is under FOREIGN COVER right now. A
+    potted ball is not under a hand; an occluded one is. The tracker
+    cannot see this: update() takes only (dets, t). So plumb the foreign
+    mask from prepare_detections into the tracker and extend the coast
+    ONLY while the last-known position is covered. That is the work the
+    round-70 shortcut was trying to avoid, and skipping it is what cost
+    4 pots. Do it properly.
 
-*** THE ENGINE WAS RIGHT IN THE BLIND SPOT ALL ALONG ***
-    With 3 and 5 now scored the cold clip reads:
-        3: 105/105   5: 139/143   (ZERO wrong, 4 unnamed)
-    and round 68's open question is answered by measurement: the 87
-    "saw 3 -> said 5" contradictions were the gates correctly
-    overriding bad reads, exactly as the pot-order argument implied.
-    THE YARDSTICK GOT 29% HARDER, so the headline moved DOWN and that is
-    not a regression - no engine code changed this round:
-        checks       925 -> 1190
-        naming     99.9% -> 99.6%
-        all checks 99.7% -> 99.4%
-        wrong            1 -> 1      (still the single 9->1)
-        invented         0 -> 0
+1. WHILE DOING SO, note the mask is 160px wide (~1.4cm/px) so a ball is
+    ~4 mask pixels and merges into any touching arm blob. Whether the
+    veto should fire at all for a fully-visible ball beside a hand is a
+    separate question worth measuring - the current test is "is the
+    CENTRE inside the blob", not "is the ball actually covered".
 
-                              bench            cold
-    strokes / outcomes        10/10            9/9
-    pots to right ball          4/4            5/5
-    naming                    99.8%           99.6%
-    of ALL checks             99.2%           99.4%
-    wrong names                   0               1
-    invented                      0               0
-    shows what it saw          99.5%           99.4%
+2. THE BENCH'S 7 BLIND SIGHTINGS AND 2 UNNAMED remain open (that is what
+    this round attacked). Everything else on the bench is perfect: 10/10
+    strokes, 10/10 outcomes, 4/4 pots, ZERO wrong names, 0 invented.
+    Cold: 9/9, 9/9, 5/5, 1 wrong, 4 unnamed, 2 blind, 0 invented.
 
-0. THE BENCH'S REMAINING GAPS ARE BLINDNESS, NOT ERROR: 7 sightings
-    with no track and 2 unnamed, against ZERO wrong. Find why a ball
-    the truth can see has no track at all. Its contradictions (saw 9 ->
-    said 1 x6, saw 6 -> said 1 x6) are still unresolved - there is no 6
-    on the bench so the READ is wrong there, but whether "1" is right
-    is unmeasured.
+3. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
+    truth scores the cue 175/175 - a TRACKING gap, not naming. Likely
+    the SAME mechanism as this round: the cue metric demands a LIVE
+    sighting every frame, and the cue is the ball a player's hands are
+    nearest to.
 
-1. THE COLD CLIP'S 4 UNNAMED 5s and the single 9->1. Both are now
-    scoreable, which they were not this morning.
+4. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
+    finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
 
-2. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
-    truth scores the cue 175/175 - a TRACKING gap, not naming, because
-    the cue metric demands a LIVE sighting every frame.
+5. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
+    gave the cold clip; its truth is still hand-fitted colour windows.
 
-3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
-    finds (54.5%) and bench 339 of 790 (42.9%) get NO identity read.
-    The unchecked half is repaired now so the loss is contained, but
-    that is the upstream fact.
+6. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+    settled moments - a fine YARDSTICK and a biased SURVEY (65); a
+    hypothesis written into this backlog is not a finding but inherits
+    the authority of one (67); a truth-side sample can be contaminated
+    rather than imprecise (69); and AGGREGATING OVER A WINDOW HIDES A GAP
+    INSIDE IT - this round I checked "is there a track near this ball in
+    115-140s", got 560 rows, and concluded the engine was fine, when the
+    failure was a 190-frame hole in the middle of that window (70).
 
-4. THE BENCH PALETTE HAS NEVER HAD THIS TREATMENT. The cold clip's
-    truth is now pot-order derived and covers all ten balls; the
-    bench's is still the hand-fitted colour windows. Same method
-    applies and would put both clips on the same footing.
-
-5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
-    settled moments - a fine YARDSTICK and a biased SURVEY (round 65);
-    a hypothesis written into this backlog is not a finding but
-    inherits the authority of one (round 67); and a truth-side sample
-    can be contaminated rather than merely imprecise, so a
-    "these are inseparable" conclusion deserves a second source before
-    it closes a target for nine rounds (round 69).
-
-6. The palette is hand-labelled and does not scale; the identifier
-    mislabels balls mid-collision (round 55); colour cannot separate
-    gold from white at speed (round 56); both naming figures in the
-    phone STATUS view; recovered detections lose their name; _locate is
-    ~37% of engine wall time; rebuild_batch.py still drives an OLD
-    build() path (every clip in the library is stale at rules_v 20);
-    events/shot.py is a third shot detector in the live path; delete
-    vision/tracking.py and the MeasurementCore shadow scaffolding.
+7. The palette is hand-labelled and does not scale; the identifier
+    mislabels balls mid-collision (55); colour cannot separate gold from
+    white at speed (56); both naming figures in the phone STATUS view;
+    recovered detections lose their name; _locate is ~37% of engine wall
+    time; rebuild_batch.py still drives an OLD build() path; events/
+    shot.py is a third shot detector in the live path; delete vision/
+    tracking.py and the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

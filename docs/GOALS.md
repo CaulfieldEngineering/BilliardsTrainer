@@ -3284,3 +3284,38 @@ Rounds continue with Joe's visual feedback as the gate.
   leftover plainly crimson - what the shot truth already calls them -
   and the rebuilt truth's inventory agrees with the pot order at every
   sampled instant.
+
+- 2026-08-30 ~14:15 EDT - ROUND 70: FOUND WHY THE APP GOES BLIND, AND MY
+  FIX FAILED ITS GATE AND IS REVERTED. The 7 bench "no track" sightings
+  are REAL blindness, not a truth error (I checked the pot list first and
+  it pointed the wrong way: the 3 is potted at 85.1s, but the pixels show
+  it back on the table - it was returned, and the setup-window note is
+  incomplete). CAUSE, identical on both clips: prepare_detections vetoes
+  any detection whose centre lands in a hand/arm blob and promises the
+  track "coasts on the occlusion budget and resumes" - that budget is
+  COAST_S = 0.6s, while a player stands over the table for 6.3s (bench,
+  the red 3, 125.5-131.8) and 6.7s (cold, the 7, 57.8-64.5). Foreign
+  coverage in those windows is ~10x normal (0.043 vs 0.004; 0.035 vs
+  0.002, nonzero on EVERY frame), the ball is plainly visible and still
+  detected at 0.72-0.86. The mask is a 160px-wide warp (~1.4cm/px) so a
+  ball is ~4px and merges into any touching arm blob.
+  TRIED: budget 8s for a CONFIRMED, AT-REST track. It fixed the
+  blindness as designed (bench no-track 7 -> 1, all-checks 99.2 ->
+  99.5%) and the scorecard threw it out - bench outcomes 10/10 -> 8/10
+  and pots 4/4 -> 2/4; cold 9/9 -> 7/9 and 5/5 -> 3/5. WHY: a POTTED
+  ball is also a confirmed ball at rest that stops being detected - it
+  decelerates into the pocket so its last frames read settled, and the
+  ghost then sat on the table for 8s with the pot never seen. REVERTED;
+  both clips restored exactly (bench 10/10, 10/10, 4/4, 99.8%, ZERO
+  wrong; cold 9/9, 9/9, 5/5, 99.6%).
+  PINNED: TestRestingBallStillGoesInactiveQuickly, verified to FAIL with
+  the widened constant so it is a real pin.
+  THE CORRECT FIX IS NOW SPECIFIED BY THE FAILURE: extend the coast only
+  while the last-known position is under FOREIGN COVER - the one thing
+  that actually differs between an occluded ball and a potted one. That
+  needs the mask plumbed from prepare_detections into the tracker, which
+  is exactly the work this shortcut avoided.
+  METHOD LESSON: I first asked "is there a track near this ball in
+  115-140s", got 560 rows, and concluded the engine was fine. The
+  failure was a 190-frame hole INSIDE that window. Aggregating over a
+  window hides a gap inside it.

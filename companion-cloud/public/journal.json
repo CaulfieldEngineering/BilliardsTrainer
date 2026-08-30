@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 116,
+   "ts": "2026-08-30T16:21:57",
+   "date": "Aug 30, 12:21 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 12:21 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/116-r70_blind.png",
+     "caption": "The red 3 across the six seconds the app could not see it. The ball is in plain view the whole time - it is next to you, and being next to you is what removes it."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r70_blind.png' alt=''><figcaption>The red 3 across the six seconds the app could not see it. The ball is in plain view the whole time - it is next to you, and being next to you is what removes it.</figcaption></figure></div>"
+  },
+  {
+   "id": 115,
+   "ts": "2026-08-30T16:21:56",
+   "date": "Aug 30, 12:21 PM EDT",
+   "kind": "finding",
+   "title": "Found why balls vanish while you're on the shot - and my fix broke pots",
+   "score": "Balls next to you are blanked with the hand and only coasted 0.6s, while you stand over a shot for 6+. My fix cost 4 pots because a potted ball also looks like a still ball. Reverted.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/115-r70_blind.png",
+     "caption": "The red 3 across the six seconds the app could not see it. The ball is in plain view the whole time - it is next to you, and being next to you is what removes it."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>A regression, reported the same as a win. I found why the app loses\nsight of balls, built the fix, and it broke something worse - so it is reverted\nand both your clips are back exactly where they were.</strong></p>\n\n<h3>What I found</h3>\n<p>When you lean over the table, the app deliberately ignores anything inside\nyour arm and hand, so a glove or a cue butt is never mistaken for a ball. A ball\nsitting right next to you gets swallowed by that same blanking, and the app is\nbuilt to just coast the ball through it and pick it up again afterwards.</p>\n<p>It allows <strong>six tenths of a second</strong> for that. You stand over a\nshot for far longer. Measured on both clips:</p>\n<pre>\nyour pinned table, the red 3   ignored for 6.3 seconds\nthe newer table, the 7         ignored for 6.7 seconds\n</pre>\n<p>In both cases the ball is plainly visible in the video and the detector still\nfinds it confidently - it is the blanking that removes it. So the ball simply\ndisappears from the app for six seconds, and it happens precisely when you are\ndown on the shot, which is exactly when the app should be working.</p>\n\n<h3>What I tried, and why it was wrong</h3>\n<p>I let a ball that is sitting still be coasted for eight seconds instead. It\nfixed the disappearing exactly as intended. It also broke four pots across the\ntwo clips - makes and misses went from perfect to 8 of 10 and 7 of 9.</p>\n<p>The reason is obvious in hindsight and I should have seen it before running\nit: <strong>a potted ball is also a still ball that stops being seen.</strong> A\nball rolling into a pocket slows down first, so its last moments look exactly\nlike a ball sitting quietly - and my rule then left it sitting on the table for\neight seconds, so the pot never registered.</p>\n\n<h3>Where that leaves it</h3>\n<p>Reverted, and both clips measure exactly as they did this morning - your\npinned session still names zero balls wrong. The failure narrowed the problem\nusefully: the app has to distinguish \"I cannot see this ball because YOU are\nstanding over it\" from \"I cannot see this ball because it went in the pocket\".\nThe difference is whether your hands are over that spot, which the tracking part\nof the app currently is not told. Wiring that through is the next job, and it is\nthe work I was trying to shortcut.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 114,
    "ts": "2026-08-30T15:36:00",
    "date": "Aug 30, 11:36 AM EDT",
@@ -1111,26 +1143,6 @@
    "title": "Shot clock is live, plus a menu bar and a squishable window",
    "score": "",
    "body": "The shot clock now runs off the cue ball itself: the countdown starts the moment your cue ball stops rolling and stops the instant you strike it. Sounds mark every phase - a rising cue when the clock starts (including after every shot), a warning beep, 3-2-1 ticks, and the buzzer. It works with or without recording, and you can flip it on and off from the new Play menu. The desktop window also squishes down to about a third of the screen now, and a File menu keeps everything reachable when it's narrow.\nClock settings (seconds, warning time, sounds) are in Settings > Shot clock; the Play menu is just the on/off.\nThe countdown starts about a fifth of a second after the cue ball truly rests - that debounce is what stops table jitter from false-starting the clock.\nNext precision step when it matters: using the strike SOUND to stop the clock frame-exactly.",
-   "images": []
-  },
-  {
-   "id": 36,
-   "ts": "2026-08-26T12:00:00",
-   "date": "Aug 26, 2026",
-   "kind": "update",
-   "title": "Stay-down timer on the desktop scoreboard",
-   "score": "",
-   "body": "The timer you asked for: a STAY-DOWN row on the live scoreboard. It starts counting the moment you take the shot (shown with a ~ while it's a live estimate), then locks to the camera-measured number seconds later - green when you stayed down, red POP when you popped up early. If the camera couldn't measure that shot, it shows a dash instead of guessing.\nCounts only while recording, same as the rest of the scoreboard.\nThe live count is an estimate; the locked number is the same measured stay-down you see in shot details.",
-   "images": []
-  },
-  {
-   "id": 35,
-   "ts": "2026-08-26T12:00:00",
-   "date": "Aug 26, 2026",
-   "kind": "update",
-   "title": "Clips load and play much lighter",
-   "score": "",
-   "body": "Every session now gets a lightweight playback copy made right after it ends - about a fifth the data of the original. Your phone picks it automatically, so clips start faster, scrub smoother, and use far less cellular data. Same video, same overlays, same everything - just easier for the phone to play. This is also the leading fix for the tail stutter: the originals were heavy enough to strain the phone's video decoder.\nThe lightweight copies match the originals frame-for-frame, so trails, aim lines and shot times line up exactly.\nOlder sessions are being converted in the background; each one switches over as soon as its copy is ready.\nRecording always comes first: any conversion stops instantly the moment a session starts.",
    "images": []
   }
  ]
