@@ -211,11 +211,17 @@ def _write_shots(writer, times, frames, carried, calib) -> int:
             pocketed_balls=balls, pocketed_at=at,
             pocketed_xy=at_xy))
         n += 1
+    # ...and count them with the SAME function that classified them.
+    # This line still spelled the rule out by hand after round 51 moved
+    # it into shots.is_stroke, and it named two constants the import no
+    # longer brought in - so _write_shots raised NameError on EVERY run
+    # from round 51 to round 62, eleven rounds, swallowed by the
+    # "shot derivation failed" except in reprocess(). The shot list
+    # survived because every add_shot happens above this line, which is
+    # exactly why nothing looked wrong. Found only because a probe ran
+    # with the traceback visible.
     log.info("m1 shots derived: %d (%d strokes)", n,
-             sum(1 for e in eps
-                 if not e.setup and e.cue_moved
-                 and e.cue_travel >= MIN_CUE_TRAVEL
-                 and e.cue_peak >= MIN_CUE_PEAK))
+             sum(1 for e in eps if _struck(e)))
     return n
 
 

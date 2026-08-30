@@ -3047,3 +3047,37 @@ Rounds continue with Joe's visual feedback as the gate.
   classifies every ball correctly on BOTH clips (bench 0.265, cold
   0.245), while the engine's absolute stripe_above=0.48 sits above both
   real stripes and can only abstain.
+
+- 2026-08-30 ~15:00 EDT - ROUND 62: FIXED A NameError THAT HAD FIRED ON
+  EVERY ENGINE RUN FOR ELEVEN ROUNDS. _write_shots ended with a log line
+  that spelled the stroke rule out by hand and named MIN_CUE_TRAVEL /
+  MIN_CUE_PEAK, which round 51 dropped from the import when the rule
+  moved into shots.is_stroke. Every clip since raised NameError there,
+  swallowed by the broad except in reprocess() logging "shot derivation
+  failed". The shot list survived only because every add_shot happens
+  ABOVE that line - which is precisely why nothing looked wrong. Both
+  clips now report 0 derivation failures and the summary works.
+  I SAW THIS IN ROUND 56 and dismissed it as a short-probe edge case. A
+  traceback is evidence; "probably harmless" was a hypothesis I never
+  tested, and it was wrong for eleven rounds.
+  MEASURED: the cold clip's stripe is NOT a yellow 9. Bench 9 band BGR
+  (30,253,251) G/R 1.008 vs cold stripe (20,175,242) G/R 0.723 - 64.5
+  Lab apart, pure yellow against amber, visually obvious. So "9" is
+  wrong on that ball whatever its true number.
+  WHY THE REPAIR CANNOT REACH IT: _fix_stripe_colour is sound - it
+  samples the BAND and matches SOLID references, so 13 = 5+8 - but
+  instrumented over 698 firings it concluded "band agrees with the
+  claim" every time. The band's nearest reference is the gold 1 at 24
+  Lab and there is NO 5 in that table's reference set, because round 60
+  excluded 3 and 5 as inseparable. The band sits BETWEEN the gold 1 and
+  the deep-orange 5. The two uses differ: whole-crop naming must
+  separate 3 from 5, the stripe path only needs the band to prefer 5
+  over 1 - so a 5 reference may be admissible for the stripe path alone.
+  RECORDED, a flaw in my own yardstick: the cold palette's 1/3/5 rows
+  were labelled with the app's names accepted because they matched what
+  I saw. That is NOT independent truth - a systematic 1/3/5 confusion
+  would be inherited by the scoring sheet. The other seven balls were
+  read from colour alone and are sound. Re-derive 1/3/5 from the shot
+  truth (which ball is potted when) before using them to justify a fix.
+  Both clips unchanged: bench 10/10 10/10 4/4 99.6%; cold 9/9 9/9 5/5
+  93.3%. Suite green.

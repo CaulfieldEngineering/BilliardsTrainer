@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 104,
+   "ts": "2026-08-30T12:05:23",
+   "date": "Aug 30, 08:05 AM EDT",
+   "kind": "finding",
+   "title": "A crash that has been happening every run for eleven rounds",
+   "score": "Silent NameError in the shot writer, fixed; plus why the striped ball still cannot be named, and a flaw in my own reference sheet",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/104-stripe_compare.png",
+     "caption": "Left: the yellow striped ball on your pinned table. Right: the striped ball on the new one, which the app also calls a 9. Their bands are about as far apart as two ball colours get."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Found a crash that has been happening on every single clip the engine\nhas processed for eleven rounds, silently. Nothing was broken by it, which is\nwhy it went unnoticed - including by me, ten days ago.</strong></p>\n\n<h3>The silent crash</h3>\n<p>The last line of the shot-writing step printed a summary: how many shots, how\nmany were real strokes. When I reorganised that rule a week ago I forgot this\none line, and it has thrown an error ever since. The error was caught by a\nsafety net that logs \"shot derivation failed\" and carries on.</p>\n<p>Everything still worked because that line runs AFTER all the shots have been\nwritten - so the shot list was always complete and correct. The only casualty\nwas the summary itself. But an error thrown on every run is not something to\nleave lying around, and I had actually SEEN this message in an earlier round and\ntalked myself into believing it was harmless. It was not harmful, as it happens,\nbut I had no basis for that belief at the time.</p>\n\n<h3>The striped ball, measured properly</h3>\n<p>The app calls that ball a 9. A 9 is the YELLOW striped ball. I compared its\nstripe directly against the yellow striped ball on your pinned table:</p>\n<pre>\nyour pinned table's 9      band colour reads pure yellow\nthe new table's stripe     band colour reads amber/orange\n                           - about as far apart as two ball colours get\n</pre>\n<p>So the name is wrong, whatever the right one is. The machinery to fix it\nalready exists and is well built - it reads the colour of the BAND across the\nball rather than the ball as a whole, which is the right idea. It fired 698\ntimes and every time concluded the app's answer was consistent, because the\nreference sheet for that table has no entry for the orange ball it would need to\nmatch against. I removed that entry myself two rounds ago for a good reason, and\nit turns out the two uses need different things.</p>\n\n<h3>Something I need to flag about my own reference sheet</h3>\n<p>When I named that table's balls from photographs, three of them - the gold,\nthe red and the orange - are genuinely hard to tell apart on that cloth, and for\nthose I went along with what the app called them because it matched what I saw.\nThat is not an independent check. If the app mixes those three up in some\nsystematic way, my scoring sheet would agree with it and I would never know.</p>\n<p>The other seven balls were read from colour alone and are sound. I have\nwritten this down as something to fix before it is used to justify any change -\nthose three need re-deriving from something the app never touched.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 61: per-session colour references - cold naming 85.7% -&gt; 93.3%, bench unchanged</li><li>Round 60: the cold clip has a naming gate, and both remaining defects share one root</li><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li></ul>"
+  },
+  {
    "id": 103,
    "ts": "2026-08-30T11:39:54",
    "date": "Aug 30, 07:39 AM EDT",
@@ -1055,16 +1071,6 @@
    "title": "Tracking sees through the grain now",
    "score": "",
    "body": "Tonight's high-ISO footage was confusing the ball tracker (identity mix-ups ran 4x the usual rate). The analysis feed now gets cleaned of grain before the detector looks at it - measured on your grainiest session: fewer identity mix-ups, better ball numbering, and 12-13% more balls held per frame. Your recordings are untouched.\nVerified on two separate 6-minute slices before enabling: identity hops down 15%, ball-number coverage up, track fragmentation down 14-21%, and more balls tracked per frame in both tests with no metric worse.\nThis is the software half of the grain fix. The camera half (1/250 shutter + half the ISO next time you're at the rig) removes grain at the source and roughly halves file sizes too.",
-   "images": []
-  },
-  {
-   "id": 24,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Trail animations keep up with the ball now",
-   "score": "",
-   "body": "The animated trails lagged because the phone's browser reports video time slightly in the past, and three hidden per-frame costs were eating the iPhone's processing budget. The overlay now reads the exact time of each displayed frame, and those costs are gone.\nThe overlay clock now uses frame callbacks (exact presented-frame timestamps, iOS 15.4+) instead of the stale 'official playback position', with a clean fallback when paused or on older devices. This also fixes extra lag in Low Power Mode.\nThe frame cache that makes scrubbing instant was JPEG-encoding every single frame during playback; it now stores every 3rd frame (scrubbing still always hits, and the cache covers 70 seconds instead of 23).\nTwo canvas layers were being reallocated on every animation tick even when nothing was drawn - both now only rebuild when the size actually changes.",
    "images": []
   }
  ]
