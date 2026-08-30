@@ -253,3 +253,49 @@ class TestBenchPaletteProvenance:
             "that absence is what made it uncheckable for 83 rounds")
         assert set(d["ball_colours_observed"]) == {
             "0", "1", "2", "3", "4", "9"}
+
+
+class TestColdPaletteProvenance:
+    """Round 84: the cold clip's five POTTED balls are pot-order confirmed.
+
+    A ball that vanishes at a pot IS the ball that was potted - no colour
+    reference consulted, each ball matched only to itself across the four
+    seconds spanning the pot. The 1 needed the stripe test because its
+    colour twin the 9 stays on the table and masks the disappearance.
+
+    6, 7 and 8 are never potted, so the method cannot reach them - and
+    round 82 showed the 7 and 8 are the two named ENTIRELY by colour.
+    That gap is the point of this test: it must stay visible.
+    """
+
+    @staticmethod
+    def _pal():
+        import json
+        return json.loads(
+            (ROOT / "docs" / "cold_palette_20260823-185550.json")
+            .read_text(encoding="utf-8"))
+
+    def test_the_potted_balls_are_confirmed(self):
+        pal = self._pal()
+        for n in ("1", "2", "3", "4", "5"):
+            src = pal["balls"][n].get("source", "")
+            assert "pot-order" in src, (
+                f"ball {n} lost its independent derivation; the potted "
+                f"balls are the only ones the pot order can confirm")
+
+    def test_the_unreachable_balls_are_still_marked_by_eye(self):
+        """If someone quietly marks these derived without doing the work,
+        the campaign loses the one honest record of what is unchecked."""
+        pal = self._pal()
+        for n in ("6", "7", "8"):
+            src = pal["balls"][n].get("source", "")
+            assert "pot-order" not in src, (
+                f"ball {n} is never potted - the pot order cannot confirm "
+                f"it, so claiming it does is false provenance")
+
+    def test_the_gap_is_written_down(self):
+        pal = self._pal()
+        note = pal.get("validated_round84", "")
+        assert "6, 7 and 8" in note and "never potted" in note, (
+            "the limit of the method must stay recorded - the two most "
+            "load-bearing references are the two it cannot check")

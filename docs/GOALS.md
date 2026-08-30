@@ -3628,3 +3628,29 @@ Rounds continue with Joe's visual feedback as the gate.
   the 9 correctly in one frame, shows the 3 back on the table at t=120
   (round 70's correction) and the 1 gone by t=200.
   METHOD: a yardstick nobody has checked is not evidence.
+
+- 2026-08-30 ~23:45 EDT - ROUND 84: THE COLD CLIP'S FIVE POTTED BALLS ARE
+  POT-ORDER CONFIRMED, AND THE THREE THAT CANNOT BE ARE NAMED. Eight of
+  its ten were still by-eye from round 60 (only 3 and 5 derived, round
+  69). A ball that VANISHES at a pot IS the ball potted - no colour
+  reference consulted, each ball matched only to ITSELF across the four
+  seconds spanning its pot: 2 @62.6 lands on its own entry at 1.4 Lab
+  (runner-up 70.0), 3 @121.7 6.8 (43.3), 4 @138.1 1.7 (40.9), 5 @158.9
+  5.9 (36.4).
+  THE 1 NEEDED THE STRIPE TEST: its colour TWIN the 9 stays on the table
+  and masks the disappearance. Yellow-family white fractions run
+  0.048/0.051/0.395 before the pot and 0.054/0.388 after - a LOW-white
+  solid vanished, which is the 1. Same fact the bench re-derived in
+  round 83.
+  FIRST CUT FAILED HONESTLY: matching by POSITION flagged the cue as
+  "vanished" too, because it travels the table on a shot. Matching each
+  ball to itself by colour across the pot fixed it.
+  THE METHOD'S LIMIT IS THE UNCOMFORTABLE PART: 6, 7 and 8 are NEVER
+  POTTED so the pot order says nothing about them, and round 82 showed
+  the 7 and 8 are named ENTIRELY by colour (166 and 183 names; the model
+  reads them 2 of 85 and 0 of 92). The two most load-bearing references
+  are exactly the two this cannot check. Written into the palette and
+  guarded by a test against anyone marking them derived.
+  NO ENGINE CODE CHANGED; both clips verified identical (bench 10/10,
+  10/10, 4/4, naming 99.9%, ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%).
+  METHOD: when a method cannot reach something, say which something.

@@ -64,7 +64,8 @@
      317,
      343
     ]
-   }
+   },
+   "source": "round84-pot-order-confirmed (vanishes at its 48.9s pot; separated from its colour TWIN the 9 by white fraction)"
   },
   "0": {
    "bgr": [
@@ -106,7 +107,8 @@
      225,
      606
     ]
-   }
+   },
+   "source": "round84-pot-order-confirmed (vanishes at its 62.6s pot, nearest palette entry 1.4 Lab, runner-up 70.0)"
   },
   "3": {
    "bgr": [
@@ -128,7 +130,7 @@
      778
     ]
    },
-   "source": "round69-pot-order-follow (was 114,198,176 by eye - confirmed)"
+   "source": "round69-pot-order-follow (was 114,198,176 by eye - confirmed) + round84 pot-vanish confirmed (6.8 vs 43.3)"
   },
   "6": {
    "bgr": [
@@ -171,7 +173,7 @@
      1013
     ]
    },
-   "source": "round69-pot-order-follow"
+   "source": "round69-pot-order-follow + round84 pot-vanish confirmed (5.9 vs 36.4)"
   },
   "4": {
    "bgr": [
@@ -192,7 +194,8 @@
      321,
      1015
     ]
-   }
+   },
+   "source": "round84-pot-order-confirmed (vanishes at its 138.1s pot, nearest 1.7 Lab, runner-up 40.9)"
   },
   "9": {
    "bgr": [
@@ -221,5 +224,6 @@
  "revised_round63": "13 -> 9. The stripe was called a 13 (orange stripe) on the strength of it looking amber next to the BENCH's yellow 9. That is a cross-table comparison and it is invalid: under THIS table's light its own 1 reads amber too (G/R 0.676). Measured WITHIN the table, the stripe's band sits 10.0 Lab from this table's 1 and 98.8 from its 5, so by 'stripe = solid + 8' it is the 9. The same test on the bench returns 1 -> 9, which is the known answer there, so the method is validated on a case with truth. The engine had been right all along and my file was scoring it wrong 61 times.",
  "stripe_bar": 0.137,
  "stripe_bar_why": "Midpoint of THIS table's measured gap in the palette's own white_frac: solids reach 0.064 (the 6), the stripe sits at 0.209. Required by identify_by_palette, which had no value here at all.",
- "revised_round69": "3 and 5 are now SCORED. See not_scored_why."
+ "revised_round69": "3 and 5 are now SCORED. See not_scored_why.",
+ "validated_round84": "THE FIVE POTTED BALLS ARE NOW INDEPENDENTLY CONFIRMED. A ball that vanishes from the cloth at a pot IS the ball that was potted - no colour reference is consulted; each ball is matched only to ITSELF across the four seconds spanning the pot. 2, 3, 4 and 5 land on their own palette entry at 1.4-6.8 Lab with runners-up 36-70 away. THE 1 NEEDED THE STRIPE TEST, for a structural reason worth recording: its colour TWIN the 9 stays on the table, so the disappearance is masked. Within the yellow family the white fractions run 0.048 / 0.051 / 0.395 before the pot and 0.054 / 0.388 after - a LOW-white (solid) member vanished, which is the 1 and not the stripe. Same fact the bench re-derived in round 83: the 9 IS the 1 with a white band. WHAT THIS CANNOT REACH, stated plainly: 6, 7 and 8 are never potted, so the pot order says nothing about them and they remain by-eye from round 60. That is uncomfortable, because round 82 showed the 7 and 8 are named ENTIRELY by colour (166 and 183 names, the identity model reading them 2 of 85 and 0 of 92) - the two most load-bearing references on this table are the two the pot order cannot check."
 }
