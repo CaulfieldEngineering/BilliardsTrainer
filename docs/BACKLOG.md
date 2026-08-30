@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T17:28Z
+    written        2026-08-30T19:04Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T16:37Z
@@ -57,59 +57,80 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 73
+### NEXT TARGETS (top first) — round 76
 
-*** THE CUE'S RESIDUAL IS THE JAW-PHANTOM RULE DOING ITS JOB. MEASURED,
-    AND DELIBERATELY NOT CHANGED. ***
-    The cold clip's last 1.2% of cue loss is at 91.1-92.6s, where the
-    ball sits at a pocket jaw with the cue stick across it. Per frame:
-        finder sees it, survives prepare  70 frames
-        finder sees it, prepare DROPS it  11 frames   <- the residual
-        finder never sees it               9 frames
-    and NONE of the drops are under foreign cover, so this is NOT the
-    round-71 hand family. What drops them is the JAW PHANTOM rule -
-    near a pocket, a sub-0.60 detection is treated as leather. The cue
-    stick across the ball collapses its score to 0.33-0.58.
-    A COLOUR ESCAPE HATCH WAS MEASURED ON BOTH POPULATIONS AND REJECTED:
-        bench leather, 277 dets     93-101 Lab from ANY reference
-        the real cue ball at a jaw  56-58 Lab, nearest ref the 1
-        one cold near-pocket det     7 Lab from the black 8
-    With the stick over it the ball's colour is corrupted so it
-    resembles nothing, while a dark phantom resembles the 8: the hatch
-    would admit the phantom AND still reject the ball. No code written.
-    VISION-CORROBORATED: the bench detections the rule kills sit on
-    EMPTY FELT at the jaw; the cold ones are a plainly visible white cue
-    ball under the stick. The rule is right on 277 and wrong on 11.
-    KEPT. The trade is 277 phantoms killed for 11 real frames, and the
-    ball keeps its TRACK throughout anyway (round 71) - only the
-    per-frame metric suffers. The constants are now pinned so they
-    cannot be loosened silently, and the measurement is recorded at the
-    rule so a future round does not "fix" this and rediscover ghost
-    tracks, phantom episodes and off-table trails.
-    NO ENGINE BEHAVIOUR CHANGED - comments and tests only. Both clips
-    verified unchanged.
+*** THE BACKLOG WENT STALE FOR TWO ROUNDS AND THAT IS ITS OWN BUG ***
+    Rounds 74 (Joe's rearranging + scrub trail bugs) and 75 (the bank)
+    shipped without updating this file - exactly the rot that cost
+    rounds 34-47, and the reason tools/campaign_state.py exists. Both
+    are recorded below. A round that skips the queue update is not
+    finished, however good its commit message is.
 
-                              bench            cold
-    strokes / outcomes        10/10            9/9
-    pots to right ball          4/4            5/5
-    cue named                 99.9%           98.8%
-    naming                    99.8%           99.6%
-    of ALL checks             99.7%           99.6%
-    wrong names                   0               1
-    invented                      0               0
+*** JOE'S THREE TRAIL REPORTS (2026-08-30) ARE ALL SHIPPED ***
+    74a REARRANGING TRAILS. Shot 1/12 of the pinned session drew Joe's
+        HANDS carrying balls, plus the identity swaps hand-carrying
+        causes, with the same glowing lines that everywhere else mean "a
+        struck ball went here". drawTrails now returns for
+        rearrange / ball_in_hand / nothing.
+    74b SCRUB SYNC. The render loop blanked the overlay for the whole
+        drag because the video clock is parked while the cached-frame
+        cover owns the picture. The cover now publishes the frame it
+        painted (FrameCache.shownTime) and the overlay draws at THAT
+        time. Blanking still applies when the time is genuinely unknown.
+    75  THE BANK. Two causes, and the measurement corrected my own first
+        diagnosis - I had claimed 3 ball-widths of sampling error from a
+        probe that CLIPPED the polyline and invented endpoints; against
+        the full drawn line it is 0.18. The renderer was the bigger
+        half: both builders used each sample as a quadratic CONTROL
+        point, so the curve never touches it and every corner is cut by
+        a quarter of the vertex offset.
+            quadratic throughout : off by 0.72 ball-widths
+            hard corner          : off by 0.39
+        Both builders now share ONE rule (segThrough). The exporter
+        keeps its 0.15s grid and ADDS full-rate samples at turns.
+        A TRAVEL FLOOR MATTERS MORE THAN THE ANGLE: without one, noise
+        on a RESTING ball read as a corner every frame and the bench
+        export went 920 -> 9,763 points (24 KB -> 224 KB). With it,
+        2,199 points / 57 KB.
 
-0. THE BENCH'S LAST BLIND SIGHTING AND ITS 2 UNNAMED, against ZERO
-    wrong; plus cold's 4 unnamed 5s and its single 9->1. These are now
-    the only per-ball defects left on either clip. Note the bench's 2
-    unnamed include t=19 ball 4 where the track's own READ was 4 and it
-    published nothing - a SUPPRESSED correct read (round 68's
-    instrument sees it), which is a different fault from a misread.
+*** A LIBRARY REFRESH NEARLY DESTROYED A SESSION, AND THE GUARD IS THE
+    REAL DELIVERABLE ***
+    Round 75's fix only reached the pinned session, so this round set
+    out to refresh the rest. The first pass preferred the m1 sidecar
+    whenever one existed. For session-20260826-002906 the m1 sidecar is
+    PARTIAL (579 KB for a 111-minute session) while the real shot data
+    came from the sidecar BESIDE THE VIDEO - so the re-export wrote an
+    EMPTY file over 196 shots and 79,144 points. Restored from backup;
+    caught only because one clip was measured first and backed up.
+    The pass now tries every source, keeps the best, and REFUSES to
+    write anything with fewer shots or fewer points than what is on
+    disk. Result:
+        5 refreshed, 9 REFUSED by the gate, 4 skipped (already empty).
+        points 23,295 -> 27,243 (+17%), size 590 -> 686 KB (+16%).
+        EVERY refusal was the same shape: identical shot count, far
+        FEWER points than on disk (196 shots/32,327 pts offered against
+        79,144 held). Those files already carry DENSE 30fps trails
+        merged from m1 - they are big because they are already at full
+        resolution. Without the gate this pass would have replaced dense
+        trails with sparser ones on NINE sessions: quieter than the
+        empty file, and just as destructive. It also means the weak-
+        cellular worry is smaller than feared - the large sessions were
+        left untouched.
+    LESSON, and it generalises past this script: a data migration needs
+    a gate for the same reason a champion change does. "Regenerate from
+    the source" silently assumes the source is complete.
 
-1. WHETHER THE FOREIGN VETO SHOULD FIRE AT ALL for a fully-visible ball
-    beside a hand. The mask is a 160px-wide warp (~1.4cm/px) so a ball
-    is ~4 pixels and merges into any touching blob, and the test is "is
-    the CENTRE inside the blob", not "is the ball actually covered".
-    Round 71 made the consequence survivable rather than removing it.
+0. THE PHONE PAYLOAD ON WEAK CELLULAR. The corner densifier costs about
+    2.4x in trail points, and the biggest session's shots.json is
+    already 1962 KB before it. Joe's phone is often on weak cellular
+    (memory: every fetch needs timeout + cached fallback), so measure
+    what these files cost to pull before densifying the large sessions -
+    the gate above refuses shrinkage, not growth.
+
+1. THE BENCH'S LAST BLIND SIGHTING AND 2 UNNAMED, against ZERO wrong;
+    cold's 4 unnamed 5s and its single 9->1. Note the bench's t=19 ball
+    4 is a SUPPRESSED CORRECT READ (the track's own read was 4 and it
+    published nothing), which is a different fault from a misread.
 
 2. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
@@ -117,18 +138,23 @@ queue cannot be told something the measurements disagree with.
 3. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
     gave the cold clip; its truth is still hand-fitted colour windows.
 
-4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+4. tools/phone_view.py NOW EXISTS (round 74) - it screenshots the real
+    player, and --local serves the working tree so a fix is checked
+    BEFORE it ships. Every UI change from here should be looked at
+    through it; that is what caught all three of Joe's reports being
+    reproduced on the first run.
+
+5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
     contaminated rather than imprecise (69); aggregating over a window
     hides a gap inside it (70); measure the discriminator itself before
-    building on it (71, and this round it FAILED and saved a
-    regression); a metric can be the defect (72); and a measured
-    NEGATIVE result is a real deliverable - the cheapest round is the
-    one that stops a future session breaking something (73).
+    building on it (71, 73); a metric can be the defect (72); AN ANGLE
+    TEST NEEDS A MAGNITUDE GUARD or noise reads as signal (75); and a
+    regeneration needs a gate or it silently deletes (76).
 
-5. The palette is hand-labelled and does not scale; the identifier
+6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall

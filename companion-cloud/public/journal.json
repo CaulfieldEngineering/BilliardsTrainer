@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 123,
+   "ts": "2026-08-30T19:04:52",
+   "date": "Aug 30, 03:04 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 03:04 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/123-pv_coldbank.png",
+     "caption": "A bank on the newer table, seen through the phone player itself: the yellow 9 turns sharply off the left rail and the green 6 off the bottom-right jaw. Corners, not rounded hooks."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/pv_coldbank.png' alt=''><figcaption>A bank on the newer table, seen through the phone player itself: the yellow 9 turns sharply off the left rail and the green 6 off the bottom-right jaw. Corners, not rounded hooks.</figcaption></figure></div>"
+  },
+  {
    "id": 122,
    "ts": "2026-08-30T17:28:38",
    "date": "Aug 30, 01:28 PM EDT",
@@ -1169,16 +1185,6 @@
    "title": "You were right - the replays WERE mostly old trails. Fixed this morning.",
    "score": "",
    "body": "The overnight merge was built cautious: on any doubt it kept the old sparse trail, and that caution kept exactly the trails you watch - your first clip's cue ball, your second clip's 3-ball (10 points with a near-second hole). The engine's own gate scores have now earned a bolder rule: on gate-passing sessions dense wins by default, and the old trail survives only when the video itself sides with it. Re-merged everywhere: the marathon went from 58 to 124 of 125 covered shots dense; about 316 shots across the library. Re-watch the same two clips.\nVerified before changing anything: the dense data was in the files, Dropbox cloud matched to the second, and the player was innocent - the timid merge rule was the whole story.\nThe 3-ball wrongly counted as a make is a SEPARATE, real issue: re-measurement upgraded trails but has not yet re-judged outcomes. Make/miss verdicts are still the recording-night detector's. Re-deriving outcomes from the dense measurements is queued next - trails first, judgments second, no shortcuts.",
-   "images": []
-  },
-  {
-   "id": 43,
-   "ts": "2026-08-28T12:00:00",
-   "date": "Aug 28, 2026",
-   "kind": "update",
-   "title": "Library re-measurement complete: 13 of 17 sessions now dense",
-   "score": "",
-   "body": "The overnight rollout finished. Thirteen sessions - including the marathon - now carry frame-by-frame dense trails, every one passing the physics gate with room to spare (worst score 0.23 impossible-states per thousand against the old tracker's 0.55). 137 shots' trails upgraded across the library on top of the marathon's. Each merged session's 'proc' stamp shows today.\nThree August 23 sessions were REFUSED by the gate (scores 0.69-3.12) and keep their honest sparse trails - that was camera-surgery day, and the EOS focus rectangles burned into the feed are the suspected cause. They're queued for investigation, not forced through.\nOne 2-minute camera-adjustment clip couldn't calibrate at all and was skipped.\nA quality gate that refuses its own new engine's output when the numbers aren't there is the whole point - what merged, earned it.",
    "images": []
   }
  ]

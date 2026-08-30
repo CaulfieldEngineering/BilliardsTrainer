@@ -3407,3 +3407,34 @@ Rounds continue with Joe's visual feedback as the gate.
   METHOD: a measured NEGATIVE result is a real deliverable. Round 71's
   discipline - measure the discriminator before building on it - paid
   again, this time by preventing a change rather than enabling one.
+
+- 2026-08-30 ~17:30 EDT - ROUNDS 74-76 (the backlog went stale for two
+  of them, which is its own bug - see BACKLOG round 76).
+  74: Joe's REARRANGING trails (a table change has no shot, so drawTrails
+  now refuses rearrange/ball_in_hand/nothing) and SCRUB SYNC (the cover
+  now publishes the frame it painted via FrameCache.shownTime, so the
+  overlay draws at that time instead of the layer being blanked for the
+  whole drag). Built tools/phone_view.py first, at Joe's request - it
+  screenshots the REAL player, and --local serves the working tree so a
+  fix is verified BEFORE shipping.
+  75: THE BANK. My own first diagnosis was wrong and the measurement
+  corrected it - the "3 ball-widths of sampling error" came from a probe
+  that clipped the polyline and invented endpoints; against the full
+  drawn line it is 0.18. The renderer owned the bigger half: both path
+  builders used each sample as a quadratic CONTROL point, cutting every
+  corner by a quarter of the vertex offset (0.72 ball-widths at the 3's
+  140-degree contact, 0.39 with a hard corner). Both now share ONE rule.
+  The exporter keeps its 0.15s grid and adds full-rate samples at turns;
+  the travel floor is what keeps it honest - without it, noise on a
+  RESTING ball read as a corner every frame (920 -> 9,763 points).
+  76: A LIBRARY REFRESH NEARLY DESTROYED A SESSION. The first pass
+  preferred the m1 sidecar whenever present; for session-20260826-002906
+  that sidecar is PARTIAL (579 KB for 111 minutes) while the real data
+  came from the one beside the video, so the export wrote an EMPTY file
+  over 196 shots and 79,144 points. Restored from backup, caught only
+  because one clip was measured first. The pass now tries every source,
+  keeps the best, and REFUSES to write fewer shots or points than are on
+  disk. A data migration needs a gate for the same reason a champion
+  change does.
+  Engine untouched across all three: bench 10/10, 10/10, 4/4, naming
+  99.8% with ZERO wrong, all-checks 99.7%.
