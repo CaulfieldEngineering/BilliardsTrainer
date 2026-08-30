@@ -273,3 +273,48 @@ class TestARestingBallCanStillBeCorrected:
             t += 1 / 30.0
         assert any(r.number == 9 for r in rows), \
             "a resting ball could never be corrected - the freeze was permanent"
+
+
+class TestATrackCannotComeBackFromTheDead:
+    """A dead track object must not sit in the table forever.
+
+    Round 50, measured on the bench: track id3 WAS the real yellow 1,
+    tracked 10.9s-33.2s and potted at 31.7. It died mid-felt, 7.4 pocket
+    radii from anything, so RETIRE_S - which only removes a track that
+    ended in a pocket or off the bed - never touched it. It then came
+    back from the dead twice: once 20 seconds later, and once 154
+    SECONDS later, when it seized 11 frames of the moving 2 diving into
+    the bottom-right and the shot was scored a MAKE that "potted the 1".
+    An occlusion lasts a second. Nothing on this table is occluded for
+    two and a half minutes.
+    """
+
+    def test_a_track_lost_mid_felt_is_forgotten(self):
+        from billiards_trainer.measure.tracker import FORGET_S, MotionTracker
+        tk = MotionTracker(pockets=[(0.0, 0.0), (600.0, 1200.0)],
+                           pocket_r=25.0)
+        t = 0.0
+        for i in range(12):                       # a real, MOVING ball
+            tk.update([(300.0 + i * 20, 600.0, 12.0, 1)], t)
+            t += 1 / 30
+        assert any(r.number == 1 for r in tk.tracks), "the 1 must exist"
+        for _ in range(int((FORGET_S + 2.0) * 30)):   # it vanishes mid-felt
+            tk.update([], t)
+            t += 1 / 30
+        assert not tk.tracks, "a track gone far longer than any occlusion survived"
+
+    def test_the_forgotten_name_cannot_seize_another_ball(self):
+        """The bench failure itself: the dead 1 grabbing the moving 2."""
+        from billiards_trainer.measure.tracker import FORGET_S, MotionTracker
+        tk = MotionTracker(pockets=[(0.0, 0.0), (600.0, 1200.0)],
+                           pocket_r=25.0)
+        t = 0.0
+        for i in range(12):
+            tk.update([(300.0 + i * 20, 600.0, 12.0, 1)], t)
+            t += 1 / 30
+        for _ in range(int((FORGET_S + 2.0) * 30)):
+            tk.update([], t)
+            t += 1 / 30
+        rows = tk.update([(545.0, 605.0, 12.0, 2)], t)   # a DIFFERENT ball
+        assert all(r.number != 1 for r in rows), (
+            "a ball that left the table minutes ago claimed a live ball")

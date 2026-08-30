@@ -45,11 +45,11 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T05:32Z
+    written        2026-08-30T05:44Z
     bench          session-20260824-220247.mp4
     engine rules_v 19
-    measured       2026-08-30T05:30Z
-    shot list      13 entries (11 strokes, 5 makes)
+    measured       2026-08-30T05:41Z
+    shot list      13 entries (11 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
 gate of record. This block exists so a session picking up the
@@ -57,67 +57,61 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 49
+### NEXT TARGETS (top first) — round 50
 
-0. *** ONE BALL BECOMES THREE TRACKS AT THE JAW *** - the cause of BOTH
-   remaining bench failures, and it is an ASSOCIATION defect, not a
-   scoring one. Measured at 208.0s, where the blue 2 dives into the
-   bottom-right, rattles and comes back out (Claude WATCHED it; the 2 is
-   plainly on the felt at the end):
-       track id1  name "2"   45 sightings   from 207.01 (460,624)
-       track id3  name "1"   11 sightings   from 208.51 (477,712)  <- dive
-       track id9  name "2"  137 sightings   from 208.88 (593,1134) <- return
-   The middle fragment is born misnamed AT THE JAW, dies 0.3s later
-   inside the pocket zone, and is scored a MAKE that "potted the 1" - a
-   ball potted 38s earlier and never replaced. The same entry's trail
-   list carries ball 2 with 51 points, so one shot entry contradicts
-   itself. The 1Hz naming truth cannot see an 0.33s burst, which is why
-   NAMED CORRECTLY still reads 99.6% through all of this.
-   WHY IT FRAGMENTS: the ball is fast AND near a pocket, where the jaw
-   confidence filter thins the dim reads (see the R3 round-13/14 notes),
-   so the track starves exactly where it is hardest to re-acquire. Fix
-   the association through the jaw and both the wrong outcome and the
-   phantom name go with it.
-   DO NOT patch this downstream. Round 49 TRIED "the pot goes to the name
-   the track actually wore" and it cannot fire: id3 never wore another
-   name, it was born misnamed. Reverted, with the reasoning kept in
-   shots.py so it is not re-attempted.
+0. *** THE HAND DETECTOR CANNOT SEE A HAND *** - the last bench failure
+   (fake strokes 1/10) and the only thing between here and a perfect
+   bench. The 13.1s-20.4s episode is Joe setting up by hand: VISION
+   CONFIRMED - he is leaning right across the bed, arm over the cloth,
+   walking round the table, and the trails are zigzags to and from the
+   rails (balls carried and placed, not rolled). It is scored a STROKE.
+   `setup` is decided by hand context, and the hand context is blind.
+   MEASURED foreign fraction (pipeline._foreign_state):
+       Joe's arm across the bed, 15.2-17.3s      0.021
+       empty table, nobody near it, 40.0s        0.008
+       a real stroke, 100.0s                     0.022
+   A whole forearm over the cloth reads the SAME as an empty table, and
+   LOWER than a normal stroke. CARRIED_SETUP wants >=50% of moving
+   samples hand-adjacent; it can never get there. The engine's own
+   sidecar agrees: ff is 0.012-0.033 through 13.5-15.5 and then None
+   from 16.01 - it stops recording foreign state entirely, mid-setup.
+   DO: fix the DETECTOR, not the thresholds. Two things to establish
+   first, both cheap: (a) why ff goes None from 16.01 - a mask failure
+   swallowed by the bare `except` in prepare_detections would look
+   exactly like this; (b) render the mask over the frame at 15.2s and
+   LOOK at what it is actually selecting (tools already write
+   foreign_*.png). Only then touch CARRIED_SETUP.
+   NOT the speed bars: they are measured and correct (real strokes peak
+   691-2974, hand placement 213). Round 49 already removed the label-hop
+   inflation; the residual 2920 px/s at 13.1s is a leap WITHIN one
+   track, i.e. the cue's track grabbing a different blob ~97px away
+   during the setup scramble - which the hand context is supposed to
+   make irrelevant.
 
-1. THE 13.1s HAND SETUP IS STILL SCORED A STROKE (fake 1/10). Round 49
-   fixed one half: cue travel and peak are now measured only between
-   consecutive samples of the SAME track, because the name "0" hopping
-   to another track ~97px away read as 2920 px/s against a 400 bar. That
-   was a real bug (pinned by TestSpeedAcrossALabelHop) but it did not
-   clear this episode, so the cue genuinely exceeds the bar within one
-   track while Joe rolls it into place by hand. The hand context that
-   should catch it is absent: the sidecar shows ff=None through
-   16-20s, so no foreign/hand state was recorded exactly while the cue
-   was being placed. NEXT: find out why _foreign_state produces nothing
-   there before touching the speed bars - the bars are measured and
-   correct (real strokes 691-2063, this setup 213).
+1. THE REMAINING 7 BLIND CHECKS: ball 3 x6 at 126-131s, ball 1 x1 at
+   158s. Render them with tools/show_missing.py and split
+   genuinely-occluded from in-plain-sight before theorising. (Round 49
+   took this from 88 to 7; the 81 that went were one projection bug.)
 
-2. THE HEADLINE METRIC NOW HAS AN HONEST TWIN. `...OF ALL CHECKS` counts
-   blind as failure: 91.4% -> 99.0% this round. Still to do: put BOTH
-   figures in the phone's STATUS view, and split the remaining 7 blind
-   checks (ball 3 x6 at 126-131s, ball 1 x1 at 158s) into
-   genuinely-occluded vs in-plain-sight by LOOKING at them.
+2. PUT BOTH NAMING FIGURES IN THE PHONE'S STATUS VIEW - the sighting
+   figure (99.6%) and the honest one that counts blind as failure
+   (99.0% of all 1096 checks). The first RISES as tracking gets worse.
 
 3. RECOVERED DETECTIONS LOSE THEIR NAME. blur_recovery emits an
-   UNNUMBERED detection stamped `recovered_for=<track id>`, and
-   MotionTracker ignores that field - it competes on distance like any
-   other blob. Round 48 measured the cost: ungated recovery took the
-   purple 4 to 136/136 but dropped `moving balls named` to 92.2%.
-   Honour `recovered_for` and both move together.
+   UNNUMBERED detection stamped `recovered_for=<track id>` and
+   MotionTracker ignores the field. Round 48 measured it: ungated
+   recovery took the purple 4 to 136/136 but dropped `moving balls
+   named` to 92.2%. Honour `recovered_for` and both move together.
 
-4. _locate IS ~37% OF ENGINE WALL TIME (round 48). The window clips to
-   520 so the crop is ~1040x1040 and the median runs over 15 of them.
+4. _locate IS ~37% OF ENGINE WALL TIME (round 48). Window clips to 520
+   so the crop is ~1040x1040 and the median runs over 15 of them.
    Caching helped (287ms -> ~178ms); shrink the window or search at half
    resolution as sweep() does.
 
 5. THE BENCH IS EASY. Recovery finds nothing here because the clip is
    well lit; it was built for session-20260820-005048-recovered @233.
-   Now that measured colour reaches the offline tracker, re-run that
-   clip - recovery could never fire there before round 48.
+   Now that measured colour reaches the offline tracker (round 48),
+   re-run that clip - recovery could never fire there before.
 
 6. P2 COLD CLIP blocked on colour-refs reproducibility:
    APP_DIR/colour_refs.json is rebuilt from _train, which is gitignored.

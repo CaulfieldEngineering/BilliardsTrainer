@@ -2647,3 +2647,34 @@ Rounds continue with Joe's visual feedback as the gate.
   wore". It CANNOT fire here - id3 never wore another name, it was born
   misnamed - and it would have hidden the symptom without fixing the
   fragmentation (L2). Reasoning kept in shots.py so it is not retried.
+
+- 2026-08-30 ~03:00 EDT - ROUND 50: OUTCOMES BACK TO 10/10. Round 49's
+  208.0s failure was NOT a scoring bug and NOT jaw association - a fresh
+  tracker started at 206.5s follows that dive perfectly, one track, no
+  fragmentation. The culprit was a RESURRECTED TRACK. id3 was the real
+  yellow 1, tracked 10.9-33.2s and potted at 31.7; it died MID-FELT, 7.4
+  pocket radii from anything, so RETIRE_S - which only deletes a track
+  that ended in a pocket or off the bed - never touched it. The track
+  object then sat inactive in the tracker, still competing for
+  detections, and woke up TWICE: at 53.3s (20s later) and at 208.5s
+  (154 SECONDS later), where it seized 11 frames of the moving 2 diving
+  into the bottom-right and was scored a MAKE that "potted the 1".
+  FIX: FORGET_S = 10.0 - a track unseen this long is deleted wherever it
+  died. Far longer than any real occlusion (the bridge hand at 154.2s
+  lasts about a second), far shorter than a resurrection. Pinned by
+  TestATrackCannotComeBackFromTheDead (2 tests).
+  BENCH: strokes 10/10, outcomes 10/10, pots 4/4, unexplained 0, cue
+  99.9%, named 99.6%, all-checks 99.0%, moving 98.8%, ball 4 217/217,
+  invented 0, gate 0.18, engine 326s. ONLY REMAINING FAULT: fake 1/10.
+  THAT FAULT'S CAUSE IS NOW FOUND, and it is not the speed bars. The
+  13.1s episode is hand setup (VISION CONFIRMED: Joe leaning across the
+  bed, walking round, trails zigzagging rail to rail). `setup` depends
+  on hand context, and the hand detector is blind - measured
+  _foreign_state: arm across the cloth 0.021, EMPTY TABLE 0.008, a real
+  stroke 0.022. An arm reads the same as nothing and less than a shot,
+  so CARRIED_SETUP's >=50% bar is unreachable. The sidecar agrees: ff
+  0.012-0.033 to 15.5s then None from 16.01 - it stops recording foreign
+  state entirely mid-setup. NEXT: find why ff goes None (a mask failure
+  swallowed by the bare except would look exactly like this) and LOOK at
+  what the mask selects at 15.2s. Do NOT loosen the speed bars - they
+  are measured and correct (strokes 691-2974, hand placement 213).

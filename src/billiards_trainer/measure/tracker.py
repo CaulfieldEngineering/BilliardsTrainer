@@ -134,6 +134,25 @@ RETIRE_S = 3.0           # inactive this long AND last seen leaving the
                          # name (round 30/31)
 FURNITURE_S = 8.0        # a pocket-zone track this old that has NEVER
                          # moved is furniture (leather/shadow), not a ball
+FORGET_S = 10.0          # unseen THIS long and the track is deleted
+                         # wherever it died. RETIRE_S only removes a
+                         # track that ended in a pocket or off the bed,
+                         # because a ball lost mid-felt is usually just
+                         # occluded (the bridge hand at 154.2s). But an
+                         # occlusion lasts a second, not a minute, and a
+                         # track object that is merely INACTIVE stays in
+                         # the table forever and keeps competing for
+                         # detections. Measured on the bench: track id3
+                         # was the real 1, tracked 10.9s-33.2s and potted
+                         # at 31.7 - it then died mid-felt 7.4 pocket
+                         # radii from anything, so retirement never
+                         # touched it, and it came back from the dead
+                         # TWICE: once 20s later, and once 154 SECONDS
+                         # later, when it seized 11 frames of the moving
+                         # 2 as it dived into the bottom-right and was
+                         # scored a MAKE that "potted the 1". Ten seconds
+                         # is far longer than any real occlusion on this
+                         # table and far shorter than a resurrection.
 
 
 class MotionTracker:
@@ -431,8 +450,14 @@ class MotionTracker:
         # 6 seconds early. Never-moved tracks are furniture's business,
         # not retirement's.
         for tid in [k for k, tr in self._tracks.items()
-                    if not tr.active and t - tr.t > RETIRE_S
-                    and tr.ever_moved and self._left_the_table(tr)]:
+                    if not tr.active
+                    and ((t - tr.t > RETIRE_S and tr.ever_moved
+                          and self._left_the_table(tr))
+                         # ...or simply gone too long to still be a ball
+                         # anywhere (see FORGET_S). Still exempts a
+                         # never-moved track, which is furniture's
+                         # business, not retirement's.
+                         or (t - tr.t > FORGET_S and tr.ever_moved))]:
             del self._tracks[tid]
             for num, holder in list(self._holder.items()):
                 if holder == tid:

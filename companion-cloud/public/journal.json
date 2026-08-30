@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 92,
+   "ts": "2026-08-30T05:45:23",
+   "date": "Aug 30, 01:45 AM EDT",
+   "kind": "fix",
+   "title": "Round 50: the ball that came back from the dead",
+   "score": "A ball potted at 31s stole a live ball at 208s. Outcomes are correct again; one fault left on the bench and its cause is found",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/092-strip_13_11.png",
+     "caption": "The one remaining fault: at 13s Joe is setting up by hand - leaning over the cloth, placing balls, trails zigzagging to and from the rails - and the app scores it as a shot, because its hand detector reads an arm across the table the same as an empty table."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Round 50: a ball that left the table two and a half minutes earlier\ncame back and stole a live one. Your 208-second shot is scored correctly\nagain, and the bench now has exactly one fault left.</strong></p>\n\n<h3>The dead ball that came back</h3>\n<p>Yesterday the app said your 208s shot potted the 1 - a ball that had gone\ndown 38 seconds before. I found why, and it is stranger than a scoring\nmistake.</p>\n<p>When the app follows a ball it keeps a little record for it. That record\nwas never thrown away when the ball disappeared mid-table, because the rule\nfor tidying up only removed balls that vanished INTO a pocket. A ball lost in\nthe middle of the cloth is usually just hidden by your hand for a second, so\nthe app waits for it.</p>\n<p>The yellow 1's record was created at 11 seconds and it waited. Forever:</p>\n<pre>\n10.9s - 33.2s     the real 1, followed properly, potted at 31.7\n53.3s             wakes up 20 seconds later\n208.5s            wakes up 154 SECONDS later - and grabs the blue 2\n                  as it dives into the bottom-right corner\n</pre>\n<p>It held the 2 for eleven frames, died inside the pocket, and the app scored\nthat as \"potted the 1\". Meanwhile the same shot's own trail list had the 2\nright there on the table. One shot entry, contradicting itself.</p>\n<p>The app now forgets any ball it has not actually seen for ten seconds,\nwherever it lost it. A hand covers a ball for about a second; nothing on that\ntable is hidden for two and a half minutes.</p>\n\n<h3>The bench now</h3>\n<pre>\nshots found            10/10        outcomes right        10/10\npots attributed          4/4        invented numbers       none\ncue ball named         99.9%        naming (blind counted) 99.0%\nfake shots               1/10   <-- the only fault left\n</pre>\n\n<h3>The one remaining fault, and I found its cause</h3>\n<p>At 13 seconds you are setting the table up by hand - I watched it: leaning\nacross the cloth, walking round, placing balls. The app calls it a shot.</p>\n<p>It is supposed to catch this by noticing your hand over the table. So I\nmeasured what the hand-detector actually sees:</p>\n<pre>\nyour whole arm across the cloth        0.021\nempty table, nobody near it            0.008\na normal shot                          0.022\n</pre>\n<p><strong>An arm across the table looks the same as an empty table, and less\nthan a normal shot.</strong> The hand detector cannot see a hand. That is not a\nthreshold that needs nudging - the signal is not there at all, and I am not\ngoing to paper over it by loosening the shot test, because that would start\nthrowing away real shots instead.</p>\n<p>That is the next job, and it is the last one standing between here and a\nclean bench.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li></ul>"
+  },
+  {
    "id": 91,
    "ts": "2026-08-30T05:32:12",
    "date": "Aug 30, 01:32 AM EDT",
@@ -983,16 +999,6 @@
    "title": "Player restored",
    "score": "",
    "body": "The chrome-free player experiment is rolled back \u2014 the clips screen is exactly as it was. The Instagram-style redesign is shelved for another day.",
-   "images": []
-  },
-  {
-   "id": 12,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Home screen restored",
-   "score": "",
-   "body": "The card list is gone \u2014 the home screen is back to the layout you didn't mind (What's New row stays, pause-fade stays). The real redesign target is the clips player, Instagram-style, coming next.",
    "images": []
   }
  ]
