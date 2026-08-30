@@ -350,6 +350,46 @@
               border-radius:6px; cursor:zoom-in; }
   .jcap { color:var(--faint); font-size:12.5px; line-height:1.5;
           margin-top:6px; overflow-wrap:anywhere; }
+  /* LIGHTBOX. Tapping a journal picture used to window.open() it, which
+     in the installed app opens a chromeless view with no back button -
+     Joe: "there's no Back or exit button. I'm stuck." A picture must
+     never be able to strand the reader, so it opens HERE, over the
+     page, with four independent ways out: the Close button, the scrim,
+     Escape, and the phone's own Back (a history entry is pushed). */
+  /* OPAQUE, not a translucent scrim. The offscreen render showed the
+     page reading through a 94% wash - "Dev Journal", "Sessions" and the
+     stats rows all legible behind the picture, which looks broken and
+     breaks the flat-surface rule. A picture is a full takeover. */
+  #lb { position:fixed; inset:0; z-index:120; display:none;
+        background:var(--bg,#0B0F14); }
+  #lb.on { display:flex; flex-direction:column; }
+  #lb-bar { display:flex; align-items:center; gap:10px; flex:0 0 auto;
+            padding:10px 12px; border-bottom:1px solid var(--line);
+            background:var(--panel); }
+  #lb-close { background:none; border:1px solid #232B36; border-radius:2px;
+              color:var(--text); font-size:14px; font-weight:600;
+              padding:8px 14px; cursor:pointer; min-height:38px; }
+  #lb-close:active { background:#1A212B; }
+  #lb-close:focus { outline:none; }      /* DESIGN.md: no focus rectangles */
+  #lb-hint { color:var(--faint); font-size:12px; overflow-wrap:anywhere; }
+  #lb-stage { flex:1 1 auto; display:flex; align-items:center;
+              justify-content:center; overflow:auto; padding:10px;
+              -webkit-overflow-scrolling:touch; }
+  /* FIT by default, and TAP THE PICTURE for actual size. These are wide
+     evidence strips - four ball crops side by side - and fitting one to
+     a 390px phone renders it smaller than it was in the article, so
+     "tap to see the picture" would make the picture harder to see. In
+     .zoom the image drops to natural width and the stage scrolls. */
+  #lb-stage img { max-width:100%; max-height:100%; object-fit:contain;
+                  display:block; cursor:zoom-in; }
+  #lb-stage.zoom { align-items:flex-start; justify-content:flex-start; }
+  #lb-stage.zoom img { max-width:none; max-height:none; width:auto;
+                       cursor:zoom-out; }
+  #lb-cap { flex:0 0 auto; color:var(--faint); font-size:12.5px;
+            line-height:1.5; padding:10px 12px;
+            border-top:1px solid var(--line); background:var(--panel);
+            max-height:28vh; overflow:auto; overflow-wrap:anywhere; }
+  #lb-cap:empty { display:none; }
   .jnav { display:flex; gap:10px; margin-top:28px;
           border-top:1px solid #232B36; padding-top:14px; }
   .jnav button { background:none; border:1px solid #232B36; color:#9AA4B2;
@@ -495,6 +535,15 @@
   <span class="sub" id="build"></span>
 </header>
 <div id="update">Update available — tap to reload</div>
+<div id="lb" aria-hidden="true" role="dialog" aria-modal="true"
+     aria-label="Picture">
+  <div id="lb-bar">
+    <button id="lb-close" type="button">‹ Close</button>
+    <span id="lb-hint">tap picture to zoom · tap outside to close</span>
+  </div>
+  <div id="lb-stage"><img id="lb-img" alt=""></div>
+  <div id="lb-cap"></div>
+</div>
 <div id="keygate"></div>
 <div id="keyentry" style="display:none; padding:0 24px 24px; text-align:center;">
   <input id="keyfield" placeholder="paste key here" autocapitalize="off"

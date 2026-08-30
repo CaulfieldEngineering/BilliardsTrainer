@@ -980,6 +980,72 @@ function applyRot() {
   $("ov-rot-st").style.color = ROT ? "var(--make)" : "var(--faint)";
 }
 
+// ---- Lightbox: ONE way to open a picture, for every caller.
+// Both journal image paths used to window.open(src, "_blank"), which in
+// the installed app hands the reader a chromeless view with no back
+// button (Joe, 2026-08-30: "there's no Back or exit button. I'm
+// stuck."). A picture must never be able to strand the reader, so it
+// opens over the page with FOUR independent exits: the Close button,
+// the scrim, Escape, and the phone's own Back - the last works because
+// opening pushes a history entry, so Back pops the modal instead of
+// leaving the app. Idempotent: opening while already open swaps the
+// image without stacking a second history entry.
+let lbOpen = false;
+
+function closeLightbox(fromPop) {
+  if (!lbOpen) return;
+  lbOpen = false;
+  const lb = document.getElementById("lb");
+  if (lb) { lb.classList.remove("on"); lb.setAttribute("aria-hidden", "true"); }
+  const im = document.getElementById("lb-img");
+  if (im) im.removeAttribute("src");          // free the decoded bitmap
+  document.body.style.overflow = "";
+  // Only unwind history when we closed ourselves; a popstate already did.
+  if (!fromPop && history.state && history.state.lb) history.back();
+}
+
+function openLightbox(src, caption) {
+  const lb = document.getElementById("lb");
+  const im = document.getElementById("lb-img");
+  if (!lb || !im) {                 // no modal in the DOM: never strand
+    window.open(src, "_blank", "noopener");
+    return;
+  }
+  im.src = src;
+  im.alt = caption || "";
+  document.getElementById("lb-cap").textContent = caption || "";
+  lb.classList.add("on");
+  lb.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  const stage = document.getElementById("lb-stage");
+  stage.classList.remove("zoom");        // every picture opens FIT
+  stage.scrollTop = 0;
+  stage.scrollLeft = 0;
+  if (!lbOpen) history.pushState({ lb: 1 }, "");
+  lbOpen = true;
+  document.getElementById("lb-close").focus();
+}
+
+(() => {
+  const lb = document.getElementById("lb");
+  if (!lb) return;
+  // The whole overlay closes, so a mis-tap anywhere is an exit rather
+  // than a trap; the image itself is exempt so it can be studied.
+  lb.addEventListener("click", ev => {
+    // The image itself toggles fit <-> actual size; everything else is
+    // an exit, so a mis-tap can never strand the reader.
+    if (ev.target.id === "lb-img") {
+      document.getElementById("lb-stage").classList.toggle("zoom");
+      return;
+    }
+    closeLightbox(false);
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape") closeLightbox(false);
+  });
+  window.addEventListener("popstate", () => closeLightbox(true));
+})();
+
 // ---- Dev Journal: THE channel (What's New merged in 2026-08-28).
 // A small blog: fixed header, entry sidebar, article pane. Entries are
 // posted by tools/journal.py on every engine round. -------------------
@@ -1192,8 +1258,9 @@ function applyRot() {
       rich.innerHTML = e.html;
       rich.querySelectorAll("img").forEach(im => {
         im.loading = "lazy";
-        im.title = "Click to open full size";
-        im.onclick = () => window.open(im.src, "_blank", "noopener");
+        im.title = "Tap to enlarge";
+        im.style.cursor = "zoom-in";
+        im.onclick = () => openLightbox(im.src, im.alt || "");
       });
       art.appendChild(rich);
     } else {
@@ -1211,8 +1278,8 @@ function applyRot() {
       img.src = im.src;
       img.loading = "lazy";
       img.alt = im.caption || "";
-      img.title = "Click to open full size";
-      img.onclick = () => window.open(im.src, "_blank", "noopener");
+      img.title = "Tap to enlarge";
+      img.onclick = () => openLightbox(im.src, im.caption || "");
       fig.appendChild(img);
       if (im.caption) {
         const cap = document.createElement("div");
