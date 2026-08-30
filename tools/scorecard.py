@@ -354,6 +354,21 @@ def score(truth_path: Path) -> dict:
             if not (0 < dt < 0.2):
                 continue
             v = ((tr[1] - p0[1]) ** 2 + (tr[2] - p0[2]) ** 2) ** 0.5 / dt
+            # A COASTED ROW IS NOT A MOVING BALL. This counted every
+            # active row, estimates included, so a coasting ghost's
+            # PREDICTION DRIFT registered as a ball in flight - and once
+            # round 77 correctly stopped that ghost from holding a real
+            # ball's number, its rows became "moving and unnamed" and
+            # dragged this figure 99.3 -> 98.7%. Measured: all 11 of the
+            # bench's contested cases are one coasting track at
+            # 18.81-19.11s, clocked at up to 2,052 units/s while sitting
+            # on empty felt. The metric was penalising the engine for
+            # refusing to name a ghost.
+            # The cue metric above has demanded a real sighting since
+            # 2026-08-28 for exactly this reason; this one had not caught
+            # up. `coasting` is sidecar element 7.
+            if len(tr) > 7 and tr[7]:
+                continue
             if v > 60.0:
                 if n >= 0:
                     moving_named += 1

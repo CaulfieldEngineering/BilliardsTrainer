@@ -3461,3 +3461,30 @@ Rounds continue with Joe's visual feedback as the gate.
   VISION-CORROBORATED: the overlay shows trk8 on the purple ball and
   trk7 on bare cloth.
   Pinned by TestASightingOutranksAnEstimate.
+
+- 2026-08-30 ~19:00 EDT - ROUND 78: LAST ROUND'S "REGRESSION" WAS NOT
+  REAL - THE METRIC WAS. Round 77 posted bench moving-ball naming
+  99.3 -> 98.7%. Chased rather than written off: the moving-ball metric
+  counted every ACTIVE row, ESTIMATES INCLUDED, so a coasting ghost's
+  prediction drift registered as a ball in flight. Once round 77
+  correctly stopped that ghost holding a real ball's number, its rows
+  became "moving and unnamed" and dragged the figure down. All 11
+  contested bench cases are ONE coasting track at 18.81-19.11s, clocked
+  at up to 2,052 units/s while sitting on bare cloth.
+  The cue metric has demanded a real sighting since 2026-08-28 for
+  exactly this reason; this one had not caught up. Excluding estimates:
+  bench moving 98.7 -> 99.4% (99.3% before round 77) and cold 96.9 ->
+  97.4% - so round 77 was a small IMPROVEMENT on this number too.
+  VISION-CORROBORATED: the ghost's path renders as a diagonal streak
+  across empty felt with no ball anywhere on it.
+  NO ENGINE CODE CHANGED - metric and tests only; everything else on
+  both clips is untouched (bench 10/10, 10/10, 4/4, naming 99.9% with
+  ZERO wrong, all-checks 99.8%; cold 9/9, 9/9, 5/5, 99.6%).
+  SECOND TIME IN SEVEN ROUNDS (72, 78) A NUMBER WAS THE DEFECT, both the
+  same mistake - counting estimates or absent balls as sightings. Next
+  target is to AUDIT the remaining sidecar metrics for it rather than
+  wait to be caught again: `invented numbers` walks the same rows and
+  does not exclude coasted estimates.
+  METHOD: a posted regression deserves the same scrutiny as a posted
+  win. Shrugging this one off as the price of a fix would have left a
+  wrong number standing and believed.

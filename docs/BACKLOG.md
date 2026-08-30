@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T19:34Z
+    written        2026-08-30T19:53Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T19:31Z
@@ -57,57 +57,63 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 77
+### NEXT TARGETS (top first) — round 78
 
-*** A COASTED GHOST WAS HOLDING A NUMBER THE REAL BALL WAS DENIED ***
-    Bench 18.81s: trk7 showed "4" on a coasted prediction sitting on
-    EMPTY FELT, while trk8 - a live detection also reading 4, on the
-    actual purple ball - published nothing. That was one of the bench's
-    two remaining unnamed sightings. Number arbitration weighed votes
-    and incumbency and never noticed that one claimant was being SEEN
-    and the other was a guess.
-    MEASURED BEFORE CHANGING ANYTHING: the pattern occurs on 18 bench
-    frames and 7 cold, and wherever the naming truth can say which
-    claimant is the ball it is the LIVE one 9 of 9 and the coasting one
-    NEVER. So a track matched to a detection this frame now takes the
-    number outright; votes and stickiness arbitrate only between
-    claimants of equal standing.
-    VISION-CORROBORATED: the overlay shows trk8 on the purple ball and
-    trk7 on bare cloth.
+*** LAST ROUND'S "REGRESSION" WAS NOT REAL - THE METRIC WAS ***
+    Round 77 posted a regression: bench moving-ball naming 99.3 -> 98.7%.
+    Chased rather than written off, and it was a measurement artifact.
+    The moving-ball metric counted every ACTIVE row, ESTIMATES INCLUDED,
+    so a coasting ghost's prediction drift registered as a ball in
+    flight. Once round 77 correctly stopped that ghost from holding a
+    real ball's number, its rows became "moving and unnamed" and dragged
+    the figure down. All 11 contested bench cases are ONE coasting track
+    at 18.81-19.11s, clocked at up to 2,052 units/s while sitting on
+    bare cloth.
+    The cue metric has demanded a real sighting since 2026-08-28 for
+    exactly this reason; this one had not caught up. Excluding estimates:
+        bench moving  98.7 -> 99.4%   (99.3% before round 77)
+        cold  moving  96.9 -> 97.4%
+    so round 77 was a small IMPROVEMENT on this number too, not a cost.
+    VISION-CORROBORATED: the ghost's path renders as a diagonal streak
+    across empty felt with no ball anywhere on it.
+    NO ENGINE CODE CHANGED - metric and tests only.
+
+    THAT IS TWICE IN SEVEN ROUNDS (72, 78) THAT A NUMBER WAS THE DEFECT.
+    Both were the same mistake: a metric counting estimates or absent
+    balls as if they were sightings. Any remaining metric that walks the
+    sidecar should be audited for it rather than waiting to be caught by
+    a confusing result - the `coasting` flag has existed since round 11
+    and both offenders predate nothing.
 
                               bench            cold
     strokes / outcomes        10/10            9/9
     pots to right ball          4/4            5/5
-    naming            99.8 -> 99.9%          99.6%
-    of ALL checks     99.7 -> 99.8%          99.6%
-    unnamed                  2 -> 1              4
+    cue named                 99.9%           98.9%
+    moving named      98.7 -> 99.4%   96.9 -> 97.4%
+    naming                    99.9%           99.6%
+    of ALL checks             99.8%           99.6%
     wrong names                   0               1
     invented                      0               0
-    bench ball 4      216/217 -> 217/217 (perfect)
-    REGRESSION, posted: bench moving-ball naming 99.3 -> 98.7%, and
-    cold's suppressed count 182 -> 227. Kept because the headline that
-    counts blindness as failure improved on the bench and cold is flat.
 
-0. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT, with
-    ZERO wrong names. Cold: 4 unnamed 5s, one 9->1, 0 blind. The next
-    honest gain is small and the risk of chasing it is not - prefer
-    targets with a measured population behind them, as this round had.
+0. AUDIT THE REMAINING SIDECAR METRICS FOR THE SAME FAULT. `invented
+    numbers` walks the same rows and does NOT exclude coasted estimates -
+    a ghost wearing a bad number would be counted as an invented ball
+    even though nothing is on the cloth. It currently reads 0 on both
+    clips so nothing is hidden today, but the fault is latent and this
+    is now the second instance found by accident.
 
-1. BENCH MOVING-BALL NAMING 99.3 -> 98.7% this round. Small, but it is
-    the one number that moved the wrong way; find which sightings it is
-    before assuming the trade was free.
+1. THE BENCH IS ONE UNNAMED AND ONE BLIND SIGHTING FROM PERFECT, with
+    ZERO wrong names. Cold: 4 unnamed 5s, one 9->1, 0 blind.
 
 2. THE PHONE PAYLOAD ON WEAK CELLULAR. The biggest session's shots.json
-    is 1,962 KB and carries dense 30fps merged trails. Round 76's gate
-    stopped it growing, but nobody has measured what that costs to pull
-    on a bad connection (memory: every fetch needs timeout + cached
-    fallback).
+    is 1,962 KB of dense 30fps trails; nobody has measured what that
+    costs to pull on a bad connection.
 
 3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
 
 4. THE BENCH PALETTE HAS NEVER HAD THE POT-ORDER TREATMENT that round 69
-    gave the cold clip; its truth is still hand-fitted colour windows.
+    gave the cold clip.
 
 5. tools/phone_view.py (round 74) screenshots the real player; --local
     serves the working tree so a UI fix is checked BEFORE it ships.
@@ -118,9 +124,10 @@ queue cannot be told something the measurements disagree with.
     the authority of one (67, 72); a truth-side sample can be
     contaminated rather than imprecise (69); aggregating over a window
     hides a gap inside it (70); measure the discriminator itself before
-    building on it (71, 73, 77); a metric can be the defect (72); an
-    angle test needs a magnitude guard (75); a regeneration needs a gate
-    or it silently deletes (76).
+    building on it (71, 73, 77); A METRIC CAN BE THE DEFECT (72, 78) -
+    and a posted regression deserves the same scrutiny as a posted win,
+    because this one dissolved under it; an angle test needs a magnitude
+    guard (75); a regeneration needs a gate or it silently deletes (76).
 
 7. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from

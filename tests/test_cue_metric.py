@@ -14,6 +14,7 @@ the engine.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -82,6 +83,30 @@ def test_the_cold_window_is_the_measured_one(sc, monkeypatch):
     a, b = wins[0]
     # a pixel sweep put the ball off the bed 101.5 -> 108.5s
     assert 101.0 <= a <= 102.0 and 108.0 <= b <= 109.0, wins
+
+
+def test_a_coasted_row_is_not_a_moving_ball(sc):
+    """Round 78: it was, and it made a real fix look like a regression.
+
+    The moving-ball metric counted every ACTIVE row, estimates included,
+    so a coasting ghost's prediction drift registered as a ball in
+    flight. When round 77 correctly stopped that ghost holding a real
+    ball's number, its rows became "moving and unnamed" and dragged the
+    figure 99.3 -> 98.7%. All 11 contested bench cases were one coasting
+    track at 18.81-19.11s, clocked at up to 2,052 units/s while sitting
+    on empty cloth. Excluding estimates: 99.4%, above where it started.
+
+    The cue metric has demanded a real sighting since 2026-08-28; this
+    one had not caught up.
+    """
+    import inspect
+    src = inspect.getsource(sc.score)
+    i = src.find("moving_named += 1")
+    assert i > 0, "the moving-ball metric vanished"
+    window = src[max(0, i - 900):i]
+    assert re.search(r"len\(tr\) > 7 and tr\[7\]", window), (
+        "coasted rows are being counted as moving balls again - a "
+        "prediction is not a sighting")
 
 
 def test_the_skip_count_is_reported(sc):
