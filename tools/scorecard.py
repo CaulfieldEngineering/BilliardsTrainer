@@ -163,6 +163,46 @@ def _naming_correctness(r, times, frames) -> dict:
     }
 
 
+def _cue_absent_windows() -> list:
+    """Seconds where the CUE BALL IS NOT ON THE TABLE, from the naming truth.
+
+    The cue metric below demands a live cue sighting on EVERY frame, and
+    on the cold clip that cost 4.6% - measured in round 72, essentially
+    all of it one 7-second window where the cue ball is IN A POCKET. It
+    is potted at ~101.4s, sits in the jaws, drops, and Joe reaches in and
+    replaces it at ~108.6s. Through all of it the app correctly has no
+    cue track, and the metric counted every frame as a failure: it was
+    penalising the engine for refusing to hallucinate a ball.
+
+    Absence is taken from the naming truth, which is pixel-derived and
+    already eye-checked - no new hand-labelled data, one owner for the
+    fact. Only a RUN of consecutive samples missing the cue counts: a
+    lone missing sample may be the yardstick ABSTAINING rather than the
+    ball being gone, and abstention must never excuse the engine. On the
+    cold clip that yields exactly one window (102-108s, matching a
+    pixel sweep that puts the ball off the bed 101.5-108.5s); on the
+    bench, none - its cue is present in all 221 samples.
+    """
+    try:
+        doc = json.loads(NAMING_TRUTH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    ts = sorted(float(s["t"]) for s in doc.get("samples", []))
+    if len(ts) < 3:
+        return []
+    step = min((b - a) for a, b in zip(ts, ts[1:])) or 1.0
+    missing = sorted(float(s["t"]) for s in doc.get("samples", [])
+                     if not any(int(b[0]) == 0 for b in s["balls"]))
+    runs: list = []
+    for t in missing:
+        if runs and t - runs[-1][1] <= 1.5 * step:
+            runs[-1][1] = t
+        else:
+            runs.append([t, t])
+    # a single sample is not evidence of absence - see the docstring
+    return [(a - step / 2.0, b + step / 2.0) for a, b in runs if b > a]
+
+
 def _publishes_what_it_saw(frames) -> dict:
     """Does the app SHOW the name its own evidence supports?
 
@@ -282,7 +322,8 @@ def score(truth_path: Path) -> dict:
     # presence-only metrics here cannot see a ball named as another ball)
     known = set(truth.get("balls_on_table", []))
     times, frames = r._times, r._frames
-    cue_ok = cue_bad = 0
+    cue_ok = cue_bad = cue_skipped = 0
+    cue_gone = _cue_absent_windows()
     moving_named = moving_unnamed = 0
     invented: dict = {}
     prev: dict = {}
@@ -292,7 +333,9 @@ def score(truth_path: Path) -> dict:
         # be a real sighting this frame, not a coasted estimate.
         cues = [x for x in rows_f if x[6] and x[4] == 0]
         live = [x for x in cues if not (len(x) > 7 and x[7])]
-        if len(cues) == 1 and len(live) == 1:
+        if any(a <= times[j] <= b for a, b in cue_gone):
+            cue_skipped += 1        # the ball is in a pocket; see above
+        elif len(cues) == 1 and len(live) == 1:
             cue_ok += 1
         else:
             cue_bad += 1
@@ -319,6 +362,11 @@ def score(truth_path: Path) -> dict:
     tot_mov = moving_named + moving_unnamed
     caps = {
         "cue_named_pct": round(100.0 * cue_ok / max(1, cue_ok + cue_bad), 1),
+        # ALWAYS REPORTED, never silent: a metric that drops frames from
+        # its own denominator has to say how many, or the number stops
+        # meaning anything.
+        "cue_frames_skipped": cue_skipped,
+        "cue_absent_windows": [[round(a, 1), round(b, 1)] for a, b in cue_gone],
         "named_moving_pct": round(100.0 * moving_named / max(1, tot_mov), 1),
         "invented_numbers": sorted(invented),
         "invented_frames": sum(invented.values()),
@@ -366,7 +414,10 @@ def main() -> None:
     print(f"  fake strokes    : {sc['false_strokes']} (fired during hand setup)")
     print(f"  unexplained     : {sc['extra_episodes']}")
     c = sc["caps"]
-    print(f"  cue ball named  : {c['cue_named_pct']}% of frames (target 99+)")
+    _sk = c.get("cue_frames_skipped", 0)
+    print(f"  cue ball named  : {c['cue_named_pct']}% of frames (target 99+)"
+          + (f" [{_sk} frames skipped: cue in a pocket, "
+             f"{c['cue_absent_windows']}]" if _sk else ""))
     print(f"  moving balls named: {c['named_moving_pct']}% (target 95+)")
     if c.get("name_truth_mismatch"):
         print(f"  NAMED CORRECTLY : not scored - the naming truth file is for "

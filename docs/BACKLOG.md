@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T16:39Z
+    written        2026-08-30T16:56Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T16:37Z
@@ -57,53 +57,60 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 71
+### NEXT TARGETS (top first) — round 72
 
-*** OCCLUDED IS NOT GONE. THE BLINDNESS IS FIXED AND THE POTS SURVIVED ***
-    Round 70 found the cause (the hand/arm veto removes a ball's
-    detections while the player stands over it - 6.3s and 6.7s measured
-    - against a COAST_S of 0.6s) and its fix cost four pots, because
-    extending the coast on "at rest" cannot tell an occluded ball from a
-    potted one.
-    MEASURED FIRST THIS ROUND, before building anything: is FOREIGN
-    COVER the discriminator? Over every case on both clips -
-        the two occlusions   100% covered
-        all NINE pots          0% covered
-    No overlap. So the mask is now plumbed from prepare_detections into
-    the tracker (set_occlusion, called by BOTH paths) and the coast
-    extends to 8s ONLY while the last-known position is under cover.
+*** THE CUE METRIC WAS SCORING THE APP FOR NOT HALLUCINATING A BALL ***
+    The cold clip's cue read 95.4% against a 99 target. Measured: the
+    failures are not spread out at all - one 7-second window is
+    essentially the whole deficit, and in it THE CUE BALL IS IN A POCKET.
+    It sits in the jaws at 101.4s, drops, and Joe reaches in and replaces
+    it at ~108.6s. The app correctly has no cue track throughout and the
+    metric counted all 210 frames as failures.
+    THE BACKLOG'S OWN HYPOTHESIS WAS WRONG AGAIN: target 0 said this was
+    "the most likely remaining instance of the SAME family" as round 71's
+    hand-cover blindness. Measured, only 3% of the failing frames are
+    under foreign cover. It was not that family at all.
+    Absence now comes from the naming truth (pixel-derived, eye-checked -
+    no new hand-labelled data, one owner for the fact), and only a RUN of
+    consecutive samples counts, because a lone missing sample may be the
+    yardstick ABSTAINING and an abstention must never excuse the engine.
+    Cold yields exactly one window, 102-108s, against an independent
+    pixel sweep that puts the ball off the bed 101.5-108.5s. Bench yields
+    NONE - its cue is present in all 221 samples.
+    The skip count and the windows PRINT on every run; a metric that
+    drops frames from its own denominator has to say how many.
+        cold cue   95.4% -> 98.8%   [210 frames skipped, [101.5, 108.5]]
+        bench cue  99.9% -> 99.9%   [0 skipped]
+    NO ENGINE CODE CHANGED THIS ROUND - metric and tests only, so every
+    other number on both clips is untouched.
+
                               bench            cold
     strokes / outcomes        10/10            9/9
     pots to right ball          4/4            5/5
-    NO TRACK (blind)          7 -> 1          2 -> 0
-    of ALL checks     99.2 -> 99.7%   99.4 -> 99.6%
+    cue named                 99.9%           98.8%
     naming                    99.8%           99.6%
+    of ALL checks             99.7%           99.6%
     wrong names                   0               1
     invented                      0               0
-    bench ball 3      189/189 -> 195/195 (the six occluded frames)
-    cold  ball 7      168/168 -> 170/170
-    VISION-CORROBORATED: through the whole occlusion the overlay holds
-    the red 3 with the right name and flags it COAST, so nothing
-    downstream mistakes an estimate for a sighting.
-    PINNED both directions: a covered ball survives, an uncovered one
-    still dies at COAST_S (that is the pot case), and no mask means no
-    extension at all.
 
-0. THE CUE BALL AT 95.4% ON THE COLD CLIP (target 99) while the naming
-    truth scores the cue 175/175 - a TRACKING gap. This is now the most
-    likely remaining instance of the SAME family just fixed: the cue
-    metric demands a LIVE sighting every frame, and the cue is the ball
-    the player's hands and cue are nearest to. Measure how much of that
-    4.6% is coasted frames under foreign cover before touching anything.
+0. THE CUE'S REMAINING 1.2% IS THE CUE STICK LYING OVER THE BALL.
+    Characterised this round and it is a DIFFERENT failure from the
+    pocket window: at 91.1-92.6s the ball sits at a pocket jaw with the
+    stick across it, detections drop intermittently, and the track
+    survives but COASTS - round 71's machinery keeps it alive, and a
+    coasted frame still scores as a miss. Correct behaviour arguably,
+    but if the ball is visible beside the stick the detector should hold
+    it. Measure whether the stick is occluding the ball or merely
+    adjacent before changing anything - that distinction is what round
+    70 got wrong.
 
 1. THE BENCH'S LAST BLIND SIGHTING AND 2 UNNAMED, against ZERO wrong.
     Also cold's 4 unnamed 5s and its single 9->1.
 
-2. WHETHER THE VETO SHOULD FIRE AT ALL for a fully-visible ball beside a
-    hand. The mask is a 160px-wide warp (~1.4cm/px) so a ball is ~4
-    pixels and merges into any touching arm blob, and the test is "is
+2. WHETHER THE FOREIGN VETO SHOULD FIRE AT ALL for a fully-visible ball
+    beside a hand. The mask is a 160px-wide warp (~1.4cm/px) so a ball
+    is ~4 pixels and merges into any touching blob, and the test is "is
     the CENTRE inside the blob", not "is the ball actually covered".
-    Round 71 makes the consequence survivable rather than removing it.
 
 3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%), bench 339 of 790 (42.9%) get NO identity read.
@@ -114,11 +121,11 @@ queue cannot be told something the measurements disagree with.
 5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
-    the authority of one (67); a truth-side sample can be contaminated
-    rather than imprecise (69); aggregating over a window hides a gap
-    inside it (70); and a cheap discriminator can be confidently wrong,
-    so measure the discriminator itself before building on it - this
-    round's 11-case check took minutes and would have saved round 70 (71).
+    the authority of one (67, and again this round); a truth-side sample
+    can be contaminated rather than imprecise (69); aggregating over a
+    window hides a gap inside it (70); measure the discriminator itself
+    before building on it (71); and A METRIC CAN BE THE DEFECT - before
+    chasing a number, check that it is counting what it claims to (72).
 
 6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from

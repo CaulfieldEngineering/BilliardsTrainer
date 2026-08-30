@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 120,
+   "ts": "2026-08-30T16:56:44",
+   "date": "Aug 30, 12:56 PM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 12:56 PM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/120-r72_zoom.png",
+     "caption": "The cue ball in the jaws of the middle pocket, then gone, then your hand reaching in to retrieve it. The app had no cue ball on the table for those seven seconds because there wasn't one."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r72_zoom.png' alt=''><figcaption>The cue ball in the jaws of the middle pocket, then gone, then your hand reaching in to retrieve it. The app had no cue ball on the table for those seven seconds because there wasn&#x27;t one.</figcaption></figure></div>"
+  },
+  {
+   "id": 119,
+   "ts": "2026-08-30T16:56:44",
+   "date": "Aug 30, 12:56 PM EDT",
+   "kind": "finding",
+   "title": "One of my own scores was wrong, not the app",
+   "score": "The cue-tracking score was marking the app down for seven seconds when the cue ball was in a pocket. 95.4% -> 98.8%, with the skipped frames printed every run.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/119-r72_zoom.png",
+     "caption": "The cue ball in the jaws of the middle pocket, then gone, then your hand reaching in to retrieve it. The app had no cue ball on the table for those seven seconds because there wasn't one."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>One of my own scores was wrong. The app was being marked down for\nseven seconds in which the cue ball was sitting in a pocket - it was losing marks\nfor correctly NOT inventing a ball that was not on the table.</strong></p>\n\n<pre>\n                        before          now\ncue ball tracking        95.4%          98.8%\n   (frames excluded)         -      210, cue in a pocket\nyour pinned session      99.9%          99.9%   unchanged\n</pre>\n\n<h3>What happened</h3>\n<p>The score asks: on every single frame, can the app see exactly one cue ball?\nOn the newer clip it was failing 4.6% of the time, and I had assumed it was the\nsame hand-blocking problem I fixed yesterday. It was not - only 3% of the failing\nframes had your hands anywhere near.</p>\n<p>Almost all of them are one stretch: you scratch, the cue ball sits in the jaws\nof the middle pocket, drops in, and about seven seconds later you reach in and\nput it back. The app has no cue ball on the table during that time, which is\nexactly right - and my score was counting all 210 of those frames as mistakes.</p>\n\n<h3>How it knows now</h3>\n<p>My reference notes already record, second by second, which balls are visible -\nso the app's score now simply skips the moments when the cue ball is not on the\ntable. It only does this for a sustained run of seconds, never a single one,\nbecause a single gap might just mean my notes were unsure, and being unsure must\nnever let the app off. The number of skipped frames is printed every time, so\nthis can never quietly flatter the score.</p>\n<p>Nothing about the app itself changed today. Every other number on both clips\nis exactly as it was.</p>\n\n<h3>What is genuinely still wrong</h3>\n<p>The remaining 1.2% is real, and it is a different thing: your cue stick lying\nacross the ball. The app holds onto the ball through it but is estimating rather\nthan seeing it. That is next.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 118,
    "ts": "2026-08-30T16:39:08",
    "date": "Aug 30, 12:39 PM EDT",
@@ -1135,26 +1167,6 @@
    "title": "Make calls name the pocket, a Time Foul voice, and a truth-telling ball tray",
    "score": "",
    "body": "Makes are now announced the way you'd call them: 'Five ball in the top left pocket.' If the shot clock runs out unshot, the buzzer is followed by a spoken 'Time Foul.' And the ball tray now shows exactly what the system detects on the table, updating within a fraction of a second - no more comfort smoothing, so if the tray flickers, that's the detector telling on itself. The tray, the schematic, and the announcer now all read the same measurement source, and a make can no longer be announced while the ball is visibly still sitting on the table.\nThe 8-ball chip wears a bright ring when present so black never looks like the greyed-out 'potted' state.\nKnown honest gap: the 3 and 5 ball still get confused under warm light - that's the identifier model, and its retraining data is being mined from the new dense measurements.",
-   "images": []
-  },
-  {
-   "id": 40,
-   "ts": "2026-08-27T12:00:00",
-   "date": "Aug 27, 2026",
-   "kind": "update",
-   "title": "Your marathon session: trails re-measured every frame",
-   "score": "",
-   "body": "The new measurement engine re-processed your full 90-minute session frame by frame - ball positions every 33 milliseconds instead of every 150, with no takeoff blind spot (the cue ball's trail now responds within a frame of the strike instead of 2 seconds late). 78 shots' trails were upgraded; each upgraded trail had to match the old one's path and endpoints to prove itself, and the session's 'proc' stamp shows the update. This is the first session through the engine - the rest of the library follows as it clears its gates.\nTrails held back on 47 shots where the dense measurement couldn't prove agreement - honest sparse stays until the engine earns full trust via the corpus gates.\nLook for detail the old sampling couldn't see: quick bounce-backs, curve of masse/spin shots, true takeoff direction.",
-   "images": []
-  },
-  {
-   "id": 39,
-   "ts": "2026-08-27T12:00:00",
-   "date": "Aug 27, 2026",
-   "kind": "update",
-   "title": "Shot clock: per-beep volume and a table status readout",
-   "score": "",
-   "body": "Each shot clock sound - the start chime, the warning, the 3-2-1 ticks, and the buzzer - now has its own volume slider in the clock panel (zero mutes just that one). Release a slider and it plays that sound once at the new level, so you can tune by ear. Above the timer there's now a live status: ON THE CLOCK, SHOT IN PLAY, TABLE SETTLED, PAUSED.\nAlso under the hood tonight: ball detection moved to the GPU (roughly 3.5x more measurements per second) - the tracking improvement you noticed at the table.",
    "images": []
   }
  ]

@@ -3344,3 +3344,36 @@ Rounds continue with Joe's visual feedback as the gate.
   METHOD: round 70's cheap discriminator was confidently wrong and cost a
   round. Measuring the discriminator ITSELF took minutes here and settled
   it 11/11 before a line was written. Do that first.
+
+- 2026-08-30 ~16:00 EDT - ROUND 72: THE CUE METRIC WAS THE DEFECT, NOT
+  THE ENGINE. The cold clip's cue read 95.4% against a 99 target, and the
+  failures are not spread out: one 7-second window is essentially the
+  whole deficit, and in it THE CUE BALL IS IN A POCKET - it sits in the
+  jaws at 101.4s, drops, and Joe reaches in and replaces it at ~108.6s.
+  The app correctly has no cue track throughout and the metric counted
+  all 210 frames as failures: it was scoring the engine for refusing to
+  hallucinate a ball.
+  THE BACKLOG'S OWN HYPOTHESIS WAS WRONG AGAIN - target 0 called this
+  "the most likely remaining instance of the SAME family" as round 71's
+  hand-cover blindness; measured, only 3% of the failing frames are
+  under foreign cover.
+  FIX: absence comes from the naming truth (pixel-derived, eye-checked,
+  one owner for the fact - no new hand-labelled data), and only a RUN of
+  consecutive missing samples counts, because a lone missing sample may
+  be the yardstick ABSTAINING and abstention must never excuse the
+  engine. Cold yields exactly one window (102-108s) against an
+  independent pixel sweep putting the ball off the bed 101.5-108.5s;
+  bench yields NONE, its cue being present in all 221 samples. The skip
+  count and windows PRINT on every run.
+      cold cue  95.4 -> 98.8%  [210 skipped, [101.5,108.5]]
+      bench cue 99.9 -> 99.9%  [0 skipped]
+  NO ENGINE CODE CHANGED - metric and tests only, so every other number
+  on both clips is untouched (bench 10/10, 10/10, 4/4, 99.8% naming,
+  ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%).
+  VISION-CORROBORATED: rendered the window - the ball in the jaws, then
+  an empty pocket mouth, then Joe's hand retrieving it.
+  RESIDUAL CHARACTERISED: the remaining 1.2% is a DIFFERENT failure -
+  at 91.1-92.6s the cue stick lies across the ball at a pocket jaw,
+  detections drop intermittently, and the track survives but COASTS.
+  METHOD: a metric can be the defect. Before chasing a number, check it
+  is counting what it claims to.
