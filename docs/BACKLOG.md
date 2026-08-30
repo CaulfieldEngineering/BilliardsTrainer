@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T10:16Z
+    written        2026-08-30T10:35Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T10:15Z
+    measured       2026-08-30T10:33Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,64 +57,68 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 58
+### NEXT TARGETS (top first) — round 59
 
-*** THE COLD CLIP'S BALL LIST WAS WRONG AND IS NOW FIXED ***
-    docs/cold_truth_20260823-185550.json listed EIGHT balls; the table
-    holds TEN. Corrected by colour census + zoomed visual checks, the
-    same way round 25 corrected the bench's truth. Consequence: the
-    scorecard's `invented numbers` was largely measuring THIS FILE, not
-    the engine - 5739 of 10009 "invented" frames were a real ball being
-    named correctly. Honest figure is now [9] over 4270 frames.
-    Both clips unchanged and passing: bench 10/10 10/10 4/4 named 99.6%
-    gate 0.18; cold 9/9 9/9 5/5 gate 0.37.
+*** THE STRIPE READER IS FITTED TO ONE TABLE, AND NO SINGLE THRESHOLD
+    CAN FIX IT *** - measured, so the next attempt does not start over.
+    stripe_reading() scores a crop by the fraction of pixels that are
+    "white" under an ABSOLUTE test (saturation < 110 and value > 170),
+    then calls solid below 0.32 and stripe above 0.48. Those numbers were
+    fitted to 398 labelled balls that are ALL from the bench, whose only
+    stripe is a YELLOW 9.
+    MEASURED PER PHYSICAL BALL (grouping by emitted NAME is useless here -
+    the "9" label lands on two different balls):
+      cold clip   orange STRIPE      white fraction 0.23
+      cold clip   every solid        0.00 - 0.07
+      cold clip   cue                0.74 - 1.00
+      bench       solids p95         0.31   (from the fitting note)
+    So on its own table the orange stripe separates PERFECTLY from its
+    neighbours, and is still below a 0.32 bar - because an orange band is
+    darker than a yellow one and less of it passes an absolute white
+    test. The distributions now OVERLAP ACROSS TABLES (bench solids 0.31
+    > cold stripe 0.23), so lowering the bar far enough to catch this
+    stripe would start calling bench solids stripes.
+    A FRAME-RELATIVE VERSION WAS ALSO MEASURED AND DOES NOT SEPARATE.
+    LANDED THIS ROUND, and it is not the fix: solid_below 0.32 -> 0.18,
+    which turns a CONFIDENT WRONG ANSWER ("this stripe is a solid",
+    followed by repairing its number by -8) into an ABSTENTION, which is
+    what the middle band exists for. Zero measured change on either clip.
 
-0. *** THE ENGINE HAS NO WORKING NOTION OF STRIPES *** - the whole of
-    the cold clip's remaining naming problem, and it has never been
-    under measurement because the bench has six SOLIDS and no stripes.
-    Measured this round on the cold clip:
-      - the ORANGE STRIPE (a 13) is called "9" (a YELLOW stripe) in most
-        frames, and "13" in a few. Its white-pixel fraction is 0.27
-        against 0.00-0.11 for every solid on the table, so the stripe is
-        plainly visible in the pixels.
-      - the gold SOLID 1 is called "9" in 17 of 22 sampled frames.
-      - the black 8 and burgundy 7 share a dark cluster the engine
-        splits 59/46 between the two names.
-    DO NOT reach for the finder's solid/stripe class - see the rejection
-    below. The instrument that MEASURES a stripe is _fix_stripe_bit,
-    which reads the band across the ball; it was tuned on the bench's
-    single yellow stripe (round 27/29) and has never been exercised on
-    an orange one. START by measuring what it reports for each ball on
-    this clip before changing anything.
+0. GIVE THE STRIPE TEST A PER-TABLE REFERENCE. The white fraction is
+    meaningful RELATIVE TO THE OTHER BALLS ON THAT TABLE under THAT
+    lighting, and meaningless as an absolute. The colour-reference
+    machinery already does exactly this for hue
+    (docs/colour_refs.json, tools/build_colour_refs.py) and is per-table
+    by construction; a stripe reference belongs in the same file and the
+    same install path. Build it from the session's own balls, then the
+    bar can be "far above this table's solids" instead of a constant.
+    ALTERNATIVE if that stalls: a stripe feature that survives lighting -
+    the RADIAL structure of a stripe (a band across the middle, white
+    poles) rather than a global count of white pixels.
 
-    TRIED AND REJECTED THIS ROUND, with the numbers, so it is not
-    repeated: refuse an identifier number whose class contradicts the
-    FINDER's solid/stripe judgement. Well-motivated (over 900 cold
-    frames the two agree 6357 times and contradict 1727, nearly all a
-    gold SOLID called "9") and immediately fatal on the bench, whose 9
-    is a yellow STRIPE that reads SOLID to the finder:
-      named 99.6% -> 76.8%, outcomes 10/10 -> 8/10, pots 4/4 -> 2/4.
-    The finder's class is a GUESS about stripes, not a measurement.
+1. NO NAMING TRUTH FILE FOR THE COLD CLIP, so item 0 has no gate. This
+    now blocks everything in naming. tools/build_naming_truth.py is
+    bench-shaped and assumes the bench's rack; generalise it, then write
+    clip #2's naming truth by pixel measurement as round 25 did.
 
-1. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9). This
+2. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9). That
     table has a white cue, a pale gold 1 and a white-bodied orange
-    stripe, so the cue has two close neighbours the bench never had.
+    stripe - two close neighbours the bench never had.
 
-2. A NAMING TRUTH FILE FOR THE COLD CLIP. Items 0-1 have no per-ball
-    gate without one; tools/build_naming_truth.py is bench-shaped and
-    assumes the bench's rack.
+3. THE IDENTIFIER MISLABELS BALLS MID-COLLISION (round 55); colour
+    cannot separate gold from white at speed (round 56); the remaining 7
+    blind checks on the bench; both naming figures in the phone STATUS
+    view; recovered detections lose their name; _locate is ~37% of
+    engine wall time; rebuild_batch.py still drives an OLD build() path
+    (every clip in the library is stale at rules_v 20); events/shot.py
+    is a third shot detector in the live path; delete vision/tracking.py
+    and the MeasurementCore shadow scaffolding; CARRIED_SETUP is dead.
 
-3. THE IDENTIFIER MISLABELS BALLS MID-COLLISION (round 55) - probably
-    the same root as item 0.
-
-4. Colour cannot separate gold from white at speed (round 56); the
-    remaining 7 blind checks on the bench; both naming figures in the
-    phone STATUS view; recovered detections lose their name; _locate is
-    ~37% of engine wall time; rebuild_batch.py still drives an OLD
-    build() path (every clip in the library is stale at rules_v 20);
-    events/shot.py is a third shot detector in the live path; delete
-    vision/tracking.py and the MeasurementCore shadow scaffolding;
-    CARRIED_SETUP/_carried_ids is structurally dead.
+NOTE ON PACE: three rounds now without a metric moving (57 was the last
+gain). That is not drift - both clips are at 9/9 and 10/10 on shots,
+outcomes and pot attribution, and everything left is NAMING on a table
+whose ball set the engine has never been calibrated for. The next real
+gain needs item 1 (a gate) before item 0 (a fix), in that order.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

@@ -2954,3 +2954,32 @@ Rounds continue with Joe's visual feedback as the gate.
   NEXT: measure what _fix_stripe_bit reports for each ball on the cold
   clip. It was tuned on the bench's single YELLOW stripe (rounds 27/29)
   and has never seen an orange one.
+
+- 2026-08-30 ~12:00 EDT - ROUND 59: ROOT-CAUSED THE STRIPE FAILURE AND
+  PROVED NO SINGLE THRESHOLD FIXES IT. Both clips unchanged (bench 10/10
+  10/10 0 fake 4/4 named 99.6% gate 0.18; cold 9/9 9/9 0 fake 5/5 gate
+  0.37). Suite green.
+  stripe_reading() scores a crop by the fraction of pixels passing an
+  ABSOLUTE white test (s<110, v>170): solid below 0.32, stripe above
+  0.48, fitted to 398 labelled balls ALL from the bench, whose only
+  stripe is a YELLOW 9.
+  MEASURED PER PHYSICAL BALL on the cold clip (grouping by emitted NAME
+  is useless - the "9" label lands on two different balls):
+      orange STRIPE  0.23      every solid  0.00-0.07     cue 0.74-1.00
+  So the stripe separates PERFECTLY from its own neighbours and is still
+  below a 0.32 bar, because an orange band is darker than a yellow one
+  and less of it passes an absolute white test. AND NO SINGLE THRESHOLD
+  WORKS: the bench's own solids reach p95 0.31, ABOVE this clip's stripe
+  at 0.23 - the distributions overlap across tables. A frame-relative
+  version was measured too and does not separate.
+  LANDED, and it is explicitly NOT the fix: solid_below 0.32 -> 0.18,
+  turning a CONFIDENT WRONG ANSWER (a stripe declared solid, then its
+  number repaired by -8) into an ABSTENTION, which is what the middle
+  band is for. ZERO measured change on either clip - reported as such.
+  NEXT, IN THIS ORDER: (1) a naming truth file for the cold clip, or
+  there is no gate for any naming change; (2) give the stripe test a
+  PER-TABLE reference, the way docs/colour_refs.json already does for
+  hue - "far above this table's solids" instead of a constant.
+  PACE NOTE: three rounds without a metric moving. Both clips are at
+  10/10 and 9/9 on shots, outcomes and pot attribution; everything left
+  is naming on a table the engine was never calibrated for.

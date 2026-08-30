@@ -127,7 +127,7 @@ def _inner_disc(patch_bgr, mask):
 
 
 def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
-                   solid_below: float = 0.32, stripe_above: float = 0.48):
+                   solid_below: float = 0.18, stripe_above: float = 0.48):
     """Is this crop a STRIPE (True), a SOLID (False), or too close to call (None)?
 
     Deliberately abstains in the middle. The 16-class model gets a ball's HUE
@@ -155,6 +155,23 @@ def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
     # ground truth). Bounds and thresholds fitted to the measured
     # distributions over 398 labelled balls: solids p95=0.31, stripes
     # p10=0.37 under this test.
+    # SOLID_BELOW WAS 0.32 AND WAS FITTED TO ONE TABLE (round 59). Those
+    # 398 labelled balls are all from the bench, whose only stripe is a
+    # YELLOW 9. Measured per PHYSICAL ball on the cold clip, whose stripe
+    # is ORANGE: its white fraction is 0.23 against 0.00-0.07 for every
+    # solid on that table - separated perfectly from its own neighbours,
+    # and yet BELOW a 0.32 bar, so the reader declared a stripe to be a
+    # solid CONFIDENTLY and repaired its number by -8. An orange band is
+    # darker than a yellow one, so less of it passes an absolute
+    # `s < 110 and v > 170` white test; the constant does not travel.
+    # 0.18 does not make this ball read as a stripe - nothing here can,
+    # since the bench's own solids reach p95 = 0.31 and the two
+    # distributions now OVERLAP ACROSS TABLES. What it does is turn a
+    # confident wrong answer into an ABSTENTION, which is what the middle
+    # band is for: "an ambiguous crop never OVERWRITES a model answer
+    # that may well be right".
+    # A per-table calibration, or a stripe feature that survives a change
+    # of lighting, is the real fix and is queued.
     white_frac = float(np.mean((s < 110) & (v > 170)))
     if white_frac < solid_below:
         return False

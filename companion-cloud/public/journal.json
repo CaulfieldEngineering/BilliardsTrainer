@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 101,
+   "ts": "2026-08-30T10:35:09",
+   "date": "Aug 30, 06:35 AM EDT",
+   "kind": "finding",
+   "title": "The stripe test was calibrated on a table with no stripes",
+   "score": "Measured why the orange striped ball reads as solid, and why no single threshold can fix it",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/101-cold_nine.png",
+     "caption": "The striped ball in question, at four moments. About a quarter of it is white - unmistakable against the solids on that table, and still below a threshold measured on a session that has no striped balls."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Chasing the striped-ball problem to its root. The app's test for\n\"is this ball striped\" was calibrated on your pinned session, and your pinned\nsession has no striped balls at all.</strong></p>\n\n<h3>What the test actually does</h3>\n<p>It counts how much of a ball looks white. A striped ball is white at the\npoles with a colour band across the middle, so from overhead it shows a lot of\nwhite; a solid ball shows almost none. Below a third white it calls the ball\nsolid; above about a half it calls it striped.</p>\n<p>Measured on the new clip, ball by ball:</p>\n<pre>\nthe orange striped ball     23% white\nevery solid ball on it       0 - 7% white\nthe cue ball                74 - 100% white\n</pre>\n<p>On its own table that striped ball stands out perfectly from its neighbours.\nAnd it still falls under the \"one third\" line, so the app declares it a solid -\nconfidently - and then adjusts its number accordingly.</p>\n\n<h3>Why there is no quick fix</h3>\n<p>An orange band is darker than a yellow one, so less of it counts as white.\nThe threshold came from 398 balls measured on your pinned session, where the\nonly striped ball is yellow. Worse, on that table some SOLID balls reach 31%\nwhite - higher than this clip's stripe at 23%. So there is no single number that\nworks for both tables. I tried a version that judges each ball against the\nothers in the same frame; that does not separate them either.</p>\n<p>What I did change is small and honest: the app now says \"I do not know\"\ninstead of \"definitely solid\" for balls in that range. It made no difference to\nany score on either clip - which I am reporting rather than dressing up - but it\nstops a confident wrong answer from overwriting the naming model.</p>\n\n<h3>The real fix, and the order it has to happen in</h3>\n<p>The app already learns each table's colours - that is what stopped it calling\nyour purple 4 a 7. The striped test needs the same treatment: learn what\n\"striped\" looks like on THIS table under THIS light, instead of carrying a\nnumber from somewhere else. But first the new clip needs its own per-ball\nreference sheet, or I have no way to prove a naming change helped rather than\nhurt. That is the next job, in that order.</p>\n<p>Both sessions still read correctly at shot level - 10 of 10 and 9 of 9 shots,\nmakes and misses, and every pot credited to the right ball. Everything left is\nnaming.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li></ul>"
+  },
+  {
    "id": 100,
    "ts": "2026-08-30T10:16:45",
    "date": "Aug 30, 06:16 AM EDT",
@@ -1037,16 +1053,6 @@
    "title": "You were right about the shutter \u2014 blur is fixed",
    "score": "",
    "body": "The new camera settings are real and working: a crop of the fastest-moving thing in your latest clip (the cue stick mid-stroke) is tack sharp. My earlier claim that the shutter 'wasn't applying' was my measurement's fault \u2014 it was counting pieces of your cue stick as blurred balls.\nThe smear detector ranks elongated blobs, and a cue stick is naturally elongated \u2014 no motion needed. Once your 1/500 shutter made the balls crisp, stick fragments were the only stretched shapes left, and they topped the list looking like blur.\nThe decisive test: the fastest mover in session 18:55 (inter-frame extent 199px \u2014 full stroke speed) shows zero smear in a single frame. At the old 1/60 exposure it would have smeared ~75px.\nWhat this unlocks: fast shots stop vanishing mid-flight. 39 of the 62 remaining uncategorized misses failed because the ball was never captured between strike and pocket \u2014 that failure class should not exist in new recordings.",
-   "images": []
-  },
-  {
-   "id": 21,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Fixed the laggy mouse and keyboard",
-   "score": "",
-   "body": "The AI was hogging the graphics chip \u2014 the same chip Windows uses to draw your cursor and keystrokes, which is why typing felt broken whenever the app ran. Ball detection now runs on the CPU instead: your desktop got its graphics chip back (app's share: 69% \u2192 0%), and detection barely slows down.\nRoot cause: DirectML inference saturated the Radeon 780M's 3D engine at ~30 inferences/sec. On an integrated GPU that's the exact engine the Windows compositor needs for the cursor, and GPU engines have no preemptive priority \u2014 which is why every process/thread priority fix failed to help.\nMeasured before choosing: CPU at 4 threads does a full tiled detection in 88ms (~11/sec) vs ~15/sec on the GPU. Detections verified identical between the two (6/6 balls matched within 2px, same numbers).\nIt's a setting (detection.inference_provider: auto/gpu/cpu), so a future camera-PC or GPU upgrade flips it back with one word. The CPU session is capped at 4 threads and the app runs below-normal priority, so your input always preempts it.",
    "images": []
   }
  ]
