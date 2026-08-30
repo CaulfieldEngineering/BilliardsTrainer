@@ -42,6 +42,9 @@ SHEET = ROOT / "_train" / "bench_fix" / "naming_truth_check.png"
 
 MIN_SCORE = 0.70      # phantoms 0.30-0.49, real balls 0.84-0.88 (round 26)
 STRIPE_AT = 0.314     # midpoint of the measured gap 0.211 -> 0.418
+MARGIN_LAB = 12.0     # nearest palette entry must beat the runner-up
+                      # by this much, or the sample is left UNNAMED.
+                      # A yardstick abstains; it never guesses.
 
 
 def _white_frac(crop) -> float:
@@ -65,6 +68,72 @@ def _white_frac(crop) -> float:
     s = hsv[:, :, 1][sel].astype(np.float32)
     v = hsv[:, :, 2][sel].astype(np.float32)
     return float(np.mean((s < 110) & (v > 150)))
+
+
+def identify_by_palette(frame, x: float, y: float, r: float, pal: dict):
+    """Nearest entry in a PER-TABLE palette, or None when it is not decisive.
+
+    The bench windows below are hand-fitted to one table's six balls and
+    cannot describe another rack. A palette is that same idea measured
+    per table: every ball on the cloth, labelled BY EYE from a zoomed
+    grid, with its crop median and its white fraction.
+
+    Two things make this a yardstick rather than a guess:
+
+      * IT ABSTAINS. A sample is only named when the nearest palette
+        entry beats the runner-up by MARGIN_LAB. On the cold clip the
+        closest pairs are 19.0 Lab (the gold 1 against the orange 13),
+        22.8 (burgundy 7 against black 8) and 23.3 (crimson 3 against
+        orange 5), so colour alone genuinely cannot decide many samples -
+        and a truth file must say "I don't know" rather than invent one.
+
+      * THE STRIPE BAR IS PER TABLE. 1-vs-13 is 19 Lab apart in colour
+        and 0.03-vs-0.21 apart in white fraction, so white decides it -
+        but only against THIS table's own solids. The engine's absolute
+        0.32 sits above both and is exactly why it calls that stripe a
+        solid (round 59).
+    """
+    import cv2
+    import numpy as np
+    rr = max(2, int(round(r * 0.7)))
+    y0, x0 = max(0, int(y) - rr), max(0, int(x) - rr)
+    crop = frame[y0:int(y) + rr + 1, x0:int(x) + rr + 1]
+    if crop.size < 30:
+        return None
+    px = crop.reshape(-1, 3).astype(np.float32)
+    keep = px[px.mean(1) <= np.percentile(px.mean(1), 75)]
+    if len(keep) < 10:
+        return None
+    med = np.median(keep, axis=0)
+    lab = cv2.cvtColor(np.uint8([[med]]), cv2.COLOR_BGR2LAB)[0][0].astype(float)
+    rr2 = max(2, int(round(r)))
+    y2, x2 = max(0, int(y) - rr2), max(0, int(x) - rr2)
+    wf = _white_frac(frame[y2:int(y) + rr2 + 1, x2:int(x) + rr2 + 1])
+    skip = {str(n) for n in pal.get("not_scored", ())}
+    balls = {k: v for k, v in pal["balls"].items() if k not in skip}
+    bar = pal["stripe_bar"]
+    ranked = sorted(
+        ((float(np.linalg.norm(lab - np.array(v["lab"]))), int(k))
+         for k, v in balls.items()), key=lambda z: z[0])
+    if not ranked:
+        return None
+    (d0, n0), rest = ranked[0], ranked[1:]
+    if rest and (rest[0][0] - d0) < MARGIN_LAB:
+        # not decisive on colour - the stripe bit may still decide it,
+        # but only when the two candidates differ in class
+        cand = [n for _, n in ranked[:2]]
+        cls = [bool(balls[str(n)]["stripe"]) for n in cand]
+        if cls[0] == cls[1]:
+            return None
+        want = wf >= bar
+        return cand[0] if cls[0] == want else cand[1]
+    # The CUE is white all over, so a stripe/solid test says nothing
+    # about it - applying one dropped every cue sample in the first
+    # build. The 8 is exempt for the same reason in reverse: it is the
+    # darkest thing on the cloth and no white test can inform it.
+    if n0 not in (0, 8) and bool(balls[str(n0)]["stripe"]) != (wf >= bar):
+        return None            # colour and appearance disagree: abstain
+    return n0
 
 
 def identify(frame, x: float, y: float, r: float) -> int | None:
@@ -100,7 +169,7 @@ def identify(frame, x: float, y: float, r: float) -> int | None:
     return None
 
 
-def build(session: str, step: float) -> list:
+def build(session: str, step: float, pal: dict | None = None) -> list:
     import cv2
     from billiards_trainer.config import Settings
     from billiards_trainer.detector_strategies import discover
@@ -124,7 +193,8 @@ def build(session: str, step: float) -> list:
         for d in (strat._finder.detect(fr, calib) or []):
             if float(getattr(d, "score", 1.0)) < MIN_SCORE:
                 continue
-            n = identify(fr, d.x, d.y, d.radius)
+            n = (identify_by_palette(fr, d.x, d.y, d.radius, pal)
+                 if pal else identify(fr, d.x, d.y, d.radius))
             if n is not None:
                 balls.append([n, round(float(d.x), 1), round(float(d.y), 1)])
         # a number may appear at most once per frame; drop the whole
@@ -168,8 +238,30 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--session", default="session-20260824-220247.mp4")
     ap.add_argument("--step", type=float, default=1.0)
+    ap.add_argument("--palette", default=None,
+                    help="per-table palette JSON (docs/<clip>_palette.json). "
+                         "Without it the bench's hand-fitted colour windows "
+                         "are used, which describe ONE table's six balls.")
+    ap.add_argument("--out", default=None)
     a = ap.parse_args()
-    truth = build(a.session, a.step)
+    pal = None
+    if a.palette:
+        pal = json.loads(Path(a.palette).read_text(encoding="utf-8"))
+        wfs = sorted(v["white_frac"] for v in pal["balls"].values()
+                     if not v["stripe"] and v["white_frac"] < 0.5)
+        stripes = sorted(v["white_frac"] for v in pal["balls"].values()
+                         if v["stripe"])
+        # the bar sits in THIS table's own gap, not in another table's
+        pal["stripe_bar"] = ((max(wfs) + min(stripes)) / 2.0
+                             if wfs and stripes else STRIPE_AT)
+        print(f"palette: {len(pal['balls'])} balls, stripe bar "
+              f"{pal['stripe_bar']:.3f} (solids <= {max(wfs):.2f}, "
+              f"stripes >= {min(stripes):.2f})")
+    global OUT, SHEET
+    if a.out:
+        OUT = Path(a.out)
+        SHEET = ROOT / "_train" / "bench_fix" / (OUT.stem + "_check.png")
+    truth = build(a.session, a.step, pal)
     OUT.write_text(json.dumps({
         "session": a.session,
         "note": ("Per-frame naming truth from PIXELS - colour family plus the "

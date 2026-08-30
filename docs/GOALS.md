@@ -2983,3 +2983,33 @@ Rounds continue with Joe's visual feedback as the gate.
   PACE NOTE: three rounds without a metric moving. Both clips are at
   10/10 and 9/9 on shots, outcomes and pot attribution; everything left
   is naming on a table the engine was never calibrated for.
+
+- 2026-08-30 ~13:00 EDT - ROUND 60: THE COLD CLIP HAS A NAMING GATE.
+  Built docs/cold_palette_20260823-185550.json (every ball on the table
+  rendered at one frame and LABELLED BY EYE) and generalised
+  tools/build_naming_truth.py to work from a per-table palette instead
+  of the bench's hand-fitted colour windows; tools/scorecard.py takes
+  --naming-truth. Result, verified ball by ball in zoomed crops before
+  publishing:
+    NAMED CORRECTLY 85.7% of 925 checks (target 95)
+    perfect  0:175/175 1:15/15 2:37/38 6:184/184 8:183/183
+    failing  13:5/66   4:66/111   7:126/151
+    confusions 13->9 x44, 4->7 x25, 13->1 x17
+  EVERY CONFUSION CLASS WAS ADJUDICATED BY EYE FIRST, and one of them -
+  3->5 x66 - was MY TRUTH being wrong, not the engine: the crop is
+  plainly orange. The 3/5 pair (23.3 Lab apart, centroids from a single
+  frame) is now explicitly not scored on this clip and the reason is in
+  the palette file. Bench unchanged: 10/10, 10/10, 4/4, 99.6%, 0.18.
+  BOTH REMAINING DEFECTS HAVE ONE ROOT - no per-table calibration:
+    (a) the orange stripe is wrong in 61 of 66 sightings because the
+        stripe bar is an ABSOLUTE 0.32 while this table separates at
+        0.06 (solids) vs 0.21 (stripe). The truth builder computes the
+        right bar PER TABLE (0.137 here) and names the 13 correctly, so
+        the method is proven - the engine just needs the same number.
+    (b) the purple 4 is called the burgundy 7 in 25 sightings: the same
+        dark-cluster misread round 33 fixed on the bench with measured
+        colour references, which cannot fire here because
+        measured_identity() returns -1 for every ball on this table
+        (round 58) - the reference file describes the bench's rack.
+  NEXT: build colour references AND a stripe bar per session. The
+  palette written this round is exactly the labelled data that needs.

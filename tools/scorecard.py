@@ -292,12 +292,20 @@ def score(truth_path: Path) -> dict:
 
 
 def main() -> None:
+    global NAMING_TRUTH
     ap = argparse.ArgumentParser()
     ap.add_argument("--truth", default=str(ROOT / "docs" / "bench_truth.json"))
+    ap.add_argument("--naming-truth", default=None,
+                    help="per-clip naming truth (docs/<clip>_naming_truth.json). "
+                         "Without it the BENCH's file is used, and scoring "
+                         "another session against it is refused rather than "
+                         "reported as a number (round 54).")
     ap.add_argument("--publish", action="store_true")
     ap.add_argument("--evidence", action="store_true",
                     help="render one overlay frame per shot as citation")
     a = ap.parse_args()
+    if getattr(a, 'naming_truth', None):
+        NAMING_TRUTH = Path(a.naming_truth)
     sc = score(Path(a.truth))
     if a.evidence:
         _evidence(sc["session"], sc["shots"],

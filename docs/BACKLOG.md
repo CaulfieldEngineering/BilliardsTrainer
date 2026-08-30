@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T10:35Z
+    written        2026-08-30T11:00Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T10:33Z
@@ -57,68 +57,75 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 59
+### NEXT TARGETS (top first) — round 60
 
-*** THE STRIPE READER IS FITTED TO ONE TABLE, AND NO SINGLE THRESHOLD
-    CAN FIX IT *** - measured, so the next attempt does not start over.
-    stripe_reading() scores a crop by the fraction of pixels that are
-    "white" under an ABSOLUTE test (saturation < 110 and value > 170),
-    then calls solid below 0.32 and stripe above 0.48. Those numbers were
-    fitted to 398 labelled balls that are ALL from the bench, whose only
-    stripe is a YELLOW 9.
-    MEASURED PER PHYSICAL BALL (grouping by emitted NAME is useless here -
-    the "9" label lands on two different balls):
-      cold clip   orange STRIPE      white fraction 0.23
-      cold clip   every solid        0.00 - 0.07
-      cold clip   cue                0.74 - 1.00
-      bench       solids p95         0.31   (from the fitting note)
-    So on its own table the orange stripe separates PERFECTLY from its
-    neighbours, and is still below a 0.32 bar - because an orange band is
-    darker than a yellow one and less of it passes an absolute white
-    test. The distributions now OVERLAP ACROSS TABLES (bench solids 0.31
-    > cold stripe 0.23), so lowering the bar far enough to catch this
-    stripe would start calling bench solids stripes.
-    A FRAME-RELATIVE VERSION WAS ALSO MEASURED AND DOES NOT SEPARATE.
-    LANDED THIS ROUND, and it is not the fix: solid_below 0.32 -> 0.18,
-    which turns a CONFIDENT WRONG ANSWER ("this stripe is a solid",
-    followed by repairing its number by -8) into an ABSTENTION, which is
-    what the middle band exists for. Zero measured change on either clip.
+*** THE COLD CLIP HAS A NAMING GATE AT LAST ***
+    docs/cold_naming_truth_20260823-185550.json, built from a per-table
+    PALETTE labelled by eye, verified ball by ball in zoomed crops, and
+    scored with `tools/scorecard.py --truth ... --naming-truth ...`.
+      NAMED CORRECTLY   85.7% of 925 pixel-truth checks  (target 95)
+      perfect   0:175/175  1:15/15  2:37/38  6:184/184  8:183/183
+      failing   13: 5/66      4: 66/111      7: 126/151
+      confusions  13->9 x44   4->7 x25   13->1 x17
+    Every confusion class was ADJUDICATED BY EYE before publishing the
+    number - and one class, 3->5 x66, turned out to be MY TRUTH being
+    wrong, so the 3/5 pair is now explicitly not scored on this clip
+    (23.3 Lab apart; centroids from a single frame cannot separate them).
+    Bench unchanged: 10/10, 10/10, 4/4, named 99.6%, gate 0.18.
 
-0. GIVE THE STRIPE TEST A PER-TABLE REFERENCE. The white fraction is
-    meaningful RELATIVE TO THE OTHER BALLS ON THAT TABLE under THAT
-    lighting, and meaningless as an absolute. The colour-reference
-    machinery already does exactly this for hue
-    (docs/colour_refs.json, tools/build_colour_refs.py) and is per-table
-    by construction; a stripe reference belongs in the same file and the
-    same install path. Build it from the session's own balls, then the
-    bar can be "far above this table's solids" instead of a constant.
-    ALTERNATIVE if that stalls: a stripe feature that survives lighting -
-    the RADIAL structure of a stripe (a band across the middle, white
-    poles) rather than a global count of white pixels.
+0. *** BOTH REMAINING NAMING DEFECTS HAVE ONE ROOT: THERE IS NO
+    PER-TABLE CALIBRATION FOR THIS TABLE. ***
+    a) THE ORANGE STRIPE 13 IS WRONG IN 61 OF 66 SIGHTINGS (called 9, a
+       YELLOW stripe, or 1). Colour cannot decide it - 1 and 13 are 19.0
+       Lab apart - but WHITE FRACTION can: 0.03 for the gold 1 against
+       0.21 for the stripe, a 7x gap. The engine's bar is an ABSOLUTE
+       0.32 (round 59), above both. The truth builder already computes
+       the right bar per table (this clip: 0.137, sitting in its own gap
+       between solids <=0.06 and stripes >=0.21) and it works - that is
+       how the truth file names the 13 correctly.
+       DO: give the ENGINE the same per-table stripe bar. It belongs
+       beside the measured colour references, which are already
+       per-table by construction (docs/colour_refs.json,
+       tools/build_colour_refs.py --install). Compute it from the
+       session's own balls at calibration time.
+    b) THE PURPLE 4 IS CALLED THE BURGUNDY 7 IN 25 SIGHTINGS (4: 66/111,
+       7: 126/151). This is the SAME dark-cluster misread round 33 fixed
+       on the bench with measured colour references - and it cannot fire
+       here, because measured_identity() returns -1 for every ball on
+       this table: the reference file describes the bench's rack
+       (0,1,2,3,4,9) and nothing else (round 58 measurement).
+    SO THE ONE FIX FOR BOTH: colour references and a stripe bar that are
+    built PER SESSION rather than shipped from one table. The tooling
+    exists (build_colour_refs.py) but needs a labelled corpus per table;
+    the palette written this round is exactly that data for this clip.
 
-1. NO NAMING TRUTH FILE FOR THE COLD CLIP, so item 0 has no gate. This
-    now blocks everything in naming. tools/build_naming_truth.py is
-    bench-shaped and assumes the bench's rack; generalise it, then write
-    clip #2's naming truth by pixel measurement as round 25 did.
+1. THE PALETTE IS LABELLED BY HAND. docs/cold_palette_20260823-185550.json
+    was made by rendering every ball on the table at one frame and
+    reading them by eye. That is fine for two clips and does not scale to
+    the library. Before P3, decide how a new table gets calibrated
+    without a human in the loop - or accept a one-time labelling step per
+    table and build the UI for it (Joe sees the balls once, names them,
+    the app remembers).
 
-2. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9). That
-    table has a white cue, a pale gold 1 and a white-bodied orange
-    stripe - two close neighbours the bench never had.
+2. THE 3/5 PAIR IS UNSCORED on the cold clip. Separating them needs
+    centroids sampled across many positions per ball, which needs a way
+    to follow each ball that does not come from the app. The motion
+    timeline (round 53) plus hand-verified anchor frames could do it.
 
-3. THE IDENTIFIER MISLABELS BALLS MID-COLLISION (round 55); colour
+3. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9), yet
+    the naming truth scores the cue 175/175. Those two disagree because
+    the cue metric demands a LIVE sighting every frame while the naming
+    truth samples once a second - so this is a TRACKING gap, not a
+    naming one. Measure where the cue's label rides a coast.
+
+4. The identifier mislabels balls mid-collision (round 55); colour
     cannot separate gold from white at speed (round 56); the remaining 7
     blind checks on the bench; both naming figures in the phone STATUS
     view; recovered detections lose their name; _locate is ~37% of
     engine wall time; rebuild_batch.py still drives an OLD build() path
     (every clip in the library is stale at rules_v 20); events/shot.py
     is a third shot detector in the live path; delete vision/tracking.py
-    and the MeasurementCore shadow scaffolding; CARRIED_SETUP is dead.
-
-NOTE ON PACE: three rounds now without a metric moving (57 was the last
-gain). That is not drift - both clips are at 9/9 and 10/10 on shots,
-outcomes and pot attribution, and everything left is NAMING on a table
-whose ball set the engine has never been calibrated for. The next real
-gain needs item 1 (a gate) before item 0 (a fix), in that order.
+    and the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

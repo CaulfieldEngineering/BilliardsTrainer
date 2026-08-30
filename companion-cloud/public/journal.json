@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 102,
+   "ts": "2026-08-30T11:00:55",
+   "date": "Aug 30, 07:00 AM EDT",
+   "kind": "milestone",
+   "title": "The new table can be marked on naming now",
+   "score": "Built and eye-verified a per-ball yardstick for the second session: 85.7%, and both failures trace to one missing per-table calibration",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/102-cold_truth_allballs.png",
+     "caption": "Every ball on the new table, with the name my yardstick gives it - checked in close-up before it was allowed to judge anything. Far right is the orange striped ball the app keeps calling a 9."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The new session can now be marked on naming, ball by ball, the same\nway your pinned one is. It scores 85.7%, and the two things it gets wrong turn\nout to be the same problem wearing two hats.</strong></p>\n\n<h3>Building a yardstick for a second table</h3>\n<p>Until today I could only check WHICH BALL the app named on your pinned\nsession, because that check was hand-fitted to that table's six balls. I\nphotographed every ball on the new table at one moment, named them by eye, and\ntaught the tool to work from that. Then I checked its verdicts in close-up\nbefore trusting any of them.</p>\n<p>That check mattered. Of four kinds of disagreement between the app and my new\nyardstick, <strong>one was the yardstick being wrong</strong>: I had the crimson\n3 and the orange 5 mixed up in 66 places. Those two balls are almost the same\ncolour on that table, so I have marked them as \"cannot be scored here\" rather\nthan pretend. The other three are real:</p>\n<pre>\nthe orange striped ball    wrong in 61 of 66 sightings\nthe purple ball            called the dark red one 25 times\n</pre>\n\n<h3>Both are the same underlying gap</h3>\n<p>The app learns your pinned table's exact ball colours - that is what stopped\nit calling your purple ball a 7 on that session. It has never learned this\ntable's. So on the new one, that same purple-vs-dark-red mix-up is back, and the\nstriped ball is judged by a \"how white is it\" threshold measured on a table that\nhas no striped balls.</p>\n<p>The good news: my yardstick names both correctly, using a threshold worked\nout from THAT table's own balls - solids at 6% white, the stripe at 21%, so the\nline goes at 14%. The app uses a fixed 32% carried over from your pinned\nsession. So the method is proven; it just needs to run for each table instead of\nonce ever.</p>\n\n<h3>Where both sessions stand</h3>\n<pre>\n                     pinned session      new clip\nshots found              10 of 10        9 of 9\nmakes and misses         10 of 10        9 of 9\npots to right ball         4 of 4        5 of 5\nnaming                      99.6%          85.7%\n</pre>\n<p>Shots and outcomes are right on both. Naming is the whole remaining gap, and\nit is now measurable on both tables instead of one.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li></ul>"
+  },
+  {
    "id": 101,
    "ts": "2026-08-30T10:35:09",
    "date": "Aug 30, 06:35 AM EDT",
@@ -1043,16 +1059,6 @@
    "title": "Clips now start instantly on your phone",
    "score": "",
    "body": "Every recording had its seek index at the wrong end of the file, so your phone had to download huge chunks (up to ~2 GB for a late shot in a long session) before it could play anything. The index now sits at the front: playing any shot needs ~5-10 MB. All 26 older recordings were fixed tonight, and every new recording fixes itself automatically.\nThe recorder writes 'fragmented' video on purpose - it means a crash can't destroy a recording mid-write. But fragmented files carry an empty index up front; iOS can't even learn the clip's duration from it, let alone jump to a shot, so Safari crawled the file from the beginning.\nThe fix re-containers the finished file (a pure copy, ~1.4 seconds per GB, no quality change) right after recording stops - before it ever reaches Dropbox. Crash safety is unchanged: the file stays fragmented while recording is live.\nAlso found: tonight's high-ISO settings inflate file bitrate 4.6x (16 Mbps vs 3.5), which multiplies every download. The grain recommendation coming separately addresses this too.",
-   "images": []
-  },
-  {
-   "id": 22,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "You were right about the shutter \u2014 blur is fixed",
-   "score": "",
-   "body": "The new camera settings are real and working: a crop of the fastest-moving thing in your latest clip (the cue stick mid-stroke) is tack sharp. My earlier claim that the shutter 'wasn't applying' was my measurement's fault \u2014 it was counting pieces of your cue stick as blurred balls.\nThe smear detector ranks elongated blobs, and a cue stick is naturally elongated \u2014 no motion needed. Once your 1/500 shutter made the balls crisp, stick fragments were the only stretched shapes left, and they topped the list looking like blur.\nThe decisive test: the fastest mover in session 18:55 (inter-frame extent 199px \u2014 full stroke speed) shows zero smear in a single frame. At the old 1/60 exposure it would have smeared ~75px.\nWhat this unlocks: fast shots stop vanishing mid-flight. 39 of the 62 remaining uncategorized misses failed because the ball was never captured between strike and pocket \u2014 that failure class should not exist in new recordings.",
    "images": []
   }
  ]

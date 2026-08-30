@@ -1,0 +1,222 @@
+{
+ "session": "session-20260823-185550.mp4",
+ "note": "Per-table ball palette, LABELLED BY EYE from a zoomed grid of every ball on the table at t=40.01 (before any pot). Colours are the glare-trimmed crop median at that instant; white_frac is the 0.95-disc white fraction. This is truth-side data for tools/build_naming_truth.py - it is NOT installed into the engine.",
+ "labelled": "2026-08-30 round 60",
+ "balls": {
+  "8": {
+   "bgr": [
+    24.0,
+    15.0,
+    2.0
+   ],
+   "lab": [
+    10.0,
+    126.0,
+    121.0
+   ],
+   "white_frac": 0.002,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     156,
+     213
+    ]
+   }
+  },
+  "7": {
+   "bgr": [
+    26.0,
+    14.0,
+    44.0
+   ],
+   "lab": [
+    21.0,
+    145.0,
+    127.0
+   ],
+   "white_frac": 0.043,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     472,
+     275
+    ]
+   }
+  },
+  "1": {
+   "bgr": [
+    14.0,
+    163.0,
+    241.0
+   ],
+   "lab": [
+    186.0,
+    147.0,
+    203.0
+   ],
+   "white_frac": 0.033,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     317,
+     343
+    ]
+   }
+  },
+  "0": {
+   "bgr": [
+    166.0,
+    191.5,
+    200.5
+   ],
+   "lab": [
+    198.0,
+    127.0,
+    142.0
+   ],
+   "white_frac": 0.836,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     207,
+     427
+    ]
+   }
+  },
+  "2": {
+   "bgr": [
+    175.0,
+    77.0,
+    14.0
+   ],
+   "lab": [
+    89.0,
+    149.0,
+    71.0
+   ],
+   "white_frac": 0.017,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     225,
+     606
+    ]
+   }
+  },
+  "3": {
+   "bgr": [
+    30.0,
+    0.0,
+    214.0
+   ],
+   "lab": [
+    114.0,
+    198.0,
+    176.0
+   ],
+   "white_frac": 0.004,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     275,
+     778
+    ]
+   }
+  },
+  "6": {
+   "bgr": [
+    79.0,
+    97.0,
+    14.0
+   ],
+   "lab": [
+    93.0,
+    100.0,
+    132.0
+   ],
+   "white_frac": 0.064,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     542,
+     826
+    ]
+   }
+  },
+  "13": {
+   "bgr": [
+    32.5,
+    143.5,
+    226.5
+   ],
+   "lab": [
+    170.0,
+    152.0,
+    194.0
+   ],
+   "white_frac": 0.209,
+   "stripe": true,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     283,
+     943
+    ]
+   }
+  },
+  "5": {
+   "bgr": [
+    24.0,
+    56.0,
+    179.0
+   ],
+   "lab": [
+    107.0,
+    176.0,
+    173.0
+   ],
+   "white_frac": 0.002,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     475,
+     1013
+    ]
+   }
+  },
+  "4": {
+   "bgr": [
+    79.0,
+    11.0,
+    23.0
+   ],
+   "lab": [
+    23.0,
+    156.0,
+    89.0
+   ],
+   "white_frac": 0.046,
+   "stripe": false,
+   "seen_at": {
+    "t": 40.01,
+    "rect": [
+     321,
+     1015
+    ]
+   }
+  }
+ },
+ "not_scored": [
+  3,
+  5
+ ],
+ "not_scored_why": "The crimson 3 and the orange 5 are only 23.3 Lab apart on this table, and centroids measured at one instant cannot separate them across the clip's lighting: adjudicated by eye, all 66 'truth 3 / app 5' disagreements were MY truth being wrong and the engine being right. A yardstick abstains rather than guesses, so this pair is excluded from naming truth here. Separating them needs centroids sampled per ball across many positions, which needs a way to follow each ball that does not come from the app."
+}
