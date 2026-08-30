@@ -2760,3 +2760,37 @@ Rounds continue with Joe's visual feedback as the gate.
   scores shots that a truth file already lists and this clip has none.
   NEXT: watch all 3.3 minutes including the GAPS between entries, and
   write the truth file while watching - it becomes corpus clip #2.
+
+- 2026-08-30 ~06:00 EDT - ROUND 53: BUILT THE INSTRUMENT THAT CAN SEE A
+  MISSED SHOT, AND THE COLD CLIP MISSED NOTHING.
+  THE BLIND SPOT: every metric in this campaign scores shots a truth
+  file already lists, so a stroke the engine never reported is absent
+  from the shot list, absent from the tracked stream, and therefore
+  absent from the scorecard. On a clip with no truth file nothing at all
+  stood between a missed shot and a clean-looking report.
+  tools/motion_timeline.py asks the engine NOTHING: it warps each frame
+  to the table and differences consecutive frames, so it sees balls
+  rolling regardless of detection, tracking, naming or episode logic.
+  On session-20260823-185550: 28 motion bursts, 12 inside reported
+  entries, 16 outside.
+  NONE OF THE 16 IS A STROKE, on two independent grounds:
+    * a real stroke drives a tracked ball to 691-2974 px/s (bench, all
+      10 strokes); the fastest tracked ball in ANY of the 16 is 332.
+    * the three strongest were WATCHED frame by frame - 151.0s (332
+      px/s), 56.8s (193 px/s), and the longest/highest-energy at 143.5s
+      (5.5s, 0.0264, only 44 px/s tracked). All three are Joe walking
+      in, chalking and ADDRESSING: the cue stick sweeps the cloth while
+      every ball stays put.
+  CLOSED A HOLE IN MY OWN TEST: a stroke could hide INSIDE a reported
+  entry, which the orphan check skips by construction. Watched the long
+  Table change (26.6-37.4s) - ball positions change completely between
+  frames, Joe repositioning by hand and pushing with the stick. Genuine
+  rearrangement, correctly classified.
+  COLD CLIP STATUS: 3/3 pots correct (round 52), 0 missed strokes, the
+  long Table change confirmed. STILL UNVERIFIED: the five "no ball fell"
+  calls and the short Table change at 62.6s.
+  NEXT: verify those, then WRITE THE TRUTH FILE for this clip so it
+  becomes corpus clip #2 and every future round is scored on two tables.
+  Pinned by tests/test_motion_timeline.py (4 tests on the burst
+  grouping, including that a ball passing behind the cue stick must not
+  read as two separate events).

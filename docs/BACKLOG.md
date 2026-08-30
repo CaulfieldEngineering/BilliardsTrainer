@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T06:31Z
+    written        2026-08-30T06:54Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T06:06Z
@@ -57,37 +57,43 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 52
+### NEXT TARGETS (top first) — round 53
 
-*** P2 STARTED: THE FIRST COLD CLIP RAN, AND IT HELD UP ***
-    session-20260823-185550 (6020 frames, 3.3 min, a DIFFERENT DAY from
-    the bench, named in no document, never tuned against).
-    10 entries: 8 strokes + 2 Table changes. Physics gate 0.37 per 1k
-    (limit 0.55; the bench sits at 0.18, so twice as noisy but passing).
-    ALL THREE MAKES VERIFIED BY EYE, frame by frame:
-       @48.91   potted the 1, top-right      yellow ball drops   CORRECT
-       @121.67  potted the 3, bottom-right   red ball drops      CORRECT
-       @138.14  potted the 4, bottom-right   purple ball drops   CORRECT
-                (this one READ "potted the 1" before round 52's fix)
-    NOT YET VERIFIED, and it is the honest gap: whether any real stroke
-    was MISSED (false negatives), whether the five "no ball fell" calls
-    are right, and whether the two Table changes are really setups.
-    Checking those means watching all 3.3 minutes, which is the next
-    bounded round - build a cold-clip watch that samples every episode
-    AND the quiet gaps between them, so a missed shot cannot hide.
+*** THE COLD CLIP MISSED NOTHING - checked with an instrument that does
+    not ask the engine anything. ***
+    session-20260823-185550, 8 strokes + 2 Table changes reported.
+    tools/motion_timeline.py warps each frame to the table and
+    differences consecutive frames, so it sees BALLS ROLLING regardless
+    of detection, tracking, naming or episode logic. 28 bursts of cloth
+    motion; 12 inside reported entries, 16 outside.
+    THE ARGUMENT that none of the 16 is a missed stroke:
+      * a real stroke drives a tracked ball to 691-2974 px/s (bench,
+        all 10 strokes). The FASTEST tracked ball inside ANY of the 16
+        is 332 px/s.
+      * the three strongest were watched frame by frame - 151.0s
+        (332 px/s), 56.8s (193 px/s) and the longest at 143.5s (5.5s,
+        highest energy, only 44 px/s tracked). All three are Joe walking
+        in, chalking, and getting down to ADDRESS the ball: the cue
+        STICK sweeps the cloth and every ball stays put.
+      * a stroke could also hide INSIDE a reported entry, which the
+        orphan test skips by construction. The long Table change
+        (26.6-37.4s) was therefore watched too: ball positions change
+        completely between frames, Joe pushing them about by hand and
+        with the stick. A genuine rearrangement.
+    STILL UNVERIFIED on this clip, stated plainly: the five "no ball
+    fell" calls and the short Table change at 62.6s.
 
-0. WATCH THE WHOLE COLD CLIP. Verify the 5 misses and the 2 Table
-    changes, and - the part no metric can do - look at the gaps BETWEEN
-    entries for strokes the engine never reported. A missed shot is
-    invisible to every number on the scorecard, because the scorecard
-    only scores what truth already lists and this clip has no truth
-    file. Write that truth file while watching; it becomes clip #2 of
-    the corpus and unblocks scoring every future round on two tables.
+0. FINISH THE COLD CLIP AND WRITE ITS TRUTH FILE. Verify the 5 misses
+    and the 62.6s Table change, then write docs/truth for
+    session-20260823-185550 so it becomes CORPUS CLIP #2 and every
+    future round is scored on two tables instead of one. Without a truth
+    file this clip can only ever be checked by hand.
 
-1. THE COLD CLIP IS TWICE AS NOISY AS THE BENCH (0.37 vs 0.18 per 1k,
-    8 id_flicker + 8 class_flicker). Find out which balls flicker and
-    whether it is the fuller rack (this clip has stripes and a black 8
-    on the table; the bench had six balls and no stripes to confuse).
+1. THE COLD CLIP IS TWICE AS NOISY AS THE BENCH (0.37 vs 0.18 per 1k;
+    8 id_flicker + 8 class_flicker). Find which balls flicker. This clip
+    has a fuller rack WITH STRIPES and a black 8; the bench had six
+    solids and no stripes, so stripe/solid confusion has never been
+    under measurement at all.
 
 2. THE REMAINING 7 BLIND CHECKS ON THE BENCH: ball 3 x6 at 126-131s,
     ball 1 x1 at 158s. tools/show_missing.py renders them.
@@ -96,7 +102,7 @@ queue cannot be told something the measurements disagree with.
     figure (99.6%) and the honest one counting blind as failure (99.0%).
 
 4. RECOVERED DETECTIONS LOSE THEIR NAME (blur_recovery stamps
-    `recovered_for` and MotionTracker ignores it). Round 48: ungated
+    `recovered_for`; MotionTracker ignores it). Round 48: ungated
     recovery took the purple 4 to 136/136 but dropped moving-named to
     92.2%. Honour the field and both move together.
 
@@ -106,26 +112,23 @@ queue cannot be told something the measurements disagree with.
 
 6. tools/rebuild_batch.py still drives an OLD build() path and tests
     staleness by TIMESTAMP; it must drive measure/job.run and compare
-    ENGINE_RULES_V. rules_v is now 20, so EVERY clip in the library is
+    ENGINE_RULES_V. rules_v is 20, so EVERY clip in the library is
     stale - this is what stands between here and Joe's "clean and
     reproducible way of updating reprocessed clips".
 
-7. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
-    independently of shots.analyze. THE SAME CLASS OF BUG has now been
-    found three times in three rounds - the scorecard's private copy of
-    the stroke test (round 51) and describe.py's private derivation of
-    which ball was potted (round 52, caught only because a cold clip
-    made the two answers differ). Hunt the rest deliberately rather
-    than waiting for the next clip to expose one.
+7. HUNT THE REMAINING DUPLICATE OWNERS. Same bug found three rounds
+    running: the scorecard's private stroke test (51), describe.py's
+    private pot derivation (52), and still open - events/shot.py running
+    a third shot detector in the live path. Search for the rest instead
+    of waiting for a clip to expose them.
 
 8. DELETE vision/tracking.py (716 lines) after migrating its case law
     out of 4 test files; also vision/identity.py's `_Internal` import,
     tools/eval_tracking.py, and the MeasurementCore shadow scaffolding.
 
-9. CARRIED_SETUP / _carried_ids IS STRUCTURALLY DEAD (round 51: a ball
-    being carried is hidden by the hand carrying it, so it has no track
-    to mark). The cue-goes-first rule replaced it. Delete once P2 has
-    confirmed the replacement holds across several cold clips.
+9. CARRIED_SETUP / _carried_ids IS STRUCTURALLY DEAD (round 51). The
+    cue-goes-first rule replaced it. Delete once P2 has confirmed the
+    replacement across several cold clips.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

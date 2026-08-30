@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 95,
+   "ts": "2026-08-30T06:54:25",
+   "date": "Aug 30, 02:54 AM EDT",
+   "kind": "finding",
+   "title": "Proving the app did not miss a shot",
+   "score": "A new instrument that measures balls rolling without asking the engine anything - 16 unexplained bursts of movement, none of them a shot",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/095-orphan_143.png",
+     "caption": "The longest unexplained burst of movement on the new clip - 5.5 seconds of it. Not a shot: you are chalking and moving the cue over the cloth, and every ball on the table stays exactly where it was."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The question I could not answer until now: does the app ever MISS a\nshot entirely? On the new clip, it does not - and I can finally prove that\nrather than assume it.</strong></p>\n\n<h3>Why this was a blind spot</h3>\n<p>Every number I have ever shown you scores shots against a list I wrote by\nwatching. That catches wrong calls. It cannot catch a shot the app never\nmentioned - if it is missing from the list AND missing from the app, there is\nnothing to compare. A clean report and a clean report with a hole in it look\nidentical.</p>\n<p>So I built something that does not ask the app anything. It flattens each\nframe to a top-down view of the cloth and compares it to the frame before,\nwhich sees <em>balls rolling</em> no matter what the app thinks. On the new\nclip: 28 separate bursts of movement, 12 during shots the app reported, 16 not.</p>\n\n<h3>Checking all sixteen</h3>\n<p>A struck ball on your table travels 691 to 2974 pixels a second - measured\nacross all ten shots of the pinned session. The fastest ball inside any of those\nsixteen bursts is <strong>332</strong>. None of them is a shot.</p>\n<p>I watched the three strongest anyway, because an argument is not a look:</p>\n<pre>\n151.0s   fastest ball 332 px/s   you walk up and get down on the shot\n 56.8s   fastest ball 193 px/s   same - addressing, balls all still\n143.5s   5.5s, the most movement of any  you chalking and moving the\n         of them, but only 44 px/s       cue over the cloth\n</pre>\n<p>All three are the cue STICK sweeping over the table while every ball sits\nstill. Then one more gap in my own reasoning: a shot could hide inside a stretch\nthe app labelled \"Table change\", which my test skips by design. So I watched the\nlong one at 26 seconds too - the balls change position completely between\nframes, you moving them by hand and pushing them with the stick. A genuine\nrearrangement.</p>\n\n<h3>Where that leaves the new clip</h3>\n<pre>\n3 pots      all three correct, checked frame by frame (yesterday)\n8 shots     none missed, checked against raw movement\n2 setups    the long one confirmed a genuine rearrangement\n5 misses    NOT yet checked - next\n</pre>\n<p>The remaining job is to watch those five and write the new clip up as a\nsecond reference session, so from then on every change is scored against two\ntables instead of one.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li></ul>"
+  },
+  {
    "id": 94,
    "ts": "2026-08-30T06:30:59",
    "date": "Aug 30, 02:30 AM EDT",
@@ -1001,16 +1017,6 @@
    "title": "Stats restructured your way",
    "score": "",
    "body": "Lifetime Stats now reads top-down: Total Shots, Makes, Misses \u2014 then each miss subgenre with its meaning built in: Cut Left / Miss Left (Overcut), Cut Left / Miss Right (Undercut), and so on.",
-   "images": []
-  },
-  {
-   "id": 15,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "What's New and Stats actually open now",
-   "score": "",
-   "body": "Both are full pages with a \u2039 Home button, not pop-ups \u2014 and the bug where tapping them did nothing until you opened a session is fixed (they were opening inside a hidden layer).",
    "images": []
   }
  ]
