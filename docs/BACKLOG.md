@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T07:38Z
+    written        2026-08-30T08:31Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T07:33Z
+    measured       2026-08-30T08:28Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,74 +57,67 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 54
+### NEXT TARGETS (top first) — round 55
 
-*** CORPUS CLIP #2 EXISTS: docs/cold_truth_20260823-185550.json ***
-    Written by watching, never from the app. Scored with
-    `python tools/scorecard.py --truth docs/cold_truth_20260823-185550.json`
-      strokes found 9/9   outcomes 8/9   fake 0   unexplained 0
-      pots attributed 4/5   cue named 95.2% (target 99)
-      invented numbers [7, 9, 13]
-    THE BENCH IS UNCHANGED AND STILL PERFECT (10/10, 10/10, 0 fake,
-    4/4 pots, named 99.6%, all-checks 99.0%, gate 0.18).
+*** THE 158.9s POT: ROOT CAUSE FOUND, NOT YET FIXED ***
+    Three layers deep, each correcting the one above it:
+      R54 said  the 5's track "died mid-flight"
+      R55 found the track did not die - it LEFT, onto another ball
+      R55 found it is not theft either: the two tracks SWAP at contact
+      R55 found the swap starts UPSTREAM, in the identifier
+    Colour sampled along both tracks, both directions:
+      id15 "cue"  159.34 WHITE  -> 159.47 ORANGE (into the bottom-left)
+      id4  "5"    159.34 ORANGE -> 159.47 WHITE  (rebounds up-right)
+    And the identifier's labels during the collision:
+      (78.6,862.7) bgr(176,225,230) WHITE  -> labelled n=5
+      (95.5,963.9) bgr(12,85,235)   ORANGE -> labelled n=3
+    So the tracker is obeying bad input, and round 47's "a name outranks
+    four pixels" rule actively PULLS the 5's track onto the white ball
+    because that ball is wearing the label 5. The pot then happens on a
+    track named 0 and nothing is credited.
 
-0. *** THE ORANGE 5 IS POTTED AT 158.9 AND SCORED A MISS *** - the one
-    outcome the cold clip still gets wrong, and it is a TRACKING failure
-    rather than a scoring one. Watched it: the 5 runs down the left rail
-    and drops in the bottom-left; it is absent from every later frame.
-    The engine tracked it for 23 trail points and then its track DIES
-    MID-FLIGHT at rect (156, 820) - 8.3 pocket radii from any pocket,
-    still moving up-rail - so the pocket-credit rule correctly refuses
-    to score a track that vanished mid-table. Fix the loss, not the
-    credit. Same family as the bench's 85.1 case (fast ball, association
-    break); instrument the association at 159.5-160.4 the way round 47
-    did and expect the same shape of answer.
+0. EXTEND THE COLOUR VETO TO MOVING TRACKS. The veto shipped this round
+    is PROVEN to fire and to do the right thing - instrumented at
+    159.372, it refuses the white ball (colour distance 214) and keeps
+    the 5 on the orange one (distance 4), and with a fresh tracker the 5
+    is held all the way toward the pocket. It is defeated in the full
+    clip because the CUE's own track - which is MOVING, so the veto does
+    not apply to it - grabs the orange ball first under exclusive greedy
+    assignment. Extending it needs a blur allowance: a ball in flight
+    smears toward the cloth, so the threshold must be looser than 90.
+    MEASURE the colour of moving detections before picking it; the
+    detections at this collision were crisp (11,89,238), which suggests
+    blur is less of a problem than feared at these speeds.
 
-1. CUE BALL NAMED 95.2% ON THE COLD CLIP against a 99 target (the bench
-    holds 99.9). R1 does NOT generalise yet. Find where the cue label
-    comes off - the honest metric requires the label to sit on a LIVE
-    sighting, so this is either lost tracking or the name moving to
-    another blob.
+1. THE IDENTIFIER MISLABELS BALLS MID-COLLISION. Two balls in contact,
+    both read wrong, both recovering a few frames later. This is the
+    real upstream defect and it will keep producing symptoms. Measure
+    how often it happens (the cold clip's 8 id_flicker + 8 class_flicker
+    are probably mostly this), then decide: refuse identity reads while
+    two balls are within a diameter of each other, or weight them down.
 
-2. INVENTED NUMBERS [7, 9, 13] ON THE COLD CLIP, 10025 frames. 13 does
-    not exist on any table; 7 and 9 are not in this rack (balls are
-    0,1,2,3,4,5,6,8). The bench has none, so this is entirely a
-    generalisation failure - a fuller rack WITH STRIPES and a black 8,
-    which the bench never had. Likely the same stripe/solid confusion
-    behind the 0.37/1k gate (8 id_flicker + 8 class_flicker vs the
-    bench's 3+3).
+2. CUE BALL NAMED 95.2% ON THE COLD CLIP (target 99; bench 99.9). R1
+    does not generalise. Likely the same collision confusion.
 
-3. A NAMING TRUTH FILE FOR THE COLD CLIP. tools/build_naming_truth.py
-    is bench-shaped; generalise it so clip #2 gets per-ball naming
-    scored too. Round 54 stopped the scorecard silently scoring one
-    clip against another's naming truth (it printed "4.8%, no track
-    881" with full confidence), but the honest fix is a truth file per
-    clip.
+3. INVENTED NUMBERS [7, 9, 13] ON THE COLD CLIP, 10025 frames. 13 does
+    not exist; 7 and 9 are not in this rack. A fuller rack WITH STRIPES
+    that the bench never had.
 
-4. THE REMAINING 7 BLIND CHECKS ON THE BENCH (ball 3 x6 at 126-131s,
-    ball 1 x1 at 158s). tools/show_missing.py renders them.
+4. A NAMING TRUTH FILE FOR THE COLD CLIP so per-ball naming is scored on
+    two tables. tools/build_naming_truth.py is bench-shaped.
 
-5. PUT BOTH NAMING FIGURES IN THE PHONE'S STATUS VIEW - the sighting
-    figure and the honest one counting blind as failure.
+5. THE REMAINING 7 BLIND CHECKS ON THE BENCH; PUT BOTH NAMING FIGURES IN
+    THE PHONE'S STATUS VIEW; RECOVERED DETECTIONS LOSE THEIR NAME;
+    _locate IS ~37% OF ENGINE WALL TIME; rebuild_batch.py still drives
+    an OLD build() path (every clip in the library is stale at rules_v
+    20); events/shot.py is a third shot detector in the live path;
+    delete vision/tracking.py and the MeasurementCore shadow
+    scaffolding; CARRIED_SETUP/_carried_ids is structurally dead.
 
-6. RECOVERED DETECTIONS LOSE THEIR NAME (blur_recovery stamps
-    `recovered_for`; MotionTracker ignores it).
-
-7. _locate IS ~37% OF ENGINE WALL TIME. Shrink the window or search at
-    half resolution as sweep() does.
-
-8. tools/rebuild_batch.py still drives an OLD build() path and tests
-    staleness by TIMESTAMP; must drive measure/job.run and compare
-    ENGINE_RULES_V. Every clip in the library is stale.
-
-9. HUNT THE REMAINING DUPLICATE OWNERS (events/shot.py is the known
-    one). Four found in four rounds now - the scorecard's stroke test
-    (51), describe.py's pot derivation (52), and round 54's naming
-    truth scoring the wrong clip.
-
-10. DELETE vision/tracking.py (716 lines) and the MeasurementCore shadow
-    scaffolding; CARRIED_SETUP/_carried_ids is structurally dead
-    (round 51) - delete once P2 confirms the cue-first replacement.
+6. MINOR, SEEN THIS ROUND: reprocess() raises "shot derivation failed"
+    in _write_shots (engine.py:204) on a very short run (25 frames).
+    Harmless for real clips but it is an unguarded edge case in the
+    shot-list writer.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

@@ -318,3 +318,63 @@ class TestATrackCannotComeBackFromTheDead:
         rows = tk.update([(545.0, 605.0, 12.0, 2)], t)   # a DIFFERENT ball
         assert all(r.number != 1 for r in rows), (
             "a ball that left the table minutes ago claimed a live ball")
+
+
+class TestARestingBallIsNotStolenByAPasserBy:
+    """TRIED AND REVERTED (round 55) - kept as case law, not as a rule.
+
+    A name-mismatch veto (a settled, confidently named track refuses any
+    detection the identifier calls something else) changed nothing
+    measurable on either clip, and on the case that motivated it it is
+    actively harmful: during the 159.4s collision on
+    session-20260823-185550 the identifier mislabels BOTH balls - the
+    white cue reads "5" and the orange 5 reads "3" - so the veto would
+    stop the 5's track from re-acquiring its own ball exactly when it
+    matters. Names are what BREAKS in a collision; they cannot guard it.
+    The colour veto below survives because colour does not swap.
+    """
+
+
+class TestABallDoesNotChangeColour:
+    """The second half of the theft veto (round 55).
+
+    The name veto could not save the orange 5: the cue ball that stole
+    its track was moving too fast for the identifier to name, so the
+    detection arrived unnamed and there was no mismatch to see. Colour
+    cannot go missing that way - measured on that frame, orange
+    (11,86,238) against white (183,234,238) is 227 apart, while a
+    misread of the same ball sits under 40.
+    """
+
+    class _Det:
+        def __init__(self, x, y, bgr, number=-1, radius=13.0):
+            self.x, self.y, self.radius, self.number = x, y, radius, number
+            self.measured_bgr = bgr
+
+    def test_a_white_ball_cannot_take_an_orange_balls_track(self):
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(20):
+            tk.update([self._Det(100.0, 900.0, (11, 86, 238), 5)], t)
+            t += 1 / 30
+        five = [r for r in tk.tracks if r.number == 5]
+        assert five, "the orange 5 must be established"
+        tid = five[0].id
+        for x in (140.0, 152.0, 164.0):       # the cue sweeps past, UNNAMED
+            rows = tk.update([self._Det(x, 860.0, (183, 234, 238), -1)], t)
+            t += 1 / 30
+        stolen = [r for r in rows if r.id == tid and abs(r.x - 100.0) > 25]
+        assert not stolen, "a white ball took the orange ball's track"
+
+    def test_the_same_ball_is_still_matched_when_the_name_flickers(self):
+        """Colour must not strand a ball over an identifier hiccup."""
+        from billiards_trainer.measure.tracker import MotionTracker
+        tk = MotionTracker()
+        t = 0.0
+        for _ in range(20):
+            tk.update([self._Det(100.0, 900.0, (11, 86, 238), 5)], t)
+            t += 1 / 30
+        rows = tk.update([self._Det(118.0, 900.0, (14, 92, 233), -1)], t)
+        assert any(abs(r.x - 118.0) < 8 for r in rows), (
+            "the ball's own slightly-shifted detection was refused")

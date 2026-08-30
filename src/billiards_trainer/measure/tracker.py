@@ -297,6 +297,9 @@ class MotionTracker:
                 else (float(d.x), float(d.y), float(d.radius),
                       int(getattr(d, "number", -1)))
                 for d in srcs]
+        # each detection's MEASURED colour, for the theft veto below
+        det_bgr = [None if isinstance(d, tuple)
+                   else getattr(d, "measured_bgr", None) for d in srcs]
         # 1. predict every live track forward
         for tr in self._tracks.values():
             dt = max(0.0, t - tr.t)
@@ -326,6 +329,56 @@ class MotionTracker:
                     # which ball this is; the identifier's read is
                     # evidence, and evidence sorts first. Both still have
                     # to be inside the gate to be considered at all.
+                    # A RESTING BALL CANNOT BECOME ANOTHER BALL (round
+                    # 55, found on the cold clip). A name mismatch was
+                    # only a sort PREFERENCE, so when no better claimant
+                    # was in range a track would adopt a detection the
+                    # identifier had explicitly called something else.
+                    # Measured on session-20260823-185550 @159.7: the
+                    # orange 5 sat still at rect (99.5, 886) from 158.0;
+                    # the struck cue ball passed close by, its own track
+                    # fell behind, and the 5's track jumped onto it - the
+                    # sampled pixels go ORANGE, ORANGE, ORANGE, then
+                    # WHITE on the same track id - after which it
+                    # renamed itself the cue. The real 5 was left with no
+                    # track at all, so when it was potted the engine had
+                    # nothing to credit and scored the shot a miss.
+                    # The veto is limited to a track that is AT REST and
+                    # already sure of its name: a moving ball must stay
+                    # free to be re-matched through a misread, which is
+                    # what the hysteresis and MIN_ID_FRAMES exist for.
+                    # A NAME-MISMATCH VETO WAS TRIED HERE AND REVERTED
+                    # (round 55). It refused a settled, confidently named
+                    # track any detection the identifier called something
+                    # else. It changed nothing measurable on either clip,
+                    # and on the very case that motivated it it is
+                    # ACTIVELY HARMFUL: during the 159.4s collision the
+                    # identifier mislabels BOTH balls - the white cue
+                    # reads "5" and the orange 5 reads "3" - so the veto
+                    # would stop the 5's track from re-acquiring its own
+                    # ball at the moment it most needs to. Names are the
+                    # thing that breaks in a collision; they cannot be
+                    # the thing that guards it.
+                    # AND A BALL DOES NOT CHANGE COLOUR. The name veto
+                    # above could not save the 5: the cue that stole it
+                    # was moving too fast for the identifier to name, so
+                    # the detection arrived as n=-1 and there was no
+                    # mismatch to see. Colour cannot go missing that way.
+                    # Measured on that theft, orange (11,86,238) against
+                    # white (183,234,238) is 227 apart, while a misread
+                    # of the SAME ball sits under 40. Restricted to a
+                    # SETTLED track and a detection it would have to jump
+                    # to: a ball in flight smears toward the cloth, so
+                    # its colour is exactly what must not be trusted.
+                    if (tr.settled and len(tr.mbgr_hist) >= 5
+                            and det_bgr[di] is not None
+                            and dd > 1.5 * max(tr.radius, dr, 8.0)):
+                        n_h = len(tr.mbgr_hist)
+                        mine = [sorted(c[k] for c in tr.mbgr_hist)[n_h // 2]
+                                for k in range(3)]
+                        if sum((float(a) - float(b)) ** 2
+                               for a, b in zip(mine, det_bgr[di])) > 90.0 ** 2:
+                            continue
                     named = 0 if (dn >= 0 and tr.emitted == dn) else 1
                     pairs.append((named, dd, di, tr.id))
         pairs.sort()

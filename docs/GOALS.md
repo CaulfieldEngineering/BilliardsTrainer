@@ -2831,3 +2831,34 @@ Rounds continue with Joe's visual feedback as the gate.
   back "NAMED CORRECTLY 4.8%, no track 881", a meaningless number
   printed with full confidence. It now refuses to score on a session
   mismatch and says which clip the file belongs to.
+
+- 2026-08-30 ~08:00 EDT - ROUND 55: NO SCORE MOVED. Root-caused the cold
+  clip's remaining wrong outcome and corrected my own last two rounds.
+  R54 called it a track that "died mid-flight". It did not die - it
+  LEFT. Nor was it theft by a passer-by (my first theory this round).
+  The two tracks SWAP BALLS AT CONTACT, colour-verified both ways by
+  sampling the video under each track:
+    id15 "cue"  159.34 WHITE  -> 159.47 ORANGE, into the bottom-left
+    id4  "5"    159.34 ORANGE -> 159.47 WHITE,  rebounding up-right
+  The pot therefore happens on a track named 0, and a cue ball down a
+  pocket is a scratch, not a pot - hence "no ball fell".
+  THE SWAP STARTS UPSTREAM, IN THE IDENTIFIER. During the collision it
+  labels the WHITE cue "5" and the ORANGE 5 "3" (measured, with the
+  detections' own measured_bgr). Round 47's "a name outranks four
+  pixels" then actively pulls the 5's identity onto the white ball.
+  SHIPPED: a colour veto - a SETTLED track refuses a detection it would
+  have to JUMP to whose measured colour is >90 away. PROVEN to fire:
+  instrumented at 159.372 it refuses the white ball (distance 214) and
+  keeps the 5 on the orange one (distance 4), and with a fresh tracker
+  the 5 is held all the way toward the pocket. It does not fix the clip
+  because the CUE's track - moving, so exempt - takes the orange ball
+  first under exclusive greedy. Extending it to moving tracks is queue
+  item 0 and needs a blur allowance.
+  REVERTED: a name-mismatch veto. It changed nothing measurable on
+  either clip and is ACTIVELY HARMFUL on its own motivating case - it
+  would stop the 5's track re-acquiring its own ball while that ball is
+  mislabelled. Names break in collisions; names cannot guard collisions.
+  Kept in the file as case law so it is not retried (round 49 lesson).
+  BOTH CLIPS UNCHANGED: bench 10/10, 10/10, 0 fake, 4/4, named 99.6%,
+  all-checks 99.0%, gate 0.18; cold 9/9 strokes, 8/9 outcomes, 4/5 pots,
+  gate 0.37. Suite green.

@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 97,
+   "ts": "2026-08-30T08:31:27",
+   "date": "Aug 30, 04:31 AM EDT",
+   "kind": "finding",
+   "title": "Two balls swapped places in the app's head",
+   "score": "The pot scored as a miss is not a lost ball - the cue and the 5 traded identities at the moment they touched, and the naming model started it",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/097-cold_158_strip.png",
+     "caption": "The shot in question: the orange 5 runs down the left rail and drops in the bottom corner. The app follows it out of the collision as if it were the cue ball, so the pot is never credited."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>No score changed today. I spent the round finding out why one pot on\nthe new clip is still scored a miss, and the answer was three layers below where\nI was looking.</strong></p>\n\n<h3>What actually happens at 158 seconds</h3>\n<p>You strike the cue ball; it hits the orange 5; the 5 runs down and drops in\nthe bottom-left corner. The app says no ball fell.</p>\n<p>Yesterday I said the app \"lost the ball in mid-roll\". That was wrong. It did\nnot lose anything - the two balls SWAPPED places in its head at the moment they\ntouched. I checked by sampling the actual colour of the pixels under each\ntracked ball, frame by frame:</p>\n<pre>\nthe ball it calls \"the cue\"    white ... then ORANGE, heading into the pocket\nthe ball it calls \"the 5\"      orange ... then WHITE, rebounding away\n</pre>\n<p>Each one followed the wrong ball out of the collision. So the pot happens on\nsomething the app thinks is the cue ball, and a cue ball going down a pocket is\na foul, not a pot - hence \"no ball fell\".</p>\n\n<h3>And the swap starts earlier than that</h3>\n<p>The part that names balls gets BOTH of them wrong for a few frames while they\nare touching: it reads the white cue ball as \"the 5\" and the orange 5 as \"the\n3\". Everything after that is the app faithfully following bad information -\nincluding a rule I added last week that says a ball's NAME should outrank its\nposition, which here drags the 5's identity straight onto the white ball.</p>\n\n<h3>What I shipped, and what I threw away</h3>\n<p>I wrote two guards. One says a ball cannot suddenly become a differently\nnamed ball; I <strong>deleted</strong> it - it changed nothing measurable, and\non this very case it would have made things worse by stopping the 5 from\nrecognising itself while it was mislabelled. Names are the thing that breaks in\na collision, so names cannot be what guards it.</p>\n<p>The other says a ball cannot change colour, and that one I kept, because I\ncould prove it works: instrumented at the exact frame, it correctly refuses the\nwhite ball and holds the 5 on the orange one. It does not fix this shot yet\nbecause the cue's own track reaches the orange ball first, and the guard\ndeliberately stays out of the way of balls in flight. Widening it is the next\njob.</p>\n\n<h3>Where both clips stand</h3>\n<pre>\n                     pinned session      new clip\nshots found              10 of 10        9 of 9\nmakes and misses         10 of 10        8 of 9\npots to right ball         4 of 4        4 of 5\n</pre>\n<p>Unchanged from yesterday. A day that moves no number but replaces a wrong\nexplanation with a correct one is still worth having - the last two rounds were\nboth fixing the wrong thing.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li></ul>"
+  },
+  {
    "id": 96,
    "ts": "2026-08-30T07:38:28",
    "date": "Aug 30, 03:38 AM EDT",
@@ -1013,16 +1029,6 @@
    "title": "Miss verdicts now come from physics",
    "score": "",
    "body": "Every clip's miss side is now read off a physics fit of the ball's whole path \u2014 the method that got both hand-verified shots right, including one the old approach called confidently wrong. Trusted misses grew 33 \u2192 38 and the table updated.\nThe old approach judged direction from a few samples near the pocket, which a rattle could fool \u2014 your 4-ball shot and one other verified clip proved it. The new approach fits straight rolling legs to every observation of the ball and reads the verdict off the fit, with its own error bar deciding when to trust it.\nYour grading queue (Uncategorized) still works exactly the same \u2014 and every verdict you enter keeps training the system's honesty checks.",
-   "images": []
-  },
-  {
-   "id": 17,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Tap a stats line to grade those clips",
-   "score": "",
-   "body": "Every miss subgenre in Lifetime Stats \u2014 including Uncategorized \u2014 is now a playlist. Tap it, watch the clips, and set Cut/Missed in each shot's Details. Grading an Uncategorized miss moves it into its subgenre and sharpens the table.",
    "images": []
   }
  ]
