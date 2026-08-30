@@ -362,3 +362,70 @@ class TestSpeedAcrossALabelHop:
                    for a, b in zip(pts, pts[1:]) if a[3] == b[3])
         assert same < 1.0, (
             "a still cue accumulated travel across a track switch")
+
+
+class TestTheCueGoesFirst:
+    """A stroke is the cue ball arriving; setup is balls moving on their own.
+
+    Round 51. The bench's 13.1s-20.4s episode is Joe placing the 3, the 4
+    and the 9 by hand and only touching the cue six seconds later. It was
+    scored a STROKE because it cleared the cue speed bars - the hand
+    context that should have caught it cannot, because a ball being
+    CARRIED is hidden by the hand carrying it, so it has no track for
+    _carried_ids to mark. Measured over the whole bench the ordering
+    separates cleanly: all ten real strokes lead with the cue by
+    0.07-0.43s; this one trails by 2.90s.
+    """
+
+    def _run(self, seq):
+        from billiards_trainer.measure.shots import analyze
+        times = [t for t, _ in seq]
+        frames = [[(i, x, y, 12.0, n, "solid", True, False)
+                   for (i, x, y, n) in rows] for _, rows in seq]
+        return analyze(times, frames, pockets=[(0.0, 0.0), (600.0, 1200.0)],
+                       pocket_r=25.0)
+
+    def test_a_stroke_leads_with_the_cue(self):
+        seq, t = [], 0.0
+        for _ in range(20):                       # both at rest
+            seq.append((t, [(1, 100.0, 100.0, 0), (2, 400.0, 400.0, 5)]))
+            t += 1 / 30
+        for k in range(20):                       # cue sets off alone
+            seq.append((t, [(1, 100.0 + k * 15, 100.0 + k * 15, 0),
+                            (2, 400.0, 400.0, 5)]))
+            t += 1 / 30
+        for k in range(20):                       # then the object ball
+            seq.append((t, [(1, 400.0, 400.0, 0),
+                            (2, 400.0 + k * 15, 400.0 + k * 15, 5)]))
+            t += 1 / 30
+        for _ in range(30):
+            seq.append((t, [(1, 400.0, 400.0, 0), (2, 685.0, 685.0, 5)]))
+            t += 1 / 30
+        eps = [e for e in self._run(seq) if e.cue_moved]
+        assert eps, "the cue moved; an episode must exist"
+        assert eps[0].cue_lag is not None and eps[0].cue_lag < 0, (
+            "a real stroke must show the cue moving first")
+
+    def test_hand_setup_moves_the_object_ball_first(self):
+        seq, t = [], 0.0
+        for _ in range(20):
+            seq.append((t, [(1, 100.0, 100.0, 0), (2, 400.0, 400.0, 5)]))
+            t += 1 / 30
+        for k in range(20):                       # a ball is carried away
+            seq.append((t, [(1, 100.0, 100.0, 0),
+                            (2, 400.0 + k * 15, 400.0, 5)]))
+            t += 1 / 30
+        for _ in range(12):                       # set down, briefly
+            seq.append((t, [(1, 100.0, 100.0, 0), (2, 685.0, 400.0, 5)]))
+            t += 1 / 30
+        for k in range(20):                       # only NOW the cue is moved
+            seq.append((t, [(1, 100.0 + k * 15, 100.0, 0),
+                            (2, 685.0, 400.0, 5)]))
+            t += 1 / 30
+        for _ in range(30):
+            seq.append((t, [(1, 385.0, 100.0, 0), (2, 685.0, 400.0, 5)]))
+            t += 1 / 30
+        eps = [e for e in self._run(seq) if e.cue_moved and e.movers - {0}]
+        assert eps, "the fixture must produce an episode with both balls"
+        assert eps[0].cue_lag is not None and eps[0].cue_lag > 0.25, (
+            "the cue trailed the object ball; this is hand setup, not a stroke")

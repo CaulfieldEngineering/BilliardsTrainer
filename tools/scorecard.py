@@ -156,8 +156,7 @@ def score(truth_path: Path) -> dict:
     logging.disable(logging.CRITICAL)
     from billiards_trainer.config import Settings
     from billiards_trainer.measure.engine import _acquire_calib
-    from billiards_trainer.measure.shots import (MIN_CUE_PEAK,
-                                             MIN_CUE_TRAVEL, analyze)
+    from billiards_trainer.measure.shots import analyze, is_stroke
     from billiards_trainer.vision.analysis_cache import SidecarReader
     from billiards_trainer.vision.pipeline import Pipeline
 
@@ -203,12 +202,14 @@ def score(truth_path: Path) -> dict:
     for i, e in enumerate(eps):
         if i in used:
             continue
-        if (getattr(e, "setup", False) or not getattr(e, "cue_moved", True)
-                or getattr(e, "cue_travel", 999.0) < MIN_CUE_TRAVEL
-                or getattr(e, "cue_peak", 9e9) < MIN_CUE_PEAK):
+        if not is_stroke(e):
             # hand-work, or table motion with no cue ball involved: not a
             # stroke by definition (round 16 - every real stroke on the
-            # bench moves the cue; tossed-in balls do not)
+            # bench moves the cue; tossed-in balls do not). THE SAME
+            # function the engine classifies with, not a copy of it -
+            # this test had drifted and was still failing the bench for a
+            # fake stroke the engine had already stopped emitting
+            # (round 51).
             setup_labelled += 1
             continue
         if any(a <= e.t_strike <= b for a, b, *_ in setup):

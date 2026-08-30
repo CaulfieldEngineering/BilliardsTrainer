@@ -29,7 +29,14 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 19  # v19: the rect radius was measured between two
+ENGINE_RULES_V = 20  # v20: a stroke requires the CUE to move FIRST -
+                     # nothing on the table moves until the cue reaches
+                     # it - which separates hand setup from shooting
+                     # without needing to see the hand. Bench: all 10
+                     # real strokes lead by 0.07-0.43s, the hand setup
+                     # trails by 2.90s. Plus ONE copy of that judgement,
+                     # shared by the engine and the scorecard.
+                     # v19: the rect radius was measured between two
                      # different coordinate frames (parallax applied to
                      # the centre, not to the offset point it is measured
                      # against), so a real ball in plain sight could fall
@@ -133,17 +140,14 @@ def _write_shots(writer, times, frames, carried, calib) -> int:
     hand-placed 213 px/s vs 691+ for every real stroke)."""
     from types import SimpleNamespace
 
-    from .shots import MIN_CUE_PEAK, MIN_CUE_TRAVEL, analyze
+    from .shots import analyze, is_stroke
     if not times:
         return 0
     eps = analyze(times, frames,
                   pockets=[(p.x, p.y) for p in calib.table.pockets],
                   pocket_r=float(calib.table.pocket_radius),
                   carried=carried)
-    def _struck(e) -> bool:
-        return (not e.setup and e.cue_moved
-                and e.cue_travel >= MIN_CUE_TRAVEL
-                and e.cue_peak >= MIN_CUE_PEAK)
+    _struck = is_stroke      # ONE copy of the rule; see shots.is_stroke
 
     # TABLE CHANGE (Joe, 2026-08-31: "I don't think we need to separate
     # out rearranging as discrete events. Perhaps we can add a post

@@ -2678,3 +2678,45 @@ Rounds continue with Joe's visual feedback as the gate.
   swallowed by the bare except would look exactly like this) and LOOK at
   what the mask selects at 15.2s. Do NOT loosen the speed bars - they
   are measured and correct (strokes 691-2974, hand placement 213).
+
+- 2026-08-30 ~04:00 EDT - ROUND 51: *** PHASE 1 MET ON ITS TARGET DATE.
+  THE BENCH IS PERFECT *** (rules_v 19 -> 20).
+    strokes 10/10  outcomes 10/10  fake 0  unexplained 0
+    cue named 99.9%  moving named 98.8%  named correctly 99.6%
+    of ALL 1096 pixel-truth checks 99.0%  invented none  pots 4/4
+    physics gate 0.18/1k (limit 0.55)  engine 329s / 21.7 fps
+  THE LAST FAULT was the 13.1s hand setup scored as a stroke. TWO of my
+  round-50 claims about it were WRONG and are corrected here:
+    (a) "ff goes None from 16.01, a mask failure" - NO. _foreign_state
+        recomputes every 3rd frame and returns its cache otherwise; I
+        sampled every 15th frame and 15 %% 3 == 0, so I always landed on
+        a non-compute frame. My own sampling artifact.
+    (b) "the hand detector cannot see a hand" - OVERSTATED. foreign.py
+        documents a reaching arm at 2-6%%; it measures 0.021-0.036 here
+        against a 0.004 empty-table floor. It sees the arm fine.
+  THE REAL DEFECT is a catch-22 in _carried_ids: a ball being CARRIED is
+  hidden by the hand carrying it, so it has no track, and that function
+  can only mark a ball that is BOTH tracked AND touching the blob. On
+  the very frames where the arm reads 0.032, `carried` is empty - 14.5%%
+  of samples against CARRIED_SETUP's 50%% bar, unreachable by
+  construction.
+  FIX - physics instead of perception: THE CUE GOES FIRST. Nothing on
+  the table moves until the cue ball reaches it. Measured over the whole
+  bench: all 10 real strokes lead by 0.07-0.43s; the hand setup TRAILS
+  by 2.90s. CUE_LEAD_TOL = 0.25s sits ten times inside that gap. Pinned
+  by TestTheCueGoesFirst (2 tests).
+  AND THEN THE FIX WORKED WHILE THE GATE KEPT FAILING IT: the engine's
+  shot list came back correct (12 entries, the setup absorbed into a
+  Table change) and tools/scorecard.py still reported fake=1, because it
+  carried its OWN inline copy of the stroke test that had never heard of
+  cue_lag. A gate judging by different rules than the product is not a
+  gate. There is now ONE shots.is_stroke() that the engine and the
+  scorecard both call (L1) - deleted the duplicate.
+  VISION-CORROBORATED: rendered 13.11-20.44 as the phone draws it - Joe
+  leaning across the cloth, walking round, trails zigzagging rail to
+  rail - and the engine now calls it a Table change. Agreed.
+  SCOPE, stated plainly: this is ONE clip, the one tuned against for
+  weeks. It is not evidence of general reliability. P2 is a COLD clip
+  scored blind, and it is blocked on the colour-refs reproducibility gap
+  (APP_DIR/colour_refs.json rebuilt from gitignored _train). That is
+  next, and the bench-tuned numbers are NOT expected to hold.

@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 93,
+   "ts": "2026-08-30T06:07:50",
+   "date": "Aug 30, 02:07 AM EDT",
+   "kind": "milestone",
+   "title": "The pinned session is perfect",
+   "score": "10/10 shots, 10/10 makes and misses, 4/4 pots to the right ball, nothing invented - and the last fault fell to physics, not a better hand detector",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/093-strip_13_11.png",
+     "caption": "The last fault: at 13s you are placing balls by hand. The app now calls this a Table change instead of a shot - because you touched the cue ball 2.9 seconds AFTER the object balls moved, and nothing on a table moves before the cue reaches it."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>The pinned session is now completely correct. Every shot found, every\nmake and miss right, every ball named, nothing invented, and the two setups\nwhere you were moving balls by hand are labelled as setups instead of shots.</strong></p>\n\n<pre>\nshots found            10 of 10        makes and misses      10 of 10\npots credited to the\n   right ball             4 of 4       invented balls           none\ncue ball named          99.9%          object balls named      99.6%\ncounting every moment,\n   including blind        99.0%        impossible physics    0.18/1000\n</pre>\n\n<h3>The last fault, and how it fell</h3>\n<p>The one thing left was the 13-second setup being scored as a shot. The app was\nmeant to catch that by seeing your hand over the table, and I spent a while\nconvinced the hand-detector was blind. It is not - I was wrong about that, and\nabout a second thing too, and both corrections are worth stating.</p>\n<p>The detector DOES see your arm: about 2-3% of the table covered, against 0.4%\nfor an empty table. What it cannot do is connect the arm to a ball, and the\nreason is almost funny: <strong>a ball being carried is hidden by the hand\ncarrying it.</strong> So it has no position for the app to follow, so there is\nnothing for the app to mark as \"in a hand\". It was looking for a ball that by\ndefinition it could not see.</p>\n<p>So I stopped trying to see the hand and used something the app can always\nmeasure: <strong>nothing on a pool table moves until the cue ball gets\nthere.</strong> Across your whole session that splits the cases cleanly:</p>\n<pre>\nall ten real shots     the cue moves FIRST, by 0.07 to 0.43 seconds\nthe 13s setup          the cue moves LAST, 2.90 seconds behind\n</pre>\n<p>You placed the 3, the 4 and the 9 by hand and only touched the cue ball six\nseconds later. No shot works that way. A ten-to-one margin, no hand detection\nneeded.</p>\n\n<h3>The fix worked and the scoreboard kept failing it</h3>\n<p>Worth admitting: after that change the app's own shot list was correct - the\nsetup properly labelled a Table change - and my scoring report went on saying\n\"1 fake shot\". The report had its own private copy of the \"what counts as a\nshot\" rule, written months earlier, which had never been told about the new\ntest. So the thing that judges the work was judging by different rules than the\nwork itself. There is now one copy that both use.</p>\n\n<h3>What this does and does not mean</h3>\n<p>This is one clip - the one I have been grinding on for weeks. It is now\nclean, which means the rules are right for this table, this light, this session.\nIt is <em>not</em> proof the engine is reliable in general. The next test is a\nclip I have never tuned against, scored blind, and I expect it to find things.\nThat is the point of it.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li></ul>"
+  },
+  {
    "id": 92,
    "ts": "2026-08-30T05:45:23",
    "date": "Aug 30, 01:45 AM EDT",
@@ -989,16 +1005,6 @@
    "title": "Lifetime Stats \u2014 and your verdicts now count",
    "score": "",
    "body": "New on the home screen: Lifetime Stats, a tight table of your misses \u2014 Cut Left/Straight/Right against Missed Left/Right. And in any shot's Details you can now set Cut and Missed yourself; your word overrides the machine and feeds the table.\nOnly trusted verdicts are counted: shots the analysis saw clearly, plus anything you've corrected by hand. Shots where the ball was lost stay out of the table rather than polluting it.\nYour corrections do double duty: they fix the record, and they become the ground truth that validates the physics-fit work \u2014 every verdict you enter makes the automatic tagging measurably better.",
-   "images": []
-  },
-  {
-   "id": 13,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "Player restored",
-   "score": "",
-   "body": "The chrome-free player experiment is rolled back \u2014 the clips screen is exactly as it was. The Instagram-style redesign is shelved for another day.",
    "images": []
   }
  ]

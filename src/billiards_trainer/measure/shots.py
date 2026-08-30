@@ -58,6 +58,11 @@ class Episode:
     cue_peak: float = 0.0        # px/s, the cue ball's fastest step here -
                                  # a struck ball reaches 691+ on the bench,
                                  # a hand-rolled one 213 (round 35)
+    cue_lag: float | None = None  # seconds between the cue ball's first
+                                  # motion and the first OBJECT ball's.
+                                  # Negative = the cue went first, which is
+                                  # what a stroke IS. None when the episode
+                                  # has no object mover to compare against.
     cue_moved: bool = False      # the cue ball moved: the definition of a
                                  # stroke. Measured on the bench (round 16):
                                  # all 10 real strokes have it, and the
@@ -131,6 +136,55 @@ MIN_CUE_PEAK = 400.0     # px/s: below this the cue was MOVED, not struck.
                          # The bar sits in the empty middle of that gap.
 CARRIED_SETUP = 0.5      # this share of moving samples hand-adjacent =
                          # the hand moved the balls, not a cue
+CUE_LEAD_TOL = 0.25      # s: the cue may start this much AFTER the first
+                         # object ball and still be a stroke.
+                         # THE CUE GOES FIRST. That is what a stroke IS -
+                         # nothing else on the table can move until the
+                         # cue ball reaches it - and it separates hand
+                         # setup from shooting without needing to see the
+                         # hand at all. Measured over the whole bench:
+                         #   all 10 real strokes   cue leads by 0.07-0.43s
+                         #   the 13.1s hand setup  cue TRAILS by 2.90s
+                         # Joe placed the 3, the 4 and the 9 by hand and
+                         # only touched the cue six seconds later, so the
+                         # episode was scored a stroke on cue speed alone.
+                         # The tolerance covers a cue whose first sighting
+                         # is lost in the strike blur; it is ten times
+                         # smaller than the gap it has to reject.
+                         #
+                         # This replaces nothing - it is the discriminator
+                         # foreign.py was built for ("a stroke puts the
+                         # arm over the felt for a moment and withdraws")
+                         # and could never deliver: a ball being CARRIED
+                         # is hidden by the hand carrying it, so it has no
+                         # track, so _carried_ids - which can only mark a
+                         # ball that is both TRACKED and touching the
+                         # blob - finds nothing. Measured on this episode:
+                         # the arm is plainly detected (foreign fraction
+                         # 0.021-0.036 against a 0.004 empty-table floor)
+                         # and `carried` is EMPTY on those very frames,
+                         # so only 14.5% of samples ever read hand-driven
+                         # against CARRIED_SETUP's 50% bar.
+
+
+def is_stroke(ep) -> bool:
+    """Was this episode a STROKE, or someone moving balls about?
+
+    THE ONLY COPY of that judgement (round 51). It lived twice - once in
+    measure/engine._write_shots, which decides what Joe sees on his
+    phone, and once inline in tools/scorecard.py, which decides whether
+    the bench passes. They drifted, and the drift hid a fix: the
+    cue-goes-first rule cleared the bench's last fake stroke out of the
+    shot list, and the scorecard went on reporting it because its copy
+    had never heard of `cue_lag`. A gate that judges by different rules
+    than the product is not a gate (ARCHITECTURE L1).
+    """
+    return bool(
+        not ep.setup
+        and ep.cue_moved
+        and ep.cue_travel >= MIN_CUE_TRAVEL
+        and ep.cue_peak >= MIN_CUE_PEAK
+        and (ep.cue_lag is None or ep.cue_lag <= CUE_LEAD_TOL))
 
 
 def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
@@ -197,6 +251,17 @@ def analyze(times, frames, pockets=None, pocket_r: float = 40.0,
         _judge(ep, by_n, moving_ts, t_open, t_close, pockets, pocket_r,
                unnamed_pots)
         ep.cue_moved = 0 in ep.movers
+        # WHO MOVED FIRST (see CUE_LEAD_TOL). Only NAMED object balls
+        # count: an unnamed mover is as likely to be the arm itself, and
+        # blaming the cue for arriving after a blob would be circular.
+        def _first(n):
+            got = [t for t in moving_ts.get(n, []) if t_open <= t <= t_close]
+            return min(got) if got else None
+        _cue_t = _first(0)
+        _obj_t = [t for t in (_first(n) for n in ep.movers if n > 0)
+                  if t is not None]
+        ep.cue_lag = (_cue_t - min(_obj_t)
+                      if _cue_t is not None and _obj_t else None)
         # HOW FAR the cue actually went. Measured on the bench (round 16):
         # real strokes move it 263px at minimum, while addressing the ball
         # or pushing it with the stick registers 8-29px. Joe nudges the cue

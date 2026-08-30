@@ -45,11 +45,11 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T05:44Z
+    written        2026-08-30T06:07Z
     bench          session-20260824-220247.mp4
-    engine rules_v 19
-    measured       2026-08-30T05:41Z
-    shot list      13 entries (11 strokes, 4 makes)
+    engine rules_v 20
+    measured       2026-08-30T06:06Z
+    shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
 gate of record. This block exists so a session picking up the
@@ -57,45 +57,37 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 50
+### NEXT TARGETS (top first) — round 51
 
-0. *** THE HAND DETECTOR CANNOT SEE A HAND *** - the last bench failure
-   (fake strokes 1/10) and the only thing between here and a perfect
-   bench. The 13.1s-20.4s episode is Joe setting up by hand: VISION
-   CONFIRMED - he is leaning right across the bed, arm over the cloth,
-   walking round the table, and the trails are zigzags to and from the
-   rails (balls carried and placed, not rolled). It is scored a STROKE.
-   `setup` is decided by hand context, and the hand context is blind.
-   MEASURED foreign fraction (pipeline._foreign_state):
-       Joe's arm across the bed, 15.2-17.3s      0.021
-       empty table, nobody near it, 40.0s        0.008
-       a real stroke, 100.0s                     0.022
-   A whole forearm over the cloth reads the SAME as an empty table, and
-   LOWER than a normal stroke. CARRIED_SETUP wants >=50% of moving
-   samples hand-adjacent; it can never get there. The engine's own
-   sidecar agrees: ff is 0.012-0.033 through 13.5-15.5 and then None
-   from 16.01 - it stops recording foreign state entirely, mid-setup.
-   DO: fix the DETECTOR, not the thresholds. Two things to establish
-   first, both cheap: (a) why ff goes None from 16.01 - a mask failure
-   swallowed by the bare `except` in prepare_detections would look
-   exactly like this; (b) render the mask over the frame at 15.2s and
-   LOOK at what it is actually selecting (tools already write
-   foreign_*.png). Only then touch CARRIED_SETUP.
-   NOT the speed bars: they are measured and correct (real strokes peak
-   691-2974, hand placement 213). Round 49 already removed the label-hop
-   inflation; the residual 2920 px/s at 13.1s is a leap WITHIN one
-   track, i.e. the cue's track grabbing a different blob ~97px away
-   during the setup scramble - which the hand context is supposed to
-   make irrelevant.
+*** PHASE 1 MET, 2026-08-30 (its target date). THE BENCH IS PERFECT. ***
+    strokes 10/10   outcomes 10/10   fake 0   unexplained 0
+    cue named 99.9%   moving named 98.8%   named correctly 99.6%
+    of ALL 1096 pixel-truth checks 99.0%   invented none   pots 4/4
+    physics gate 0.18 per 1k (limit 0.55)   engine rules_v 20
+    Vision-corroborated every round; the 13.1s setup Joe was seen
+    placing balls in is now a Table change, and the 208.0s rattle is
+    correctly no-pot.
+    THIS IS ONE CLIP. It is the pinned session and it is now clean; it
+    is NOT evidence the engine is reliable in general. P2 is a COLD
+    clip - one never tuned against - and everything below serves that.
+
+0. P2 COLD CLIP - the real test, and it is blocked on reproducibility.
+   APP_DIR/colour_refs.json is regenerated from _train, which is
+   gitignored, so a fresh clone cannot rebuild the measured colour
+   references the naming depends on. Fix that FIRST (docs/colour_refs.json
+   is the version of record; tools/build_colour_refs.py --install
+   places it), then run a clip that has never been looked at and score
+   it blind. Expect the bench-tuned numbers NOT to hold - that gap is
+   the finding.
 
 1. THE REMAINING 7 BLIND CHECKS: ball 3 x6 at 126-131s, ball 1 x1 at
-   158s. Render them with tools/show_missing.py and split
-   genuinely-occluded from in-plain-sight before theorising. (Round 49
-   took this from 88 to 7; the 81 that went were one projection bug.)
+   158s (down from 88 in round 49). Render them with
+   tools/show_missing.py and split genuinely-occluded from
+   in-plain-sight before theorising.
 
 2. PUT BOTH NAMING FIGURES IN THE PHONE'S STATUS VIEW - the sighting
-   figure (99.6%) and the honest one that counts blind as failure
-   (99.0% of all 1096 checks). The first RISES as tracking gets worse.
+   figure (99.6%) and the honest one counting blind as failure (99.0%).
+   The first RISES as tracking gets worse; Joe should see both.
 
 3. RECOVERED DETECTIONS LOSE THEIR NAME. blur_recovery emits an
    UNNUMBERED detection stamped `recovered_for=<track id>` and
@@ -106,26 +98,39 @@ queue cannot be told something the measurements disagree with.
 4. _locate IS ~37% OF ENGINE WALL TIME (round 48). Window clips to 520
    so the crop is ~1040x1040 and the median runs over 15 of them.
    Caching helped (287ms -> ~178ms); shrink the window or search at half
-   resolution as sweep() does.
+   resolution as sweep() does. Engine is 21.7 fps against a 24 baseline.
 
 5. THE BENCH IS EASY. Recovery finds nothing here because the clip is
    well lit; it was built for session-20260820-005048-recovered @233.
    Now that measured colour reaches the offline tracker (round 48),
    re-run that clip - recovery could never fire there before.
 
-6. P2 COLD CLIP blocked on colour-refs reproducibility:
-   APP_DIR/colour_refs.json is rebuilt from _train, which is gitignored.
-
-7. tools/rebuild_batch.py still drives an OLD build() path and tests
+6. tools/rebuild_batch.py still drives an OLD build() path and tests
    staleness by timestamp; must drive measure/job.run and compare
-   ENGINE_RULES_V before being pointed at the library.
+   ENGINE_RULES_V before being pointed at the library. Joe's "clean and
+   reproducible way of updating reprocessed clips" is not done until
+   this lands - and with rules_v now 20, every clip in the library is
+   stale.
 
-8. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
-   independently of shots.analyze. One opinion per fact (L1).
+7. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
+   independently of shots.analyze. One opinion per fact (L1) - round 51
+   found the same class of bug in the scorecard, where a private copy
+   of the stroke test kept failing the bench for a fault the engine had
+   already fixed. Look for the remaining duplicates.
 
-9. DELETE vision/tracking.py (716 lines) after migrating its case law out
+8. DELETE vision/tracking.py (716 lines) after migrating its case law out
    of 4 test files; also vision/identity.py's `_Internal` import,
    tools/eval_tracking.py, and the MeasurementCore shadow scaffolding.
+
+9. CARRIED_SETUP / _carried_ids IS STRUCTURALLY DEAD and should probably
+   be deleted. A ball being CARRIED is hidden by the hand carrying it,
+   so it has no track, so _carried_ids - which marks only a ball that is
+   both TRACKED and touching a foreign blob - cannot see the case it was
+   written for. Measured round 51: the arm is plainly detected (0.021 to
+   0.036 against a 0.004 empty-table floor) while `carried` is EMPTY on
+   those same frames; 14.5% of samples against a 50% bar. The
+   cue-goes-first rule now does this job on physics alone. Do not delete
+   until P2 confirms the replacement holds on a cold clip.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on
