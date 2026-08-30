@@ -2922,3 +2922,35 @@ Rounds continue with Joe's visual feedback as the gate.
   named 95.3% against a 99 target. Both are naming, both plausibly the
   same root: this clip has a fuller rack WITH STRIPES that the bench
   never had, so stripe/solid confusion has never been under measurement.
+
+- 2026-08-30 ~11:00 EDT - ROUND 58: THE COLD CLIP'S TRUTH FILE WAS
+  WRONG, and one plausible fix was measured and REVERTED. No engine
+  change shipped; both clips end exactly where they started (bench 10/10
+  10/10 0 fake 4/4 named 99.6% all-checks 99.0% gate 0.18; cold 9/9 9/9
+  0 fake 5/5 gate 0.37).
+  THE YARDSTICK: docs/cold_truth_20260823-185550.json listed EIGHT balls
+  for a table holding TEN. Colour census over ~60 moments plus zoomed
+  crops of every disputed ball: the "7" is a real burgundy solid sitting
+  motionless all clip (number circle visible, clearly darker than the
+  3), and the ball called 9/13 is a single ORANGE STRIPE - so the "13"
+  reads were the CORRECT ones. `invented numbers` fell from [7,9,13]
+  over 10009 frames to [9] over 4270: 5739 frames were the engine naming
+  a ball correctly while my file called it invented. Same failure class
+  as round 25 on the bench; the file now records how each ball was
+  identified.
+  THE REAL DEFECT, now precisely stated: THE ENGINE HAS NO WORKING
+  NOTION OF STRIPES, and it has never been under measurement because the
+  bench has six solids and none. The orange stripe's white-pixel
+  fraction is 0.27 against 0.00-0.11 for every solid on that table.
+  TRIED AND REVERTED: refuse an identifier number whose class
+  contradicts the FINDER's solid/stripe class. Measured over 900 cold
+  frames the two agree 6357 times and contradict 1727, nearly all a gold
+  SOLID called "9" - and the scorecard killed it on the BENCH, whose 9
+  is a yellow STRIPE that reads SOLID to the finder: named 99.6% ->
+  76.8%, outcomes 10/10 -> 8/10, pots 4/4 -> 2/4, invented [] -> [5,11].
+  The finder's class is a GUESS about stripes, not a measurement - which
+  is why _fix_stripe_bit, which reads the actual band, exists. Numbers
+  kept in tracker/ensemble/tests as case law.
+  NEXT: measure what _fix_stripe_bit reports for each ball on the cold
+  clip. It was tuned on the bench's single YELLOW stripe (rounds 27/29)
+  and has never seen an orange one.

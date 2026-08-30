@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 100,
+   "ts": "2026-08-30T10:16:45",
+   "date": "Aug 30, 06:16 AM EDT",
+   "kind": "finding",
+   "title": "Most of those invented balls were my mistake",
+   "score": "The reference file listed 8 balls on a table holding 10; and a plausible fix for the rest was measured and thrown away",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/100-cold_nine.png",
+     "caption": "The ball I had wrong. It is an ORANGE striped ball - an orange band on white - photographed at four different moments. I recorded it as a yellow 9, so the app was marked wrong every time it read the stripe correctly."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Today I found that most of what I have been calling the app's\nmistakes on the new clip were mine. And I tried a fix for the rest, measured it,\nand threw it away.</strong></p>\n\n<h3>I had the balls wrong</h3>\n<p>When I wrote up the new clip as a reference session I listed eight balls on\nthe table. There are ten. I missed a dark burgundy ball sitting still in the\nsame spot the whole time, and I mistook an ORANGE striped ball for a yellow\none.</p>\n<p>That mattered, because the app was being marked wrong for naming both of\nthem correctly. Of the roughly 10,000 frames where I said it was inventing balls\nthat do not exist, <strong>5,739 were the app being right and my notes being\nwrong</strong>. The honest figure is about 4,270 frames, all of them one real\nmistake: the orange striped ball gets called the 9, which is the YELLOW stripe.</p>\n<p>I rewrote the reference file, including how each ball was identified, so the\nnext person - or the next me - can check it rather than trust it.</p>\n\n<h3>The real problem, now clearly stated</h3>\n<p>The app has no working idea of stripes on that table. Your pinned session has\nsix solid balls and no stripes at all, so this has never once been tested. On\nthe new clip the striped ball is unmistakable in the pixels - about a quarter of\nits surface is white, against almost none for every solid - and the app still\ncalls it a solid ball's neighbour.</p>\n\n<h3>The fix I threw away</h3>\n<p>The obvious move: the app's finder already judges whether a ball is solid or\nstriped, and its numbering model already implies one, so when they disagree,\nbelieve the picture. The numbers looked convincing - over 900 frames they agree\n6,357 times and disagree 1,727, almost all of it that one ball.</p>\n<p>I measured it and it was a disaster, on your PINNED session:</p>\n<pre>\nnaming        99.6%  ->  76.8%\nmakes/misses  10/10  ->   8/10\npots            4/4  ->    2/4\n</pre>\n<p>Your bench 9-ball is a yellow STRIPE whose body looks solid to the finder, so\nthe rule threw away a correct name and undid one of the hardest fixes in this\nwhole campaign. Reverted, with the numbers written into the code so nobody tries\nit again.</p>\n<p>Both clips are back exactly where they were this morning. A round that ships\nnothing but a corrected measuring stick and one properly-buried idea is still a\nround worth having - the alternative was shipping that regression.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li><li>Round 51: PHASE 1 MET - the bench is perfect (rules_v 20)</li><li>Round 50: a track came back from the dead after 154 seconds</li><li>Round 49: a real ball discarded by 0.22px for 82 seconds (rules_v 19)</li><li>Round 48: the offline path never measured ball colour (rules_v 18)</li><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li></ul>"
+  },
+  {
    "id": 99,
    "ts": "2026-08-30T09:43:43",
    "date": "Aug 30, 05:43 AM EDT",
@@ -1031,16 +1047,6 @@
    "title": "Fixed the laggy mouse and keyboard",
    "score": "",
    "body": "The AI was hogging the graphics chip \u2014 the same chip Windows uses to draw your cursor and keystrokes, which is why typing felt broken whenever the app ran. Ball detection now runs on the CPU instead: your desktop got its graphics chip back (app's share: 69% \u2192 0%), and detection barely slows down.\nRoot cause: DirectML inference saturated the Radeon 780M's 3D engine at ~30 inferences/sec. On an integrated GPU that's the exact engine the Windows compositor needs for the cursor, and GPU engines have no preemptive priority \u2014 which is why every process/thread priority fix failed to help.\nMeasured before choosing: CPU at 4 threads does a full tiled detection in 88ms (~11/sec) vs ~15/sec on the GPU. Detections verified identical between the two (6/6 balls matched within 2px, same numbers).\nIt's a setting (detection.inference_provider: auto/gpu/cpu), so a future camera-PC or GPU upgrade flips it back with one word. The CPU session is capped at 4 threads and the app runs below-normal priority, so your input always preempts it.",
-   "images": []
-  },
-  {
-   "id": 20,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "31 more misses solved \u2014 backlog down to 62",
-   "score": "",
-   "body": "A smarter read of rattle-heavy shots (judging only the ball's initial run, not the chaos after it hits the jaws) solved 31 more misses. Trusted verdicts: 116 \u2192 147. Uncategorized: 93 \u2192 62.\nA measurement pass showed most stuck shots weren't missing data \u2014 they were fully observed but their paths bend too much (rattles, rebounds) for a whole-journey fit. The verdict only ever needed the first straight run from contact, so that's what gets judged now, under an even stricter straightness bar.\nOf the 62 remaining: 39 were never captured at all (the shutter-speed change will prevent these going forward), 21 are genuinely too messy to trust, 2 pointed at no pocket. All stay in your grading playlist rather than being guessed.\nYour categorized misses now split about even left/right overall \u2014 with 'cut right, missed right' (overcut) still the single biggest bucket at 28.",
    "images": []
   }
  ]

@@ -111,6 +111,17 @@ def _pair_identities(found, ident_by_pos, frame_bgr=None) -> None:
         # collected the name "1" whenever the real 1 left the table. The
         # heuristic is also where the invented numbers come from (it
         # emits 8s and an 11 across this clip).
+        # TRIED AND REVERTED (round 58): refuse a number whose class
+        # contradicts the finder's solid/stripe judgement (1-7 solid,
+        # 9-15 stripe). It looked well-founded - measured over 900 cold
+        # frames the two agree 6357 times and contradict 1727, almost
+        # all of it a gold SOLID called "9" - and the scorecard threw it
+        # out at once: the BENCH's 9 is a yellow STRIPE whose body reads
+        # SOLID to the finder, so the rule vetoed the correct name and
+        # took naming 99.6% -> 76.8%, outcomes 10/10 -> 8/10, pots
+        # 4/4 -> 2/4. The finder's class is not evidence about
+        # stripes; it is a guess about them, and round 33 already bought
+        # the 9's name the hard way.
         if num >= 0:
             d.number = num
             if frame_bgr is not None:

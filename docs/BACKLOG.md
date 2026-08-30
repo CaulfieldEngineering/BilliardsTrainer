@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T09:43Z
+    written        2026-08-30T10:16Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T09:41Z
+    measured       2026-08-30T10:15Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,51 +57,58 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 57
+### NEXT TARGETS (top first) — round 58
 
-*** BOTH CLIPS NOW SCORE PERFECTLY AT SHOT LEVEL ***
-                          bench          cold clip
-    strokes found         10/10          9/9
-    outcomes right        10/10          9/9
-    pots to right ball      4/4          5/5
-    fake strokes              0            0
-    unexplained               0            0
-    Every one of the cold clip's ten entries matches what was WATCHED.
-    P2 is met for shot detection, windowing, outcome and attribution on
-    a clip the engine was never tuned against.
+*** THE COLD CLIP'S BALL LIST WAS WRONG AND IS NOW FIXED ***
+    docs/cold_truth_20260823-185550.json listed EIGHT balls; the table
+    holds TEN. Corrected by colour census + zoomed visual checks, the
+    same way round 25 corrected the bench's truth. Consequence: the
+    scorecard's `invented numbers` was largely measuring THIS FILE, not
+    the engine - 5739 of 10009 "invented" frames were a real ball being
+    named correctly. Honest figure is now [9] over 4270 frames.
+    Both clips unchanged and passing: bench 10/10 10/10 4/4 named 99.6%
+    gate 0.18; cold 9/9 9/9 5/5 gate 0.37.
 
-STILL FAILING ON THE COLD CLIP, and these are now the campaign:
+0. *** THE ENGINE HAS NO WORKING NOTION OF STRIPES *** - the whole of
+    the cold clip's remaining naming problem, and it has never been
+    under measurement because the bench has six SOLIDS and no stripes.
+    Measured this round on the cold clip:
+      - the ORANGE STRIPE (a 13) is called "9" (a YELLOW stripe) in most
+        frames, and "13" in a few. Its white-pixel fraction is 0.27
+        against 0.00-0.11 for every solid on the table, so the stripe is
+        plainly visible in the pixels.
+      - the gold SOLID 1 is called "9" in 17 of 22 sampled frames.
+      - the black 8 and burgundy 7 share a dark cluster the engine
+        splits 59/46 between the two names.
+    DO NOT reach for the finder's solid/stripe class - see the rejection
+    below. The instrument that MEASURES a stripe is _fix_stripe_bit,
+    which reads the band across the ball; it was tuned on the bench's
+    single yellow stripe (round 27/29) and has never been exercised on
+    an orange one. START by measuring what it reports for each ball on
+    this clip before changing anything.
 
-0. *** INVENTED NUMBERS [7, 9, 13] - 10009 frames *** This table holds
-    0,1,2,3,4,5,6,8. There is no 7, no 9, and 13 does not exist on any
-    table. It is the last thing standing between the cold clip and a
-    clean card, and it has already caused a wrong OUTCOME once (the
-    173.8 false pot was credited to a "9"), so it is not cosmetic.
-    This clip has a fuller rack WITH STRIPES and a black 8; the bench
-    had six solids and no stripes, so stripe/solid confusion has never
-    been under measurement. START by counting which real ball each
-    invented number sits on, per frame, using the same colour sampling
-    that solved rounds 55-57.
+    TRIED AND REJECTED THIS ROUND, with the numbers, so it is not
+    repeated: refuse an identifier number whose class contradicts the
+    FINDER's solid/stripe judgement. Well-motivated (over 900 cold
+    frames the two agree 6357 times and contradict 1727, nearly all a
+    gold SOLID called "9") and immediately fatal on the bench, whose 9
+    is a yellow STRIPE that reads SOLID to the finder:
+      named 99.6% -> 76.8%, outcomes 10/10 -> 8/10, pots 4/4 -> 2/4.
+    The finder's class is a GUESS about stripes, not a measurement.
 
-1. CUE BALL NAMED 95.3% (target 99; the bench holds 99.9). R1 does not
-    generalise. The honest metric requires the label to sit on a LIVE
-    sighting, so this is lost tracking or the name moving to another
-    blob - and with a white cue and a pale yellow 1 and a yellow-white
-    9 stripe on this table, the second is likely.
+1. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99; bench 99.9). This
+    table has a white cue, a pale gold 1 and a white-bodied orange
+    stripe, so the cue has two close neighbours the bench never had.
 
-2. THE IDENTIFIER MISLABELS BALLS MID-COLLISION (round 55): the white
-    cue read as "5", the orange 5 read as "3", both recovering a few
-    frames later. Probably the same root as item 0.
+2. A NAMING TRUTH FILE FOR THE COLD CLIP. Items 0-1 have no per-ball
+    gate without one; tools/build_naming_truth.py is bench-shaped and
+    assumes the bench's rack.
 
-3. A NAMING TRUTH FILE FOR THE COLD CLIP so per-ball naming is scored on
-    two tables instead of one. Without it items 0-2 have no gate.
+3. THE IDENTIFIER MISLABELS BALLS MID-COLLISION (round 55) - probably
+    the same root as item 0.
 
-4. COLOUR CANNOT SEPARATE GOLD FROM WHITE AT SPEED (round 56): a fast
-    ball's own colour drifts up to 88 from its resting median while gold
-    against the white cue is only 90 apart. That pair needs a different
-    signal.
-
-5. The remaining 7 blind checks on the bench; both naming figures in the
+4. Colour cannot separate gold from white at speed (round 56); the
+    remaining 7 blind checks on the bench; both naming figures in the
     phone STATUS view; recovered detections lose their name; _locate is
     ~37% of engine wall time; rebuild_batch.py still drives an OLD
     build() path (every clip in the library is stale at rules_v 20);

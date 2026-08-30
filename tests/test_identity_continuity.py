@@ -396,3 +396,27 @@ class TestABallDoesNotChangeColour:
         rows = tk.update([self._Det(118.0, 900.0, (14, 92, 233), -1)], t)
         assert any(abs(r.x - 118.0) < 8 for r in rows), (
             "the ball's own slightly-shifted detection was refused")
+
+
+# TRIED AND REVERTED (round 58) - "the appearance gets a vote": refuse an
+# identifier number whose class disagrees with the finder's solid/stripe
+# judgement (1-7 solid, 9-15 stripe, 8 the eight).
+#
+# It was well-motivated and well-measured. Over 900 frames of the cold clip
+# the finder's class agrees with the identifier in 6357 pairings and
+# contradicts it in 1727, and the contradiction is concentrated in ONE
+# place: a gold SOLID ball called "9", a stripe number, 827 times - the
+# whole of that clip's remaining invented-number problem.
+#
+# The scorecard rejected it on the first run, on the BENCH:
+#     named correctly  99.6% -> 76.8%
+#     outcomes         10/10 -> 8/10
+#     pots               4/4 -> 2/4
+#     invented            []  -> [5, 11]
+# The bench's 9 is a yellow STRIPE whose body reads SOLID to the finder, so
+# the rule vetoed the correct name and undid round 33's hardest-won result.
+#
+# THE LESSON: the finder's class is a GUESS about stripes, not a measurement
+# of one. That is precisely why _fix_stripe_bit - which reads the actual
+# band across the ball - exists. A guess cannot be promoted to a veto over
+# a trained read just because it disagrees often.

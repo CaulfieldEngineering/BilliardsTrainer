@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from ..core.balls import pool_ball_bgr, stripe_reading
+from ..core.balls import number_to_class, pool_ball_bgr, stripe_reading
 from ..core.types import BallClass
 from . import DetectorStrategy, onnx_model
 
@@ -176,6 +176,18 @@ class FindIdEnsemble(DetectorStrategy):
         f.cls = BallClass.SOLID
         f.bgr = med
         f.measured_bgr = med
+
+    # TRIED AND REVERTED (round 58) - class_contradicts(): refuse an
+    # identifier number whose class disagrees with the finder's
+    # solid/stripe judgement. Measured over 900 cold-clip frames the two
+    # agree in 6357 pairings and contradict in 1727, nearly all of it a
+    # gold SOLID called "9", so it looked like the fix for that clip's
+    # invented numbers. The scorecard rejected it immediately: the
+    # BENCH's 9 is a yellow STRIPE whose body reads SOLID to the finder,
+    # so the rule vetoed a correct name and took naming 99.6% -> 76.8%,
+    # outcomes 10/10 -> 8/10 and pots 4/4 -> 2/4. The finder's class is
+    # a GUESS about stripes, not a measurement of them - which is
+    # exactly why the stripe-band reader (_fix_stripe_bit) exists.
 
     @staticmethod
     def sample_colour(frame_bgr, f) -> None:

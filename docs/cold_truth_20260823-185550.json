@@ -1,22 +1,26 @@
 {
  "session": "session-20260823-185550.mp4",
  "established": "2026-08-30 (round 54) by Claude's own frame-by-frame watch of rectified top-down views. CORPUS CLIP #2 - the first clip written up that the engine was never tuned against.",
- "note": "GROUND TRUTH. Every entry here was read off the video by eye, never from the app's output. The app is scored against this; this file is never edited to match the app. Where the app and this file disagree, the disagreement is the finding.",
+ "revised": "2026-08-30 (round 58) - THE BALL LIST WAS WRONG. It named eight balls; the table holds ten. Corrected by a colour census over ~60 moments across the clip plus zoomed visual checks of each disputed ball, exactly as round 25 corrected the bench's truth. This mattered: the scorecard's `invented numbers` metric was largely measuring THIS FILE'S error rather than the engine's, and 5588 of the 10009 'invented' frames were a real ball being named correctly.",
+ "note": "GROUND TRUTH. Every entry here was read off the video by eye, never from the app's output. The app is scored against this; this file is never edited to match the app. Where the app and this file disagree, the disagreement is the finding - and where THIS FILE turns out to be wrong, that is the finding too.",
  "how_verified": [
   "Shot list checked against tools/motion_timeline.py, which warps each frame to the table and differences consecutive frames - it sees balls rolling independently of detection, tracking, naming and episode logic, so a stroke the engine never reported still shows up as cloth motion.",
   "Every pot verified by watching the ball leave the table in a rectified top-down strip, and by confirming it is absent from all later frames.",
-  "Every miss verified by comparing the ball inventory immediately before the stroke with the inventory after it settles."
+  "Every miss verified by comparing the ball inventory immediately before the stroke with the inventory after it settles.",
+  "BALL LIST (round 58): colour sampled under every live track at ~60 moments across the clip, clustered, plus zoomed crops of each disputed ball. A white-pixel fraction inside the crop separates STRIPES (0.27+) from solids (0.00-0.11)."
  ],
- "balls_on_table": [0, 1, 2, 3, 4, 5, 6, 8],
+ "balls_on_table": [0, 1, 2, 3, 4, 5, 6, 7, 8, 13],
  "ball_colours_observed": {
-  "0": "white cue",
-  "1": "yellow solid",
-  "2": "blue solid",
-  "3": "red solid",
-  "4": "purple solid",
-  "5": "orange solid",
-  "6": "green STRIPE",
-  "8": "black"
+  "0": "white cue - BGR (183,232,234), white fraction 0.96",
+  "1": "gold/yellow SOLID - BGR (10,161,236)",
+  "2": "blue solid - BGR (177,75,12), potted at 62.6",
+  "3": "red solid - BGR (19,0,105)",
+  "4": "purple solid - BGR (76,27,23), potted at 138.1",
+  "5": "orange solid - BGR (10,51,223), potted at 158.9",
+  "6": "green SOLID - BGR (74,99,14)",
+  "7": "burgundy/maroon solid, motionless at rect (472,276) the whole clip - visually confirmed as a dark red ball carrying a number circle, distinctly darker than the 3",
+  "8": "black, motionless at rect (155,214)",
+  "13": "ORANGE STRIPE - an orange band on white, white fraction 0.27. The engine calls this ball '9' (a YELLOW stripe) in most frames and '13' in a few; the '13' reads are the correct ones."
  },
  "strokes": [
   {"strike": 48.9, "pot": true, "ball": 1, "what": "yellow 1 potted, top-right"},
@@ -28,14 +32,18 @@
   {"strike": 138.1, "pot": true, "ball": 4,
    "what": "purple 4 potted, bottom-right, while the yellow 1 rolls on and stays on the table. The app's SENTENCE said 'potted the 1' until round 52 - the engine had credited the 4 correctly and describe.py re-derived it wrongly."},
   {"strike": 158.9, "pot": true, "ball": 5,
-   "what": "orange 5 runs down the left rail and is potted in the bottom-left. STILL SCORED A MISS by the engine as of round 54: the 5's track dies mid-flight at rect (156, 820), 8.3 pocket radii from any pocket, so the pocket-credit rule correctly refuses to score a track that vanished mid-table. The defect is the TRACKING loss, not the scoring."},
-  {"strike": 173.8, "pot": false, "what": "nothing fell"},
+   "what": "orange 5 runs down the left rail and is potted in the bottom-left. Scored a MISS until round 56: the cue ball stole the 5's track at the collision, so the pot had no ball to credit."},
+  {"strike": 173.8, "pot": false,
+   "what": "the ORANGE STRIPE runs down the long rail, reaches the bottom-right jaw, BOUNCES and comes back up the table - it is plainly on the felt seconds later. Scored a false MAKE until round 57: the track's prediction sailed through the cushion into the pocket, and its shown name flipped mid-bounce so the old name simply ended beside a pocket."},
   {"strike": 191.9, "pot": false, "what": "nothing fell"}
  ],
  "setup_windows": [
   [26.6, 37.4, "genuine rearrangement - ball positions change completely between frames; Joe repositions by hand and pushes balls with the cue stick"]
  ],
  "engine_disagreements_open": [
-  "158.9: a real pot of the orange 5 is scored 'no ball fell' because the tracker loses the ball mid-flight near the left rail. Same family as the bench's 85.1 case (fast ball, association break)."
+  "THE ORANGE STRIPE (13) IS CALLED '9' in most frames. A 9 is a YELLOW stripe; this ball is an ORANGE stripe. The engine has no working notion of stripes on this table - the bench had six solids and none, so stripe/solid confusion has never been under measurement.",
+  "The gold SOLID 1 is also called '9' in a majority of its frames.",
+  "The black 8 and the burgundy 7 are both dark and the engine splits them: one dark cluster is called 8 in 59 samples and 7 in 46.",
+  "Cue ball named 95.3% of frames against a 99 target (the bench holds 99.9)."
  ]
 }
