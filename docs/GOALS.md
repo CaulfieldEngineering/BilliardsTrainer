@@ -3246,3 +3246,41 @@ Rounds continue with Joe's visual feedback as the gate.
   excluded both as inseparable so the naming truth scores neither, and
   all 87 contradictions sit in that blind spot. The pot ORDER resolves
   them independently of colour.
+
+- 2026-08-30 ~13:15 EDT - ROUND 69: THE 3/5 BLIND SPOT IS CLOSED AND THE
+  REASON IT EXISTED WAS A CONTAMINATED SAMPLE IN MY OWN PALETTE. Round 60
+  excluded the crimson 3 and orange 5 from the cold clip's naming truth
+  as "23.3 Lab apart, inseparable". Measured properly they are 41.1 Lab
+  apart. The 23.3 was the distance between the 3 and a bad crop recorded
+  as the 5: at t=40.01 the two warm balls measure Lab [118,200,178] (the
+  3, 5 Lab from its entry) and [142,184,192] (the orange 5), and the old
+  "5" entry [107,176,173] matches NEITHER - it is not a ball colour at
+  all. FOURTH time truth-side data has been the defect (25, 58, 63, 69),
+  and this one kept a target shut for nine rounds.
+  BUILT THE METHOD ROUND 60 ASKED FOR ("a way to follow each ball that
+  does not come from the app"): the POT ORDER fixes the inventory
+  (1@48.9 2@62.6 3@121.7 4@138.1 5@158.9), so anchoring at 157.0s and
+  taking the single leftover after assigning every trusted reference
+  identifies the 5 by ELIMINATION, never by colour; then walk backward
+  in position, aborting on ambiguity. It never aborted - 157.0 -> 40.0s,
+  1756 samples, Lab [145.8,182.5,192.9] sd [2.4,1.8,0.9]. The other warm
+  ball is the 3: 44 paired samples, 44/44 each nearer its own centroid.
+  TWO METHODS FAILED FIRST, both my error not the premise's: an absolute
+  30-Lab cut admitted 3-5 balls a frame, and a leftover-by-chroma
+  heuristic gave a sample whose spread (36.6 mean, 93.7 max) exceeded
+  the separation it was meant to resolve. The anchor guard refusing an
+  unclean start is what forced the correct third attempt.
+  REBUILD IS PURELY ADDITIVE: all 925 pre-existing samples UNCHANGED,
+  plus 3:105 and 5:143 and 7 gaining 17 formerly-abstained sightings.
+  THE ENGINE WAS RIGHT IN THE BLIND SPOT: 3 scores 105/105 and 5 scores
+  139/143 with ZERO wrong, which ANSWERS round 68's open question - the
+  87 "saw 3 -> said 5" contradictions were the gates correctly
+  overriding bad reads.
+  THE YARDSTICK GOT 29% HARDER so the headline moved DOWN, and that is
+  not a regression - no engine code changed: checks 925 -> 1190, naming
+  99.9 -> 99.6%, all-checks 99.7 -> 99.4%, wrong still 1, invented 0.
+  Bench unchanged: 10/10, 10/10, 4/4, naming 99.8%, ZERO wrong.
+  VISION-CORROBORATED: the followed ball is plainly orange and the
+  leftover plainly crimson - what the shot truth already calls them -
+  and the rebuilt truth's inventory agrees with the pot order at every
+  sampled instant.

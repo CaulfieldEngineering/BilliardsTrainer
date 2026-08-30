@@ -110,14 +110,14 @@
   },
   "3": {
    "bgr": [
-    30.0,
+    28.0,
     0.0,
-    214.0
+    221.0
    ],
    "lab": [
-    114.0,
-    198.0,
-    176.0
+    110.0,
+    197.0,
+    177.0
    ],
    "white_frac": 0.004,
    "stripe": false,
@@ -127,7 +127,8 @@
      275,
      778
     ]
-   }
+   },
+   "source": "round69-pot-order-follow (was 114,198,176 by eye - confirmed)"
   },
   "6": {
    "bgr": [
@@ -152,14 +153,14 @@
   },
   "5": {
    "bgr": [
-    24.0,
-    56.0,
-    179.0
+    9.0,
+    83.0,
+    234.0
    ],
    "lab": [
-    107.0,
-    176.0,
-    173.0
+    143.0,
+    184.0,
+    192.0
    ],
    "white_frac": 0.002,
    "stripe": false,
@@ -169,7 +170,8 @@
      475,
      1013
     ]
-   }
+   },
+   "source": "round69-pot-order-follow"
   },
   "4": {
    "bgr": [
@@ -214,10 +216,10 @@
    }
   }
  },
- "not_scored": [
-  3,
-  5
- ],
- "not_scored_why": "The crimson 3 and the orange 5 are only 23.3 Lab apart on this table, and centroids measured at one instant cannot separate them across the clip's lighting: adjudicated by eye, all 66 'truth 3 / app 5' disagreements were MY truth being wrong and the engine being right. A yardstick abstains rather than guesses, so this pair is excluded from naming truth here. Separating them needs centroids sampled per ball across many positions, which needs a way to follow each ball that does not come from the app.",
- "revised_round63": "13 -> 9. The stripe was called a 13 (orange stripe) on the strength of it looking amber next to the BENCH's yellow 9. That is a cross-table comparison and it is invalid: under THIS table's light its own 1 reads amber too (G/R 0.676). Measured WITHIN the table, the stripe's band sits 10.0 Lab from this table's 1 and 98.8 from its 5, so by 'stripe = solid + 8' it is the 9. The same test on the bench returns 1 -> 9, which is the known answer there, so the method is validated on a case with truth. The engine had been right all along and my file was scoring it wrong 61 times."
+ "not_scored": [],
+ "not_scored_why": "ROUND 69 RESOLVED THIS AND THE OLD REASON WAS FOUNDED ON A BAD SAMPLE. Round 60 excluded 3 and 5 as '23.3 Lab apart, inseparable'. Measured properly they are 41.1 Lab apart. The 23.3 was the distance between the crimson 3 and a CONTAMINATED crop recorded as the 5: at t=40.01 the two warm balls measure Lab [118,200,178] (the 3, 5 Lab from its entry) and [142,184,192] (the orange 5) - and the old 5 entry [107,176,173] matches NEITHER. It was not a ball colour at all. The 5 is now followed BACKWARD IN POSITION from its own pot, which is the app-independent handle round 60 said was missing: anchored at 157.0s by assigning every trusted reference and taking the single leftover (the pot order fixes the inventory: 1@48.9 2@62.6 3@121.7 4@138.1 5@158.9), then walked back to 40.0s over 1756 samples, aborting on ambiguity - it never aborted. Its colour over that whole span is Lab [145.8,182.5,192.9] sd [2.4,1.8,0.9]. The OTHER warm ball in the pair era is then the 3 by elimination: 44 paired samples, 44/44 of each nearer its own centroid than the other's. VISION-CORROBORATED: the followed ball is plainly orange and the leftover plainly crimson, which is what the shot truth already calls them.",
+ "revised_round63": "13 -> 9. The stripe was called a 13 (orange stripe) on the strength of it looking amber next to the BENCH's yellow 9. That is a cross-table comparison and it is invalid: under THIS table's light its own 1 reads amber too (G/R 0.676). Measured WITHIN the table, the stripe's band sits 10.0 Lab from this table's 1 and 98.8 from its 5, so by 'stripe = solid + 8' it is the 9. The same test on the bench returns 1 -> 9, which is the known answer there, so the method is validated on a case with truth. The engine had been right all along and my file was scoring it wrong 61 times.",
+ "stripe_bar": 0.137,
+ "stripe_bar_why": "Midpoint of THIS table's measured gap in the palette's own white_frac: solids reach 0.064 (the 6), the stripe sits at 0.209. Required by identify_by_palette, which had no value here at all.",
+ "revised_round69": "3 and 5 are now SCORED. See not_scored_why."
 }

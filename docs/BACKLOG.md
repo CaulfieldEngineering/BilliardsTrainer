@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T15:04Z
+    written        2026-08-30T15:35Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T15:02Z
@@ -57,66 +57,70 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 68
+### NEXT TARGETS (top first) — round 69
 
-*** THE EVIDENCE BEHIND A PUBLISHED NAME IS NOW RECORDED ***
-    Five gates sit between a track's votes and the name it SHOWS - the
-    vote majority, uniqueness arbitration, the age bar, hysteresis, and
-    the final uniqueness belt - and NONE of them left a trace. Only the
-    verdict was ever written down. That is why round 65 (a track showing
-    13 on 330 frames while its own reads backed 8 of 366) and round 67
-    (the identifier reading 9 one pixel from a ball called 1) each
-    needed a bespoke GPU sweep to find.
-    Track.read now carries the vote majority beside the verdict,
-    sidecar element 8, additive - old sidecars still load. The scorecard
-    reports it on every run:
-        cold   shows what it saw 99.4% of 43358 live sightings
-               [contradicted 94, suppressed 182, unbacked 0]
-        bench  shows what it saw 99.5% of 34246 live sightings
-               [contradicted 24, suppressed 157, unbacked 0]
+*** THE 3/5 BLIND SPOT IS CLOSED, AND THE REASON IT EXISTED WAS A BAD
+    SAMPLE IN MY OWN PALETTE ***
+    Round 60 excluded the crimson 3 and the orange 5 from the cold
+    clip's naming truth as "23.3 Lab apart, inseparable". Measured
+    properly they are 41.1 Lab apart. The 23.3 was the distance between
+    the 3 and a CONTAMINATED crop recorded as the 5: at t=40.01 the two
+    warm balls measure Lab [118,200,178] (the 3, 5 Lab from its entry)
+    and [142,184,192] (the orange 5), and the old "5" entry
+    [107,176,173] matches NEITHER. It was not a ball colour at all.
+    FOURTH time truth-side data has been the defect (rounds 25, 58, 63,
+    69) - and this one blocked a whole target for nine rounds.
 
-*** AND IT OVERTURNS THIS BACKLOG'S OWN FRAMING ***
-    Target 0 said "THE APP DISCARDS A CORRECT IDENTIFIER READ". At
-    population scale the opposite dominates: the gates are mostly
-    RESCUING bad reads, not suppressing good ones.
-      cold  saw 3 -> said 5 x87: the published 5 is CORRECT. The 3 was
-            potted at 121.7s, so a ball on the table from 136.2-159.6s
-            cannot be the 3 - and it leaves the table at 158.9s, which
-            is exactly the 5's pot. Vision agrees: the ball is orange.
-            87 frames of a bad read overridden correctly.
-      cold  saw 15 -> said 7 x7: there is no 15 on that table.
-            Arbitration suppressing an invented number, correctly.
-      bench saw 1 -> said 9 x12: ball 9 scores 221/221, so the held
-            name is the right one - rest-frozen identity working.
-    So "contradicted" is NOT a defect count. The two incidents that
-    motivated this target were real but are the MINORITY direction, and
-    I had generalised from them without measuring the population.
+*** THE METHOD ROUND 60 ASKED FOR, BUILT ***
+    Round 60 said separating them "needs a way to follow each ball that
+    does not come from the app". The POT ORDER is that handle:
+    1@48.9 2@62.6 3@121.7 4@138.1 5@158.9 fixes the inventory at every
+    instant. Anchor at 157.0s by assigning every trusted reference and
+    taking the single leftover - that is the 5 by elimination, never by
+    its colour - then walk BACKWARD in position, aborting on ambiguity.
+    It never aborted: 157.0s -> 40.0s, 1756 samples, colour Lab
+    [145.8,182.5,192.9] sd [2.4,1.8,0.9] over the whole span. The other
+    warm ball in the pair era is then the 3: 44 paired samples, 44/44 of
+    each nearer its own centroid than the other's.
+    TWO METHODS FAILED FIRST and both failures were mine, not the
+    premise's: an absolute 30-Lab "unknown" cut admitted 3-5 balls a
+    frame, and a leftover-by-chroma heuristic produced a sample whose
+    own spread (36.6 Lab mean, 93.7 max) exceeded the separation it was
+    meant to resolve. The anchor guard refusing to start on an unclean
+    frame is what forced the third, correct attempt.
+
+*** THE ENGINE WAS RIGHT IN THE BLIND SPOT ALL ALONG ***
+    With 3 and 5 now scored the cold clip reads:
+        3: 105/105   5: 139/143   (ZERO wrong, 4 unnamed)
+    and round 68's open question is answered by measurement: the 87
+    "saw 3 -> said 5" contradictions were the gates correctly
+    overriding bad reads, exactly as the pot-order argument implied.
+    THE YARDSTICK GOT 29% HARDER, so the headline moved DOWN and that is
+    not a regression - no engine code changed this round:
+        checks       925 -> 1190
+        naming     99.9% -> 99.6%
+        all checks 99.7% -> 99.4%
+        wrong            1 -> 1      (still the single 9->1)
+        invented         0 -> 0
 
                               bench            cold
     strokes / outcomes        10/10            9/9
     pots to right ball          4/4            5/5
-    naming                    99.8%           99.9%
-    of ALL checks             99.2%           99.7%
+    naming                    99.8%           99.6%
+    of ALL checks             99.2%           99.4%
     wrong names                   0               1
     invented                      0               0
     shows what it saw          99.5%           99.4%
 
-0. THE COLD CLIP'S 3/5 PAIR IS A HOLE IN THE YARDSTICK. Round 60
-    excluded 3 and 5 from that table's references as inseparable (23.3
-    Lab apart), so the naming truth scores NEITHER - its per-ball line
-    is 0,1,2,4,6,7,8,9 with no 3 and no 5. The new instrument found 87
-    frames of internal disagreement sitting exactly in that blind spot.
-    The pot ORDER resolves it independently of colour (3 potted 121.7,
-    5 potted 158.9), which is a source the app never touches. Extend the
-    naming truth to cover 3 and 5 using the pot order, then the 87
-    frames can be scored instead of merely noticed.
+0. THE BENCH'S REMAINING GAPS ARE BLINDNESS, NOT ERROR: 7 sightings
+    with no track and 2 unnamed, against ZERO wrong. Find why a ball
+    the truth can see has no track at all. Its contradictions (saw 9 ->
+    said 1 x6, saw 6 -> said 1 x6) are still unresolved - there is no 6
+    on the bench so the READ is wrong there, but whether "1" is right
+    is unmeasured.
 
-1. THE BENCH'S REMAINING GAPS ARE BLINDNESS, NOT ERROR: 7 sightings
-    with no track and 2 unnamed, against ZERO wrong. Different failure,
-    different fix - find why a ball truth can see has no track at all.
-    Its remaining contradictions (saw 9 -> said 1 x6, saw 6 -> said 1
-    x6) are unresolved; there is no 6 on the bench, so the READ is
-    wrong in those, but whether "1" is right is unmeasured.
+1. THE COLD CLIP'S 4 UNNAMED 5s and the single 9->1. Both are now
+    scoreable, which they were not this morning.
 
 2. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
     truth scores the cue 175/175 - a TRACKING gap, not naming, because
@@ -125,25 +129,29 @@ queue cannot be told something the measurements disagree with.
 3. WHY DOES THE IDENTIFIER READ ONLY HALF THE BALLS? cold 461 of 846
     finds (54.5%) and bench 339 of 790 (42.9%) get NO identity read.
     The unchecked half is repaired now so the loss is contained, but
-    that is the upstream fact. Measure whether it is tiling, ball size
-    or the score floor before tuning anything downstream.
+    that is the upstream fact.
 
-4. TWO METHOD WARNINGS, both bought: (round 65) the naming truth samples
-    ~1/sec on settled moments - a fine YARDSTICK and a badly biased
-    SURVEY, so any per-frame claim must be measured per frame; and
-    (round 67) a hypothesis written into this backlog is not a finding,
-    but it inherits the authority of one. Round 68 is the second time in
-    two rounds that a backlog line stated as fact turned out wrong.
+4. THE BENCH PALETTE HAS NEVER HAD THIS TREATMENT. The cold clip's
+    truth is now pot-order derived and covers all ten balls; the
+    bench's is still the hand-fitted colour windows. Same method
+    applies and would put both clips on the same footing.
 
-5. The palette's 1/3/5 independence caveat; the palette is hand-labelled
-    and does not scale; the identifier mislabels balls mid-collision
-    (round 55); colour cannot separate gold from white at speed (round
-    56); both naming figures in the phone STATUS view; recovered
-    detections lose their name; _locate is ~37% of engine wall time;
-    rebuild_batch.py still drives an OLD build() path (every clip in the
-    library is stale at rules_v 20); events/shot.py is a third shot
-    detector in the live path; delete vision/tracking.py and the
-    MeasurementCore shadow scaffolding.
+5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+    settled moments - a fine YARDSTICK and a biased SURVEY (round 65);
+    a hypothesis written into this backlog is not a finding but
+    inherits the authority of one (round 67); and a truth-side sample
+    can be contaminated rather than merely imprecise, so a
+    "these are inseparable" conclusion deserves a second source before
+    it closes a target for nine rounds (round 69).
+
+6. The palette is hand-labelled and does not scale; the identifier
+    mislabels balls mid-collision (round 55); colour cannot separate
+    gold from white at speed (round 56); both naming figures in the
+    phone STATUS view; recovered detections lose their name; _locate is
+    ~37% of engine wall time; rebuild_batch.py still drives an OLD
+    build() path (every clip in the library is stale at rules_v 20);
+    events/shot.py is a third shot detector in the live path; delete
+    vision/tracking.py and the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

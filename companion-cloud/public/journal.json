@@ -1,6 +1,38 @@
 {
  "entries": [
   {
+   "id": 114,
+   "ts": "2026-08-30T15:36:00",
+   "date": "Aug 30, 11:36 AM EDT",
+   "kind": "finding",
+   "title": "Hourly check-in - Aug 30, 11:36 AM EDT",
+   "score": "10/10 shots \u00b7 10/10 calls",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/114-r69_3v5.png",
+     "caption": "The two balls I had recorded as nearly identical. Top row is the orange 5, identified by following it backwards from the moment it was potted; bottom is the crimson 3. They are not remotely the same colour."
+    }
+   ],
+   "html": "<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div><h2>Evidence</h2><div class='grid2'><figure><img src='journal/r69_3v5.png' alt=''><figcaption>The two balls I had recorded as nearly identical. Top row is the orange 5, identified by following it backwards from the moment it was potted; bottom is the crimson 3. They are not remotely the same colour.</figcaption></figure></div>"
+  },
+  {
+   "id": 113,
+   "ts": "2026-08-30T15:35:59",
+   "date": "Aug 30, 11:35 AM EDT",
+   "kind": "finding",
+   "title": "Two balls were never being checked, because of my own bad measurement",
+   "score": "The 3 and 5 on the newer table were excluded nine rounds ago as 'inseparable'. They are 41 Lab apart; the closeness was a contaminated sample. Both now scored: 244 of 248 right, none wrong.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/113-r69_3v5.png",
+     "caption": "The two balls I had recorded as nearly identical. Top row is the orange 5, identified by following it backwards from the moment it was potted; bottom row is the crimson 3. They are not remotely the same colour."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Two of the ten balls on your newer table were never being checked at\nall. I had written them off nine rounds ago as impossible to tell apart - and\nthat turns out to have been my own bad measurement, not a real difficulty. Both\nare now scored, and the app gets them right on 244 of 248 sightings with none\nwrong.</strong></p>\n\n<pre>\n                        before          now\nballs actually checked    8 of 10      10 of 10\nchecks per run              925          1,190\nthe crimson 3           not scored     105 of 105\nthe orange 5            not scored     139 of 143\nballs named WRONG             1              1\n</pre>\n\n<h3>What I got wrong</h3>\n<p>I had recorded the two balls as being nearly the same colour - so close that\nno scoring could separate them - and excluded both. Measuring them properly, they\nare almost twice as far apart as I thought. The \"closeness\" was between the red\nball and a bad sample: when I recorded the orange ball's colour I must have\ncaught the edge of it, picking up cloth and shadow along with the ball. The\nnumber I wrote down does not match ANY ball on that table.</p>\n<p>So a real capability sat switched off for nine rounds because of one\ncontaminated measurement of mine.</p>\n\n<h3>How they are separated now</h3>\n<p>Not by colour at all, which was the trap. The order the balls are potted tells\nme exactly which balls are on the cloth at any second. The red 3 is potted at\n2:01 and the orange 5 at 2:39, so in between there is only one of the pair left -\nwhichever ball that is, it must be the 5. From there I follow that ball\nbackwards through the video position by position, stopping if it ever becomes\nambiguous. It never did: 1,756 steps back across two minutes, and its colour\nholds steady the whole way. The other warm ball is then the 3 by elimination.</p>\n<p>Two earlier attempts failed before this worked, and both were my methods being\nsloppy rather than the idea being wrong.</p>\n\n<h3>The numbers moved DOWN and that is not a step backwards</h3>\n<p>The score on that clip reads 99.6% instead of 99.9%. Nothing about the app\nchanged today - the test simply got 29% bigger and now includes two balls it had\nbeen letting through unexamined. A harder exam with the same result is better\ninformation, not worse performance.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>99.3%</td><td class='num'>95%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><div class='note warn'><p>No code landed in this window \u2014 either a long measuring run was in flight or the loop was paused.</p></div>"
+  },
+  {
    "id": 112,
    "ts": "2026-08-30T15:04:46",
    "date": "Aug 30, 11:04 AM EDT",
@@ -1099,26 +1131,6 @@
    "title": "Clips load and play much lighter",
    "score": "",
    "body": "Every session now gets a lightweight playback copy made right after it ends - about a fifth the data of the original. Your phone picks it automatically, so clips start faster, scrub smoother, and use far less cellular data. Same video, same overlays, same everything - just easier for the phone to play. This is also the leading fix for the tail stutter: the originals were heavy enough to strain the phone's video decoder.\nThe lightweight copies match the originals frame-for-frame, so trails, aim lines and shot times line up exactly.\nOlder sessions are being converted in the background; each one switches over as soon as its copy is ready.\nRecording always comes first: any conversion stops instantly the moment a session starts.",
-   "images": []
-  },
-  {
-   "id": 34,
-   "ts": "2026-08-26T12:00:00",
-   "date": "Aug 26, 2026",
-   "kind": "update",
-   "title": "Full-length ball trails, no more circle",
-   "score": "",
-   "body": "The tails now cover the entire shot - strike to rest - for the cue AND object balls, across the whole library. Two data bugs were cutting them short: the sampling window opened after the ball had already covered most of its travel, and the tracker's number-dropping during fast flight filtered out the flight itself. Both fixed; the circle covering the ball is gone too.\nProof case: a marathon-session shot whose tail was the last foot now draws the full 582-pixel strike-to-rest path.\nUnnumbered fast-flight stretches inherit the ball's identity only when the track's numbered segments on both sides agree - the old protection against mid-flight identity mixups stays intact.\nFor the remaining lag/stutter: triple-tap the top bar in the player for a live diagnostics readout, and send a screenshot of it during a stutter - it will show whether the phone is dropping video frames on these high-bitrate files.",
-   "images": []
-  },
-  {
-   "id": 33,
-   "ts": "2026-08-26T12:00:00",
-   "date": "Aug 26, 2026",
-   "kind": "update",
-   "title": "Miss analysis caught up on every session",
-   "score": "",
-   "body": "A gap in the pipeline meant new sessions weren't getting the deep second-pass that resolves tricky misses - your marathon session had 51 misses and only 1 categorized. That pass now runs automatically at every session close, and the whole library was swept: 180 verdicts recovered, trusted tags 150 -> 227, uncategorized 203 -> 126. Your Lifetime Stats patterns just got a lot more data behind them.\nFound via the abstention notes shipped last week: 48 marathon misses stated their reasons, and the reasons pointed at the missing pipeline stage rather than bad tracking.\nThe remaining 126 uncategorized are genuine hard cases (each states why) - your grading playlists can settle any of them with two taps.\nThe drift tests now require this stage in the close pass, so it can never silently fall out again.",
    "images": []
   }
  ]
