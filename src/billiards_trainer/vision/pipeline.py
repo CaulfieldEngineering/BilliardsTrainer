@@ -22,7 +22,7 @@ from ..events.shot_detector import ShotDetector, ShotEvent
 from .background import BackgroundModel, downscale, flow_activity
 from .calibration import CalibrationManager
 from .overlay import draw_perspective, draw_rectified, render_schematic
-from .tracking import BallTracker
+from ..measure.tracker import MotionTracker
 
 log = logging.getLogger("vision.pipeline")
 
@@ -93,7 +93,7 @@ class Pipeline:
         self._preview_table: TableModel | None = None
         self.calib = CalibrationManager()
         self._strategy = self._load_strategy()  # the single raw-frame detector
-        self.tracker = BallTracker()
+        self.tracker = MotionTracker()   # the ONE tracker (round 39)
         # THE Measurement Core seam (docs/ARCHITECTURE.md L1): presence +
         # the hardened shadow tracker + divergence counters. Consumers
         # read core.present / core.tracks — nobody keeps a private copy.
@@ -573,13 +573,17 @@ class Pipeline:
                                              frame=frame)
         tbl = calib.table
         exp_r = expected_ball_radius_px(tbl, self.settings.table.size)
+        # ONE TRACKER (round 39). This was BallTracker; the offline engine
+        # ran a different one, and measured head to head on identical
+        # detections the live one named 57.6% of ball sightings correctly
+        # against the engine's 98.9% - it called the striped 9 a "3" in
+        # 221 of 221 samples, so the red 3 was never right either
+        # (tools/tracker_bakeoff.py, tools/live_path_check.py). Live and
+        # offline now differ only in where frames come from.
+        self.tracker.set_geometry([(p.x, p.y) for p in tbl.pockets],
+                                  float(tbl.pocket_radius))
         tracks = self.tracker.update(
-            detections, calib.table.short_side,
-            bounds=(tbl.x0, tbl.y0, tbl.x1, tbl.y1),
-            pockets=[(p.x, p.y) for p in tbl.pockets],
-            pocket_r=float(tbl.pocket_radius),
-            ball_r=float(exp_r),
-        )
+            detections, float(getattr(self, "_last_t", 0.0)))
         # VACANCY PRUNING (Joe: "false positive cue balls and lingering cue
         # ball assumed positions"): a STILL track whose spot is plainly
         # visible — no detection near it AND no hand/foreign blob covering

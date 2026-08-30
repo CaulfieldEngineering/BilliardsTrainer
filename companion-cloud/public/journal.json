@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 81,
+   "ts": "2026-08-30T00:45:44",
+   "date": "Aug 29, 08:45 PM EDT",
+   "kind": "update",
+   "title": "Round 39: the live path runs the good engine now - 57.6% to 99.5%",
+   "score": "one tracker serves both paths; replay results unchanged",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/081-live_after_200.png",
+     "caption": "The LIVE path's own output at 200 seconds, after the swap: red 3, cue, purple 4, blue 2 and striped 9 - five balls, five correct names. Before today this same frame labelled the 9 as a '3'."
+    }
+   ],
+   "html": "\n<div class='note win'>\n<p><strong>Round 39: the live path now runs the good engine. Ball naming while\nyou are actually at the table goes from 57.6% to 99.5%.</strong></p>\n\n<p>Everything fixed over the past week - the ball that stopped answering to\nanother ball's name, the phantom shots, the invented numbers - had been landing\non the replay side only. This is the round that carries it to the table.</p>\n\n<h3>Measured, not asserted</h3>\n<p>I built a check that drives the real live pipeline over your practice clip -\ndetection, tracking, pruning, everything the app does while you play - and\nscored what it publishes. Before and after:</p>\n<table>\n<tr><th></th><th>named correctly</th><th>your red 3</th><th>your striped 9</th></tr>\n<tr><td>live path, before</td><td>57.6%</td><td>0 / 188</td><td>0 / 221</td></tr>\n<tr><td>live path, after</td><td><strong>99.5%</strong></td><td>188 / 189</td><td>220 / 221</td></tr>\n</table>\n<p>Two wrong ball namings in the whole clip, down from 266. The picture below\nis the live path's own output at 200 seconds: your red 3, cue, purple 4, blue 2\nand striped 9, all correct. Before today that same frame called the 9 a \"3\".</p>\n\n<h3>And the replay side is untouched</h3>\n<p>The practice clip still scores exactly as it did - 10 of 10 shots, 10 of 10\noutcomes, 4 of 4 pots, no invented numbers. That matters: this was a\nconsolidation, and a consolidation that changes results is a consolidation that\nbroke something.</p>\n\n<h3>One thing switched off, deliberately</h3>\n<p>A blur-recovery feature - which rescues balls the detector loses to motion\nblur - reaches directly into the old tracker's private internals. Rather than\nhave it throw an error every frame behind a safety net, I have made it stand\ndown until it is ported. So it is currently inactive on the live path. It is\nthe next item, and I would rather tell you it is off than have it fail quietly.</p>\n\n<h3>Where the merge stands</h3>\n<p>Two of four steps done: one kind of tracked ball (yesterday), one tracker\nactually running both paths (today). Still to do: port blur recovery, then move\nthe old tracker's accumulated incident history onto the surviving one before\ndeleting its 716 lines. The two engines are now one in behaviour; making them\none in the source is the remaining cleanup.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li><li>Round 35: no more phantom shots - R2 passes, the bench is one defect from clean</li><li>Round 34: make the 99.5% reproducible, and stop it leaning on unvalidated refs</li><li>Round 33: naming 89% -&gt; 99.5%, outcomes 10/10, pots 4/4 - R3 and R4 gates passed</li><li>Round 32: the 9&#x27;s correct read is given away to a passing ball - two fixes tried, both worse</li><li>Round 31: naming 76% -&gt; 89% and pot attribution 2/4 -&gt; 3/4, nothing worse (rules_v 13)</li><li>Round 30: both naming root causes found and fixed - 76% to 89%, one artifact from landing</li><li>Round 29: the name outlives the ball - identity continuity is the R3 blocker</li><li>Round 28: a scorecard that can see a ball wearing another ball&#x27;s name</li><li>Round 27: the engine never called the ensemble - naming fixes were dead code</li></ul>"
+  },
+  {
    "id": 80,
    "ts": "2026-08-29T23:25:02",
    "date": "Aug 29, 07:25 PM EDT",
@@ -937,16 +953,6 @@
    "title": "Honest verdicts",
    "score": "",
    "body": "When the app can't actually see which side a miss went, it says 'can't tell' instead of guessing.\nEarly on, the app labelled every miss with a side, even when its data was garbage. That's how your miss-left got called miss-right: it measured a direction across a half-second hole and confidently reported nonsense.\nThe standing rule now: the app only states what it actually measured. When the ball was lost at the decisive moment, the verdict says 'can't tell which side \u2014 ball lost after contact' instead of guessing. When it IS sure, that confidence means something.\nThis matters for the stats. Your miss patterns are only useful if every counted miss is real \u2014 one wrong-side label pollutes the pattern more than ten honest abstentions. Trusted verdicts went from 30 to 33 this week, and each 'can't tell' is a known repair target, not a mystery.",
-   "images": []
-  },
-  {
-   "id": 1,
-   "ts": "2026-08-22T12:00:00",
-   "date": "Aug 22, 2026",
-   "kind": "update",
-   "title": "Sharper shots for free (when you have a minute)",
-   "score": "",
-   "body": "One camera dial change \u2014 shutter to 1/250 \u2014 would make every future recording dramatically easier to analyse. Plain-language walkthrough saved for you.\nMost of this week's problems trace to motion blur, and most of that traces to shutter speed. Your camera is exposing each frame for about 1/75th of a second; at 1/250th, a hard-hit ball stays a crisp dot instead of a streak.\nThe full plain-language walkthrough is saved as CAMERA_SETTINGS.md in the project \u2014 which dial, which direction, what it costs (a bit of grain, which the software barely notices). No new lighting needed. Whenever you get a minute at the table, it's the single highest-value tweak available.",
    "images": []
   }
  ]

@@ -153,6 +153,16 @@ class BlurRecovery:
 
 
         tracks = getattr(tracker, "_tracks", [])
+        if isinstance(tracks, dict):
+            tracks = list(tracks.values())
+        # This feature reads a tracker's PRIVATE state (`confirmed`,
+        # `mbgr_hist`, `committed_number`), which the surviving tracker
+        # does not expose. Round 39 moved the live path onto it, so blur
+        # recovery stands down until it is ported (backlog step 3)
+        # rather than raising once per frame behind the catch-all.
+        if not all(hasattr(t, "confirmed") and hasattr(t, "mbgr_hist")
+                   for t in tracks):
+            return []
         # Gate on "its detection just VANISHED". A struck ball was at REST one
         # frame earlier, so anything keyed on move_streak excludes the only
         # case this exists for (measured: it never once fired for the cue).

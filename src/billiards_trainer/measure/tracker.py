@@ -116,11 +116,22 @@ class MotionTracker:
         # leaves. Needs geometry, so the engine passes it in.
         self._pockets = list(pockets or [])
         self._pocket_r = float(pocket_r)
+        # last published frame, for the live path's detect=False reuse
+        self._published: list = []
 
     # ---- the LIVE path's tracker contract -------------------------------
     # vision/pipeline.py drives its tracker with these three besides
     # update(). They exist here so the live path can be moved onto this
     # tracker without a shim (Joe, 2026-08-30: one module, not two).
+
+    def set_geometry(self, pockets, pocket_r: float) -> None:
+        """Table geometry, refreshed per frame by the live path.
+
+        The offline engine passes this once at construction because a
+        clip has one calibration; the live pipeline re-locks the table
+        as it goes, so it hands the current geometry in each frame."""
+        self._pockets = list(pockets or [])
+        self._pocket_r = float(pocket_r)
 
     def reset(self) -> None:
         """Forget everything - a new table, clip, or calibration."""
@@ -173,9 +184,24 @@ class MotionTracker:
         return not (min(xs) - pad <= tr.x <= max(xs) + pad
                     and min(ys) - pad <= tr.y <= max(ys) + pad)
 
+    @property
+    def tracks(self) -> list:
+        """The last published frame. The live path reuses this on display
+        frames that skip detection, so playback can outrun the detector."""
+        return list(self._published)
+
     def update(self, dets, t: float) -> list:
-        """dets: iterable of (x, y, radius, number) for one frame at time
-        t. Returns the frame's track rows (Track-like objects)."""
+        """dets for one frame at time t; returns this frame's Tracks.
+
+        Detections may arrive as (x, y, radius, number) tuples - how the
+        offline engine feeds it - or as Detection objects, which is what
+        the live pipeline already had in hand. Accepting both is what
+        lets ONE tracker serve both paths without a conversion shim at
+        either call site."""
+        dets = [d if isinstance(d, tuple)
+                else (float(d.x), float(d.y), float(d.radius),
+                      int(getattr(d, "number", -1)))
+                for d in dets]
         # 1. predict every live track forward
         for tr in self._tracks.values():
             dt = max(0.0, t - tr.t)
@@ -478,4 +504,5 @@ class MotionTracker:
                 misses=int(round(tr.misses * 30.0)),
                 active=True, history=list(tr.history),
                 coasting=tr.misses > 0.0))
+        self._published = out
         return out

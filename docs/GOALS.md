@@ -2385,3 +2385,20 @@ Rounds continue with Joe's visual feedback as the gate.
   live-review request (Tier 3, ~2 weeks) with a design note: an
   invariant-triggered evidence queue beats streaming raw frames, and it
   should follow the live swap.
+
+- 2026-08-31 ~02:00 EDT - ROUND 39 *** LIVE PATH SWAPPED *** (step 2 of
+  4). vision/pipeline.py now drives MotionTracker; BallTracker is no
+  longer used by the app. Measured end to end with new
+  tools/live_path_check.py (drives the real Pipeline.process over the
+  bench clip and scores what it publishes): live naming 57.6% -> 99.5%,
+  the red 3 0/188 -> 188/189, the striped 9 0/221 -> 220/221, two wrong
+  namings left in the whole clip. OFFLINE UNCHANGED (10/10 strokes,
+  10/10 outcomes, 0 fake, 0 invented, 99.3% named, 4/4 pots) - a
+  consolidation that changes results has broken something. Vision-checked
+  at t=200s on the live path's own tracks. MotionTracker gained
+  set_geometry() and a `tracks` property, and update() now takes
+  Detection objects or tuples so neither call site needs a shim. BLUR
+  RECOVERY IS DELIBERATELY OFF: it reads BallTracker privates and now
+  stands down rather than raising every frame - porting it is step 3.
+  Step 4 is migrating four test files' case law before deleting
+  vision/tracking.py and the MeasurementCore shadow scaffolding.
