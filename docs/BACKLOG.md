@@ -31,6 +31,91 @@ BAR: every real shot detected, windowed at its strike, named,
 classified (stroke vs setup), and scored correctly — verified by
 Claude's vision, not by metrics.
 
+<!-- CAMPAIGN-STATE:BEGIN -- machine-written by tools/campaign_state.py;
+     do not hand-edit. Rounds 34-47 hand-edited this file with anchor
+     `.replace()` calls whose anchors no longer existed, so the edits
+     silently did nothing and THE QUEUE went stale for fourteen rounds
+     while every script reported success. A session reading Tier 0 on
+     2026-08-30 would have been told naming was 74.5% with an invented
+     "11" (actual: 99.4% and none) and gone off to re-fix solved
+     problems.
+     Regenerated from the bench sidecar + summary, and pinned by
+     tests/test_campaign_state.py, which FAILS if this block is missing,
+     unparseable, or older than the newest bench measurement. -->
+
+**CURRENT STATE — machine-written, do not hand-edit.**
+
+    written        2026-08-30T04:51Z
+    bench          session-20260824-220247.mp4
+    engine rules_v 18
+    measured       2026-08-30T04:51Z
+    shot list      14 entries (10 strokes, 4 makes)
+
+Run `python tools/scorecard.py` for the full card; that is the
+gate of record. This block exists so a session picking up the
+queue cannot be told something the measurements disagree with.
+
+<!-- CAMPAIGN-STATE:END -->
+
+### NEXT TARGETS (top first) — round 48
+
+0. *** THE HEADLINE METRIC EXCLUDES 8% OF THE CHECKS *** (raised by
+   Joe, 2026-08-30: "what does it mean to correctly name 99.6% of
+   balls"). _naming_correctness divides right by (right+wrong+unnamed)
+   and leaves `missing` OUT of the denominator. On the bench that is 88
+   of 1096 checks - 8.0% - where pixel truth says a ball is at a spot
+   and the app has NO live sighting within 30px. So "99.6% named
+   correctly" honestly means "of the moments it had the ball at all".
+   88 blind moments is a bigger hole than 4 misnamed ones, and the
+   headline hides it behind a number that goes UP as tracking gets
+   worse (fewer tracked = smaller denominator).
+   DO: (a) report a second, unforgiving figure - right / ALL truth
+   checks (currently 1004/1096 = 91.6%) - beside the existing one, and
+   put BOTH in the phone's STATUS view; (b) then attack the 88. First
+   split them: a ball genuinely occluded by hand/cue is not the same
+   failure as a ball in plain sight with no track, and only the pixels
+   can tell those apart - render the missing moments and LOOK before
+   theorising. Gate: no regression in name_right_pct while the new
+   figure rises.
+
+1. RECOVERED DETECTIONS LOSE THEIR NAME. blur_recovery emits an
+   UNNUMBERED detection stamped `recovered_for=<track id>`, and
+   MotionTracker ignores that field entirely - it competes on distance
+   like any other blob. Measured round 48: with recovery ungated the
+   purple 4 went 134/136 -> 136/136 (recovery genuinely found it), but
+   `moving balls named` fell 95.7% -> 92.2% because the recovered
+   sightings arrive nameless. Honour `recovered_for` in association and
+   both numbers should move together. THIS is how to get the 4 to
+   136/136 without the regression.
+2. _locate IS STILL ~37% OF ENGINE WALL TIME. Measured over 900 bench
+   frames: ungated 311 calls at 287ms = 66% of wall; after the name gate
+   and _MIN_MISSES=2, 145 calls; after caching the background median
+   (which sweep() had always done and _locate never did), ~178ms each =
+   37%. The window clips to 520, so the crop is routinely ~1040x1040 and
+   the median runs over 15 of them. NEXT: shrink the window (it is sized
+   for the worst case on every call), or subsample the buffer depth, or
+   do the search at half resolution as sweep does. Engine is 18.5 fps
+   vs a 24 fps baseline; the library catch-up feels this on every clip.
+3. THE BENCH IS EASY. Recovery found nothing here because the clip is
+   well lit; the module was built for
+   session-20260820-005048-recovered @233, where balls ARE lost. Now
+   that measured colour reaches the offline tracker, re-run that clip
+   and check recovery actually fires - it never could before round 48.
+4. P2 COLD CLIP is still blocked on the colour-refs reproducibility gap:
+   APP_DIR/colour_refs.json is regenerated from _train, which is
+   gitignored, so a fresh clone cannot rebuild it.
+5. tools/rebuild_batch.py still drives an OLD build() path and tests
+   staleness by timestamp. It must drive measure/job.run and compare
+   ENGINE_RULES_V before it is pointed at the library. Joe's "clean and
+   reproducible way of updating reprocessed clips" is not done until
+   this lands.
+6. THIRD SHOT DETECTOR: events/shot.py still runs in the live path
+   independently of shots.analyze. One opinion per fact (L1).
+7. DELETE vision/tracking.py (716 lines) after migrating its case law
+   out of 4 test files; also vision/identity.py's `_Internal` import,
+   tools/eval_tracking.py, and the MeasurementCore shadow/divergence
+   scaffolding.
+
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on
 the ones below it; every rung is measured by tools/scorecard.py and
@@ -55,8 +140,13 @@ its gate holds AND a vision watch agrees.
      detection) - fix the metric first, then the failure it exposes.
   R2 SHOT EVENTS - every stroke found and windowed AT the strike; no
      stroke invented during hand setup. Gate: 10/10 found, 0 fake.
-     NOW: 10/10 FOUND (round 10: engine writes hand context into the
-     dense stream, so setup can be told from strokes); 3 fake remain.
+     *** PASSED *** (round 44+): 10/10 found, 0 fake, 0 unexplained.
+     Held every round since. NOTE the prose below this line is HISTORY,
+     kept for the case law; the CURRENT STATE block above and
+     tools/scorecard.py are the only live numbers. Rounds 34-47 could
+     not update this file at all (see the block's note), so anything
+     here describing a "NOW" older than round 33 is stale by
+     construction.
   R3 ROUND 14 (tried + reverted): "persistence" jaw filter - refuse a
      dim near-pocket read only if a detection sat at the same spot last
      frame. FAILED twice: (a) it read self._last_detections, which ONLY

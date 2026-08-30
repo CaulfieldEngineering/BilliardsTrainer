@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 90,
+   "ts": "2026-08-30T04:52:53",
+   "date": "Aug 30, 12:52 AM EDT",
+   "kind": "finding",
+   "title": "Round 48: what 99.6% really means, and a subsystem that never ran",
+   "score": "The headline metric leaves out 8% of the checks; blur recovery had never once worked on a recorded clip",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/090-strip_100_98.png",
+     "caption": "Vision check on the 101s stroke on the 4: the purple trail runs down the left rail, hooks at the bottom and comes back to rest ON the table. Engine says no pot; truth says nothing fell. Agreed."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>Round 48. You asked what \"99.6% named correctly\" actually means -\nthe honest answer is below, and it is less flattering than the number. Also:\nthe app had a whole subsystem that has never once run on a recorded clip.</strong></p>\n\n<h3>What that percentage really counts</h3>\n<p>There is a truth file built from the PIXELS, not from the app: one snapshot\nper second for 220 seconds, five balls each, so 1,096 individual checks. Each\ncheck asks \"the app has a ball tracked here - did it put the right number on\nit?\" Every check lands in one of four buckets:</p>\n<pre>\nright                                                 1,004\nwrong  (called it another ball)                           3\nunnamed (tracked it, never named it)                      1\nno track (truth says a ball is here, app has nothing)    88\n</pre>\n<p>The headline is 1,004 divided by 1,008 - right, wrong and unnamed. <strong>The\n88 \"no track\" checks are not in that denominator.</strong> So the honest sentence\nis: of the moments the app had the ball at all, it named it right 99.6% of the\ntime. In another 88 moments - 8% of every check - it had nothing there to name.</p>\n<p>That is not hidden on purpose (the line prints the 88), but 8% blind is a\nbigger hole than 0.4% misnamed, and worse, the headline number goes UP as\ntracking gets WORSE, because losing a ball shrinks the denominator. I have put\na second, unforgiving figure at the top of the queue: right divided by ALL\n1,096 checks, which today is 91.6%. Both will show in the app.</p>\n<p>The three genuinely wrong ones are all the same pair - the yellow 1 and the\nyellow-striped 9. Those two really are near-identical yellows; measured, 7.3\nunits apart in colour space.</p>\n\n<h3>A subsystem that never ran</h3>\n<p>The app has a recovery pass for balls the detector loses to motion smear. I\nfound it has NEVER worked on a recorded clip - not once, on any session. It\nneeds each ball's measured colour, and the offline path skipped the one place\nthat colour is sampled. So it sat there, called every frame, unable to consider\na single candidate.</p>\n<p>Switching it on immediately did two good things - the purple 4 went from 134\nof 136 to a perfect 136, and naming rose to 99.6% - and one bad thing: it made\nthe engine <strong>three and a half times slower</strong>. Measuring where the\ntime went: 66% of it was the recovery pass, and 87% of THAT was hunting for\nphantom tracks that have no name at all. It was searching hardest for things\nthat were never balls.</p>\n<p>Two limits fixed that, both from what the feature is actually for - it only\nhunts a ball it can NAME (a nameless smudge has no identity to keep), and it\nwaits for a ball to be genuinely gone rather than blinking for a single frame.\nPlus it now reuses its background instead of rebuilding a 1000x1000-pixel\nmedian from fifteen frames on every single search.</p>\n\n<h3>The bench</h3>\n<pre>\nstrokes found       10/10          outcomes right      10/10\npots attributed      4/4           fake strokes            0\ncue ball named     99.9%           named correctly     99.4%\ninvented numbers    none           physics violations   0.18 per 1k (was 0.22)\n</pre>\n<p>Honest trade: gating the recovery gave back the two purple-4 sightings it had\ngenuinely found. Getting both - the 4 at 136/136 AND no slowdown - needs the\nrecovered ball to keep its name, which is the next item on the list.</p>\n\n<h3>And a bookkeeping failure worth admitting</h3>\n<p>The work queue that decides what I do each round had not actually been\nwritten to in fourteen rounds. The update was being made by a text-replace\nwhose anchor no longer existed - which is not an error, it just does nothing -\nso every round printed \"updated\" and wrote nothing. It still advertised\nproblems I fixed two weeks ago. It is now generated from the measurements, and\nrefuses to run silently when it cannot find its place.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 47: @85 solved - the ball went to the wrong track, by two pixels</li><li>Round 46: the app draws a path the ball never took (@85 diagnosed)</li><li>Round 45: trails end at the pocket - and my vision check was on the wrong artifact</li><li>Round 44: you cannot pot a ball that was not on the table</li><li>Round 43: built the loop collapse, measured it, reverted it</li><li>Round 42: a reprocess rebuilds the clip instead of patching it</li><li>Round 41: physics gate green again (0.71 -&gt; 0.19) - and the shot list is not from the engine</li><li>Round 40: blur recovery ported - and the physics gate is red, unnoticed</li><li>Round 39: the live path runs the good engine - naming 57.6% -&gt; 99.5%</li><li>Round 38: two kinds of &quot;tracked ball&quot; become one (engine merge, step 1 of 4)</li><li>Round 37: measured the two trackers head to head - live 57.5%, replay 98.9%</li><li>Round 36: PHASE 1 COMPLETE - the bench clip is clean on every measure</li></ul>"
+  },
+  {
    "id": 89,
    "ts": "2026-08-30T04:02:47",
    "date": "Aug 30, 12:02 AM EDT",
@@ -971,16 +987,6 @@
    "title": "Pause button gets out of the way",
    "score": "",
    "body": "The play symbol now fades out a moment after you pause, so it no longer sits on top of the frame you paused to study.",
-   "images": []
-  },
-  {
-   "id": 10,
-   "ts": "2026-08-23T12:00:00",
-   "date": "Aug 23, 2026",
-   "kind": "update",
-   "title": "What's New moved home",
-   "score": "",
-   "body": "This panel now lives at the top of the home screen, where it belongs \u2014 the menu inside the player is back to being just overlays and drawing tools.\nFair catch: the update feed had been tucked into the player's drawing menu, which made no sense. It's now a single row above your sessions \u2014 latest headline visible, dot when there's something unread, tap to read.\nA broader cleanup of the sessions screen is queued next.",
    "images": []
   }
  ]

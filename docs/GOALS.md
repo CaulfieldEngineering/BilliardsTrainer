@@ -2555,3 +2555,52 @@ Rounds continue with Joe's visual feedback as the gate.
   measured_bgr is None on every offline detection - mbgr_hist stays empty
   and blur recovery cannot fire (find() called 340/340 frames, zero
   candidates). Its own round.
+
+- 2026-08-30 ~01:00 EDT - ROUND 48 (rules_v 17 -> 18). THE OFFLINE PATH
+  NEVER MEASURED BALL COLOUR. engine called strat._finder.detect
+  directly - to run identity on its own cadence with the fp16 finder -
+  bypassing FindIdEnsemble.detect, the only place sample_colour runs. So
+  measured_bgr was None on EVERY detection of EVERY clip ever processed,
+  mbgr_hist never filled, and blur_recovery could not select a single
+  candidate (measured: find() called 340/340 frames, `lost` empty every
+  one). A whole subsystem, dead on every recording since it was written.
+  ENABLING IT: naming 99.4 -> 99.6%, purple 4 134/136 -> 136/136, gate
+  0.216 -> 0.18 (the teleport went away) - AND 3.3x slower (296s ->
+  987s). Profiled instead of guessing: sample_colour itself is 2.9s over
+  the whole clip; the cost was recovery finally RUNNING - 66% of wall at
+  287ms per search, and 271 of 311 searches (87%) were hunting NAMELESS
+  phantom tracks, one alone accounting for 244.
+  TWO GATES, both from what the feature is FOR: it may only hunt a track
+  that has a NAME (a nameless blob has no identity to preserve, which is
+  recovery's whole purpose), and the ball must be genuinely gone
+  (_MIN_MISSES=2) not blinking for one frame. NOTE a velocity gate was
+  tried FIRST and was WRONG - a ball struck from rest and lost on the
+  first frame of motion has no measured velocity, which is the exact
+  case the module exists for; tests/test_blur_recovery.py caught it.
+  Also cached _locate's background median (sweep() had always refreshed
+  every 4th call; _locate rebuilt a ~1040x1040 median over 15 frames
+  every single search): 287ms -> ~178ms.
+  FINAL BENCH: strokes 10/10, outcomes 10/10, pots 4/4, fake 0,
+  unexplained 0, cue 99.9%, named 99.4%, moving 95.6%, invented 0, gate
+  0.18, engine 385s/18.5fps (baseline 296s/24fps). All gates PASS.
+  HONEST TRADE: gating gave back the two purple-4 sightings recovery had
+  genuinely found (136/136 -> 134/136). Getting both needs the tracker to
+  honour `recovered_for`, which it ignores entirely - queue item 1.
+  VISION-CORROBORATED: rendered the 101s stroke on the 4 as the phone
+  draws it - purple trail down the left rail, hooks, returns to rest ON
+  the table; engine says no pot, truth says nothing fell. Agreed.
+  THE QUEUE HAD ROTTED: docs/BACKLOG.md had not been written since round
+  33. Rounds 34-47 updated it with anchor-text str.replace() whose
+  anchors no longer existed - a missing needle is not an error, so every
+  round printed "backlog updated" and wrote nothing. It still advertised
+  naming at 74.5% with an invented "11". Tier 0 now carries a
+  machine-written CURRENT STATE block (tools/campaign_state.py, which
+  RAISES rather than no-ops when its markers are missing) pinned by
+  tests/test_campaign_state.py, plus a live NEXT TARGETS list.
+  JOE ASKED what "99.6% named correctly" means. Answered, and it exposed
+  a real flaw: _naming_correctness excludes `missing` from the
+  denominator, so 88 of 1096 checks (8.0%) where truth says a ball is
+  present and the app has NO live sighting are not counted against it -
+  and the headline RISES as tracking gets worse. Queue item 0: report
+  right/ALL (today 1004/1096 = 91.6%) beside it, then split the 88 into
+  genuinely-occluded vs in-plain-sight by LOOKING at those frames.

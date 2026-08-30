@@ -50,6 +50,20 @@ _MIN_BUF = 6
 #: struck ball can be gone the better part of a second (measured: 0.5s), so
 #: the window stays open — the colour contest is what keeps that safe.
 _MAX_MISSES = 12
+#: frames a detection must have been missing before the search is worth its
+#: cost. A BLINK is not a loss: a resting ball whose detection drops for a
+#: single frame is back on the same spot next frame, and coasting held its
+#: position exactly in the meantime, so hunting it can only burn time —
+#: measured, a resting "4" on the bench flickered into the candidate set 150
+#: times in 900 frames and was never once actually missing. A ball that was
+#: truly struck and lost stays gone the better part of a second (~15 frames),
+#: so one frame of patience costs it nothing.
+#:
+#: NOT a velocity gate: that was tried first and is WRONG. A ball struck from
+#: rest and lost on the very first frame of motion has no measured velocity
+#: yet, and that is the exact case this module was built for (its own
+#: docstring says so, and tests/test_blur_recovery.py pins it).
+_MIN_MISSES = 2
 
 
 
@@ -176,8 +190,22 @@ class BlurRecovery:
         # Gate on "its detection just VANISHED". A struck ball was at REST one
         # frame earlier, so anything keyed on move_streak excludes the only
         # case this exists for (measured: it never once fired for the cue).
+        #
+        # AND ON "IT IS A BALL WE CAN NAME" (round 48). This search is
+        # expensive - measured at 287ms per candidate - and the whole
+        # point of it is IDENTITY: keeping a known ball attached to its
+        # track through a smear. A track with no number has no identity
+        # to preserve, so recovering it attaches nothing. When measured
+        # colour finally reached the offline tracker and this code could
+        # run at all, it took 66% of total engine wall time and 87% of
+        # its work was hunting NAMELESS blobs: over 900 bench frames,
+        # 271 of 311 searches were for unnamed tracks (one phantom alone
+        # accounted for 244), against 14 for a real named ball - and it
+        # recovered nothing on the whole clip. Chasing phantoms is not
+        # free; it was tripling the cost of every clip in the library.
         lost = [t for t in tracks if t.confirmed
-                and 1 <= _missed(t) <= _MAX_MISSES
+                and t.committed_number >= 0
+                and _MIN_MISSES <= _missed(t) <= _MAX_MISSES
                 and len(t.mbgr_hist) >= 5]
         self._buf.append(frame)
         say(f"called: buf={len(self._buf)} lost="
@@ -251,8 +279,25 @@ class BlurRecovery:
         if x1 - x0 < 8 or y1 - y0 < 8:
             return None
 
-        stack = np.stack([f[y0:y1, x0:x1] for f in self._buf]).astype(np.float32)
-        bg = np.median(stack, axis=0)
+        # CACHED BACKGROUND (round 48). `win` clips to 520, so this crop
+        # is routinely ~1040x1040 and the median ran over 15 of them -
+        # ~195MB of float32 - from scratch for every candidate on every
+        # frame. Measured at 287ms per search, which was 66% of total
+        # engine wall time once recovery could finally run at all. The
+        # felt does not change in a tenth of a second, and sweep() has
+        # always refreshed its own background every 4th call for exactly
+        # this reason; _locate simply never did. Same window, same
+        # buffer depth -> reuse for 4 calls.
+        key = (x0, y0, x1, y1)
+        self._bg_n = getattr(self, "_bg_n", 0) + 1
+        cached = getattr(self, "_bg_cache", None)
+        if cached is not None and cached[0] == key and self._bg_n - cached[1] < 4:
+            bg = cached[2]
+        else:
+            stack = np.stack([f[y0:y1, x0:x1]
+                              for f in self._buf]).astype(np.float32)
+            bg = np.median(stack, axis=0)
+            self._bg_cache = (key, self._bg_n, bg)
         cur = frame[y0:y1, x0:x1]
         moved = np.linalg.norm(cur.astype(np.float32) - bg, axis=2)
         mask = (moved > _MOVED).astype(np.uint8) * 255

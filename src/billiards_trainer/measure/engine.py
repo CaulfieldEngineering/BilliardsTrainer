@@ -29,11 +29,12 @@ PROGRESS_FILE_S = 2.0    # UI progress-file cadence (Joe: see percent)
 #: bump when tracker/filter RULES change - the gate refuses sidecars
 #: from older rules (a stale pre-hardened sidecar once gated at 184/1k
 #: and nearly condemned a good session)
-ENGINE_RULES_V = 17  # v17: the track-merge bar takes a floor at the
-                     # table's median ball diameter, so a SHRUNKEN ghost
-                     # can no longer sit beside a real ball without being
-                     # merged away (it was the whole source of the
-                     # physics gate going red)
+ENGINE_RULES_V = 18  # v18: association fixed three ways (acquire gate is
+                     # a FLOOR not a branch, travel term bounded by the
+                     # coast window, a NAME outranks four pixels), and
+                     # every detection now carries its measured colour
+                     # offline - it never did, so blur recovery and the
+                     # colour machinery were structurally dead in clips
 
 
 def _joe_present(idle_min: float = 10.0) -> bool:
@@ -210,6 +211,7 @@ def reprocess(video: str, out_dir: str | None = None,
     from ..config import EXPORTS_DIR, Settings
     from ..detector_strategies import discover
     from ..vision.analysis_cache import SidecarWriter
+    from ..detector_strategies.ensemble import FindIdEnsemble as _ENSEMBLE
     from ..vision.pipeline import Pipeline
 
     video = Path(video)
@@ -355,6 +357,24 @@ def reprocess(video: str, out_dir: str | None = None,
                         time.sleep(30)
                     log.info("Joe idle again - engine resuming")
             found = finder.detect(frame, calib) or []
+            # MEASURE EVERY BALL'S COLOUR UP FRONT (round 48), exactly as
+            # FindIdEnsemble.detect does for the live path. The engine
+            # calls strat._finder.detect directly - so it can run
+            # identity on its own cadence with the fp16 finder - and that
+            # bypassed the one place sample_colour runs. So offline,
+            # measured_bgr was None on EVERY detection of EVERY clip, and
+            # everything downstream that reasons about appearance was
+            # dead: a track's mbgr_hist never filled, so blur recovery
+            # could not select a single candidate (measured on the @85
+            # bank: find() called 340 times in 340 frames, `lost` empty
+            # every one), and the colour-consensus and settled-track
+            # colour veto had nothing to read either. This is a
+            # MEASUREMENT, not a verdict - nothing here names a ball.
+            for d in found:
+                try:
+                    _ENSEMBLE.sample_colour(frame, d)
+                except Exception:  # noqa: BLE001 - a colour read is never fatal
+                    pass
             if fi % IDENT_EVERY == 0:
                 ids = ident.detect(frame, calib) or []
                 ident_by_pos = [(d.x, d.y, d.number) for d in ids
