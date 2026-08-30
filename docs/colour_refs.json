@@ -229,5 +229,7 @@
    "n": 9,
    "source": "inherited-2026-08-15-UNVALIDATED"
   }
- }
+ },
+ "stripe_bar": 0.352,
+ "_stripe_bar_note": "BENCH (session-20260824-220247). Midpoint of that table's measured gap: solids reach 0.340 (the red 3's tail), the yellow 9 starts at 0.364, measured per detection over 875 naming-truth sightings in round 65."
 }

@@ -100,8 +100,7 @@ class FindIdEnsemble(DetectorStrategy):
             src = self._last_ids[di]
             f = found[fi]
             f.number, f.cls, f.bgr = src.number, src.cls, src.bgr
-            self._fix_stripe_bit(frame_bgr, f)
-            self._fix_colour(frame_bgr, f)
+            self.repair_identity(frame_bgr, f)
         # Frame-level uniqueness for colour naming: numbers already worn by
         # any detection this frame are off the menu, and each name we hand
         # out joins the exclusion — two green blobs cannot both become the 6
@@ -219,6 +218,23 @@ class FindIdEnsemble(DetectorStrategy):
         f.measured_bgr = tuple(int(v) for v in np.median(keep, axis=0))
 
     @staticmethod
+    def repair_identity(frame_bgr, f) -> None:
+        """THE repair applied to a model identity — one copy (round 65).
+
+        There were two. The live path repaired the STRIPE BIT and then the
+        COLOUR; the offline engine (_pair_identities) called only the
+        colour half, so _fix_stripe_bit had never run on a recorded clip
+        in its life — every scorecard number the campaign has published
+        was measured with half the repair missing, and round 64's fix to
+        the stripe reader changed literally nothing on either clip
+        because the code it fixed was unreachable. Same class of bug as
+        round 48 (sample_colour live-only) and the same cause: a
+        SEQUENCE is a fact, and it had two owners.
+        """
+        FindIdEnsemble._fix_stripe_bit(frame_bgr, f)
+        FindIdEnsemble._fix_colour(frame_bgr, f)
+
+    @staticmethod
     def _fix_colour(frame_bgr, f) -> None:
         """Correct a model misread using THIS table's measured colours.
 
@@ -297,7 +313,9 @@ class FindIdEnsemble(DetectorStrategy):
         nothing). Sample only the saturated band pixels and compare to the
         SOLID references (a band is its base colour). No band at all means
         the "stripe" is the CUE (0-as-15 x5) — hand it back."""
-        from ..core.balls import band_colour, lab_distance_to_ref, measured_identity
+        from ..core.balls import _load_measured_refs as _loaded_refs
+        from ..core.balls import (band_colour, lab_distance_to_ref,
+                                  measured_identity)
         n = f.number
         rr = max(2, int(round(f.radius * 0.85)))
         y0, x0 = max(0, int(f.y) - rr), max(0, int(f.x) - rr)
@@ -321,6 +339,35 @@ class FindIdEnsemble(DetectorStrategy):
         base_claim = n - 8
         claimed_d = lab_distance_to_ref(band, base_claim)
         if claimed_d is None:
+            # NO REFERENCE FOR THE CLAIM — and absence of evidence must
+            # not protect it. _fix_colour bought this exact lesson in
+            # round 34; this second copy never learned it, so a "13" on a
+            # table with no 5 reference (round 60 excluded 3 and 5 there
+            # as inseparable) was UNCHALLENGEABLE, and 330 frames of the
+            # cold clip's 9 answered to it.
+            # Thresholds are the BAND's own, measured over all 66
+            # naming-truth sightings of that ball in round 65 — a band is
+            # a narrower, noisier sample than a whole crop, so
+            # _fix_colour's 20/25 would reject the truth here:
+            #     nearest reference   the gold 1 in 66 of 66
+            #     best distance       min 5.0  p50 13.8  max 24.1
+            #     margin over runner  min 0.9  p10 11.9  p50 15.5
+            # 30 admits every real sighting; a 10 margin abstains on the
+            # near-ties rather than guessing, which leaves the model's
+            # answer standing — the fail-closed direction.
+            m0 = measured_identity(band, max_dist=30.0)
+            if not 1 <= m0 <= 8 or m0 == base_claim:
+                return
+            best = lab_distance_to_ref(band, m0)
+            runner = min((d for k in _loaded_refs() if k != m0
+                          for d in [lab_distance_to_ref(band, k)]
+                          if d is not None), default=None)
+            if best is None or runner is None or runner - best < 10.0:
+                return
+            f.number = m0 + 8
+            f.cls = BallClass.STRIPE
+            f.bgr = pool_ball_bgr(f.number)
+            f.measured_bgr = band
             return
         m = measured_identity(band, max_dist=45.0)
         if m <= 0 or m > 8 or m == base_claim:

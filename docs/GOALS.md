@@ -3109,3 +3109,40 @@ Rounds continue with Joe's visual feedback as the gate.
   bench spent rounds 27-33 on and solved with the band's stripe bit.
   Everything else is at or near perfect. Cue named 95.3% is a TRACKING
   gap, not naming (truth scores the cue 175/175).
+
+- 2026-08-30 ~09:45 EDT - ROUND 65: THE STRIPE REPAIR HAD NEVER RUN ON A
+  RECORDED CLIP. The live path repaired the stripe bit then the colour;
+  the offline engine called the colour half only, so _fix_stripe_bit
+  (bought over rounds 27-33) has never executed on any clip the campaign
+  has scored - and round 64's fix to the stripe reader changed nothing
+  because the code it fixed was unreachable. Now ONE entry point,
+  FindIdEnsemble.repair_identity, called by both. Same class as round 48.
+  THREE one-fact-two-owners splits in ONE round: the repair SEQUENCE
+  (engine had half), the stripe WINDOW (the yardstick has documented the
+  0.95 disc since round 27 while the engine kept the inner 62%), and the
+  no-reference RULE (_fix_colour learned in round 34 that absence of
+  evidence must not protect a claim; _fix_stripe_colour never did, so a
+  "13" on a table with no 5 reference was unchallengeable).
+  THE BAR IS PER-TABLE, MEASURED over 1811 detections: bench solids max
+  0.340 / stripe min 0.364 -> 0.352; cold solids max 0.110 / stripe min
+  0.236 -> 0.173. The distributions OVERLAP ACROSS TABLES, so no constant
+  serves both; it now lives with the per-session colour refs as
+  stripe_bar and an unmeasured table ABSTAINS.
+  BENCH IMPROVED: naming 99.6 -> 99.8%, all-checks 99.0 -> 99.2%, wrong
+  3 -> 2, unnamed 1 -> 0, 1->9 confusion gone, still 10/10, 10/10, 4/4,
+  zero invented. COLD REGRESSED on invented numbers: [13] 151 -> 330
+  frames, 9->1 x17 becoming 9->13 x11, naming flat at 97.6%.
+  KEPT rather than reverted, and the reason is the finding:
+  THE TRACKER PUBLISHES A NAME 2% OF THE EVIDENCE SUPPORTS. Dense sweep
+  of 176-196s, 366 sightings of that track: the TRACK shows 13 x330 and
+  9 x36, while the repair chain returns 9 x143, 1 x130, 5 x85 and 13 x8.
+  The published name is supported by EIGHT of 366 frames against a
+  plurality of 9. The defect is after naming, not in it. TOP TARGET.
+  VISION-CORROBORATED: rendered the app's 13 frames beside its 9 frames -
+  the same orange ball with a white band, differing only by rotation,
+  and beside the plain orange 1 which has no band.
+  CORRECTION TO MY OWN CLAIM THIS ROUND: measured on the 66 naming-truth
+  samples the chain looked 65/66; measured over the same window at full
+  frame rate it is 143/366. The truth samples are ~1/sec on settled
+  moments - a fine yardstick, a biased survey - and I stated the 65/66 as
+  if it described the engine. Same trap as the round-49 survey.

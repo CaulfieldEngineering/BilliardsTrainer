@@ -101,5 +101,7 @@
    "source": "palette-round60-by-eye"
   }
  },
- "_revised_round63": "13 -> 9; the stripe's band belongs to this table's 1."
+ "_revised_round63": "13 -> 9; the stripe's band belongs to this table's 1.",
+ "stripe_bar": 0.173,
+ "_stripe_bar_note": "COLD (session-20260823-185550). Midpoint of that table's measured gap: solids reach 0.110, the stripe starts at 0.236, measured per detection over 936 naming-truth sightings in round 65. The bench's 0.352 would reject this stripe on nearly every frame - the bar does not travel."
 }

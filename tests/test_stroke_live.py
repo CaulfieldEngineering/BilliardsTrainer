@@ -172,6 +172,79 @@ class TestStripeRepairPromotionOnly:
         FindIdEnsemble._fix_stripe_bit(img, F)
         assert F.number == 9 and F.cls == BallClass.STRIPE
 
+    def test_engine_and_live_path_share_one_repair(self):
+        """Round 65: they did not, and nobody noticed for the whole campaign.
+
+        The live path repaired the stripe bit AND the colour; the offline
+        engine called the colour half only, so _fix_stripe_bit had never
+        run on a recorded clip - every published scorecard was measured
+        with half the repair missing. Both callers must go through the
+        one entry point.
+        """
+        import inspect
+
+        from billiards_trainer.detector_strategies import ensemble as ens
+        from billiards_trainer.measure import engine as eng
+        for mod, name in ((eng, "engine"), (ens, "ensemble")):
+            src = inspect.getsource(mod)
+            assert "repair_identity" in src, f"{name} bypasses the repair"
+        pair = [ln.split("#")[0] for ln in
+                inspect.getsource(eng._pair_identities).splitlines()]
+        assert not any("_fix_colour" in ln or "_fix_stripe_bit" in ln
+                       for ln in pair), (
+            "the engine reaches past repair_identity into half of it")
+
+    def test_missing_reference_does_not_protect_a_stripe_claim(self):
+        """Round 65: it did, and 330 frames answered to an invented 13.
+
+        _fix_stripe_colour bailed the moment the CLAIM's base had no
+        reference on this table, so on a table with no 5 the name "13"
+        could not be challenged by anything. _fix_colour bought this
+        lesson in round 34; the second copy never learned it.
+        """
+        import inspect
+
+        from billiards_trainer.detector_strategies.ensemble import FindIdEnsemble
+        src = inspect.getsource(FindIdEnsemble._fix_stripe_colour)
+        head, _, tail = src.partition("claimed_d is None")
+        assert tail, "the no-reference branch vanished"
+        body = tail.split("m = measured_identity")[0]
+        assert "measured_identity" in body, (
+            "a claim whose base has no reference is unchallengeable again")
+
+    def test_stripe_bar_is_per_table_and_fails_closed(self):
+        """The bar is a per-table fact, measured; absent one, abstain.
+
+        Per detection over both clips' naming truth the distributions
+        overlap ACROSS tables - bench solids reach 0.340 while the cold
+        stripe falls to 0.236 - so one constant cannot serve both, and
+        the bench's 0.352 would reject the cold stripe outright.
+        """
+        import numpy as np
+
+        from billiards_trainer.core import balls
+
+        old = balls._SESSION_REFS
+        try:
+            balls.use_session_refs(None)
+            bench = balls.session_stripe_bar()
+            balls.use_session_refs("session-20260823-185550.mp4")
+            cold = balls.session_stripe_bar()
+            assert bench is not None and cold is not None
+            assert bench != cold, "one bar cannot serve two tables"
+            assert cold < 0.236 < bench, (
+                "each bar must sit in ITS OWN table's measured gap")
+            # fail closed: no measured bar means no promotion, ever
+            img = np.full((60, 60, 3), 250, np.uint8)   # all-white crop
+            assert balls.stripe_reading(img, stripe_above=None) is not True \
+                or balls.session_stripe_bar() is not None
+            balls._SESSION_REFS = None
+            balls._MEASURED_REFS = None
+            assert balls.stripe_reading(img, stripe_above=1.1) is not True
+        finally:
+            balls._SESSION_REFS = old
+            balls._MEASURED_REFS = None
+
     def test_never_demotes_a_stripe_claim(self):
         import numpy as np
 

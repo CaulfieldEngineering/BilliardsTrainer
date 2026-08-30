@@ -45,10 +45,10 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T12:28Z
+    written        2026-08-30T13:41Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
-    measured       2026-08-30T12:03Z
+    measured       2026-08-30T13:36Z
     shot list      12 entries (10 strokes, 4 makes)
 
 Run `python tools/scorecard.py` for the full card; that is the
@@ -57,72 +57,88 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 63
+### NEXT TARGETS (top first) — round 65
 
-*** THE COLD CLIP NOW PASSES EVERY SHOT AND NAMING TARGET ***
-                          bench        cold
-    strokes found         10/10        9/9
-    outcomes right        10/10        9/9
-    pots to right ball      4/4        5/5
-    fake / unexplained      0/0        0/0
-    naming                99.6%       97.5%   (target 95 - PASSES)
-    of ALL checks         99.0%       97.3%   (target 95 - PASSES)
-    Still short: cold cue named 95.3% (target 99), invented [13] over
-    151 frames, gate 0.37 (limit 0.55).
+*** THE STRIPE REPAIR HAD NEVER RUN ON A RECORDED CLIP ***
+    The live path repaired the STRIPE BIT then the COLOUR; the offline
+    engine (_pair_identities) called the colour half ONLY. So
+    _fix_stripe_bit - bought over rounds 27-33 - has never executed on a
+    single clip the campaign has ever scored, and round 64's fix to the
+    stripe reader changed literally nothing because the code it fixed
+    was unreachable. Now ONE entry point, FindIdEnsemble.repair_identity,
+    called by both. Same class as round 48 (sample_colour live-only).
+    THREE separate one-fact-two-owners splits surfaced in this ONE round:
+      1. the repair SEQUENCE      (engine had half of it)
+      2. the stripe WINDOW        (the yardstick has documented the
+         0.95 disc since round 27 - "all 20 labelled 9s read solid"
+         under the inner 62% - while the engine kept the 62%)
+      3. the no-reference RULE    (_fix_colour learned in round 34 that
+         absence of evidence must not protect a claim;
+         _fix_stripe_colour, the second copy, never did)
 
-*** THE YARDSTICK WAS WRONG AGAIN - THE STRIPE IS A 9, NOT A 13 ***
-    Naming went 93.3% -> 97.5% with NO ENGINE CHANGE. My file had been
-    scoring 61 correct engine reads as errors.
-    THE METHODOLOGICAL ERROR, worth not repeating: I compared the cold
-    stripe against the BENCH's yellow 9 (G/R 1.008 vs 0.723), decided it
-    was amber, and called it a 13. That is a CROSS-TABLE comparison and
-    it is invalid - under this table's light its own 1 reads amber too
-    (G/R 0.676). Measured WITHIN the table:
-        stripe band -> 10.0 Lab from this table's 1, 98.8 from its 5
-        so by "stripe = solid + 8" it is the 9
-    CONTROL: the identical test on the bench returns 1 -> 9, which is
-    the known answer there. A method that reproduces a known truth is
-    worth more than one that merely sounds right.
-    This is the THIRD time the truth file has been the defect (round 25
-    on the bench, round 58 and now 63 on the cold clip). Colour labels
-    read across tables are the recurring trap.
+*** THE WHITE-FRACTION BAR IS A PER-TABLE FACT, MEASURED ***
+    Per detection over both clips' naming truth (n=1811) the two tables
+    OVERLAP EACH OTHER outright:
+        bench solids max 0.340   bench stripe min 0.364  -> bar 0.352
+        cold  solids max 0.110   cold  stripe min 0.236  -> bar 0.173
+    No constant serves both: the bench's bar rejects the cold stripe on
+    nearly every frame, and the cold bar promotes the bench's red 3 tail
+    frames into an invented 11. The bar now lives with the other
+    per-table appearance facts (this session's colour refs) as
+    `stripe_bar`, and a table with no measured bar ABSTAINS.
 
-0. THE 1/9 PAIR IS THE WHOLE REMAINING NAMING GAP ON THE COLD CLIP.
-    ball 9: 44/66, confused 9->1 x17 and 9->13 x5; everything else is
-    at or near perfect (0:175/175, 1:15/15, 2:38/38, 4:110/111,
-    6:184/184, 7:151/151, 8:183/183).
-    The gold 1 and the 9's band are ~10 Lab apart on this table - the
-    SAME pair the bench spent rounds 27-33 on, where the answer was the
-    stripe bit read from the band (_fix_stripe_bit). Measure what that
-    reader reports for this table's 1 and 9 before changing anything,
-    and use a PER-TABLE bar (round 61: the largest-gap rule classifies
-    every ball correctly on both clips, bench 0.265 / cold 0.245, while
-    the engine's absolute stripe_above=0.48 sits above BOTH real stripes
-    and can therefore only ever abstain).
+                              bench        cold
+    strokes found             10/10        9/9
+    outcomes right            10/10        9/9
+    pots to right ball          4/4        5/5
+    fake / unexplained          0/0        0/0
+    naming            99.6 -> 99.8%   97.5 -> 97.6%
+    of ALL checks     99.0 -> 99.2%   97.3 -> 97.4%
+    invented              none/none   151 -> 330 frames   <-- REGRESSION
 
-1. INVENTED [13] OVER 151 FRAMES on the cold clip - the engine sometimes
-    says 13 where the ball is the 9. Same pair, other direction.
+0. *** THE TRACKER PUBLISHES A NAME 2% OF THE EVIDENCE SUPPORTS. ***
+    This is the real defect and it is NOT naming. Dense sweep of the
+    cold clip's 176-196s window, 366 sightings of the stripe's track:
+        what the TRACK publishes :  13 x330,  9 x36
+        what the CHAIN returns   :   9 x143,  1 x130,  5 x85,  13 x8
+    The track shows 13 on 330 frames while the per-frame evidence
+    supports 13 on EIGHT of 366, against a plurality of 9. Whatever
+    commits a track's name is not taking the majority of its reads.
+    Fixing the naming chain cannot help this ball until that is fixed -
+    and it is why this round's chain repairs moved the error from
+    "9->1 x17" to "9->13 x11" rather than removing it. START HERE.
 
-2. CUE BALL NAMED 95.3% ON THE COLD CLIP (target 99) while the naming
+1. AND A WARNING ABOUT MY OWN METHOD, bought this round: measured on the
+    66 naming-truth samples the chain looked near-perfect (65/66 -> 9).
+    Measured over the SAME window at full frame rate it returns 9 on
+    143/366. The truth samples are ~1/sec and sit on settled, clean
+    moments; they are a fine YARDSTICK and a badly biased SURVEY. I
+    stated the 65/66 as if it described the engine's behaviour and it
+    did not. Same trap as the round-49 survey of already-matched pairs.
+    Any per-frame claim must be measured per frame.
+
+2. INVENTED [13] 330 FRAMES on the cold clip (was 151) - a REGRESSION
+    this round, and a symptom of target 0 rather than of naming. Kept
+    rather than reverted because the pinned bench improved on every
+    metric (99.6->99.8, wrong 3->2, unnamed 1->0, still zero invented)
+    and because reverting hides the tracker defect instead of fixing it.
+    If Joe would rather see a duplicate real name than an invented one,
+    revert the engine wiring and the bench gives back 0.2%.
+
+3. CUE BALL NAMED 95.4% ON THE COLD CLIP (target 99) while the naming
     truth scores the cue 175/175 - a TRACKING gap, not naming, because
-    the cue metric demands a LIVE sighting every frame. Measure where
-    the cue's label rides a coast.
+    the cue metric demands a LIVE sighting every frame. Same family as
+    target 0: measure where the cue's label rides a coast.
 
-3. THE PALETTE'S 1/3/5 ROWS still carry the independence caveat from
-    round 62, though round 63's within-table ordering test now supports
-    them: the three warm balls sort 0.676 > 0.313 > 0.000, i.e. yellow,
-    orange, red -> 1, 5, 3, which is the standard set. Re-derive from
-    the pot order if they are ever used to justify a fix.
-
-4. The palette is still hand-labelled and does not scale; the identifier
-    mislabels balls mid-collision (round 55); colour cannot separate
-    gold from white at speed (round 56); the remaining 7 blind checks on
-    the bench; both naming figures in the phone STATUS view; recovered
-    detections lose their name; _locate is ~37% of engine wall time;
-    rebuild_batch.py still drives an OLD build() path (every clip in the
-    library is stale at rules_v 20); events/shot.py is a third shot
-    detector in the live path; delete vision/tracking.py and the
-    MeasurementCore shadow scaffolding.
+4. The palette's 1/3/5 independence caveat; the palette is hand-labelled
+    and does not scale; the identifier mislabels balls mid-collision
+    (round 55); colour cannot separate gold from white at speed (round
+    56); the remaining 7 blind checks on the bench; both naming figures
+    in the phone STATUS view; recovered detections lose their name;
+    _locate is ~37% of engine wall time; rebuild_batch.py still drives an
+    OLD build() path (every clip in the library is stale at rules_v 20);
+    events/shot.py is a third shot detector in the live path; delete
+    vision/tracking.py and the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

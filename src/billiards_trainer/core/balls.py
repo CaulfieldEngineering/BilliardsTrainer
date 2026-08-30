@@ -115,19 +115,57 @@ def _hue_to_base(hue: float, val: float) -> int:
     return best
 
 
-def _inner_disc(patch_bgr, mask):
-    """Boolean selection of the ball's inner 62% — dodges felt and neighbours."""
+def _inner_disc(patch_bgr, mask, frac: float = 0.62):
+    """Boolean selection of the ball's inner `frac` — dodges felt and neighbours.
+
+    62% is right for reading a ball's BODY colour. It is wrong for reading
+    a STRIPE, whose white lives at the poles: see stripe_reading.
+    """
     h, w = patch_bgr.shape[:2]
     if mask is not None and np.any(mask > 0):
         return mask > 0
     yy, xx = np.ogrid[:h, :w]
     cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
-    rr = 0.62 * min(h, w) / 2.0
+    rr = frac * min(h, w) / 2.0
     return (xx - cx) ** 2 + (yy - cy) ** 2 <= rr * rr
 
 
+def session_stripe_bar() -> float | None:
+    """THIS table's white-fraction bar between a solid and a stripe, or None.
+
+    An ABSOLUTE bar cannot travel and round 65 measured why. Per detection,
+    over both clips' naming truth (n = 1811), the two tables' distributions
+    overlap each other outright:
+        bench solids  max 0.340   bench stripe  min 0.364
+        cold  solids  max 0.110   cold  stripe  min 0.236
+    The bench needs a bar near 0.35; a bar that high rejects the cold
+    stripe on nearly every frame, and the cold bar of 0.17 promotes the
+    bench's red 3 on its tail frames into an invented 11. There is no
+    number that serves both, so the bar is a PER-TABLE FACT and lives with
+    the other per-table appearance facts - this session's colour
+    references - as `stripe_bar`, the midpoint of that table's measured
+    gap. FAIL CLOSED: a table with no measured bar abstains rather than
+    guesses, which is what the middle band has been for since round 59.
+    """
+    import json
+    from ..config import APP_DIR
+    order = [APP_DIR / "colour_refs.json", _RECORD_REFS]
+    if _SESSION_REFS is not None:
+        order.insert(0, _SESSION_REFS)
+    for cand in order:
+        try:
+            doc = json.loads(cand.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if "stripe_bar" in doc:
+            return float(doc["stripe_bar"])
+        if doc.get("refs"):
+            return None      # this table's refs are in force and say nothing
+    return None
+
+
 def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
-                   solid_below: float = 0.18, stripe_above: float = 0.48):
+                   solid_below: float = 0.18, stripe_above: float | None = None):
     """Is this crop a STRIPE (True), a SOLID (False), or too close to call (None)?
 
     Deliberately abstains in the middle. The 16-class model gets a ball's HUE
@@ -143,7 +181,20 @@ def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
     """
     if patch_bgr is None or patch_bgr.size == 0:
         return None
-    sel = _inner_disc(patch_bgr, mask)
+    # THE WHOLE BALL, NOT ITS MIDDLE (round 64). This read the inner
+    # 62%, which is where a stripe has NO white - the band crosses the
+    # centre and the white is at the POLES. Measured per ball against
+    # both tables' naming truth:
+    #                       inner 62%        0.95 disc
+    #     bench  9 (STRIPE)     0.081           0.360
+    #     bench  4 (solid)      0.262           0.161
+    #     cold   9 (STRIPE)     0.462           0.385
+    #     cold   solids max     0.118           0.052
+    # Under the old window the bench's STRIPE reads LESS white than a
+    # solid does - the test was inverted there and could never promote.
+    # Over the 0.95 disc both tables agree: every solid sits at or below
+    # 0.161 and both stripes at or above 0.360.
+    sel = _inner_disc(patch_bgr, mask, 0.95)
     if not np.any(sel):
         return None
     hsv = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2HSV)
@@ -170,12 +221,17 @@ def stripe_reading(patch_bgr: np.ndarray, mask: np.ndarray | None = None,
     # confident wrong answer into an ABSTENTION, which is what the middle
     # band is for: "an ambiguous crop never OVERWRITES a model answer
     # that may well be right".
-    # A per-table calibration, or a stripe feature that survives a change
-    # of lighting, is the real fix and is queued.
+    # STRIPE_ABOVE WAS 0.48, above BOTH tables' real stripes (0.360 and
+    # 0.385 on the 0.95 disc), so a stripe could never be confirmed and
+    # _fix_stripe_bit could never promote a misread solid. It is now
+    # THIS TABLE'S measured bar (session_stripe_bar) because round 65
+    # measured that no single number serves both tables; absent one, the
+    # promotion half of this reader abstains outright.
     white_frac = float(np.mean((s < 110) & (v > 170)))
     if white_frac < solid_below:
         return False
-    if white_frac > stripe_above:
+    bar = session_stripe_bar() if stripe_above is None else stripe_above
+    if bar is not None and white_frac > bar:
         return True
     return None
 

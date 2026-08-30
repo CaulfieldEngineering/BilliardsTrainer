@@ -135,8 +135,11 @@ def _pair_identities(found, ident_by_pos, frame_bgr=None) -> None:
                 # has to run here too. It compares the crop against THIS
                 # table's measured colours and only overrules the model
                 # when the claim is far and another number is close.
+                # ONE repair, not the colour half of it (round 65): this
+                # called _fix_colour alone, so the stripe-bit repair ran
+                # only in the live path and never on a recorded clip.
                 from ..detector_strategies.ensemble import FindIdEnsemble
-                FindIdEnsemble._fix_colour(frame_bgr, d)
+                FindIdEnsemble.repair_identity(frame_bgr, d)
 
 
 def _write_shots(writer, times, frames, carried, calib) -> int:

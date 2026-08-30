@@ -1,6 +1,22 @@
 {
  "entries": [
   {
+   "id": 106,
+   "ts": "2026-08-30T13:41:42",
+   "date": "Aug 30, 09:41 AM EDT",
+   "kind": "finding",
+   "title": "A repair that never ran, and a name the evidence does not support",
+   "score": "The stripe repair was live-path only and has never executed on a recorded clip; and the app publishes a ball name that 8 of 366 frames support.",
+   "body": "",
+   "images": [
+    {
+     "src": "journal/106-r65_13s.png",
+     "caption": "Top row: the frames where the app says 13. Middle: where it says 9. Same ball, same orange body and white band, only rotated - so one of those two names is simply wrong. Bottom: the plain orange ball it keeps getting confused with, which has no band at all."
+    }
+   ],
+   "html": "\n<div class='note'>\n<p><strong>A repair I built for your pinned table over six rounds turns out to\nhave never run on a recorded clip in its life. It worked while you were playing\nand was skipped entirely when the app analysed the video afterwards.</strong></p>\n\n<p>The app fixes a ball's name in two steps: correct the stripe-or-solid bit,\nthen correct the colour. The live path did both. The path that analyses a\nrecording did the colour half only - so the stripe half has never executed on a\nsingle clip I have ever measured. Every scorecard in this campaign was taken\nwith half the repair missing, and last round's fix to that exact code changed\nnothing at all, because the code could not be reached.</p>\n\n<pre>\n                     pinned session         new clip\nshots found              10 of 10           9 of 9\nmakes and misses         10 of 10           9 of 9\npots to right ball         4 of 4           5 of 5\nnaming              99.6% -> 99.8%    97.5% -> 97.6%\ninvented numbers        none, still     151 -> 330 frames\n</pre>\n\n<h3>The regression, stated plainly</h3>\n<p>Your pinned table improved on every measure. The new table did not: the app\nnow invents the name \"13\" on 330 frames where it used to on 151. I have kept the\nchange rather than undoing it, and the reason is the next paragraph - but that\nis a real step backwards on that clip and you should see it as one.</p>\n\n<h3>What is actually broken, and it is not naming</h3>\n<p>I followed that ball frame by frame through the twenty seconds where the app\ncalls it a 13:</p>\n<pre>\nwhat the app SHOWS for it     13 on 330 frames,  9 on 36\nwhat the evidence SAYS         9 on 143 frames,  1 on 130,\n                               5 on 85,         13 on EIGHT\n</pre>\n<p>The app is displaying a name that eight frames out of 366 support, and\nignoring the answer that 143 support. Whatever decides a ball's final name is\nnot taking the majority of what it saw. That is the real defect, it sits after\nnaming rather than in it, and no amount of improving the colour reading can\nreach it. It is the top of the queue now.</p>\n\n<h3>And a mistake in my own method</h3>\n<p>Partway through this I measured the naming chain against my reference sheet\nand it looked nearly perfect - 65 of 66. I said so. Then I measured the same\nball over the same seconds at full frame rate and it was right 143 times out of\n366. My reference sheet samples about one frame a second, on settled moments;\nit is a good yardstick and a badly misleading survey. The near-perfect number\ndescribed my sampling, not your app.</p>\n</div>\n<h2>Where the engine stands</h2><table><tr><th>Capability</th><th>Now</th><th>Need</th><th></th></tr><tr><td>Cue ball tracked + named</td><td class='num'>99.9%</td><td class='num'>99%</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Object balls named while moving</td><td class='num'>94.7%</td><td class='num'>95%</td><td class='num'><span class='fail'>not yet</span></td></tr><tr><td>No invented ball numbers</td><td class='num'>none</td><td class='num'>none</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Shots found</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Make/miss calls</td><td class='num'>10/10</td><td class='num'>10/10</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>Pots attributed to the right ball</td><td class='num'>4/4</td><td class='num'>all</td><td class='num'><span class='pass'>PASS</span></td></tr><tr><td>No invented shots</td><td class='num'>0</td><td class='num'>0</td><td class='num'><span class='pass'>PASS</span></td></tr></table><h2>Changes since the last update</h2><ul><li>Round 63: the yardstick was wrong again - the stripe is a 9, and the engine was right</li><li>Round 62: a NameError had been firing on every engine run for eleven rounds</li><li>Round 61: per-session colour references - cold naming 85.7% -&gt; 93.3%, bench unchanged</li><li>Round 60: the cold clip has a naming gate, and both remaining defects share one root</li><li>Round 59: the stripe test is fitted to one table, and no single threshold can fix it</li><li>Round 58: the cold clip&#x27;s truth file was wrong, and one plausible fix was measured and reverted</li><li>Round 57: cold clip outcomes 8/9 -&gt; 9/9. Both clips now perfect at shot level.</li><li>Round 56: a pot recovered, a phantom pot gained - the trade, in full</li><li>Round 55: two balls swapped identities at contact - and the naming model started it</li><li>Round 54: the cold clip broke a bench-tuned threshold - and corrected my own all-clear</li><li>Round 53: the instrument that can see a MISSED shot - and the cold clip missed nothing</li><li>Round 52: first COLD clip - three for three, and it caught a real bug</li></ul>"
+  },
+  {
    "id": 105,
    "ts": "2026-08-30T12:28:20",
    "date": "Aug 30, 08:28 AM EDT",
@@ -1067,16 +1083,6 @@
    "title": "You were right: quick pop-ups go with misses",
    "score": "",
    "body": "Overnight, every shot in the library (1,193 across 35 sessions) got its stroke measured. The pattern you predicted is real: 32% of your misses come with a stay-down under 1 second, versus 16% of your makes - exactly double. Your median hold is also 0.3s shorter on misses (1.27s vs 1.57s). Lifetime Stats now shows medians and quick-exit rates.\nThe averages almost hid this (1.58s vs 1.65s) - the signature is a fat tail of quick exits on misses, so the stats show median and %-under-1-second instead.\nNo shot in the library measured under 0.7s, so your 'pop-ups' are subtle - a 0.9s exit, not a jump. The camera catches what feels invisible.\nEvery shot's Details sheet now carries its own numbers - check a few of your misses against your makes.",
-   "images": []
-  },
-  {
-   "id": 26,
-   "ts": "2026-08-24T12:00:00",
-   "date": "Aug 24, 2026",
-   "kind": "update",
-   "title": "New metric: how long you stay down on the shot",
-   "score": "",
-   "body": "Every shot now gets stroke measurements straight from the camera: how long your cue stays down after contact, your backstroke length, the pause at the top of it, and your practice-stroke count. Misses often come with popping up early - now there's a number for it, and Lifetime Stats compares your average stay-down on makes vs misses.\nVerified frame-by-frame before shipping: 9 of 9 measured shots matched hand-checked ground truth within 0.1 seconds (a tenth shot, where the balls were moved by hand, correctly measured nothing).\nThe shot Details sheet shows a STROKE row: stay-down seconds, an early pop-up warning, pause milliseconds, backstroke length, practice strokes.\nUnder the hood the true strike moment is re-detected from the cue ball's disappearance (the tracker's shot clock runs ~2.4s late), and the cue stick is tracked even when your arm overlaps it.\nThese field names match your Bluetooth cue sensor's - when it's installed, both sources will measure the same things and check each other.",
    "images": []
   }
  ]
