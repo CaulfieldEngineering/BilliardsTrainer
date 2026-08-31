@@ -1,0 +1,236 @@
+{
+ "_note": "REUSED from the BENCH set (session-20260824-220247) for session-20260824-220740, round 89. Same table; the felt reads within 2.3 units of the bench session, and round 87 established that what varies between sessions is the LIGHT. Borrowed, not independently derived.",
+ "_measured": "Balls 0,1,2,3,4,9 were measured on 2026-08-29 from 115 hand-verified crops of the bench table (_train/bench_fix/store, which is NOT in git) using the same glare-trimmed crop the live naming path uses. Regenerate with `tools/build_colour_refs.py --store <store> --write`.",
+ "_inherited": "Balls 5,6,7,8,10-15 below are INHERITED from 2026-08-15 and were never validated - no ball of those numbers is on the bench table. They are kept here as history, NOT installed, because they are measurably harmful: the 10's reference is BGR (236,185,185), a skin tone, and hands and the cue were being named 10 and 8. Round 27 measured 302 -> 56 invented frames when they were dropped. Re-measure them from labelled crops of footage that actually contains those balls before installing any of them.",
+ "refs": {
+  "0": {
+   "bgr": [
+    233.5,
+    253.0,
+    250.0
+   ],
+   "lab": [
+    252.0,
+    124.0,
+    137.0
+   ],
+   "n": 22,
+   "source": "measured-2026-08-29"
+  },
+  "1": {
+   "bgr": [
+    21.5,
+    234.0,
+    247.0
+   ],
+   "lab": [
+    232.0,
+    113.0,
+    216.0
+   ],
+   "n": 16,
+   "source": "measured-2026-08-29"
+  },
+  "2": {
+   "bgr": [
+    239.0,
+    131.0,
+    22.0
+   ],
+   "lab": [
+    140.0,
+    139.0,
+    66.0
+   ],
+   "n": 19,
+   "source": "measured-2026-08-29"
+  },
+  "3": {
+   "bgr": [
+    75.0,
+    26.5,
+    224.5
+   ],
+   "lab": [
+    124.0,
+    200.0,
+    154.0
+   ],
+   "n": 20,
+   "source": "measured-2026-08-29"
+  },
+  "4": {
+   "bgr": [
+    159.0,
+    23.0,
+    53.5
+   ],
+   "lab": [
+    59.0,
+    178.0,
+    61.0
+   ],
+   "n": 18,
+   "source": "measured-2026-08-29"
+  },
+  "9": {
+   "bgr": [
+    52.0,
+    241.0,
+    247.0
+   ],
+   "lab": [
+    237.0,
+    111.0,
+    211.0
+   ],
+   "n": 20,
+   "source": "measured-2026-08-29"
+  }
+ },
+ "inherited_unvalidated": {
+  "5": {
+   "bgr": [
+    44.0,
+    166.0,
+    243.0
+   ],
+   "lab": [
+    189.0,
+    147.0,
+    197.0
+   ],
+   "n": 43,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "6": {
+   "bgr": [
+    128.0,
+    161.0,
+    18.5
+   ],
+   "lab": [
+    151.0,
+    85.0,
+    135.0
+   ],
+   "n": 21,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "7": {
+   "bgr": [
+    30.0,
+    14.0,
+    80.0
+   ],
+   "lab": [
+    41.0,
+    159.0,
+    136.0
+   ],
+   "n": 37,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "8": {
+   "bgr": [
+    39.0,
+    21.0,
+    15.5
+   ],
+   "lab": [
+    18.0,
+    132.0,
+    115.0
+   ],
+   "n": 27,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "10": {
+   "bgr": [
+    236.0,
+    185.0,
+    185.0
+   ],
+   "lab": [
+    196.0,
+    139.0,
+    103.0
+   ],
+   "n": 1,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "11": {
+   "bgr": [
+    244.0,
+    242.5,
+    243.5
+   ],
+   "lab": [
+    244.0,
+    129.0,
+    127.0
+   ],
+   "n": 15,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "12": {
+   "bgr": [
+    185.5,
+    96.0,
+    100.0
+   ],
+   "lab": [
+    115.0,
+    153.0,
+    81.0
+   ],
+   "n": 1,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "13": {
+   "bgr": [
+    141.5,
+    204.0,
+    251.0
+   ],
+   "lab": [
+    216.0,
+    137.0,
+    166.0
+   ],
+   "n": 14,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "14": {
+   "bgr": [
+    153.0,
+    146.0,
+    73.0
+   ],
+   "lab": [
+    144.0,
+    107.0,
+    117.0
+   ],
+   "n": 11,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  },
+  "15": {
+   "bgr": [
+    156.0,
+    149.5,
+    140.5
+   ],
+   "lab": [
+    156.0,
+    126.0,
+    123.0
+   ],
+   "n": 9,
+   "source": "inherited-2026-08-15-UNVALIDATED"
+  }
+ },
+ "stripe_bar": 0.352,
+ "_stripe_bar_note": "BENCH (session-20260824-220247). Midpoint of that table's measured gap: solids reach 0.340 (the red 3's tail), the yellow 9 starts at 0.364, measured per detection over 875 naming-truth sightings in round 65.",
+ "_reused_from": "session-20260824-220247 (global/bench refs)"
+}

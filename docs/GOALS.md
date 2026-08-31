@@ -3762,3 +3762,26 @@ Rounds continue with Joe's visual feedback as the gate.
   pot-order palettes.
   METHOD: when the same action succeeds and fails, find the variable that
   predicts which.
+
+- 2026-08-31 ~04:00 EDT - ROUND 89: THE REUSE RULE HOLDS ON BOTH
+  REFERENCE SETS, AND THE LIBRARY IS TRIAGED. Surveyed every stale
+  session's felt (median of 4 samples - round 87's single frame gave a
+  near-black outlier): 194542 d=3.0 from the cold refs; 220740 d=2.3 and
+  002906 d=4.1 from the bench refs; the other EIGHT all d>=15 and need
+  their own.
+  Re-measured 220740 with the BENCH references - deliberately the other
+  set, so the rule is tested not repeated: naming 82.9 -> 99.2%, numbers
+  0-5/8/9/10 -> 0-4 and 9 (exactly that table's set), INVENTED frames
+  8,546 -> 156, duplicates 0.
+  TWO FOR TWO on different reference sets: 191319 (cold, d=1.0) invented
+  16,640 -> 178; 220740 (bench, d=2.3) 8,546 -> 156. The single failure
+  (142633, d=35.2) is explained by the same number.
+  VISION-CORROBORATED: white cue, red 3, purple 4, blue 2, yellow 9 - the
+  bench set exactly, no phantoms.
+  Still not verified against ground truth (neither session has any), so
+  the claim stays "far fewer self-inconsistencies", not "correct".
+  Both gate clips untouched and passing.
+  NEXT: 194542 (~55 min) as the third confirmation, then commit to
+  002906 - 196 shots, 111 minutes, d=4.1, ~3 hours of GPU and the file
+  behind the weak-cellular worry.
+  METHOD: test a new rule on the other case, not the same one again.

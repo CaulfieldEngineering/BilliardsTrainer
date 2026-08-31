@@ -1,6 +1,6 @@
 {
  "session": "session-20260824-220247.mp4",
- "ts": "2026-08-31T01:16:23Z",
+ "ts": "2026-08-31T02:01:00Z",
  "detected": "10/10",
  "outcome": "10/10",
  "false_strokes": 0,
@@ -16,8 +16,7 @@
    "truth": "pot",
    "ball_truth": 1,
    "ball_engine": 1,
-   "ball_ok": true,
-   "img": "journal/evidence/shot_31_7.jpg"
+   "ball_ok": true
   },
   {
    "strike": 51.5,
@@ -28,8 +27,7 @@
    "truth": "pot",
    "ball_truth": 2,
    "ball_engine": 2,
-   "ball_ok": true,
-   "img": "journal/evidence/shot_51_5.jpg"
+   "ball_ok": true
   },
   {
    "strike": 68.8,
@@ -37,8 +35,7 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot",
-   "img": "journal/evidence/shot_68_8.jpg"
+   "truth": "no pot"
   },
   {
    "strike": 85.1,
@@ -49,8 +46,7 @@
    "truth": "pot",
    "ball_truth": 3,
    "ball_engine": 3,
-   "ball_ok": true,
-   "img": "journal/evidence/shot_85_1.jpg"
+   "ball_ok": true
   },
   {
    "strike": 101.0,
@@ -58,8 +54,7 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot",
-   "img": "journal/evidence/shot_101_0.jpg"
+   "truth": "no pot"
   },
   {
    "strike": 130.2,
@@ -67,8 +62,7 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot",
-   "img": "journal/evidence/shot_130_2.jpg"
+   "truth": "no pot"
   },
   {
    "strike": 154.2,
@@ -76,8 +70,7 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot",
-   "img": "journal/evidence/shot_154_2.jpg"
+   "truth": "no pot"
   },
   {
    "strike": 170.6,
@@ -88,8 +81,7 @@
    "truth": "pot",
    "ball_truth": 1,
    "ball_engine": 1,
-   "ball_ok": true,
-   "img": "journal/evidence/shot_170_6.jpg"
+   "ball_ok": true
   },
   {
    "strike": 189.8,
@@ -97,8 +89,7 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot",
-   "img": "journal/evidence/shot_189_8.jpg"
+   "truth": "no pot"
   },
   {
    "strike": 208.0,
@@ -106,8 +97,7 @@
    "found": true,
    "outcome_ok": true,
    "engine": "no pot",
-   "truth": "no pot",
-   "img": "journal/evidence/shot_208_0.jpg"
+   "truth": "no pot"
   }
  ],
  "caps": {

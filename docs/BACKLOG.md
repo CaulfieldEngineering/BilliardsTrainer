@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-31T01:19Z
+    written        2026-08-31T02:02Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,60 +57,54 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 88
+### NEXT TARGETS (top first) — round 89
 
-*** REFERENCE REUSE WORKS WHEN THE LIGHTING MATCHES ***
-    Round 87 established that Joe has ONE table and what varies between
-    sessions is the light, and gave a cheap criterion: the felt's green
-    reading at mid-table. session-20260823-191319 reads G=166 against the
-    cold clip's 165 - a one-unit match - so it got the cold clip's
-    references and a re-measure.
+*** THE REUSE RULE HOLDS ON BOTH REFERENCE SETS, AND THE LIBRARY IS NOW
+    TRIAGED ***
+    Surveyed every stale session's felt (median of 4 samples, not the one
+    frame round 87 used - that gave a near-black outlier) against the two
+    sessions that HAVE references:
+        reuse the cold refs   194542  d=3.0
+        reuse the bench refs  220740  d=2.3    002906  d=4.1
+        need their own        8 sessions, all d>=15
+    Then re-measured 220740 with the BENCH references - deliberately the
+    other reference set, so the rule is tested rather than repeated:
                                   BEFORE (stale)   AFTER
-        naming coverage               87.2%        96.9%
-        numbers seen               0-11 and 15     0-9 (+13 x1, 14 x177)
-        INVENTED frames              16,640          178
+        naming coverage               82.9%        99.2%
+        numbers seen            0-5, 8, 9, 10      0-4 and 9
+        INVENTED frames               8,546          156
         duplicate names                   -            0
-    The stale engine was showing a phantom "10" on 15,453 frames - 76% of
-    that session - and it is gone. Invented frames fall 99%.
-    VISION-CORROBORATED: two frames rendered with every name drawn; the
-    green 6, blue 2, red 3, yellow 9 and the two dark balls all read
-    sensibly, no 10 anywhere, and zero duplicate names across all 20,365
-    frames.
-    THE CONTRAST WITH ROUND 86 IS THE POINT. There, 142633 got the same
-    treatment and failed: it has NO close lighting match (G=230, R=132
-    against the cold clip's 165/55 and the bench's 228/97), the invented
-    numbers survived, and two reference sets gave wildly different
-    answers on the same footage. Same action, opposite result, and the
-    felt reading predicted which was which. That is a criterion, not a
-    hope.
-    KEPT, with the borrowed provenance recorded in the refs file so it is
-    never mistaken for an independently derived palette. STILL NOT
-    VERIFIED AGAINST GROUND TRUTH - that session has none - so the claim
-    is precisely "far fewer self-inconsistencies", not "correct".
+    The bench table holds 0,1,2,3,4,9 and the AFTER set is exactly that.
+    The stale run's phantom 5, 8 and 10 are gone.
+    TWO FOR TWO, on different reference sets:
+        191319  cold refs,  d=1.0   invented 16,640 -> 178
+        220740  bench refs, d=2.3   invented  8,546 -> 156
+    and the one failure (142633, d=35.2) is explained by the same number.
+    VISION-CORROBORATED: white cue, red 3, purple 4, blue 2, yellow 9 -
+    the bench set exactly, no phantoms in either rendered frame.
+    Still not verified against ground truth (neither session has any), so
+    the claim remains "far fewer self-inconsistencies", not "correct".
 
-0. EXTEND THE REUSE TO THE OTHER TWO MATCHES. 194542 reads G=167 (delta
-    2 from the cold clip) and 220740 G=227 (delta 1 from the bench).
-    Same recipe, and each is a bigger clip - 36 and 24 minutes - so
-    budget ~55 and ~37 minutes of GPU. If both improve like 191319 did,
-    five of the fourteen stale sessions are repaired without any new
-    hand-labelling and the remaining nine are the ones that genuinely
-    need their own palettes.
+0. session-20260826-002906 IS THE BIG ONE: 196 shots, 111 minutes, and
+    d=4.1 from the bench references. It is also the file behind the
+    weak-cellular worry (1,962 KB of dense trails). Budget ~3 hours of
+    GPU, which is why it has not been done yet - it needs its own run
+    rather than sharing a round, and the recording guard matters over
+    that span. Do 194542 (d=3.0, ~55 min) first as the third
+    confirmation, then commit to 002906.
 
-1. THE SESSIONS WITH NO LIGHTING MATCH need palettes of their own, by
-    the pot order (rounds 69/83/84). 142633 is the known case. Establish
-    which of the fourteen have a match and which do not before spending
-    GPU on any of them.
+1. THE EIGHT SESSIONS WITH NO LIGHTING MATCH need palettes of their own
+    by the pot order (rounds 69/83/84). They cluster: 163313/165930/
+    005048/005647 sit at d(bench) 15-24, and 142111/142633 at 35. Two
+    palettes might cover all eight if those clusters are internally
+    tight - measure that before deriving anything.
 
 2. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
 
-3. THE PHONE PAYLOAD ON WEAK CELLULAR: 1,962 KB of dense trails on the
-    biggest session, cost-to-pull unmeasured. UNBLOCKED, delivery-side.
+3. THE TWO GATE CLIPS PASS EVERYTHING and were untouched: bench 10/10,
+    10/10, 4/4, naming 99.9% with ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
 
-4. THE TWO GATE CLIPS PASS EVERYTHING and were untouched by this round:
-    bench 10/10, 10/10, 4/4, naming 99.9% with ZERO wrong; cold 9/9,
-    9/9, 5/5, 99.6%.
-
-5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
@@ -127,11 +121,13 @@ queue cannot be told something the measurements disagree with.
     not evidence (83); when a method cannot reach something, say which
     something (84); put a known answer through every new method (85); an
     improvement you cannot check is not an improvement (86); check what
-    your clusters are actually clustering (87); AND WHEN THE SAME ACTION
-    SUCCEEDS AND FAILS, FIND THE VARIABLE THAT PREDICTS WHICH - here it
-    was one number off the felt (88).
+    your clusters are actually clustering (87); when the same action
+    succeeds and fails, find the variable that predicts which (88); AND
+    TEST A NEW RULE ON THE OTHER CASE, NOT THE SAME ONE AGAIN - 220740
+    used the bench refs precisely because 191319 had used the cold's
+    (89).
 
-6. The palette is hand-labelled and does not scale; the identifier
+5. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall
