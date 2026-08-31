@@ -317,3 +317,72 @@ class TestColdPaletteProvenance:
         assert "6, 7 and 8" in note and "never potted" in note, (
             "the limit of the method must stay recorded - the two most "
             "load-bearing references are the two it cannot check")
+
+
+class TestBorrowedRefsStaySignposted:
+    """Three sessions are named from a palette they did not earn.
+
+    Rounds 88, 89 and 90 lent verified colour references to sessions
+    whose felt reads within a couple of units of a verified clip's -
+    the criterion round 87 bought by finding that Joe has ONE table and
+    what varies between sessions is which lamps were on. It works: the
+    frames showing an impossible ball fell 99%, 98% and 98%.
+
+    But a borrowed palette is NOT a derived one. Neither borrower has
+    ground truth, so the honest claim is "far fewer self-contradictions",
+    never "correct". The only thing standing between that distinction
+    and a future round quietly promoting these to evidence is the note
+    inside each file - so the note is a tested artefact, not a comment.
+
+    Round 86 is what the promotion costs: naming 64.7% -> 86.5% on a
+    session with NO lighting match looked like a clean win and was
+    reference-sensitive noise.
+    """
+
+    BORROWED = {
+        "session-20260823-191319": "session-20260823-185550",
+        "session-20260823-194542": "session-20260823-185550",
+        "session-20260824-220740": "session-20260824-220247",
+    }
+
+    def test_every_borrowed_palette_names_its_lender(self):
+        for stem, lender in self.BORROWED.items():
+            p = ROOT / "docs" / f"colour_refs_{stem}.json"
+            assert p.is_file(), f"{p.name} vanished"
+            note = json.loads(p.read_text(encoding="utf-8")).get("_note", "")
+            assert "REUSED" in note, (
+                f"{p.name} no longer declares itself borrowed - it will be "
+                f"read as an independently derived palette")
+            assert lender in note, (
+                f"{p.name} does not say which session it borrowed from; "
+                f"without the lender the justification cannot be rechecked")
+
+    def test_every_borrowed_palette_carries_its_felt_measurement(self):
+        """The felt reading IS the justification, so it is a field, not
+        prose.
+
+        Round 89 wrote "within 2.3 units" into a note with no reading to
+        recheck - which is a sentence, not a criterion. Round 90 measured
+        all three pairs the same way and put the numbers in the files:
+            191319 <- 185550   1.12
+            194542 <- 185550   2.74
+            220740 <- 220247   2.29
+        Round 89's survey found every reusable session at <= 4.1 and
+        every session needing its own palette at >= 15; 8 is the line
+        through that gap.
+        """
+        for stem, lender in self.BORROWED.items():
+            p = ROOT / "docs" / f"colour_refs_{stem}.json"
+            felt = json.loads(p.read_text(encoding="utf-8")).get("_felt")
+            assert felt, (
+                f"{p.name} lost the felt measurement that justifies the "
+                f"loan; round 86 shows what borrowing without one costs")
+            assert felt["lender_session"] == lender
+            assert felt["distance"] < 8.0, (
+                f"{p.name} claims a lighting match at distance "
+                f"{felt['distance']} - past the gap round 89 measured, so "
+                f"this palette describes a different lighting")
+            got = [round(a - b, 1)
+                   for a, b in zip(felt["borrower"], felt["lender"])]
+            assert any(abs(v) <= 8 for v in got), (
+                "the recorded readings do not support the recorded distance")

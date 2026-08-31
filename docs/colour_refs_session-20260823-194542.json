@@ -1,5 +1,5 @@
 {
- "_note": "REUSED from session-20260823-185550 (round 88). Same table, and the felt at mid-table reads G=166 here against 165 there - a one-unit match, which round 87 established is the criterion that matters because what varies between sessions is the LIGHT, not the cloth. Recorded so nobody mistakes this for an independently derived palette: it is a borrowed one, justified by a measured lighting match.",
+ "_note": "REUSED from session-20260823-185550 (round 90). Third and last of the three lighting matches. Measured on the frames: this session's felt reads BGR 224/167/56 against the lender's 223/165/55 - within two units on every channel - while the bench's reads 251/227/96. Round 87 established that Joe has ONE table and what varies between sessions is the light, so a felt match is the criterion for borrowing. Recorded so nobody mistakes this for an independently derived palette: it is a borrowed one, justified by a measured lighting match. The ball set was established by LOOKING - t=47.6s is a nine-ball diamond, so 0-9 and nothing else.",
  "_excluded": "3 and 5 - only 23.3 Lab apart on this table; see the palette's not_scored note.",
  "refs": {
   "8": {
@@ -104,12 +104,11 @@
  "_revised_round63": "13 -> 9; the stripe's band belongs to this table's 1.",
  "stripe_bar": 0.173,
  "_stripe_bar_note": "COLD (session-20260823-185550). Midpoint of that table's measured gap: solids reach 0.110, the stripe starts at 0.236, measured per detection over 936 naming-truth sightings in round 65. The bench's 0.352 would reject this stripe on nearly every frame - the bar does not travel.",
- "_reused_from": "session-20260823-185550",
  "_felt": {
   "borrower": [
-   223.0,
-   165.0,
-   55.0
+   224.5,
+   167.5,
+   56.5
   ],
   "lender": [
    224.0,
@@ -117,7 +116,7 @@
    55.5
   ],
   "lender_session": "session-20260823-185550",
-  "distance": 1.12,
+  "distance": 2.74,
   "method": "median BGR of four 140px patches at mid-bed, sampled at 20/40/60/80% of the clip - four because round 89 found a single frame can land in shadow and read near-black",
   "criterion": "round 89 surveyed the library: every session that reuses well sits at distance <= 4.1, every session that needs its own palette at >= 15. The gap is the criterion; 8 is the line drawn through it."
  }

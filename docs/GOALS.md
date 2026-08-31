@@ -3785,3 +3785,51 @@ Rounds continue with Joe's visual feedback as the gate.
   002906 - 196 shots, 111 minutes, d=4.1, ~3 hours of GPU and the file
   behind the weak-cellular worry.
   METHOD: test a new rule on the other case, not the same one again.
+
+- 2026-08-31 ~00:00 EDT - ROUND 90: THREE FOR THREE, AND THE APP WAS
+  DRAWING 42 BALLS ON A 10-BALL TABLE. session-20260823-194542 was the
+  last of round 89's three lighting matches. Measured on the frames:
+  borrower felt BGR 224/167/56, lender (cold) 224/165/55, distance 2.74;
+  the bench reads 250/227/96.
+  BALL SET ESTABLISHED BY LOOKING before the word "invented" was used
+  (round 80): 18 samples across all 36 minutes are nine-ball diamonds,
+  never more than nine object balls, no fifteen-ball triangle - so 0-9.
+  STALE -> FRESH: naming 81.2 -> 94.4%; frames with an impossible ball
+  47,240 -> 971; the phantom "10" 47,089 frames -> 87; frames claiming
+  MORE balls than exist 11,333 (17.4%) -> 557 (0.9%); busiest frame 42 ->
+  15; duplicates 0; shots 86 -> 102; engine gate 0.23/1k against 0.55.
+  VISION-CORROBORATED at one instant, both panels from the same tool and
+  video: 42 circles mostly over BARE FELT become 10, every one on a real
+  ball. Every track cropped and medianed over +/-1.5s - blue 2, white
+  cue, amber 1, red 3, purple 4, burgundy 7, black 8, gold-stripe 9: all
+  eight names right, the green 6 and orange 5 unnamed. Zero wrong.
+  Still no ground truth here, so the claim stays "far fewer
+  self-contradictions", not "correct".
+  THE CRITERION IS NOW A FIELD, NOT PROSE: all three borrowed refs files
+  carry `_felt` with both readings and the distance (1.12 / 2.74 / 2.29),
+  with two tests enforcing it and a threshold of 8 through round 89's
+  measured gap.
+  CORRECTIONS TO MY OWN ESTIMATES: this clip was budgeted ~55 min and
+  took 87 (12.5 fps over 64,962 frames); 002906 was budgeted ~3 hours and
+  is ~4.4.
+  Both gate clips untouched and passing.
+  NEXT: a track that shows a number its OWN reads voted against (id254
+  shows 15 x108 while reading 7 x88) - round 68's evidence-vs-verdict,
+  and it is on the gate clips too (bench contradicted 24, cold 98), so it
+  can be pinned rather than argued.
+  METHOD: a justification written as prose is not a criterion; the
+  reading has to be in the file where a test can reach it.
+
+- hygiene: clean through 08dcfde, 1 standing note. First incremental
+  pass since the 2026-08-27 baseline (264645e) - 116 code commits, 2,526
+  added source lines, reviewed by the targeted hunt AUTONOMY.md names.
+  The map's three worst families added NOTHING: zero new FramePacket
+  fields, zero time-proximity joins, zero timebase reconciliations, and
+  zero downstream-patch markers. The one L1 hit - tracker._pockets - is a
+  pushed cache with a setter, fed by both callers from calibration, which
+  is the correct shape.
+  STANDING NOTE, pre-existing and already on the backlog: MeasurementCore
+  holds no table geometry at all, so CLAUDE.md's "table truth lives in
+  MeasurementCore" is aspirational. The four real holders are
+  eval/invariants.py, measure/arbitrate.py, measure/tracker.py and
+  vision/pipeline.py. Not a regression; the diff added no new holder.

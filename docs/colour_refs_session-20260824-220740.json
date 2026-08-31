@@ -232,5 +232,21 @@
  },
  "stripe_bar": 0.352,
  "_stripe_bar_note": "BENCH (session-20260824-220247). Midpoint of that table's measured gap: solids reach 0.340 (the red 3's tail), the yellow 9 starts at 0.364, measured per detection over 875 naming-truth sightings in round 65.",
- "_reused_from": "session-20260824-220247 (global/bench refs)"
+ "_reused_from": "session-20260824-220247 (global/bench refs)",
+ "_felt": {
+  "borrower": [
+   251.0,
+   226.0,
+   94.0
+  ],
+  "lender": [
+   250.5,
+   227.0,
+   96.0
+  ],
+  "lender_session": "session-20260824-220247",
+  "distance": 2.29,
+  "method": "median BGR of four 140px patches at mid-bed, sampled at 20/40/60/80% of the clip - four because round 89 found a single frame can land in shadow and read near-black",
+  "criterion": "round 89 surveyed the library: every session that reuses well sits at distance <= 4.1, every session that needs its own palette at >= 15. The gap is the criterion; 8 is the line drawn through it."
+ }
 }

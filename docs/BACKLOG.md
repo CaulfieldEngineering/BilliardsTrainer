@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-31T02:02Z
+    written        2026-08-31T03:48Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,54 +57,90 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 89
+### NEXT TARGETS (top first) — round 90
 
-*** THE REUSE RULE HOLDS ON BOTH REFERENCE SETS, AND THE LIBRARY IS NOW
-    TRIAGED ***
-    Surveyed every stale session's felt (median of 4 samples, not the one
-    frame round 87 used - that gave a near-black outlier) against the two
-    sessions that HAVE references:
-        reuse the cold refs   194542  d=3.0
-        reuse the bench refs  220740  d=2.3    002906  d=4.1
-        need their own        8 sessions, all d>=15
-    Then re-measured 220740 with the BENCH references - deliberately the
-    other reference set, so the rule is tested rather than repeated:
-                                  BEFORE (stale)   AFTER
-        naming coverage               82.9%        99.2%
-        numbers seen            0-5, 8, 9, 10      0-4 and 9
-        INVENTED frames               8,546          156
-        duplicate names                   -            0
-    The bench table holds 0,1,2,3,4,9 and the AFTER set is exactly that.
-    The stale run's phantom 5, 8 and 10 are gone.
-    TWO FOR TWO, on different reference sets:
-        191319  cold refs,  d=1.0   invented 16,640 -> 178
-        220740  bench refs, d=2.3   invented  8,546 -> 156
-    and the one failure (142633, d=35.2) is explained by the same number.
-    VISION-CORROBORATED: white cue, red 3, purple 4, blue 2, yellow 9 -
-    the bench set exactly, no phantoms in either rendered frame.
-    Still not verified against ground truth (neither session has any), so
-    the claim remains "far fewer self-inconsistencies", not "correct".
+*** THREE FOR THREE, AND THE APP WAS DRAWING 42 BALLS ON A 10-BALL
+    TABLE ***
+    session-20260823-194542 was the last of round 89's three lighting
+    matches. Measured on the frames, not from the survey:
+        194542  felt BGR 224 167 56   <- borrower
+        185550  felt BGR 224 165 55   <- lender, distance 2.74
+        220247  felt BGR 250 227 96   <- the bench, plainly brighter
+    BALL SET ESTABLISHED BY LOOKING, before the word "invented" was used
+    (round 80): 18 samples across all 36 minutes show nine-ball diamonds
+    and never more than nine object balls - no fifteen-ball triangle
+    anywhere - so the cloth holds 0-9.
+                                  STALE          FRESH
+        naming coverage           81.2%          94.4%
+        frames w/ impossible ball 47,240           971
+        the phantom "10"          47,089 frames     87
+        frames claiming MORE
+          balls than exist        11,333 (17.4%)   557 (0.9%)
+        busiest frame             42 balls          15
+        duplicate names                0             0
+        shots exported                86           102
+    Engine gate 0.23 impossible/1k against a 0.55 limit.
+    VISION-CORROBORATED at the same instant, both panels from the same
+    tool and video (r90_beforeafter.png): 42 circles, most streaming
+    across BARE FELT, become 10, every one on a real ball. Every track
+    cropped and medianed over +/-1.5s: blue 2, white cue, amber 1, red 3,
+    purple 4, burgundy 7, black 8, gold-stripe 9 - eight names, all
+    right; the green 6 and orange 5 went UNNAMED. Zero wrong, two misses.
+    Still no ground truth on this session, so the claim stays "far fewer
+    self-contradictions", not "correct".
+    THE BORROWING CRITERION IS NOW A CHECKED FIELD, NOT PROSE. Round 89
+    wrote "within 2.3 units" into a note with no reading to recheck -
+    a sentence, not a criterion. All three borrowed files now carry
+    `_felt` with both readings and the distance (1.12 / 2.74 / 2.29),
+    and two tests enforce it, including a threshold of 8 drawn through
+    the gap round 89 measured (reusable <= 4.1, need-own >= 15).
 
-0. session-20260826-002906 IS THE BIG ONE: 196 shots, 111 minutes, and
-    d=4.1 from the bench references. It is also the file behind the
-    weak-cellular worry (1,962 KB of dense trails). Budget ~3 hours of
-    GPU, which is why it has not been done yet - it needs its own run
-    rather than sharing a round, and the recording guard matters over
-    that span. Do 194542 (d=3.0, ~55 min) first as the third
-    confirmation, then commit to 002906.
+0. A TRACK THAT SHOWS A NUMBER ITS OWN READS VOTED AGAINST. The 971
+    residual frames are 58 seconds of 2,166, never more than one bad
+    number at a time, across 19 tracks - and they split into two modes:
+        the identifier reads an impossible digit and the track agrees
+            id281  named 13 x110, its own reads 13 x110
+        the track OVERRULES its own evidence
+            id254  shows 15 x108, reads 7 x88 / 15 x14 / 13 x6
+            id228  shows 14 x51,  reads 6 x44 / 14 x7
+            id83   shows 11 x48,  reads 5 x44 / 11 x4
+    The second is round 68's evidence-vs-verdict and it is FIXABLE with
+    truth we already have: the same defect shows on both gate clips -
+    bench "contradicted 24", cold "contradicted 98" - so a fix can be
+    pinned on the bench instead of argued about on a session with no
+    truth. VOTE_N=9 and HYST_K=5 exist in the tracker; measure why the
+    vote is not flipping these before changing either.
 
-1. THE EIGHT SESSIONS WITH NO LIGHTING MATCH need palettes of their own
-    by the pot order (rounds 69/83/84). They cluster: 163313/165930/
-    005048/005647 sit at d(bench) 15-24, and 142111/142633 at 35. Two
-    palettes might cover all eight if those clusters are internally
-    tight - measure that before deriving anything.
+1. THE BIGGEST SESSION'S SIDECAR DESCRIBES 1.4% OF IT.
+    session-20260826-002906 is 198,950 frames (110.5 min); its sidecar
+    holds 2,750 frames covering 0.0 -> 91.8s. Its shots.json, built by
+    some earlier complete pass, claims 196 shots out to 6,585s. So the
+    per-frame record and the shot list of Joe's longest session disagree
+    about 109 minutes, and everything that reads the sidecar - trails,
+    scrubbing, the debug overlay - has nothing there. This is a bigger
+    defect than its naming score and it was invisible until the library
+    sweep printed durations. Re-measuring costs ~4.4 hours of GPU
+    (198,950 frames at the 12.5 fps this round measured), NOT the ~3
+    hours round 89 guessed.
 
-2. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
+2. THE EIGHT SESSIONS WITH NO LIGHTING MATCH still need palettes of
+    their own by the pot order (rounds 69/83/84). They cluster:
+    163313/165930/005048/005647 at d(bench) 15-24, 142111/142633 at 35.
+    Measure whether those clusters are internally tight before deriving
+    anything - two palettes may cover all eight.
 
-3. THE TWO GATE CLIPS PASS EVERYTHING and were untouched: bench 10/10,
-    10/10, 4/4, naming 99.9% with ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
+3. THIS ROUND MADE ONE PHONE PAYLOAD BIGGER: 194542's shots.json went
+    452 KB -> 1,064 KB with the denser, more accurate trails. Joe is
+    often on weak cellular. The biggest is 002906 at 2,009 KB and the
+    cost-to-pull is still unmeasured. UNBLOCKED, delivery-side.
 
-4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+4. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
+
+5. THE TWO GATE CLIPS PASS EVERYTHING and were untouched: bench 10/10,
+    10/10, 4/4, naming 99.9% with ZERO wrong, 0 invented; cold 9/9, 9/9,
+    5/5, 99.6%, 0 invented.
+
+6. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
@@ -117,23 +153,25 @@ queue cannot be told something the measurements disagree with.
     deserves auditing too (79); check what your control group actually
     contains (80); a statistic about detections is only as good as its
     definition of one (81); a rebuilt object loses every field the
-    constructor is not told about (82); a yardstick nobody has checked is
-    not evidence (83); when a method cannot reach something, say which
-    something (84); put a known answer through every new method (85); an
-    improvement you cannot check is not an improvement (86); check what
-    your clusters are actually clustering (87); when the same action
-    succeeds and fails, find the variable that predicts which (88); AND
-    TEST A NEW RULE ON THE OTHER CASE, NOT THE SAME ONE AGAIN - 220740
-    used the bench refs precisely because 191319 had used the cold's
-    (89).
+    constructor is not told about (82); a yardstick nobody has checked
+    is not evidence (83); when a method cannot reach something, say
+    which something (84); put a known answer through every new method
+    (85); an improvement you cannot check is not an improvement (86);
+    check what your clusters are actually clustering (87); when the same
+    action succeeds and fails, find the variable that predicts which
+    (88); test a new rule on the other case, not the same one again
+    (89); AND A JUSTIFICATION WRITTEN AS PROSE IS NOT A CRITERION - the
+    reading has to be in the file where a test can reach it (90).
 
-5. The palette is hand-labelled and does not scale; the identifier
+7. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall
     time; rebuild_batch.py still drives an OLD build() path; events/
     shot.py is a third shot detector in the live path; delete vision/
-    tracking.py and the MeasurementCore shadow scaffolding.
+    tracking.py and the MeasurementCore shadow scaffolding - round 90's
+    hygiene pass found MeasurementCore holds NO table geometry at all,
+    so "table truth lives in MeasurementCore" is still aspirational.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on
