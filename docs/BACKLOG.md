@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T23:59Z
+    written        2026-08-31T00:23Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,48 +57,48 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 86
+### NEXT TARGETS (top first) — round 87
 
-*** I HAVE BEEN POLISHING TWO CLIPS WHILE FOURTEEN RAN A STALE ENGINE ***
-    CLAUDE.md says "the bench is the pinned session; WHEN IT IS PERFECT,
-    MOVE TO OTHER CLIPS". The bench has been perfect for several rounds
-    and I kept re-examining the same two. Only 2 of 16 sidecars are at
-    rules_v 20; fourteen predate rules versioning entirely.
-    A truth-free sweep (internal consistency only - duplicate names,
-    evidence-vs-verdict contradictions, teleports, naming coverage - no
-    ground truth needed, so it works on ANY clip):
-        current engine, 2 clips   named 98.9%
-        the other 14 clips        named 83.9%   worst 64.3 / 64.7 / 69.2
-        2.5 hours of footage on a stale engine
-    (coast and contra read 0 on the old clips only because those sidecar
-    fields did not exist then - not comparable. Naming coverage is.)
+*** IT IS ONE TABLE. WHAT VARIES IS THE LIGHT. ***
+    Round 86 set the prerequisite as "establish how many TABLES the
+    library contains, then one palette per table". Grouping by
+    calibration geometry and felt colour produced 8 clusters - and the
+    PIXELS say that grouping is wrong. Zooming the same corner across
+    three clusters shows the SAME rail grain, the SAME pocket leather and
+    braid, the SAME diamond sight markers, the SAME rail plate and the
+    SAME carpet. Joe has one table. The clusters are camera pose and
+    lighting.
+    THE CAMPAIGN HAS CALLED THESE "DIFFERENT TABLES" SINCE ROUND 58 and
+    the label was imprecise the whole time. The REASONING was never wrong
+    - round 63's "cross-table comparison is invalid, under this table's
+    light its own 1 reads amber" is about LIGHT, and holds exactly as
+    stated - but the noun was.
+    WHAT ACTUALLY VARIES, measured on the felt at mid-table:
+        the cold clip's group  G = 165 / 166 / 167   (14:55-15:45 local)
+        the bench's group      G = 228 / 227         (18:02-18:07)
+        whole library          G spans 165 to 230, R spans 55 to 132
+    Same cloth. It does not track daylight either - 10:26 is the
+    BRIGHTEST reading and 14:55 the dimmest - so it is which lamps were
+    on, which is a per-SESSION fact.
+    SO MY ROUND-86 PLAN WAS WRONG AND THE ENGINE WAS ALREADY RIGHT:
+    references are keyed per SESSION (use_session_refs), which is the
+    correct shape for a per-lighting fact. "One palette per table" would
+    have been one palette for everything, which is precisely the
+    cross-lighting error round 63 caught.
 
-*** BUT A MASS RE-MEASURE IS THE WRONG MOVE, AND ONE CLIP PROVED IT ***
-    Re-measured session-20260823-142633 (2.2 min, the worst-but-one) with
-    the current engine: naming coverage 64.7% -> 86.5%. A clean win on
-    the face of it. It is not.
-    The engine's own log said why: "no per-session colour references for
-    session-20260823-142633 - using the global set, which may describe a
-    different table". It applied the BENCH's references to another table -
-    round 58's exact failure - and emitted numbers that cannot be on the
-    cloth: a 14 on 112 frames and an 11 on 6.
-    Testing whether it shares the cold clip's table (copying those refs
-    across): the invented numbers SURVIVED (14 x112, 11 x34) and the two
-    reference sets disagreed wildly on the same footage - ball 4 on 680
-    frames vs 2800, ball 8 on 2074 vs 412. Neither answer can be checked,
-    because that clip has no truth.
-    So re-measuring the library would make it LOOK better (86.5% named)
-    while being reference-sensitive and unverifiable. RESTORED the clip
-    to what Joe was actually seeing and deleted the test refs file. The
-    two gate clips are untouched.
-
-0. PER-TABLE COLOUR REFERENCES ARE THE PREREQUISITE FOR EVERYTHING ELSE
-    IN THE LIBRARY. Naming rests on them (round 82: 534 of the cold
-    clip's names, 349 on the two dark balls alone), and 14 of 16 clips
-    have none. FIRST establish HOW MANY TABLES the library actually
-    contains - table geometry and felt colour will group the sessions -
-    then derive one palette per TABLE by the pot order (rounds 69/83/84),
-    not one per session. Only then is a re-measure safe.
+0. TEST REFERENCE REUSE ON THE CLOSEST LIGHTING MATCH. Felt colour gives
+    a cheap, measurable criterion the library did not have:
+        session-20260823-191319  G=166 vs the cold clip's 165  (delta 1)
+        session-20260823-194542  G=167                        (delta 2)
+        session-20260824-220740  G=227 vs the bench's 228      (delta 1)
+    Copy the matching references onto ONE of those, re-measure, and check
+    the truth-free markers (invented numbers, duplicate names,
+    contradictions). Round 86's failure case had NO close match - 142633
+    sits at G=230, R=132, far from either - which is why both reference
+    sets produced invented numbers there. If reuse works at delta<=2,
+    five stale sessions become correctly measurable without any new
+    hand-labelling; if it fails, the reuse idea dies cheaply and the
+    answer is per-session palettes by pot order.
 
 1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
 
@@ -106,8 +106,7 @@ queue cannot be told something the measurements disagree with.
     biggest session, cost-to-pull unmeasured. UNBLOCKED, delivery-side.
 
 3. THE TWO GATE CLIPS PASS EVERYTHING: bench 10/10, 10/10, 4/4, naming
-    99.9% with ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%. Their remaining
-    errors are individually named. Nothing further to win there.
+    99.9% with ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
 
 4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
@@ -124,18 +123,19 @@ queue cannot be told something the measurements disagree with.
     definition of one (81); a rebuilt object loses every field the
     constructor is not told about (82); a yardstick nobody has checked is
     not evidence (83); when a method cannot reach something, say which
-    something (84); put a known answer through every new method (85); AND
-    AN IMPROVEMENT YOU CANNOT CHECK IS NOT AN IMPROVEMENT - 64.7% to
-    86.5% looked like a win and was reference-sensitive noise (86).
+    something (84); put a known answer through every new method (85); an
+    improvement you cannot check is not an improvement (86); AND CHECK
+    WHAT YOUR CLUSTERS ARE ACTUALLY CLUSTERING - eight "tables" were one
+    table under eight lightings, and only looking at the rails settled
+    it (87).
 
-5. The palette is hand-labelled and does not scale (and round 86 is what
-    that costs); the identifier mislabels balls mid-collision (55);
-    colour cannot separate gold from white at speed (56); both naming
-    figures in the phone STATUS view; recovered detections lose their
-    name; _locate is ~37% of engine wall time; rebuild_batch.py still
-    drives an OLD build() path; events/shot.py is a third shot detector
-    in the live path; delete vision/tracking.py and the MeasurementCore
-    shadow scaffolding.
+5. The palette is hand-labelled and does not scale; the identifier
+    mislabels balls mid-collision (55); colour cannot separate gold from
+    white at speed (56); both naming figures in the phone STATUS view;
+    recovered detections lose their name; _locate is ~37% of engine wall
+    time; rebuild_batch.py still drives an OLD build() path; events/
+    shot.py is a third shot detector in the live path; delete vision/
+    tracking.py and the MeasurementCore shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

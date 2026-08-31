@@ -3707,3 +3707,32 @@ Rounds continue with Joe's visual feedback as the gate.
   sessions), then derive one palette per TABLE by the pot order - not one
   per session. Only then is a re-measure safe.
   METHOD: an improvement you cannot check is not an improvement.
+
+- 2026-08-31 ~02:00 EDT - ROUND 87: IT IS ONE TABLE; WHAT VARIES IS THE
+  LIGHT. Round 86's prerequisite was "how many TABLES does the library
+  contain". Grouping by calibration geometry and felt colour gave 8
+  clusters - and the pixels say that grouping is wrong. Zooming the same
+  corner across three clusters shows the SAME rail grain, pocket leather
+  and braid, diamond markers, rail plate and carpet. One table; the
+  clusters are camera pose and lighting.
+  THE CAMPAIGN HAS SAID "different tables" SINCE ROUND 58 and the noun
+  was imprecise the whole time. The reasoning was not: round 63's
+  "cross-table comparison is invalid - under this table's light its own 1
+  reads amber" is about LIGHT and holds exactly as written.
+  MEASURED on the felt at mid-table: the cold clip's group G = 165/166/
+  167 (14:55-15:45 local), the bench's G = 228/227 (18:02-18:07), the
+  library spanning G 165-230 and R 55-132 on the same cloth. Not
+  daylight - 10:26 is the brightest reading and 14:55 the dimmest - so it
+  is which lamps were on, a per-SESSION fact.
+  SO MY ROUND-86 PLAN WAS WRONG AND THE ENGINE WAS ALREADY RIGHT:
+  references are keyed per SESSION (use_session_refs), the correct shape
+  for a per-lighting fact. "One palette per table" would have meant one
+  palette for everything - precisely the cross-lighting error round 63
+  caught.
+  NEXT: felt colour is now a cheap reuse criterion. 191319 (G=166) and
+  194542 (G=167) sit within 1-2 of the cold clip's 165; 220740 (G=227)
+  within 1 of the bench's 228. Copy the matching refs onto one,
+  re-measure, check the truth-free markers. Round 86's failure case had
+  no close match (142633 at G=230, R=132), which is why both reference
+  sets invented numbers there.
+  METHOD: check what your clusters are actually clustering.
