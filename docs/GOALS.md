@@ -3736,3 +3736,29 @@ Rounds continue with Joe's visual feedback as the gate.
   no close match (142633 at G=230, R=132), which is why both reference
   sets invented numbers there.
   METHOD: check what your clusters are actually clustering.
+
+- 2026-08-31 ~03:00 EDT - ROUND 88: REFERENCE REUSE WORKS WHEN THE
+  LIGHTING MATCHES. Round 87 gave the criterion - one table, what varies
+  is the light, and the felt's green reading measures it.
+  session-20260823-191319 reads G=166 against the cold clip's 165, so it
+  got the cold clip's references and a re-measure:
+      naming 87.2 -> 96.9%; numbers 0-11 and 15 -> 0-9 (+13 x1, 14 x177);
+      INVENTED frames 16,640 -> 178; duplicate names 0.
+  The stale engine had been showing a phantom "10" on 15,453 frames - 76%
+  of that session - and it is gone.
+  VISION-CORROBORATED: two frames with every name drawn; green 6, blue 2,
+  red 3, yellow 9 and the two darks all sensible, no 10, no duplicates in
+  20,365 frames.
+  THE CONTRAST WITH ROUND 86 IS THE POINT: 142633 got the same treatment
+  and failed, because it has NO close lighting match (G=230 R=132 against
+  165/55 and 228/97). Same action, opposite result, and the felt reading
+  predicted which. A criterion, not a hope.
+  KEPT, with the borrowed provenance recorded in the refs file. STILL NOT
+  VERIFIED AGAINST GROUND TRUTH - that session has none - so the claim is
+  "far fewer self-inconsistencies", not "correct".
+  Both gate clips untouched and still passing.
+  NEXT: 194542 (G=167) and 220740 (G=227) are the other close matches;
+  ~55 and ~37 min of GPU. Then the sessions with NO match need their own
+  pot-order palettes.
+  METHOD: when the same action succeeds and fails, find the variable that
+  predicts which.

@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-31T00:23Z
+    written        2026-08-31T01:19Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,58 +57,60 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 87
+### NEXT TARGETS (top first) — round 88
 
-*** IT IS ONE TABLE. WHAT VARIES IS THE LIGHT. ***
-    Round 86 set the prerequisite as "establish how many TABLES the
-    library contains, then one palette per table". Grouping by
-    calibration geometry and felt colour produced 8 clusters - and the
-    PIXELS say that grouping is wrong. Zooming the same corner across
-    three clusters shows the SAME rail grain, the SAME pocket leather and
-    braid, the SAME diamond sight markers, the SAME rail plate and the
-    SAME carpet. Joe has one table. The clusters are camera pose and
-    lighting.
-    THE CAMPAIGN HAS CALLED THESE "DIFFERENT TABLES" SINCE ROUND 58 and
-    the label was imprecise the whole time. The REASONING was never wrong
-    - round 63's "cross-table comparison is invalid, under this table's
-    light its own 1 reads amber" is about LIGHT, and holds exactly as
-    stated - but the noun was.
-    WHAT ACTUALLY VARIES, measured on the felt at mid-table:
-        the cold clip's group  G = 165 / 166 / 167   (14:55-15:45 local)
-        the bench's group      G = 228 / 227         (18:02-18:07)
-        whole library          G spans 165 to 230, R spans 55 to 132
-    Same cloth. It does not track daylight either - 10:26 is the
-    BRIGHTEST reading and 14:55 the dimmest - so it is which lamps were
-    on, which is a per-SESSION fact.
-    SO MY ROUND-86 PLAN WAS WRONG AND THE ENGINE WAS ALREADY RIGHT:
-    references are keyed per SESSION (use_session_refs), which is the
-    correct shape for a per-lighting fact. "One palette per table" would
-    have been one palette for everything, which is precisely the
-    cross-lighting error round 63 caught.
+*** REFERENCE REUSE WORKS WHEN THE LIGHTING MATCHES ***
+    Round 87 established that Joe has ONE table and what varies between
+    sessions is the light, and gave a cheap criterion: the felt's green
+    reading at mid-table. session-20260823-191319 reads G=166 against the
+    cold clip's 165 - a one-unit match - so it got the cold clip's
+    references and a re-measure.
+                                  BEFORE (stale)   AFTER
+        naming coverage               87.2%        96.9%
+        numbers seen               0-11 and 15     0-9 (+13 x1, 14 x177)
+        INVENTED frames              16,640          178
+        duplicate names                   -            0
+    The stale engine was showing a phantom "10" on 15,453 frames - 76% of
+    that session - and it is gone. Invented frames fall 99%.
+    VISION-CORROBORATED: two frames rendered with every name drawn; the
+    green 6, blue 2, red 3, yellow 9 and the two dark balls all read
+    sensibly, no 10 anywhere, and zero duplicate names across all 20,365
+    frames.
+    THE CONTRAST WITH ROUND 86 IS THE POINT. There, 142633 got the same
+    treatment and failed: it has NO close lighting match (G=230, R=132
+    against the cold clip's 165/55 and the bench's 228/97), the invented
+    numbers survived, and two reference sets gave wildly different
+    answers on the same footage. Same action, opposite result, and the
+    felt reading predicted which was which. That is a criterion, not a
+    hope.
+    KEPT, with the borrowed provenance recorded in the refs file so it is
+    never mistaken for an independently derived palette. STILL NOT
+    VERIFIED AGAINST GROUND TRUTH - that session has none - so the claim
+    is precisely "far fewer self-inconsistencies", not "correct".
 
-0. TEST REFERENCE REUSE ON THE CLOSEST LIGHTING MATCH. Felt colour gives
-    a cheap, measurable criterion the library did not have:
-        session-20260823-191319  G=166 vs the cold clip's 165  (delta 1)
-        session-20260823-194542  G=167                        (delta 2)
-        session-20260824-220740  G=227 vs the bench's 228      (delta 1)
-    Copy the matching references onto ONE of those, re-measure, and check
-    the truth-free markers (invented numbers, duplicate names,
-    contradictions). Round 86's failure case had NO close match - 142633
-    sits at G=230, R=132, far from either - which is why both reference
-    sets produced invented numbers there. If reuse works at delta<=2,
-    five stale sessions become correctly measurable without any new
-    hand-labelling; if it fails, the reuse idea dies cheaply and the
-    answer is per-session palettes by pot order.
+0. EXTEND THE REUSE TO THE OTHER TWO MATCHES. 194542 reads G=167 (delta
+    2 from the cold clip) and 220740 G=227 (delta 1 from the bench).
+    Same recipe, and each is a bigger clip - 36 and 24 minutes - so
+    budget ~55 and ~37 minutes of GPU. If both improve like 191319 did,
+    five of the fourteen stale sessions are repaired without any new
+    hand-labelling and the remaining nine are the ones that genuinely
+    need their own palettes.
 
-1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
+1. THE SESSIONS WITH NO LIGHTING MATCH need palettes of their own, by
+    the pot order (rounds 69/83/84). 142633 is the known case. Establish
+    which of the fourteen have a match and which do not before spending
+    GPU on any of them.
 
-2. THE PHONE PAYLOAD ON WEAK CELLULAR: 1,962 KB of dense trails on the
+2. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
+
+3. THE PHONE PAYLOAD ON WEAK CELLULAR: 1,962 KB of dense trails on the
     biggest session, cost-to-pull unmeasured. UNBLOCKED, delivery-side.
 
-3. THE TWO GATE CLIPS PASS EVERYTHING: bench 10/10, 10/10, 4/4, naming
-    99.9% with ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%.
+4. THE TWO GATE CLIPS PASS EVERYTHING and were untouched by this round:
+    bench 10/10, 10/10, 4/4, naming 99.9% with ZERO wrong; cold 9/9,
+    9/9, 5/5, 99.6%.
 
-4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
@@ -124,12 +126,12 @@ queue cannot be told something the measurements disagree with.
     constructor is not told about (82); a yardstick nobody has checked is
     not evidence (83); when a method cannot reach something, say which
     something (84); put a known answer through every new method (85); an
-    improvement you cannot check is not an improvement (86); AND CHECK
-    WHAT YOUR CLUSTERS ARE ACTUALLY CLUSTERING - eight "tables" were one
-    table under eight lightings, and only looking at the rails settled
-    it (87).
+    improvement you cannot check is not an improvement (86); check what
+    your clusters are actually clustering (87); AND WHEN THE SAME ACTION
+    SUCCEEDS AND FAILS, FIND THE VARIABLE THAT PREDICTS WHICH - here it
+    was one number off the felt (88).
 
-5. The palette is hand-labelled and does not scale; the identifier
+6. The palette is hand-labelled and does not scale; the identifier
     mislabels balls mid-collision (55); colour cannot separate gold from
     white at speed (56); both naming figures in the phone STATUS view;
     recovered detections lose their name; _locate is ~37% of engine wall

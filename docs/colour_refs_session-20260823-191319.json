@@ -1,0 +1,108 @@
+{
+ "_note": "REUSED from session-20260823-185550 (round 88). Same table, and the felt at mid-table reads G=166 here against 165 there - a one-unit match, which round 87 established is the criterion that matters because what varies between sessions is the LIGHT, not the cloth. Recorded so nobody mistakes this for an independently derived palette: it is a borrowed one, justified by a measured lighting match.",
+ "_excluded": "3 and 5 - only 23.3 Lab apart on this table; see the palette's not_scored note.",
+ "refs": {
+  "8": {
+   "bgr": [
+    24.0,
+    15.0,
+    2.0
+   ],
+   "lab": [
+    10.0,
+    126.0,
+    121.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  },
+  "7": {
+   "bgr": [
+    26.0,
+    14.0,
+    44.0
+   ],
+   "lab": [
+    21.0,
+    145.0,
+    127.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  },
+  "1": {
+   "bgr": [
+    14.0,
+    163.0,
+    241.0
+   ],
+   "lab": [
+    186.0,
+    147.0,
+    203.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  },
+  "2": {
+   "bgr": [
+    175.0,
+    77.0,
+    14.0
+   ],
+   "lab": [
+    89.0,
+    149.0,
+    71.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  },
+  "6": {
+   "bgr": [
+    79.0,
+    97.0,
+    14.0
+   ],
+   "lab": [
+    93.0,
+    100.0,
+    132.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  },
+  "4": {
+   "bgr": [
+    79.0,
+    11.0,
+    23.0
+   ],
+   "lab": [
+    23.0,
+    156.0,
+    89.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  },
+  "9": {
+   "bgr": [
+    32.5,
+    143.5,
+    226.5
+   ],
+   "lab": [
+    170.0,
+    152.0,
+    194.0
+   ],
+   "n": 20,
+   "source": "palette-round60-by-eye"
+  }
+ },
+ "_revised_round63": "13 -> 9; the stripe's band belongs to this table's 1.",
+ "stripe_bar": 0.173,
+ "_stripe_bar_note": "COLD (session-20260823-185550). Midpoint of that table's measured gap: solids reach 0.110, the stripe starts at 0.236, measured per detection over 936 naming-truth sightings in round 65. The bench's 0.352 would reject this stripe on nearly every frame - the bar does not travel.",
+ "_reused_from": "session-20260823-185550"
+}
