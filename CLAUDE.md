@@ -34,12 +34,19 @@ Operational hard rules:
   hourly, not just uptime.
 - Full test suite green BEFORE every commit (pre-push enforces; don't
   make it catch you).
+- Commit at every checkpoint, not just at close-out (Joe, 2026-08-31):
+  data artefact written / source+test green / measurement landed /
+  close-out. Never launch a heavy job over a dirty tree — commit first.
+  See `docs/AUTONOMY.md` §Commit at every checkpoint.
 - Edit tool only for source edits — scripted heredocs corrupted files
   twice.
 - Never restart the app or start heavy jobs while a recording is live
   (`.session-*.part.mp4`) or a session file changed in the last 3 min.
 - One heavy GPU job at a time; heavy jobs are presence-guarded and
-  BelowNormal (see `measure/engine.py` for the pattern).
+  BelowNormal (see `measure/engine.py` for the pattern). Check the
+  PROCESS TABLE, not just the RUNNING marker — the marker is written
+  after the process starts, so "no marker" never means "not running"
+  (incident 2026-08-31).
 - Secrets live in `C:\Users\Joe\.billiards-secrets\` — never in repo,
   logs, or chat.
 - Joe's review verdicts outrank any machine/forensic conclusion.

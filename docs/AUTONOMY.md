@@ -40,6 +40,36 @@ Two scheduled jobs live in the Claude session attached to this repo:
    layering grow under green tests (Joe, 2026-08-27: "The audit you just did is what the hygiene
    watchdog is supposed to be doing every hour").
 
+## Commit at every checkpoint, not just at close-out (Joe, 2026-08-31)
+
+Joe: "Can we make sure we're committing to GitHub frequently." The
+cadence is already ~30-45 commits a day, so the gap is not the average -
+it is the LONG round. Round 90 went 1h46m between commits because it
+contained an 87-minute measurement, and everything it produced sat
+uncommitted behind that job. That is also the window in which round 90's
+rogue second job deleted a sidecar (incident below): the further apart
+the commits, the more a single mishap costs.
+
+So a round commits at each checkpoint it reaches, not once at the end:
+
+1. **Data artefact written** (colour references, truth file, palette,
+   backup taken) — commit BEFORE the long job starts, so the inputs to
+   the measurement are recorded even if the measurement never lands.
+2. **Source change + its pinning test green** — commit before running
+   the measurement it is meant to move. A change and its test belong in
+   one commit; the measurement that judges them does not.
+3. **Measurement landed** — commit the evidence and the numbers.
+4. **Close-out** — BACKLOG, GOALS, journal, heartbeat.
+
+A checkpoint commit still obeys every existing rule: the FULL suite must
+be green first (pre-push enforces it), and the message says what is true
+so far, never what is hoped. A round that is abandoned half-way leaves
+its finished steps on main and its unfinished ones absent - which is the
+honest record, and a better starting point than a lost afternoon.
+
+Corollary: never let a heavy job run over a dirty tree. Commit first,
+then launch. `git status` before every job launch.
+
 ## Hourly dev update (every watchdog run, and after any round)
 
 Joe, 2026-08-28: "let's be sure to include updates hourly or something
@@ -144,6 +174,29 @@ session did. Refreshed at the END of each successful work session.
 
 ## Incident log
 (watchdog appends here)
+- 2026-08-31: TWO HEAVY JOBS RAN AT ONCE on the same video, and the
+  second one's output was later DELETED by the first. Round 90's first
+  launch was malformed; I checked for the RUNNING marker and for python
+  processes, saw neither, and concluded it had failed. It had not - it
+  had started and immediately parked on the presence guard at 0.0s,
+  before writing its marker. So a second job was launched, ran 87
+  minutes, produced the sidecar round 90 reported on, and cleared the
+  marker on its way out. Hours later the first job woke, took the freed
+  marker, and did what every fresh run does first: deleted the sidecar.
+  Joe's shots.json, the colour references and the evidence images were
+  untouched; the sidecar was rebuilt by re-running the identical
+  command.
+  ROOT CAUSE, and it is not the malformed command: the guard is a marker
+  file written AFTER the process starts, so there is a window in which a
+  running job is invisible to it - and I read that silence as proof of
+  failure rather than as absence of evidence.
+  STRUCTURAL FIX: measure.job must refuse to start when a process for
+  the same video already exists, not merely when the marker file does;
+  the marker is a convenience, the process table is the truth. Until
+  that lands, every launch is preceded by a process-table check, and
+  "no marker" is never read as "not running".
+  SECOND FIX: the checkpoint-commit rule above - the damage window was
+  wide because a 1h46m round held all its work uncommitted.
 - 2026-08-27: CHARTER GAP, caught by Joe, not the loop: a week of
   hourly "hygiene" watchdogs verified liveness only (heartbeat, locks,
   champion .bak) because that's all this charter listed — meanwhile
