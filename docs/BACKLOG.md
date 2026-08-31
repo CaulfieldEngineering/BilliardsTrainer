@@ -45,7 +45,7 @@ Claude's vision, not by metrics.
 
 **CURRENT STATE — machine-written, do not hand-edit.**
 
-    written        2026-08-30T23:26Z
+    written        2026-08-30T23:59Z
     bench          session-20260824-220247.mp4
     engine rules_v 20
     measured       2026-08-30T22:14Z
@@ -57,67 +57,59 @@ queue cannot be told something the measurements disagree with.
 
 <!-- CAMPAIGN-STATE:END -->
 
-### NEXT TARGETS (top first) — round 85
+### NEXT TARGETS (top first) — round 86
 
-*** TRIED TO READ THE PRINTED NUMBERS OFF THE BALLS. THE CONTROL FAILED,
-    SO THE METHOD IS REJECTED. ***
-    The cold 6, 7 and 8 are never potted, so round 84's pot-order check
-    cannot reach them - and they are the most load-bearing references on
-    that table (round 82: the 7 and 8 are named ENTIRELY by colour).
-    ATTEMPT 1, and it was a good idea: those balls are MOTIONLESS all
-    clip, so 400 frames each were averaged to cancel sensor noise and
-    compression. The averages are strikingly clean and the colours became
-    unmistakable - but the DIGITS did not resolve. What is visible is the
-    white number CIRCLE, foreshortened onto the ball's upper surface by
-    the overhead camera.
-    THE CONTROL IS WHAT SETTLED IT: ball 2, independently confirmed by
-    its own pot in round 84, does not read as a "2" either. A method that
-    cannot read a ball whose answer is known cannot be trusted on one
-    whose answer is not. Rejected, and recorded so it is not retried as
-    though it were new.
-    ATTEMPT 2, which is what the round actually delivers: the averaged
-    colours are unambiguous and force the assignment ON A STANDARD SET.
-        claimed 6:  L=93  a*=100  strongly GREEN, 85+ Lab from either dark
-        claimed 7:  L=21  a*=145  dark RED
-        claimed 8:  L=10  a*=126  NEUTRAL and darkest
-    The only plausible swap was 7 against 8, and they differ on exactly
-    the right axis - 19 units of red chroma against neutral, and the 8
-    darker. So 6/7/8 move from "by eye, assumption unstated" to
-    "canonical-set, assumption STATED, colours measured, swap risk
-    assessed".
-    THIS IS WEAKER THAN THE POT ORDER AND SAYS SO. It is independent of
-    the APP - which is what round 62's circularity warning was about -
-    but NOT independent of the convention. If Joe ever plays with a
-    non-standard set, these three entries break first. A test guards
-    against anyone re-labelling them pot-order derived.
-    NO ENGINE CODE CHANGED; both clips verified identical.
+*** I HAVE BEEN POLISHING TWO CLIPS WHILE FOURTEEN RAN A STALE ENGINE ***
+    CLAUDE.md says "the bench is the pinned session; WHEN IT IS PERFECT,
+    MOVE TO OTHER CLIPS". The bench has been perfect for several rounds
+    and I kept re-examining the same two. Only 2 of 16 sidecars are at
+    rules_v 20; fourteen predate rules versioning entirely.
+    A truth-free sweep (internal consistency only - duplicate names,
+    evidence-vs-verdict contradictions, teleports, naming coverage - no
+    ground truth needed, so it works on ANY clip):
+        current engine, 2 clips   named 98.9%
+        the other 14 clips        named 83.9%   worst 64.3 / 64.7 / 69.2
+        2.5 hours of footage on a stale engine
+    (coast and contra read 0 on the old clips only because those sidecar
+    fields did not exist then - not comparable. Naming coverage is.)
 
-0. EVERY TRUTH-SIDE ENTRY ON BOTH CLIPS NOW CARRIES ITS PROVENANCE AND
-    ITS LIMIT. Bench: pot-order derived and cross-checked 1082/1082
-    (83). Cold: five balls pot-order confirmed (84), the 1 via the stripe
-    test, three by canonical set with the assumption stated (85). There
-    is no further truth-side work that does not need NEW EVIDENCE -
-    either a non-standard-set clip to test the assumption, or footage
-    where 6/7/8 are potted.
+*** BUT A MASS RE-MEASURE IS THE WRONG MOVE, AND ONE CLIP PROVED IT ***
+    Re-measured session-20260823-142633 (2.2 min, the worst-but-one) with
+    the current engine: naming coverage 64.7% -> 86.5%. A clean win on
+    the face of it. It is not.
+    The engine's own log said why: "no per-session colour references for
+    session-20260823-142633 - using the global set, which may describe a
+    different table". It applied the BENCH's references to another table -
+    round 58's exact failure - and emitted numbers that cannot be on the
+    cloth: a 14 on 112 frames and an 11 on 6.
+    Testing whether it shares the cold clip's table (copying those refs
+    across): the invented numbers SURVIVED (14 x112, 11 x34) and the two
+    reference sets disagreed wildly on the same footage - ball 4 on 680
+    frames vs 2800, ball 8 on 2074 vs 412. Neither answer can be checked,
+    because that clip has no truth.
+    So re-measuring the library would make it LOOK better (86.5% named)
+    while being reference-sensitive and unverifiable. RESTORED the clip
+    to what Joe was actually seeing and deleted the test refs file. The
+    two gate clips are untouched.
 
-1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80): needs genuine hand
-    detections; session-20260802-173553 is not in the library. BLOCKED.
+0. PER-TABLE COLOUR REFERENCES ARE THE PREREQUISITE FOR EVERYTHING ELSE
+    IN THE LIBRARY. Naming rests on them (round 82: 534 of the cold
+    clip's names, 349 on the two dark balls alone), and 14 of 16 clips
+    have none. FIRST establish HOW MANY TABLES the library actually
+    contains - table geometry and felt colour will group the sessions -
+    then derive one palette per TABLE by the pot order (rounds 69/83/84),
+    not one per session. Only then is a re-measure safe.
 
-2. THE PHONE PAYLOAD ON WEAK CELLULAR: the biggest session's shots.json
-    is 1,962 KB of dense 30fps trails, and the cost to pull it on a bad
-    connection is unmeasured. UNBLOCKED and product-visible, though it is
-    delivery rather than engine.
+1. THE HAND VETO IS BLOCKED ON A CORPUS (round 80). BLOCKED.
 
-3. THE ENGINE'S REMAINING ERRORS ARE INDIVIDUALLY NAMED: bench one
-    unnamed and one blind sighting with ZERO wrong; cold 4 unnamed 5s and
-    one 9->1. Both clips pass every gate. The honest position is that the
-    measurement engine is at the end of what these two clips can teach -
-    NEW FOOTAGE is now worth more than another pass over these.
+2. THE PHONE PAYLOAD ON WEAK CELLULAR: 1,962 KB of dense trails on the
+    biggest session, cost-to-pull unmeasured. UNBLOCKED, delivery-side.
 
-4. tools/phone_view.py (round 74) screenshots the real player; --local
-    serves the working tree so a UI fix is checked BEFORE it ships.
+3. THE TWO GATE CLIPS PASS EVERYTHING: bench 10/10, 10/10, 4/4, naming
+    99.9% with ZERO wrong; cold 9/9, 9/9, 5/5, 99.6%. Their remaining
+    errors are individually named. Nothing further to win there.
 
-5. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
+4. METHOD WARNINGS, all bought: the naming truth samples ~1/sec on
     settled moments - a fine YARDSTICK and a biased SURVEY (65); a
     hypothesis written into this backlog is not a finding but inherits
     the authority of one (67, 72); a truth-side sample can be
@@ -132,16 +124,18 @@ queue cannot be told something the measurements disagree with.
     definition of one (81); a rebuilt object loses every field the
     constructor is not told about (82); a yardstick nobody has checked is
     not evidence (83); when a method cannot reach something, say which
-    something (84); AND PUT A KNOWN ANSWER THROUGH EVERY NEW METHOD - the
-    control is what rejected this round's headline idea (85).
+    something (84); put a known answer through every new method (85); AND
+    AN IMPROVEMENT YOU CANNOT CHECK IS NOT AN IMPROVEMENT - 64.7% to
+    86.5% looked like a win and was reference-sensitive noise (86).
 
-6. The palette is hand-labelled and does not scale; the identifier
-    mislabels balls mid-collision (55); colour cannot separate gold from
-    white at speed (56); both naming figures in the phone STATUS view;
-    recovered detections lose their name; _locate is ~37% of engine wall
-    time; rebuild_batch.py still drives an OLD build() path; events/
-    shot.py is a third shot detector in the live path; delete vision/
-    tracking.py and the MeasurementCore shadow scaffolding.
+5. The palette is hand-labelled and does not scale (and round 86 is what
+    that costs); the identifier mislabels balls mid-collision (55);
+    colour cannot separate gold from white at speed (56); both naming
+    figures in the phone STATUS view; recovered detections lose their
+    name; _locate is ~37% of engine wall time; rebuild_batch.py still
+    drives an OLD build() path; events/shot.py is a third shot detector
+    in the live path; delete vision/tracking.py and the MeasurementCore
+    shadow scaffolding.
 
 CAPABILITY LADDER (Joe, 2026-08-28: "break it up by clip yes but also
 by feature/requirement"). Rungs are ordered so each depends only on

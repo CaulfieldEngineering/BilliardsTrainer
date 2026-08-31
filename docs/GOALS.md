@@ -3681,3 +3681,29 @@ Rounds continue with Joe's visual feedback as the gate.
   NO ENGINE CODE CHANGED; both clips verified identical.
   METHOD: put a known answer through every new method - the control is
   what rejected this round's headline idea.
+
+- 2026-08-31 ~01:15 EDT - ROUND 86: I HAVE BEEN POLISHING TWO CLIPS WHILE
+  FOURTEEN RAN A STALE ENGINE - and a mass re-measure turns out to be the
+  wrong move. CLAUDE.md says to move to other clips once the bench is
+  perfect; it has been for several rounds. Only 2 of 16 sidecars are at
+  rules_v 20.
+  TRUTH-FREE SWEEP (internal consistency only - duplicate names,
+  evidence-vs-verdict, teleports, naming coverage - so it works on any
+  clip): current engine 98.9% named across 2 clips, the other 14 at
+  83.9% (worst 64.3 / 64.7 / 69.2), 2.5 hours on a stale engine.
+  RE-MEASURED session-20260823-142633: naming 64.7 -> 86.5%. Looks like a
+  win, is not. The engine's own log: "no per-session colour references
+  for session-20260823-142633 - using the global set, which may describe
+  a different table" - it applied the BENCH's references to another
+  table (round 58's failure) and emitted a 14 on 112 frames and an 11 on
+  6. Lending it the cold clip's refs did NOT fix it (14 x112, 11 x34) and
+  the two reference sets disagreed wildly on the same footage - ball 4 on
+  680 frames vs 2800, ball 8 on 2074 vs 412. Unverifiable either way:
+  that clip has no truth.
+  RESTORED the clip to what Joe was seeing and deleted the test refs
+  file; the two gate clips are untouched and still pass everything.
+  NEXT, and it is the prerequisite for the whole library: establish HOW
+  MANY TABLES it contains (geometry + felt colour will group the
+  sessions), then derive one palette per TABLE by the pot order - not one
+  per session. Only then is a re-measure safe.
+  METHOD: an improvement you cannot check is not an improvement.
