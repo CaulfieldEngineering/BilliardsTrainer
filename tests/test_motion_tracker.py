@@ -532,3 +532,106 @@ class TestACushionBounce:
         past = type("T", (), {"x": 300.0, "y": 1260.0, "radius": 13.0})()
         got = tk._bounced(past)
         assert got is not None and abs(got[1] - 1114.0) < 1e-6, got
+
+
+class TestVelocityIsASpeedNotAnAccumulator:
+    """Track.speed must mean what its readers assume it means.
+
+    Everything downstream reads it - the shot clock, the shot detector's
+    motion bank, the break detector - so it is one number with many
+    consumers, and nothing pinned its behaviour at rest.
+
+    These exist because of a near-miss on 2026-08-31. Chasing Joe's
+    report that the shot clock "false positively restarts as though the
+    cue ball has been struck", the velocity update
+
+        vx = (1 - a) * vx + a * (dx - x + vx * dt) / dt
+
+    was read as an accumulator: algebraically the `+ vx * dt` cancels the
+    decay, leaving `vx + a * step / dt`. It does not, because the loop
+    has ALREADY advanced tr.x by vx*dt and damped vx by FRICTION before
+    this line runs - so (dx - tr.x) is a residual and adding vx*dt back
+    recovers the real displacement. Dropping the term shipped for about
+    ten minutes and under-reported a moving ball by nearly half. The
+    third test below is what caught it.
+    """
+
+    def test_a_resting_ball_reports_no_speed(self):
+        tk = MotionTracker()
+        for i in range(90):                      # three seconds, unmoving
+            rows = _step(tk, [(400.0, 500.0, 16, 5)], i / 30)
+        tr = next(iter(rows.values()))
+        assert tr.speed < 1.0, (
+            f"a ball that never moved reports {tr.speed:.1f} px/s - "
+            f"anything reading this as motion will fire on a still table")
+
+    def test_jitter_does_not_accumulate(self):
+        """Sub-pixel wobble is what a real detector delivers; it must
+        average out rather than pile up."""
+        tk = MotionTracker()
+        for i in range(120):
+            dx = 0.3 if i % 2 else -0.3          # alternating, mean zero
+            rows = _step(tk, [(400.0 + dx, 500.0, 16, 5)], i / 30)
+        tr = next(iter(rows.values()))
+        assert tr.speed < 20.0, (
+            f"alternating +/-0.3px jitter produced {tr.speed:.1f} px/s")
+
+    def test_a_moving_ball_reports_its_real_speed(self):
+        """6 px per frame at 30fps is 180 px/s true. The tracker settles
+        at ~144 because FRICTION damps every prediction step, so the
+        steady state sits deliberately ~20% low - a ball on cloth IS
+        decelerating. The band below accepts that and rejects the two
+        ways to get it wrong: dropping the prediction correction (81.5,
+        the 2026-08-31 near-miss) or losing the signal entirely."""
+        tk = MotionTracker()
+        for i in range(60):
+            rows = _step(tk, [(100.0 + i * 6.0, 500.0, 16, 5)], i / 30)
+        tr = next(iter(rows.values()))
+        assert 120.0 < tr.speed < 200.0, (
+            f"a ball travelling 180 px/s reports {tr.speed:.1f}")
+
+    def test_a_stopped_ball_forgets_that_it_was_moving(self):
+        """The symptom Joe saw: the clock starts when the cue rests, so a
+        ball that has stopped must stop REPORTING motion."""
+        tk = MotionTracker()
+        for i in range(30):                      # rolling
+            _step(tk, [(100.0 + i * 6.0, 500.0, 16, 5)], i / 30)
+        x = 100.0 + 29 * 6.0
+        for i in range(30, 90):                  # then parked for 2s
+            rows = _step(tk, [(x, 500.0, 16, 5)], i / 30)
+        tr = next(iter(rows.values()))
+        assert tr.speed < 20.0, (
+            f"a ball at rest for two seconds still reports {tr.speed:.1f} "
+            f"px/s - the clock will read that as a strike")
+
+
+class TestShotClockThresholdsAreInPixelsPerSecond:
+    """The clock's constants are compared against Track.speed, which is
+    px per SECOND. They were written as px per FRAME.
+
+    Measured on the bench clip once the velocity was fixed: a resting cue
+    reads p90 21 and p99 127; the first second of a real strike reads p50
+    292. The thresholds must straddle that gap, and the test states the
+    unit so the next person to tune them cannot repeat the mistake.
+    """
+
+    def test_rest_is_below_move_with_a_real_gap(self):
+        from billiards_trainer.workers.controller import PipelineController as C
+        assert C._CUE_REST_SPEED < C._CUE_MOVE_SPEED
+        assert C._CUE_MOVE_SPEED >= 5.0 * C._CUE_REST_SPEED, (
+            "hysteresis too tight - the clock will flicker between "
+            "'at rest' and 'struck', which is what Joe reported")
+
+    def test_the_thresholds_sit_in_the_measured_gap(self):
+        """Measured on the bench by driving the real tracker: a resting
+        cue maxes at 119.6 px/s, a strike's median is 236.7."""
+        from billiards_trainer.workers.controller import PipelineController as C
+        assert 119.6 <= C._CUE_MOVE_SPEED <= 236.7, (
+            "the strike threshold must sit between a resting cue's "
+            "MAXIMUM (119.6 px/s) and a real strike's median (236.7)")
+        assert C._CUE_REST_SPEED >= 1.0, (
+            "px/FRAME values (0.4, 3.0) belong to the bug this replaced")
+        assert not hasattr(C, "_CUE_MOVE_FRAMES"), (
+            "a consecutive-frames guard was tried on 2026-08-31 and scored "
+            "identically to one frame - it is an unmeasured guard, and the "
+            "rule is to subtract rather than keep it just in case")

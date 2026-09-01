@@ -38,7 +38,8 @@ def _drive():
     d._narrator = Narrator()
     d.narration = SimpleNamespace(emit=lambda kind: None)
     # the drive's tuning constants live on the controller class
-    for k in ("_CUE_MOVE_SPEED", "_CUE_STOP_FRAMES", "_CUE_GAP_S"):
+    for k in ("_CUE_MOVE_SPEED", "_CUE_REST_SPEED",
+              "_CUE_STOP_FRAMES", "_CUE_GAP_S"):
         setattr(d, k, getattr(PipelineController, k))
     d.update = PipelineController._update_cue_clock.__get__(d)
     return d
@@ -48,9 +49,17 @@ def _cue(speed):
     return SimpleNamespace(cls=BallClass.CUE, speed=speed)
 
 
+# Track.speed is rectified px per SECOND. Measured on the bench by
+# driving the real tracker (tools/clock_replay.py): a RESTING cue reads
+# p50 0.42 and maxes at 119.6; the first second of a strike reads p50
+# 236.7. These two stand for those populations - the literals here used
+# to be 0.1 and 6-8, which read the same field as px per FRAME.
+STILL, ROLLING = 0.4, 400.0
+
+
 def _rest(d, t0, frames=6, dt=1 / 30):
     for k in range(frames):
-        d.update([_cue(0.1)], t0 + k * dt)
+        d.update([_cue(STILL)], t0 + k * dt)
     return t0 + frames * dt
 
 
@@ -64,7 +73,7 @@ class TestCueClockDrive:
     def test_strike_stops_it(self):
         d = _drive()
         _rest(d, 100.0)
-        d.update([_cue(8.0)], 101.0)      # the strike: cue clearly rolling
+        d.update([_cue(ROLLING)], 101.0)      # the strike: cue clearly rolling
         assert not d._clock.running
 
     def test_expired_clock_cannot_restart_itself(self):
@@ -81,14 +90,14 @@ class TestCueClockDrive:
         assert expired
         assert not d._clock.running, "8s of continued rest must not restart"
         # a real strike re-arms; the next rest starts a fresh turn
-        d.update([_cue(8.0)], t)
+        d.update([_cue(ROLLING)], t)
         _rest(d, t + 0.1)
         assert d._clock.running
 
     def test_ball_in_hand_arms_a_fresh_turn(self):
         d = _drive()
         t = _rest(d, 100.0)
-        d.update([_cue(8.0)], t + 1.0)    # strike (clock stops)
+        d.update([_cue(ROLLING)], t + 1.0)    # strike (clock stops)
         # cue pocketed: absent > 1s, then placed gently (never "rolling")
         d.update([_cue(0.1)], t + 10.0)   # reappears at rest
         _rest(d, t + 10.1)
@@ -150,9 +159,9 @@ class TestPauseResumeAndBreak:
         d._strike_stop_t = -1e9
         d._break_pending = False
         t = _rest(d, 100.0)                   # countdown running
-        d.update([_cue(8.0)], t)              # the BREAK strike
+        d.update([_cue(ROLLING)], t)              # the BREAK strike
         # 6 balls scattering right after the strike
-        scatter = [_cue(6.0)] + [SimpleNamespace(cls=BallClass.SOLID, speed=6.0)
+        scatter = [_cue(ROLLING)] + [SimpleNamespace(cls=BallClass.SOLID, speed=ROLLING)
                                  for _ in range(5)]
         d.update(scatter, t + 0.5)
         assert d._break_pending
@@ -160,7 +169,7 @@ class TestPauseResumeAndBreak:
         assert d._clock.running
         assert d._clock._run_seconds == 77.0  # the after-break length
         # the shot after that is back to normal
-        d.update([_cue(8.0)], t + 20.0)
+        d.update([_cue(ROLLING)], t + 20.0)
         _rest(d, t + 26.0)
         assert d._clock._run_seconds == 30.0
 
@@ -199,12 +208,12 @@ class TestStatusAndVolume:
     def test_countdown_waits_for_all_balls(self):
         # Joe's clarification: "clock resumes when *all balls* come to a rest"
         d = _drive()
-        d.update([_cue(8.0)], 99.0)           # strike re-arms
-        roller = SimpleNamespace(cls=BallClass.SOLID, speed=6.0, active=True)
+        d.update([_cue(ROLLING)], 99.0)           # strike re-arms
+        roller = SimpleNamespace(cls=BallClass.SOLID, speed=ROLLING, active=True)
         for k in range(12):                   # cue rests; the 9 still rolls
             d.update([_cue(0.1), roller], 100.0 + k / 30)
         assert not d._clock.running, "a rolling object ball must hold the clock"
-        settled = SimpleNamespace(cls=BallClass.SOLID, speed=0.1, active=True)
+        settled = SimpleNamespace(cls=BallClass.SOLID, speed=STILL, active=True)
         _rest(d, 101.0, frames=6)
         d.update([_cue(0.1), settled], 101.3)
         _rest(d, 101.4)

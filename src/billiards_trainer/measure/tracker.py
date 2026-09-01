@@ -523,6 +523,17 @@ class MotionTracker:
             dt = max(1e-3, t - tr.t)
             if tr.misses == 0.0:            # velocity from real consecutive fixes
                 a = min(1.0, dt / 0.2)      # smoothed, not raw single-step
+                # TRIED AND REVERTED, 2026-08-31: the `+ tr.vx * dt` looks
+                # like it cancels the decay - algebraically (1-a)*v +
+                # a*(step + v*dt)/dt is v + a*step/dt, an accumulator. It
+                # is not, because step 1 above has ALREADY advanced tr.x
+                # by vx*dt and damped vx by FRICTION. So (dx - tr.x) is
+                # the residual AFTER prediction, and adding vx*dt back
+                # recovers the real displacement; the decay lives in the
+                # friction damping, not in this line. Dropping the term
+                # measures only the residual and UNDER-reports a moving
+                # ball by more than half (a 180 px/s ball read 81.5).
+                # Caught by test_a_moving_ball_reports_its_real_speed.
                 tr.vx = (1 - a) * tr.vx + a * (dx - tr.x + tr.vx * dt) / dt
                 tr.vy = (1 - a) * tr.vy + a * (dy - tr.y + tr.vy * dt) / dt
             else:                           # re-acquired after coasting

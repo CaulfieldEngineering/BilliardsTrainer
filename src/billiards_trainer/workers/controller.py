@@ -1672,7 +1672,43 @@ class PipelineController(QObject):
     # Cue-ball shot-clock rule (Joe's spec): the countdown starts once the cue
     # ball comes to rest, and the strike stops it — made it in time. The IMU
     # impact (on_cue_impact) is the precise stop; this is the vision side.
-    _CUE_MOVE_SPEED = 3.0   # rectified px/frame — clearly rolling, not jitter
+    # Rectified px per SECOND. Track.speed is hypot(vx, vy) and the
+    # tracker's velocity is a per-second quantity (measure/tracker.py),
+    # so every threshold compared against it is too. These were written
+    # as though it were per FRAME: 3.0 for "struck" and
+    # settings.balls.stop_speed's 0.4 floor for "at rest". Joe watched
+    # the result on 2026-08-31 - "its false positively restarting the
+    # shot clock frequently as though the cue ball has been struck."
+    #
+    # MEASURED on the bench clip by driving the real tracker over the
+    # sidecar (tools/clock_replay.py):
+    #     cue Track.speed      RESTING          in a STRIKE
+    #        p50                  0.42              236.65
+    #        p90                 16.79              766.75
+    #        p99                101.19            1,205.80
+    #        max                119.62            1,305.36
+    # At 3.0, THIRTEEN PERCENT of the samples from a ball sitting still
+    # on the cloth read as a strike - about four false triggers a second.
+    # 150 sits above the resting maximum (119.6) and below the median of
+    # a real strike (236.7): 0.00% of resting samples cross it, 57.7% of
+    # strike samples do, and a strike lasts ~30 samples, so it cannot be
+    # missed. 20 for "at rest" leaves 90.8% of resting samples under it.
+    #
+    # Beware the near-miss: an earlier pass this same day "fixed" the
+    # tracker's velocity update, having derived a resting speed of ~1000
+    # px/s by reproducing that one line WITHOUT the predict-and-damp step
+    # it is written against. The tracker was right; the reconstruction
+    # was not. Numbers here come from the tracker itself for that reason.
+    # Scored on the bench's ten known strokes (tools/clock_replay.py):
+    #     3.0 / 0.4   12 starts, 3 spurious stops, 2 missed, 2 churn
+    #     100 / 20    12 starts, 1 spurious
+    #     150 / 20    11 starts, 10 stops, 0 spurious, 0 missed, 0 churn
+    #     200 / 20    1 churn
+    # A "needs 2 consecutive rolling frames" guard was tried against the
+    # re-acquisition spike and DROPPED: it scored identically to one
+    # frame, so it was an unmeasured guard, and the rule is to subtract.
+    _CUE_MOVE_SPEED = 150.0   # above this, the cue is genuinely rolling
+    _CUE_REST_SPEED = 20.0    # below this, it is sitting still
     _CUE_STOP_FRAMES = 6    # consecutive at-rest frames before "stopped"
     _CUE_GAP_S = 1.0        # cue absent this long = pocketed / ball-in-hand
 
@@ -1704,8 +1740,7 @@ class PipelineController(QObject):
                 if kind:
                     self.narration.emit(kind)
         self._saw_cue_t = t
-        stop_v = max(0.4, float(self._settings.balls.stop_speed))
-        if cue.speed > max(self._CUE_MOVE_SPEED, 2.0 * stop_v):
+        if cue.speed > self._CUE_MOVE_SPEED:
             if self._clock.running:
                 self._clock.stop()      # the strike — player made it in time
                 log.info("shot clock stopped: cue ball moving (made it)")
@@ -1714,13 +1749,13 @@ class PipelineController(QObject):
             self._clock_armed = True    # rolling cue = the next rest is a new turn
             self._cue_still = 0
             return
-        if cue.speed < stop_v:
+        if cue.speed < self._CUE_REST_SPEED:
             # Joe's clarification: the countdown starts when ALL balls come
             # to rest, not just the cue - an object ball still rolling
             # resets the stillness run.
             others_rolling = any(
                 tr.cls != BallClass.CUE and tr.active
-                and tr.speed > max(self._CUE_MOVE_SPEED, 2.0 * stop_v)
+                and tr.speed > self._CUE_MOVE_SPEED
                 for tr in tracks)
             if others_rolling:
                 self._cue_still = 0

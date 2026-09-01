@@ -433,6 +433,12 @@ def test_shot_clock_cue_ball_rules(app):
     def cue(speed):
         return [types.SimpleNamespace(cls=BallClass.CUE, speed=speed)]
 
+    # Track.speed is rectified px per SECOND. Measured on the bench by
+    # driving the real tracker (tools/clock_replay.py, 2026-08-31): a
+    # RESTING cue reads p50 0.42 and maxes at 119.6, a strike's first
+    # second reads p50 236.7. STRIKING stands for the latter; the
+    # literal here used to be 12.0, which read the field as px/frame.
+
     # flow rule: on a non-live source (video playback) the clock NEVER starts
     assert not ctrl._clock_allowed
     for i in range(10):
@@ -453,7 +459,7 @@ def test_shot_clock_cue_ball_rules(app):
     assert ctrl._clock._start_t == started_at
 
     # the strike: a fast cue ball stops the clock = made it in time
-    ctrl._update_cue_clock(cue(12.0), 2.0)
+    ctrl._update_cue_clock(cue(400.0), 2.0)
     assert not ctrl._clock.running
 
     # it comes to rest again -> next turn's countdown starts
