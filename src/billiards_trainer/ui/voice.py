@@ -37,8 +37,27 @@ def _slug(phrase: str) -> str:
     return "".join(c if c.isalnum() else "-" for c in phrase.lower()).strip("-")
 
 
+def _voice_tag() -> str:
+    """Short filename tag for the CURRENT voice.
+
+    The cache was keyed on the phrase alone, so changing _EDGE_VOICE did
+    nothing: ensure() found the existing WAV and returned it, and
+    _at_volume scaled that same file. Joe asked for "a more mature, less
+    yippee voice" on 2026-08-28 and the constant was duly changed to
+    Christopher - but every phrase already on disk stayed Guy, and every
+    volume variant was scaled FROM Guy. Five days later, on 2026-08-31:
+    "bro you're still using this same guy's voice". He was right, and it
+    was literally the same Guy.
+
+    Keying the path on the voice makes a voice change invalidate the
+    cache by construction, so this cannot recur silently.
+    """
+    v = _EDGE_VOICE.split("-")[-1].replace("Neural", "").lower()
+    return v or "voice"
+
+
 def wav_path(phrase: str) -> Path:
-    return VOICE_DIR / f"{_slug(phrase)}.wav"
+    return VOICE_DIR / f"{_slug(phrase)}-{_voice_tag()}.wav"
 
 
 def _render_edge(phrase: str, out: Path) -> bool:

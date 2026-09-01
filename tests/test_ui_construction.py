@@ -570,3 +570,36 @@ def test_camera_dropdown_autosaves_without_save_click(app, tmp_path, monkeypatch
     assert s.source == "1"
     assert s.source_name == "Cam B"
     assert (tmp_path / "settings.json").exists()  # persisted to disk
+
+
+def test_voice_cache_is_keyed_on_the_voice():
+    """Changing the voice must actually change what Joe hears.
+
+    The cache was keyed on the phrase alone, so the 2026-08-28 switch
+    from GuyNeural to ChristopherNeural was inert: ensure() found the
+    existing WAV and returned it, and the volume-scaled copies were
+    scaled from that same file. 143 cached phrases stayed Guy. Joe, five
+    days later: "bro you're still using this same guy's voice."
+
+    A voice change has to invalidate the cache by construction.
+    """
+    from billiards_trainer.ui import voice
+
+    before = voice.wav_path("nine ball in the corner")
+    assert voice._voice_tag() in before.name, (
+        "the cached filename does not mention the voice - a voice change "
+        "will be silently ignored for every phrase already on disk")
+
+    original = voice._EDGE_VOICE
+    try:
+        voice._EDGE_VOICE = "en-US-SomeOtherNeural"
+        after = voice.wav_path("nine ball in the corner")
+    finally:
+        voice._EDGE_VOICE = original
+    assert after != before, (
+        "two different voices resolve to the SAME cache file, so whichever "
+        "rendered first wins forever")
+
+    # the volume-scaled copies derive from the stem, so they inherit the
+    # tag - the bug that made every -v35 file a quieter Guy
+    assert voice._voice_tag() in before.stem
