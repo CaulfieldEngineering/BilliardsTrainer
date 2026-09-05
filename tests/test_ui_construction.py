@@ -603,3 +603,38 @@ def test_voice_cache_is_keyed_on_the_voice():
     # the volume-scaled copies derive from the stem, so they inherit the
     # tag - the bug that made every -v35 file a quieter Guy
     assert voice._voice_tag() in before.stem
+
+
+def test_velocity_arrows_are_debug_only_and_sanely_sized():
+    """Joe, 2026-09-05: "can you hide or otherwise get rid of these giant
+    green arrows?"
+
+    They were drawn unconditionally on the bird's-eye and were wrong
+    twice: both numbers read Track.speed/vx as px per FRAME when they are
+    px per SECOND. The gate of 2.0 fired on resting balls (measured p90
+    16.8, max 119.6) and the length of vx*3 drew three seconds of travel
+    - 1200px on a 676px table at a stroke's speed.
+    """
+    import numpy as np
+    from billiards_trainer.core.types import BallClass, Track
+    from billiards_trainer.vision import overlay
+    from billiards_trainer.core.geometry import TableModel
+
+    assert overlay._ARROW_MIN_SPEED > 119.6, (
+        "the arrow gate must sit above a resting ball's measured maximum "
+        "or still balls sprout arrows")
+    assert overlay._ARROW_SECONDS <= 0.5, (
+        "an arrow longer than half a second of travel runs off the table")
+
+    table = TableModel.from_rect((676, 1271), 8)
+    fast = Track(id=1, x=300.0, y=600.0, radius=13.0, vx=400.0, vy=0.0,
+                 cls=BallClass.SOLID, number=3)
+
+    plain = overlay.render_schematic(table, [fast], show_traj=False,
+                                     show_ids=False, debug=False)
+    dbg = overlay.render_schematic(table, [fast], show_traj=False,
+                                   show_ids=False, debug=True)
+    # the arrow is the only difference, so debug=False must render less ink
+    assert not np.array_equal(plain, dbg), (
+        "debug flag makes no difference - the arrow is not gated")
+    assert int(np.abs(plain.astype(int) - dbg.astype(int)).sum()) > 0

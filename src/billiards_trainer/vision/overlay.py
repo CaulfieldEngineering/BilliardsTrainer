@@ -58,6 +58,21 @@ def ball_color(tr, measured: bool = True) -> tuple[tuple[int, int, int], bool]:
 _SHIFT = 4          # sub-pixel drawing: 1/16th-px precision kills integer snap
 _S = 1 << _SHIFT
 
+# Velocity arrows. Joe, 2026-09-05, on the bird's-eye: "can you hide or
+# otherwise get rid of these giant green arrows?" They were drawn on every
+# view, unconditionally, and were wrong twice over - both numbers read
+# Track.speed/vx as px per FRAME when they are px per SECOND (the same
+# confusion that broke the shot clock on 2026-08-31):
+#   the gate was 2.0, but a ball sitting still on the cloth reads p90 16.8
+#     and maxes at 119.6 - so resting balls sprouted arrows;
+#   the length was vx * 3, i.e. THREE SECONDS of travel, which at a
+#     stroke's 400 px/s is a 1200px arrow across a 676px-wide table.
+# Now: above the measured resting maximum, and a quarter-second long. They
+# are also DEBUG-ONLY on the bird's-eye - the trails already show motion
+# there, so the arrow was redundant in the view Joe actually watches.
+_ARROW_MIN_SPEED = 120.0    # px/s - just above a resting ball's 119.6 max
+_ARROW_SECONDS = 0.25       # arrow length = a quarter-second of travel
+
 
 def _smooth_path(pts: np.ndarray, iterations: int = 2) -> np.ndarray:
     """Chaikin corner-cutting: turns the jagged frame-to-frame tracked path
@@ -142,8 +157,9 @@ def draw_rectified(rect_bgr: np.ndarray, tracks: list[Track], table: TableModel,
         cv2.circle(img, cs, r * _S, color, 2, cv2.LINE_AA, shift=_SHIFT)
         cv2.circle(img, cs, 2 * _S, color, -1, cv2.LINE_AA, shift=_SHIFT)
         # velocity vector
-        if tr.speed > 2.0:
-            tip = (int(tr.x + tr.vx * 3), int(tr.y + tr.vy * 3))
+        if tr.speed > _ARROW_MIN_SPEED:
+            tip = (int(tr.x + tr.vx * _ARROW_SECONDS),
+                   int(tr.y + tr.vy * _ARROW_SECONDS))
             cv2.arrowedLine(img, c, tip, acc, 1, cv2.LINE_AA, tipLength=0.3)
         if show_ids:
             label = _ball_label(tr) or str(tr.id)
@@ -533,8 +549,9 @@ def render_schematic(table: TableModel, tracks: list[Track], accent: str = "#3DD
         _highlight(img, cx, cy, r)
         cv2.circle(img, (int(round(cx * _S)), int(round(cy * _S))), int(round(r * _S)),
                    (16, 15, 14), 1, cv2.LINE_AA, shift=_SHIFT)
-        if tr.speed > 2.0:
-            tip = (int(cx + tr.vx * 3), int(cy + tr.vy * 3))
+        if debug and tr.speed > _ARROW_MIN_SPEED:
+            tip = (int(cx + tr.vx * _ARROW_SECONDS),
+                   int(cy + tr.vy * _ARROW_SECONDS))
             cv2.arrowedLine(img, (int(cx), int(cy)), tip, acc, 2, cv2.LINE_AA, tipLength=0.3)
 
     if debug and diag:
